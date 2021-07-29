@@ -1,0 +1,57 @@
+# (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under AGPL v3.0
+cmake_minimum_required(VERSION 3.9.4)
+
+project(myip VERSION 0.2)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+add_definitions("-D_FILE_OFFSET_BITS=64")
+
+set(CMAKE_BUILD_TYPE Debug)
+
+add_compile_options(-Wall -pedantic)
+
+add_executable(myip
+	arp.cpp
+	font.cpp
+	http.cpp
+	icmp.cpp
+	ip_protocol.cpp
+	ipv4.cpp
+	main.cpp
+	ntp.cpp
+	packet.cpp
+	phys.cpp
+	protocol.cpp
+	stats.cpp
+	tcp.cpp
+	tcp_udp_fw.cpp
+	udp.cpp
+	utils.cpp
+	vnc.cpp
+	)
+
+add_executable(myiptop
+	myiptop.cpp
+	utils.cpp
+	)
+
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads)
+target_link_libraries(myip Threads::Threads)
+target_link_libraries(myiptop Threads::Threads)
+
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+find_package(Threads)
+target_link_libraries(myip Threads::Threads)
+
+target_link_libraries(myip -lrt -rdynamic)
+
+target_link_libraries(myiptop -lrt)
+
+target_compile_options(myip PRIVATE "-Wall")
+
+set(CMAKE_CXX_FLAGS "-O0 -rdynamic")
