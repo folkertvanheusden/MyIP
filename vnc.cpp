@@ -555,7 +555,6 @@ void vnc_thread(void *ts_in)
 		if (vs->state == vs_running_waiting_data_extra) {
 			if (running_cmd == 2) {  // SetEncodings
 				dolog("VNC: Retrieving %d encodings\n", n_encodings);
-				dolog("VNC: Retrieving %d encodings\n", n_encodings);
 
 				uint8_t *encodings_bin = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, n_encodings * 4);
 

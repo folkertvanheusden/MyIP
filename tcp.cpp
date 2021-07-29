@@ -66,6 +66,30 @@ uint16_t tcp_checksum(const std::pair<const uint8_t *, int> src_addr, const std:
 	return checksum;
 }
 
+char *flags_to_str(uint8_t flags)
+{
+	char *out = (char *)calloc(1, 128);
+
+	if (flags & (1 << 7))
+		strcat(out, "CWR,");
+	if (flags & (1 << 6))
+		strcat(out, "ECE,");
+	if (flags & (1 << 5))
+		strcat(out, "URG,");
+	if (flags & (1 << 4))
+		strcat(out, "ACK,");
+	if (flags & (1 << 3))
+		strcat(out, "PSH,");
+	if (flags & (1 << 2))
+		strcat(out, "RST,");
+	if (flags & (1 << 1))
+		strcat(out, "SYN,");
+	if (flags & (1 << 0))
+		strcat(out, "FIN,");
+
+	return out;
+}
+
 tcp::tcp(stats *const s, icmp *const icmp_) : icmp_(icmp_)
 {
 	tcp_packets = s->register_stat("tcp_packets");
@@ -93,7 +117,9 @@ tcp::~tcp()
 
 void tcp::send_segment(const uint64_t session_id, const std::pair<const uint8_t *, int> my_addr, const int my_port, const std::pair<const uint8_t *, int> peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len)
 {
-	dolog("TCP[%012" PRIx64 "]: Sending segment (flags: %02x, ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, ack_to, my_seq_nr ? *my_seq_nr : -1, data_len);
+	char *flag_str = flags_to_str(flags);
+	dolog("TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str, ack_to, my_seq_nr ? *my_seq_nr : -1, data_len);
+	free(flag_str);
 
 	size_t temp_len = 20 + data_len;
 	uint8_t *temp = new uint8_t[temp_len];
@@ -182,9 +208,11 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	auto cb_it = listeners.find(dst_port);
 
 	auto src = pkt->get_src_addr();
-	uint64_t id = src.first[0] | (src.first[1] << 8) | (src.first[2] << 16) | (src.first[3] << 24) | (uint64_t(src_port) << 32);
+	uint64_t id = src.first[0] | (src.first[1] << 8) | (src.first[2] << 16) | uint32_t(src.first[3] << 24) | (uint64_t(src_port) << 32);
 
-	dolog("TCP[%012" PRIx64 "]: packet %d->%d, flags: %02x, their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src_port, dst_port, p[13], their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
+	char *flag_str = flags_to_str(p[13]);
+	dolog("TCP[%012" PRIx64 "]: packet %d->%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src_port, dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
+	free(flag_str);
 
 	dolog("TCP[%012" PRIx64 "]: sessions lock (by TID %d)\n", id, gettid());
 	sessions_lock.lock();
@@ -224,7 +252,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 	tcp_session_t *const cur_session = cur_it->second;
 
-	dolog("TCP[%012" PRIx64 "]: start processing, state: %d\n", cur_session->state_me);
+	dolog("TCP[%012" PRIx64 "]: start processing, state: %d\n", id, cur_session->state_me);
 	cur_session->tlock.lock();
 
 	bool fail = false;
@@ -329,7 +357,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		int n_acked = 0;
 
 		// delete acked
-		while(cur_session->unacked.empty() == false && cur_session->unacked.front().first <= ack_to) {
+		while(cur_session->unacked.empty() == false && cur_session->unacked.front().first <= ack_to) {  // FIXME < ack_to?
+			dolog("TCP[%012" PRIx64 "]: got ack for %zu (%zu)\n", id, cur_session->unacked.front().first, ack_to);
+
 			delete [] cur_session->unacked.front().second.data;
 
 			cur_session->unacked.pop_front();
@@ -564,15 +594,17 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 
 		int q_size = queue_size(ts->unacked);
 
-		if (q_size < 3000) // FIXME tcp window size
+		// FIXME must allocate segment number for each segment
+		if (q_size < 3000) {  // FIXME tcp window size
+			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %lu, myseq: %lu\n", ts->id, ts->their_seq_nr, ts->my_seq_nr);
+
 			send_segment(ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 0, (1 << 4) | (1 << 3) /* ACK, PSH */, ts->their_seq_nr, &ts->my_seq_nr, p, p_len);
+		}
 
 		if (lck) {
 			lck->unlock();
 			delete lck;
 		}
-
-		dolog("segment sent\n");
 	}
 }
 
