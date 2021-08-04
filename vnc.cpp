@@ -59,6 +59,7 @@ struct frame_buffer_t
 
 	int w, h;
 
+        mutable std::mutex fb_lock;
 	uint8_t *buffer;
 
         mutable std::mutex cb_lock;
@@ -116,11 +117,12 @@ void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
 	int len = strlen(text);
 
 	for(int i=0; i<len; i++) {
+		int c = text[i] & 127;
+
 		for(int cy=0; cy<8; cy++) {
 			for(int cx=0; cx<8; cx++) {
 				int o = (cy + y) * fb -> w * 3 + (x + i * 8 + cx) * 3;
 
-				int c = text[i] & 127;
 				uint8_t pixel_value = font_8x8[c][cy][cx];
 
 				fb->buffer[o + 0] = pixel_value;
@@ -143,6 +145,8 @@ void frame_buffer_thread(void *fb_in)
 	uint64_t latest_update = 0;
 
 	for(;;) {  // FIXME terminate if requested
+		// should be locking for these as well
+
 		// increase green
 		assert(x < fb->w);
 		assert(y < fb->h);
@@ -179,6 +183,8 @@ void frame_buffer_thread(void *fb_in)
 		uint64_t now = get_us();
 
 		if (now - latest_update >= 1000000) {  // 1 time per second
+			fb->fb_lock.lock();
+
 			dolog("VNC: %zu FB UPDATE\n", now);
 			latest_update = now;
 
@@ -191,6 +197,8 @@ void frame_buffer_thread(void *fb_in)
 			draw_text(fb, fb->w / 2 - 15 * 8 / 4, fb->h / 2 - 8 / 2, text);
 
 			free(text);
+
+			fb->fb_lock.unlock();
 
 			fb->callback();
 		}
@@ -229,6 +237,8 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 
 	int o = 16;
 
+	fb->fb_lock.lock();
+
 	if (depth == 32) {
 		for(int yo=y; yo<y + h; yo++) {
 			for(int xo=x; xo<x + w; xo++) {
@@ -248,6 +258,8 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 			}
 		}
 	}
+
+	fb->fb_lock.unlock();
 }
 
 bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
