@@ -74,6 +74,8 @@ int main(int argc, char *argv[])
 	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
 	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
+	dolog("*** STARTED ***\n");
+	printf("*** STARTED ***\n");
 	getchar();
 
 	dolog(" *** TERMINATING ***\n");
