@@ -358,7 +358,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		// delete acked
 		while(cur_session->unacked.empty() == false && cur_session->unacked.front().first <= ack_to) {  // FIXME < ack_to?
-			dolog("TCP[%012" PRIx64 "]: got ack for %zu (%zu)\n", id, cur_session->unacked.front().first, ack_to);
+			dolog("TCP[%012" PRIx64 "]: got ack for %u (%u)\n", id, cur_session->unacked.front().first, ack_to);
 
 			delete [] cur_session->unacked.front().second.data;
 
@@ -388,8 +388,10 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		delete_entry = true;
 
-		if (idev)
+		if (idev) {
+			dolog("TCP[%012" PRIx64 "]: sending fail packet\n", id);
 			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, org_len, (1 << 2) | (1 << 4) /* RST, ACK */, their_seq_nr + 1, nullptr, nullptr, 0);
+		}
 	}
 	else {
 		cur_session->last_pkt = get_us();
@@ -435,6 +437,7 @@ void tcp::session_cleaner()
 	set_thread_name("tcp-clnr");
 
 	while(!stop_flag) {
+		dolog("tcp-clnr sleep %d seconds\n", clean_interval);
 		sleep(clean_interval);
 
 		// find t/o'd sessions
@@ -473,8 +476,8 @@ void tcp::session_cleaner()
 		// go through all sessions and find if any has segments to resend
 		sessions_lock.lock();
 
-		dolog("SEND UNACKED FOR %zu SESSIONS sessions_lock.lock TID %d\n", sessions.size(), gettid());
-		for(auto it = sessions.cbegin(); it != sessions.cend();) {
+		dolog("tcp-clnr SEND UNACKED FOR %zu SESSIONS sessions_lock.lock TID %d\n", sessions.size(), gettid());
+		for(auto it = sessions.cbegin(); it != sessions.cend(); it++) {
 			it->second->tlock.lock();
 
 			int n_resend = 0;
@@ -488,7 +491,7 @@ void tcp::session_cleaner()
 					break;
 
 				uint32_t resend_nr = s_it->first;
-				dolog("SEND for seq.nr.: %d\n", resend_nr);
+				dolog("tcp-clnr SEND for seq.nr.: %d\n", resend_nr);
 
 				send_segment(it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, (1 << 4) /* ACK */, it->second->their_seq_nr, &resend_nr, s_it->second.data, s_it->second.len);
 
@@ -501,7 +504,7 @@ void tcp::session_cleaner()
 
 			it->second->tlock.unlock();
 		}
-		dolog("SEND UNACKED klaar %lu, sessions_lock.unlock TID %d\n", get_us(), gettid());
+		dolog("tcp-clnr SEND UNACKED klaar %lu, sessions_lock.unlock TID %d\n", get_us(), gettid());
 
 		sessions_lock.unlock();
 	}
@@ -596,7 +599,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 
 		// FIXME must allocate segment number for each segment
 		if (q_size < 3000) {  // FIXME tcp window size
-			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %lu, myseq: %lu\n", ts->id, ts->their_seq_nr, ts->my_seq_nr);
+			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u\n", ts->id, ts->their_seq_nr, ts->my_seq_nr);
 
 			send_segment(ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 0, (1 << 4) | (1 << 3) /* ACK, PSH */, ts->their_seq_nr, &ts->my_seq_nr, p, p_len);
 		}
