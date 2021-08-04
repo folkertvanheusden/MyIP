@@ -122,7 +122,13 @@ void dolog(const char *fmt, ...)
 	FILE *fh = fopen("/tmp/myip.log", "a+");
 
 	if (fh) {
-		fprintf(fh, "%.6f|%d] ", get_us() / 1000000.0, gettid());
+		uint64_t now = get_us();
+		time_t t_now = now / 1000000;
+		struct tm *tm = localtime(&t_now);
+
+		fprintf(fh, "%04d-%02d-%02d %02d:%02d:%02d.%06u %.6f|%d] ",
+				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, int(now % 1000000),
+				get_us() / 1000000.0, gettid());
 
 		va_start(ap, fmt);
 		(void)vfprintf(fh, fmt, ap);
