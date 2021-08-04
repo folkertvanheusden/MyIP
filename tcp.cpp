@@ -203,7 +203,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 	int header_size = (p[12] >> 4) * 4;
 
-	int org_len = (p[14] << 8) | p[15];
+	int win_size = (p[14] << 8) | p[15];
 
 	auto cb_it = listeners.find(dst_port);
 
@@ -220,13 +220,18 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	auto cur_it = sessions.find(id);
 
 	if (cur_it == sessions.end()) {
-		tcp_session_t *new_session = new tcp_session_t;
+		tcp_session_t *new_session = new tcp_session_t();
 		new_session->state_me = tcp_listen;
 		new_session->last_pkt = get_us();
+
 		get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
+		new_session->last_acked_to = new_session->my_seq_nr;
+
 		new_session->their_seq_nr = their_seq_nr + 1;
 
 		new_session->id = id;
+
+		new_session->window_size = win_size;
 
 		memcpy(new_session->org_src_addr.first, pkt->get_src_addr().first, 4);
 		new_session->org_src_addr.second = pkt->get_src_addr().second;
@@ -252,8 +257,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 	tcp_session_t *const cur_session = cur_it->second;
 
-	dolog("TCP[%012" PRIx64 "]: start processing, state: %d\n", id, cur_session->state_me);
+	dolog("TCP[%012" PRIx64 "]: start processing, state: %d, window size: %d\n", id, cur_session->state_me, win_size);
 	cur_session->tlock.lock();
+
+	// FIXME ask physical layer for max. size of packet and use that unless other send_segment() invocations pushes
+	// data of 512(?) bytes or less
+	cur_it->second->window_size = std::max(1500, win_size);
 
 	bool fail = false;
 	bool delete_entry = false;
@@ -278,7 +287,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				flags |= 1 << 0; // FIN
 
 			if (idev)
-				send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, org_len, flags, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+				send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, flags, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 
 			if (cur_session->state_me == tcp_established)
 				cur_session->state_me = tcp_fin_wait1;
@@ -311,7 +320,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		else {
 			cur_session->state_me = tcp_sync_recv;
 
-			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, org_len, (1 << 1) | (1 << 4) /* SYN, ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 1) | (1 << 4) /* SYN, ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 			cur_session->my_seq_nr++;
 
 			dolog("TCP[%012" PRIx64 "]: SYN/ACK sent\n", id);
@@ -358,7 +367,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		// delete acked
 		while(cur_session->unacked.empty() == false && cur_session->unacked.front().first <= ack_to) {  // FIXME < ack_to?
-			dolog("TCP[%012" PRIx64 "]: got ack for %u (%u)\n", id, cur_session->unacked.front().first, ack_to);
+			dolog("TCP[%012" PRIx64 "]: got ack for %u (ack to: %u, internal id: %lu)\n", id, cur_session->unacked.front().first, ack_to, cur_session->unacked.front().second.internal_id);
 
 			delete [] cur_session->unacked.front().second.data;
 
@@ -367,6 +376,11 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			n_acked++;
 		}
 
+		cur_session->last_acked_to = ack_to;
+
+		if (n_acked)
+			sessions_cv.notify_all();
+
 		dolog("TCP[%012" PRIx64 "]: ACK for %u (%d acked, %zu left)\n", id, ack_to, n_acked, cur_session->unacked.size());
 	}
 
@@ -374,7 +388,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	if (data_len > 0 && fail == false && cur_session) {
 		dolog("TCP[%012" PRIx64 "]: packet len %d, header size: %d, data size: %d\n", id, size, header_size, data_len);
 
-		send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, org_len, (1 << 4) /* ACK */, their_seq_nr + data_len, &cur_session->my_seq_nr, nullptr, 0);
+		send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, their_seq_nr + data_len, &cur_session->my_seq_nr, nullptr, 0);
 
 		if (cb_it->second.new_data(cur_session, pkt, &p[header_size], data_len, cb_it->second.private_data) == false)
 			fail = true;
@@ -390,7 +404,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		if (idev) {
 			dolog("TCP[%012" PRIx64 "]: sending fail packet\n", id);
-			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, org_len, (1 << 2) | (1 << 4) /* RST, ACK */, their_seq_nr + 1, nullptr, nullptr, 0);
+			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 2) | (1 << 4) /* RST, ACK */, their_seq_nr + 1, nullptr, nullptr, 0);
 		}
 	}
 	else {
@@ -438,13 +452,17 @@ void tcp::session_cleaner()
 
 	while(!stop_flag) {
 		dolog("tcp-clnr sleep %d seconds\n", clean_interval);
-		sleep(clean_interval);
+
+		using namespace std::chrono_literals;
+
+		std::unique_lock<std::mutex> lck(sessions_lock);
+		if (pkts_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
+			dolog("tcp-clnr woke-up after ack\n");
 
 		// find t/o'd sessions
 		uint64_t now = get_us();
 
 		dolog("tcp-clnr sessions_lock.lock TID %d\n", gettid());
-		sessions_lock.lock();
 
 		for(auto it = sessions.cbegin(); it != sessions.cend();) {
 			if ((now - it->second->last_pkt) / 1000000 >= session_timeout) {
@@ -470,13 +488,13 @@ void tcp::session_cleaner()
 			}
 		}
 
-		sessions_lock.unlock();
+		lck.unlock();
 		dolog("tcp-clnr sessions_lock.unlock %d\n", gettid());
 
 		// go through all sessions and find if any has segments to resend
-		sessions_lock.lock();
+		lck.lock();
 
-		dolog("tcp-clnr SEND UNACKED FOR %zu SESSIONS sessions_lock.lock TID %d\n", sessions.size(), gettid());
+		dolog("tcp-clnr SEND UNACKED FOR %zu SESSIONS\n", sessions.size());
 		for(auto it = sessions.cbegin(); it != sessions.cend(); it++) {
 			it->second->tlock.lock();
 
@@ -484,16 +502,19 @@ void tcp::session_cleaner()
 
 			now = get_us();
 
-			// find one unacked
-			// FIXME n_resend < 1: only 1 resend at a time?
+			// find unacked
+			dolog("tcp-clnr %zu segments pending for %012" PRIx64 "\n", it->second->unacked.size(), it->second->id);
 			for(auto s_it = it->second->unacked.begin(); s_it != it->second->unacked.end(); s_it++) {
-				if (now - s_it->second.last_sent >= 500000 || n_resend > 1)
+				uint32_t resend_nr = s_it->first;
+
+				if (resend_nr + s_it->second.len > it->second->last_acked_to + it->second->window_size)
 					break;
 
-				uint32_t resend_nr = s_it->first;
-				dolog("tcp-clnr SEND for seq.nr.: %d\n", resend_nr);
+				dolog("tcp-clnr SEND for seq.nr.: %lu, internal id: %lu\n", resend_nr, s_it->second.internal_id);
 
 				send_segment(it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, (1 << 4) /* ACK */, it->second->their_seq_nr, &resend_nr, s_it->second.data, s_it->second.len);
+
+				assert(resend_nr == s_it->first + s_it -> second.len);
 
 				s_it->second.last_sent = now;
 
@@ -504,9 +525,9 @@ void tcp::session_cleaner()
 
 			it->second->tlock.unlock();
 		}
-		dolog("tcp-clnr SEND UNACKED klaar %lu, sessions_lock.unlock TID %d\n", get_us(), gettid());
+		dolog("tcp-clnr SEND UNACKED finished\n");
 
-		sessions_lock.unlock();
+		lck.unlock();
 	}
 }
 
@@ -575,10 +596,12 @@ void tcp::add_handler(const int port, tcp_port_handler_t & tph)
 
 void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len, const bool in_cb)
 {
-	dolog("TCP[%012" PRIx64 "]: send frame, %zu bytes, tid: %d\n", ts->id, len, gettid());
+	uint64_t internal_id = get_us();
 
 	// FIXME fragment depending on MTU size
 	constexpr int block_size = 1280;
+
+	dolog("TCP[%012" PRIx64 "]: send frame, %zu bytes, tid: %d, internal id: %lu, %u packets\n", ts->id, len, gettid(), internal_id, (len + block_size - 1) / block_size);
 
 	for(size_t i=0; i<len; i += block_size) {
 		const uint8_t *p = &data[i];
@@ -593,15 +616,15 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 		if (!in_cb)
 			lck = new std::unique_lock<std::mutex>(ts->tlock);
 
-		ts->unacked.push_back({ ts->my_seq_nr, { duplicate(p, p_len), p_len, get_us() } });
+		ts->unacked.push_back({ ts->my_seq_nr, { duplicate(p, p_len), p_len, get_us(), internal_id } });
 
-		int q_size = queue_size(ts->unacked);
-
-		// FIXME must allocate segment number for each segment
-		if (q_size < 3000) {  // FIXME tcp window size
+		if (ts->last_acked_to + ts->window_size >= ts->my_seq_nr + p_len)  {  // FIXME tcp window size
 			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u\n", ts->id, ts->their_seq_nr, ts->my_seq_nr);
 
 			send_segment(ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 0, (1 << 4) | (1 << 3) /* ACK, PSH */, ts->their_seq_nr, &ts->my_seq_nr, p, p_len);
+		}
+		else {
+			ts->my_seq_nr += p_len;
 		}
 
 		if (lck) {
@@ -617,9 +640,9 @@ void tcp::end_session(tcp_session_t *const ts, const packet *const pkt)
 	dolog("TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, ts->my_seq_nr);
 
 	const uint8_t *p = pkt->get_header().first;
-	int org_len = (p[14] << 8) | p[15];
+	int win_size = (p[14] << 8) | p[15];
 
-	send_segment(ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, org_len, (1 << 4) | (1 << 0) /* ACK, FIN */, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
+	send_segment(ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, win_size, (1 << 4) | (1 << 0) /* ACK, FIN */, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
 	ts->my_seq_nr++;
 
 	ts->state_me = tcp_fin_wait1;

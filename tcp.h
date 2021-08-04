@@ -25,6 +25,7 @@ typedef struct {
 	const uint8_t *data;
 	size_t len;
 	uint64_t last_sent;
+	uint64_t internal_id;
 } unacked_segment_t;
 
 typedef struct {
@@ -40,9 +41,12 @@ typedef struct {
 
 	uint64_t id;
 
+	uint16_t window_size;
+
 	tcp_state_t state_me;
 	uint64_t last_pkt;
 	uint32_t my_seq_nr, their_seq_nr;
+	uint32_t last_acked_to;
 
 	std::deque<std::pair<uint32_t, unacked_segment_t> > unacked;
 
@@ -68,6 +72,7 @@ private:
 	icmp *const icmp_;
 
 	std::mutex sessions_lock;
+	std::condition_variable sessions_cv;
 	std::map<uint64_t, tcp_session_t *> sessions; // FIXME uint64_t? is that the seq nr and should it thus be uint32_t?
 
 	std::map<int, tcp_port_handler_t> listeners;
