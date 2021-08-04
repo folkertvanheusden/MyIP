@@ -44,6 +44,8 @@ typedef struct {
 
 	vnc_state_t state;
 
+	uint8_t depth;  // 'bits per pixel' really
+
 	std::thread *th;
 
 	std::queue<vnc_thread_work_t *> wq;
@@ -199,7 +201,7 @@ void frame_buffer_thread(void *fb_in)
 	delete [] fb->buffer;
 }
 
-void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t **message, size_t *message_len)
+void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len)
 {
 	*message_len =  4 +  // FramebufferUpdate header
 			12 +  // for each block of pixels
@@ -226,12 +228,24 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	(*message)[15] = 0;
 
 	int o = 16;
-	for(int yo=y; yo<y + h; yo++) {
-		for(int xo=x; xo<x + w; xo++) {
-			(*message)[o++] = fb->buffer[yo * w * 3 + xo * 3 + 2];  // blue
-			(*message)[o++] = fb->buffer[yo * w * 3 + xo * 3 + 1];  // green
-			(*message)[o++] = fb->buffer[yo * w * 3 + xo * 3 + 0];  // red
-			(*message)[o++] = 255;  // alpha
+
+	if (depth == 32) {
+		for(int yo=y; yo<y + h; yo++) {
+			for(int xo=x; xo<x + w; xo++) {
+				(*message)[o++] = fb->buffer[yo * w * 3 + xo * 3 + 2];  // blue
+				(*message)[o++] = fb->buffer[yo * w * 3 + xo * 3 + 1];  // green
+				(*message)[o++] = fb->buffer[yo * w * 3 + xo * 3 + 0];  // red
+				(*message)[o++] = 255;  // alpha
+			}
+		}
+	}
+	else if (depth == 8) {
+		for(int yo=y; yo<y + h; yo++) {
+			for(int xo=x; xo<x + w; xo++) {
+				(*message)[o++] = (fb->buffer[yo * w * 3 + xo * 3 + 0] & 0xe0) |  // red
+						  (fb->buffer[yo * w * 3 + xo * 3 + 1] >> 3) |  // green
+						  (fb->buffer[yo * w * 3 + xo * 3 + 0] >> 6);  // blue
+			}
 		}
 	}
 }
@@ -247,6 +261,8 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 	vs->buffer_size = 0;
 
 	vs->state = vs_initial_handshake_server_send;
+
+	vs->depth = 32;
 
 	ts->p = vs;
 
@@ -328,7 +344,7 @@ void vnc_thread(void *ts_in)
 			uint8_t *message = nullptr;
 			size_t message_len = 0;
 
-			calculate_fb_update(&fb, encodings, true, 0, 0, fb.w, fb.h, &message, &message_len);
+			calculate_fb_update(&fb, encodings, true, 0, 0, fb.w, fb.h, vs->depth, &message, &message_len);
 
 			ts->t->send_data(ts, message, message_len, false);
 
@@ -454,8 +470,22 @@ void vnc_thread(void *ts_in)
 			bool proceed = false;
 			int ignore_n = 0;
 
-			if (running_cmd == 0)  // SetPixelFormat, 7.5.1
-				ignore_n = 19;
+			if (running_cmd == 0) {  // SetPixelFormat, 7.5.1
+				dolog("VNC: Retrieving pixelformat\n", n_encodings);
+
+				uint8_t *pf = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 19);
+
+				if (pf) {
+					const uint8_t *data = &pf[3];  // skip padding
+
+					vs->depth = data[1];
+					dolog("VNC: Changed 'depth'(BPP) to %d (bpp: %d)\n", vs->depth, data[0]);
+
+					vs->state = vs_running_waiting_cmd;
+
+					free(pf);
+				}
+			}
 			else if (running_cmd == 2) {  // SetEncodings, 7.5.2
 				uint8_t *parameters = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 3);
 
@@ -480,7 +510,7 @@ void vnc_thread(void *ts_in)
 					int w = (parameters[5] << 8) | parameters[6];
 					int h = (parameters[7] << 8) | parameters[8];
 
-					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, &message, &message_len);
+					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len);
 
 					dolog("SEND %zu bytes for %dx%d at %d,%d\n", message_len, w, h, x, y);
 
@@ -513,7 +543,6 @@ void vnc_thread(void *ts_in)
 				}
 			}
 			else {
-				dolog("VNC: Command %d not known (data state)\n", running_cmd);
 				dolog("VNC: Command %d not known (data state)\n", running_cmd);
 				rc = false;
 			}
@@ -574,7 +603,6 @@ void vnc_thread(void *ts_in)
 				}
 			}
 			else {
-				dolog("VNC: Command %d not known (data-extra state)\n", running_cmd);
 				dolog("VNC: Command %d not known (data-extra state)\n", running_cmd);
 				rc = false;
 			}
