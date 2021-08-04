@@ -86,7 +86,7 @@ struct frame_buffer_t
 		for(auto vs : callbacks) {
 			const std::lock_guard<std::mutex> lck(vs->w_lock);
 
-		dolog("%zu CALLBACK for %s\n", get_us(), vs->client_addr.c_str());
+			dolog("VNC: %zu CALLBACK for %s\n", get_us(), vs->client_addr.c_str());
 
 			vs->wq.push(new vnc_thread_work_t());
 
@@ -179,7 +179,7 @@ void frame_buffer_thread(void *fb_in)
 		uint64_t now = get_us();
 
 		if (now - latest_update >= 1000000) {  // 1 time per second
-			dolog("%zu FB UPDATE\n", now);
+			dolog("VNC: %zu FB UPDATE\n", now);
 			latest_update = now;
 
 			time_t now = time(nullptr);
@@ -326,7 +326,7 @@ void vnc_thread(void *ts_in)
 				if (vs->wq.empty() == false) {
 					work = vs->wq.front();
 					vs->wq.pop();
-					dolog("%zu have data %p %p\n", get_us(), work, work?work->pkt:nullptr);
+					dolog("VNC: %zu have data %p %p\n", get_us(), work, work?work->pkt:nullptr);
 					break;
 				}
 
@@ -335,12 +335,12 @@ void vnc_thread(void *ts_in)
 		}
 
 		if (!work) {
-			dolog("%zu TERMINATE THREAD REQUESTED\n", get_us());
+			dolog("VNC: %zu TERMINATE THREAD REQUESTED\n", get_us());
 			break;
 		}
 
 		if (!work->pkt) {  // means "update"
-			dolog("%zu will update for %s\n", get_us(), vs->client_addr.c_str());
+			dolog("VNC: %zu will update for %s\n", get_us(), vs->client_addr.c_str());
 			uint8_t *message = nullptr;
 			size_t message_len = 0;
 
@@ -512,7 +512,7 @@ void vnc_thread(void *ts_in)
 
 					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len);
 
-					dolog("SEND %zu bytes for %dx%d at %d,%d\n", message_len, w, h, x, y);
+					dolog("VNC: SEND %zu bytes for %dx%d at %d,%d\n", message_len, w, h, x, y);
 
 					ts->t->send_data(ts, message, message_len, false);
 
@@ -524,11 +524,11 @@ void vnc_thread(void *ts_in)
 				}
 			}
 			else if (running_cmd == 4) {  // KeyEvent
-				dolog("CLIENT KeyEvent\n");
+				dolog("VNC: CLIENT KeyEvent\n");
 				ignore_n = 7;
 			}
 			else if (running_cmd == 5) {  // PointerEvent
-				dolog("CLIENT PointerEvent\n");
+				dolog("VNC: CLIENT PointerEvent\n");
 				ignore_n = 5;
 			}
 			else if (running_cmd == 6) {  // ClientCutText
