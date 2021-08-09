@@ -48,7 +48,9 @@ typedef struct {
 	uint32_t my_seq_nr, their_seq_nr;
 	uint32_t last_acked_to;
 
-	std::deque<std::pair<uint32_t, unacked_segment_t> > unacked;
+	uint8_t *unacked;
+	size_t unacked_size;
+	bool fin_after_unacked_empty;
 
 	void *p;
 } tcp_session_t;
