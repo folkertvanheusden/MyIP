@@ -14,6 +14,19 @@
 
 using namespace std::chrono_literals;
 
+std::string bin_to_text(const uint8_t *p, const size_t len) {
+	char *temp = (char *)calloc(1, len * 6 + 1);
+
+	for(size_t i=0; i<len; i++)
+		snprintf(&temp[i * 6], 7, "%c[%02x] ", p[i] > 32 ? p[i] : '.', p[i]);
+
+	std::string out = temp;
+
+	free(temp);
+
+	return out;
+}
+
 void free_tcp_session(tcp_session_t *const p)
 {
 	free(p->unacked);
@@ -109,6 +122,11 @@ void tcp::send_segment(const uint64_t session_id, const std::pair<const uint8_t 
 
 	size_t temp_len = 20 + data_len;
 	uint8_t *temp = new uint8_t[temp_len];
+
+	if (data_len) {
+		std::string content = bin_to_text(data, data_len);
+		dolog("TCP[%012" PRIx64 "]: Sending content: %s\n", session_id, content.c_str());
+	}
 
 	temp[0] = my_port >> 8;
 	temp[1] = my_port & 255;
@@ -397,9 +415,16 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	if (data_len > 0 && fail == false && cur_session) {
 		dolog("TCP[%012" PRIx64 "]: packet len %d, header size: %d, data size: %d\n", id, size, header_size, data_len);
 
-		send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, their_seq_nr + data_len, &cur_session->my_seq_nr, nullptr, 0);
+		cur_session->their_seq_nr += data_len;  // FIXME handle missing segments
 
-		if (cb_it->second.new_data(cur_session, pkt, &p[header_size], data_len, cb_it->second.private_data) == false)
+		send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+
+		const uint8_t *data_start = &p[header_size];
+
+		std::string content = bin_to_text(data_start, data_len);
+		dolog("TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
+
+		if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.private_data) == false)
 			fail = true;
 	}
 
@@ -615,10 +640,11 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 		size_t send_n = std::max(size_t(0), std::min(p_len, ts->window_size - ts->unacked_size));
 
 		if (send_n > 0) {
-			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u, size: %zu\n", ts->id, ts->their_seq_nr, ts->my_seq_nr, send_n);
+			uint32_t send_nr = ts->my_seq_nr + ts->unacked_size - p_len;
 
-			uint32_t send_nr = ts->my_seq_nr + ts->unacked_size;
-			send_segment(ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 0, (1 << 4) | (1 << 3) /* ACK, PSH */, ts->their_seq_nr, &send_nr, p, send_n);
+			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u, size: %zu\n", ts->id, ts->their_seq_nr, send_nr, send_n);
+
+			send_segment(ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, ts->window_size, (1 << 4) | (1 << 3) /* ACK, PSH */, ts->their_seq_nr, &send_nr, p, send_n);
 		}
 
 		if (lck) {
