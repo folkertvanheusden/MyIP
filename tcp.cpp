@@ -229,7 +229,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		new_session->last_pkt = get_us();
 
 		get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
-		new_session->last_acked_to = new_session->my_seq_nr;
 
 		new_session->their_seq_nr = their_seq_nr + 1;
 
@@ -371,12 +370,10 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	}
 
 	if (flag_ack && cur_session) {
-		int n_acked = 0;
-
 		int ack_n = ack_to - cur_session->my_seq_nr;
 
 		if (ack_n > 0) {
-			dolog("TCP[%012" PRIx64 "]: ack to: %u (last seq nr %u), size: %d)\n", id, ack_to, cur_session->my_seq_nr, ack_n);
+			dolog("TCP[%012" PRIx64 "]: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", id, ack_to, cur_session->my_seq_nr, ack_n, cur_session->unacked_size);
 
 			// delete acked
 			int left_n = cur_session->unacked_size - ack_n;
@@ -385,7 +382,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				cur_session->unacked_size -= ack_n;
 
-				dolog("TCP[%012" PRIx64 "]: unacked left: %zu", cur_session->unacked_size);
+				dolog("TCP[%012" PRIx64 "]: unacked left: %zu\n", id, cur_session->unacked_size);
 
 				if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
 					dolog("TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n");
@@ -401,14 +398,13 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			}
 
 			cur_session->my_seq_nr += ack_n;
-			cur_session->last_acked_to = ack_to;
+			assert(cur_session->my_seq_nr == ack_to);
+
+			sessions_cv.notify_all();
 		}
 		else if (ack_n < 0) {
 			dolog("TCP[%012" PRIx64 "]: got ack for %u SIZE %d?!\n", id, ack_to, ack_n);
 		}
-
-		if (n_acked)
-			sessions_cv.notify_all();
 	}
 
 	int data_len = size - header_size;
@@ -485,8 +481,6 @@ void tcp::session_cleaner()
 	set_thread_name("tcp-clnr");
 
 	while(!stop_flag) {
-		dolog("tcp-clnr sleep %d seconds\n", clean_interval);
-
 		using namespace std::chrono_literals;
 
 		std::unique_lock<std::mutex> lck(sessions_lock);
@@ -495,8 +489,6 @@ void tcp::session_cleaner()
 
 		// find t/o'd sessions
 		uint64_t now = get_us();
-
-		dolog("tcp-clnr sessions_lock.lock TID %d\n", gettid());
 
 		for(auto it = sessions.cbegin(); it != sessions.cend();) {
 			if ((now - it->second->last_pkt) / 1000000 >= session_timeout) {
@@ -523,12 +515,10 @@ void tcp::session_cleaner()
 		}
 
 		lck.unlock();
-		dolog("tcp-clnr sessions_lock.unlock %d\n", gettid());
 
 		// go through all sessions and find if any has segments to resend
 		lck.lock();
 
-		dolog("tcp-clnr SEND UNACKED FOR %zu SESSIONS\n", sessions.size());
 		for(auto it = sessions.cbegin(); it != sessions.cend(); it++) {
 			it->second->tlock.lock();
 
@@ -537,7 +527,7 @@ void tcp::session_cleaner()
 			if (it->second->unacked_size) {
 				size_t send_n = std::min(size_t(it->second->window_size), it->second->unacked_size);
 
-				dolog("tcp-clnr SEND %zu bytes for sequence nr %u\n", send_n, it->second->my_seq_nr);
+				dolog("tcp-clnr SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu)\n", send_n, it->second->my_seq_nr, it->second->window_size, it->second->unacked_size);
 
 				uint32_t resend_nr = it->second->my_seq_nr;
 				send_segment(it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, (1 << 4) /* ACK */, it->second->their_seq_nr, &resend_nr, it->second->unacked, send_n);
@@ -549,7 +539,6 @@ void tcp::session_cleaner()
 
 			it->second->tlock.unlock();
 		}
-		dolog("tcp-clnr SEND UNACKED finished\n");
 
 		lck.unlock();
 	}

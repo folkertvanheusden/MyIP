@@ -211,11 +211,7 @@ void frame_buffer_thread(void *fb_in)
 
 void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len)
 {
-	*message_len =  4 +  // FramebufferUpdate header
-			12 +  // for each block of pixels
-			w * h * 4;  // RGBA pixels
-
-	*message = (uint8_t *)malloc(*message_len);
+	*message = (uint8_t *)malloc(4 + 12 * 1 + w * h * 4); // at most
 
 	(*message)[0] = 0;  // FramebufferUpdate
 	(*message)[1] = 0;  // padding
@@ -239,12 +235,14 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 
 	fb->fb_lock.lock();
 
-	if (depth == 32) {
+	if (depth == 32 || depth == 24) {
 		for(int yo=y; yo<y + h; yo++) {
 			for(int xo=x; xo<x + w; xo++) {
-				(*message)[o++] = fb->buffer[yo * w * 3 + xo * 3 + 2];  // blue
-				(*message)[o++] = fb->buffer[yo * w * 3 + xo * 3 + 1];  // green
-				(*message)[o++] = fb->buffer[yo * w * 3 + xo * 3 + 0];  // red
+				int offset = yo * w * 3 + xo * 3;
+
+				(*message)[o++] = fb->buffer[offset + 2];  // blue
+				(*message)[o++] = fb->buffer[offset + 1];  // green
+				(*message)[o++] = fb->buffer[offset + 0];  // red
 				(*message)[o++] = 255;  // alpha
 			}
 		}
@@ -252,14 +250,21 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	else if (depth == 8) {
 		for(int yo=y; yo<y + h; yo++) {
 			for(int xo=x; xo<x + w; xo++) {
-				(*message)[o++] = (fb->buffer[yo * w * 3 + xo * 3 + 0] & 0xe0) |  // red
-						  (fb->buffer[yo * w * 3 + xo * 3 + 1] >> 3) |  // green
-						  (fb->buffer[yo * w * 3 + xo * 3 + 0] >> 6);  // blue
+				int offset = yo * w * 3 + xo * 3;
+
+				(*message)[o++] = (fb->buffer[offset + 0] & 0xe0) |  // red
+						  (fb->buffer[offset + 1] >> 3) |  // green
+						  (fb->buffer[offset + 2] >> 6);  // blue
 			}
 		}
 	}
+	else {
+		dolog("VNC: depth=%d not supported\n", depth);
+	}
 
 	fb->fb_lock.unlock();
+
+	*message_len = o;
 }
 
 bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
@@ -284,6 +289,7 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 	if (vs->state == vs_initial_handshake_server_send) {
 		const char initial_message[] = "RFB 003.008\n";
 
+		dolog("VNC: send handshake of 12 bytes\n");
 		ts->t->send_data(ts, (const uint8_t *)initial_message, 12, true);  // must be 12 bytes
 
 		vs->state = vs_initial_handshake_client_resp;
@@ -352,12 +358,12 @@ void vnc_thread(void *ts_in)
 		}
 
 		if (!work->pkt) {  // means "update"
-			dolog("VNC: %zu will update for %s\n", get_us(), vs->client_addr.c_str());
 			uint8_t *message = nullptr;
 			size_t message_len = 0;
 
 			calculate_fb_update(&fb, encodings, true, 0, 0, fb.w, fb.h, vs->depth, &message, &message_len);
 
+			dolog("VNC: %zu will update for %s, output is %zu bytes\n", get_us(), vs->client_addr.c_str(), message_len);
 			ts->t->send_data(ts, message, message_len, false);
 
 			free(message);
@@ -394,6 +400,7 @@ void vnc_thread(void *ts_in)
 				1,  // 'None'
 			};
 
+			dolog("VNC: ack security types, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message, false);
 
 			vs->state = vs_security_handshake_client_resp;
@@ -404,18 +411,17 @@ void vnc_thread(void *ts_in)
 
 			if (chosen_sec) {
 				if (*chosen_sec == 1) {  // must have chosen security type 'None'
-					dolog("VNC: Valid security type chosen\n");
-
 					uint8_t response[] = { 0, 0, 0, 0 };  // OK
+					dolog("VNC: Valid security type chosen, %zu bytes\n", sizeof response);
 					ts->t->send_data(ts, response, sizeof response, false);
 
 					vs->state = vs_client_init;
 				}
 				else {
 					rc = false;
-					dolog("VNC: Unexpected/invalid security type: %d\n", *chosen_sec);
 
 					uint8_t response[] = { 0, 0, 0, 1 };  // failed
+					dolog("VNC: Unexpected/invalid security type: %d (%zu bytes)\n", *chosen_sec, sizeof response);
 					ts->t->send_data(ts, response, sizeof response, false);
 				}
 
@@ -457,9 +463,10 @@ void vnc_thread(void *ts_in)
 				'M', 'y', 'I', 'P'  // no "..."! that would include a 0x00!
 			};
 
+			dolog("VNC: server init, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message, false);
 
-			fb.register_callback(vs);
+//			fb.register_callback(vs);
 
 			vs->state = vs_running_waiting_cmd;
 		}
@@ -524,7 +531,7 @@ void vnc_thread(void *ts_in)
 
 					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len);
 
-					dolog("VNC: SEND %zu bytes for %dx%d at %d,%d\n", message_len, w, h, x, y);
+					dolog("VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes\n", message_len, w, h, x, y, message_len);
 
 					ts->t->send_data(ts, message, message_len, false);
 
@@ -628,7 +635,7 @@ void vnc_thread(void *ts_in)
 		delete work;
 	}
 
-	fb.unregister_callback(vs);
+//	fb.unregister_callback(vs);
 
 	dolog("VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }

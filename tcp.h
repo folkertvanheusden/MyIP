@@ -46,7 +46,6 @@ typedef struct {
 	tcp_state_t state_me;
 	uint64_t last_pkt;
 	uint32_t my_seq_nr, their_seq_nr;
-	uint32_t last_acked_to;
 
 	uint8_t *unacked;
 	size_t unacked_size;
