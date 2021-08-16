@@ -102,8 +102,8 @@ void frame_buffer_thread(void *ts_in);
 
 void vnc_init()
 {
-	fb.w = 128; // FIXME 640x480
-	fb.h = 64;
+	fb.w = 256;
+	fb.h = 48;
 
 	size_t n_bytes = fb.w * fb.h * 3;
 	fb.buffer = new uint8_t[n_bytes];
@@ -466,7 +466,7 @@ void vnc_thread(void *ts_in)
 			dolog("VNC: server init, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message, false);
 
-//			fb.register_callback(vs);
+			fb.register_callback(vs);
 
 			vs->state = vs_running_waiting_cmd;
 		}
@@ -635,7 +635,7 @@ void vnc_thread(void *ts_in)
 		delete work;
 	}
 
-//	fb.unregister_callback(vs);
+	fb.unregister_callback(vs);
 
 	dolog("VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
