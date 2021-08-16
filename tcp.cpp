@@ -99,6 +99,7 @@ tcp::tcp(stats *const s, icmp *const icmp_) : icmp_(icmp_)
 	tcp_new_sessions = s->register_stat("tcp_new_sessions");
 	tcp_sessions_rem = s->register_stat("tcp_sessions_rem");
 	tcp_sessions_to = s->register_stat("tcp_sessions_to");
+	tcp_sessions_closed = s->register_stat("tcp_sessions_closed");
 	tcp_rst = s->register_stat("tcp_rst");
 
 	th = new std::thread(std::ref(*this));
@@ -489,7 +490,9 @@ void tcp::session_cleaner()
 		uint64_t now = get_us();
 
 		for(auto it = sessions.cbegin(); it != sessions.cend();) {
-			if ((now - it->second->last_pkt) / 1000000 >= session_timeout) {
+			uint64_t age = (now - it->second->last_pkt) / 1000000;
+
+			if (age >= session_timeout) {
 				dolog("TCP[%012" PRIx64 "]: session timed out\n", it->first);
 
 				// call session_closed
@@ -506,6 +509,12 @@ void tcp::session_cleaner()
 				stats_inc_counter(tcp_sessions_to);
 
 				// FIXME send a FIN? RST?
+			}
+			else if (it->second->state_me == tcp_wait && age >= 2) {
+				// clean-up
+				free_tcp_session(it->second);
+
+				it = sessions.erase(it);
 			}
 			else {
 				++it;

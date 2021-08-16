@@ -87,6 +87,7 @@ private:
 	uint64_t *tcp_sessions_rem { nullptr };
 	uint64_t *tcp_sessions_to { nullptr };
 	uint64_t *tcp_rst { nullptr };
+	uint64_t *tcp_sessions_closed { nullptr };
 
 	void send_segment(const uint64_t session_id, const std::pair<const uint8_t *, int> my_addr, const int my_port, const std::pair<const uint8_t *, int> peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
 
