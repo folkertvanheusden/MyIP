@@ -386,6 +386,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			dolog("TCP[%012" PRIx64 "]: unacked left: %zu, fin after empty: %d\n", id, cur_session->unacked_size, cur_session->fin_after_unacked_empty);
 
+			cur_session->my_seq_nr += ack_n;
+			assert(cur_session->my_seq_nr == ack_to);
+
 			if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
 				dolog("TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n");
 
@@ -394,9 +397,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				cur_session->state_me = tcp_fin_wait1;
 			}
-
-			cur_session->my_seq_nr += ack_n;
-			assert(cur_session->my_seq_nr == ack_to);
 
 			sessions_cv.notify_all();
 		}
