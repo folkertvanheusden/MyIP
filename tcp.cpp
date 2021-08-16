@@ -380,15 +380,19 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			int left_n = cur_session->unacked_size - ack_n;
 			if (left_n > 0)
 				memmove(&cur_session->unacked[0], &cur_session->unacked[ack_n], left_n);
-			else if (left_n < 0)
+			else if (left_n < 0) {
 				dolog("TCP[%012" PRIx64 "]: ack underrun? %d", left_n);
+				// terminate invalid session
+				// can happen for data coming in after finished
+				cur_session->unacked_size = ack_n = 0;
+				cur_session->fin_after_unacked_empty = true;
+			}
 
 			cur_session->unacked_size -= ack_n;
 
 			dolog("TCP[%012" PRIx64 "]: unacked left: %zu, fin after empty: %d\n", id, cur_session->unacked_size, cur_session->fin_after_unacked_empty);
 
 			cur_session->my_seq_nr += ack_n;
-			assert(cur_session->my_seq_nr == ack_to);
 
 			if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
 				dolog("TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n");
@@ -511,6 +515,8 @@ void tcp::session_cleaner()
 				// FIXME send a FIN? RST?
 			}
 			else if (it->second->state_me == tcp_wait && age >= 2) {
+				dolog("TCP[%012" PRIx64 "]: session clean-up after tcp_wait state\n", it->first);
+
 				// clean-up
 				free_tcp_session(it->second);
 
