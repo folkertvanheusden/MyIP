@@ -377,24 +377,22 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			// delete acked
 			int left_n = cur_session->unacked_size - ack_n;
-			if (left_n > 0) {
+			if (left_n > 0)
 				memmove(&cur_session->unacked[0], &cur_session->unacked[ack_n], left_n);
-
-				cur_session->unacked_size -= ack_n;
-
-				dolog("TCP[%012" PRIx64 "]: unacked left: %zu\n", id, cur_session->unacked_size);
-
-				if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
-					dolog("TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n");
-
-					send_segment(cur_session->id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) | (1 << 0) /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
-					cur_session->my_seq_nr++;
-
-					cur_session->state_me = tcp_fin_wait1;
-				}
-			}
-			else if (left_n < 0) {
+			else if (left_n < 0)
 				dolog("TCP[%012" PRIx64 "]: ack underrun? %d", left_n);
+
+			cur_session->unacked_size -= ack_n;
+
+			dolog("TCP[%012" PRIx64 "]: unacked left: %zu\n", id, cur_session->unacked_size);
+
+			if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
+				dolog("TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n");
+
+				send_segment(cur_session->id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) | (1 << 0) /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+				cur_session->my_seq_nr++;
+
+				cur_session->state_me = tcp_fin_wait1;
 			}
 
 			cur_session->my_seq_nr += ack_n;
