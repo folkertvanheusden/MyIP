@@ -409,9 +409,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	if (data_len > 0 && fail == false && cur_session) {
 		dolog("TCP[%012" PRIx64 "]: packet len %d, header size: %d, data size: %d\n", id, size, header_size, data_len);
 
-		cur_session->their_seq_nr += data_len;  // FIXME handle missing segments
+		uint32_t ack_nr = cur_session->their_seq_nr + data_len;  // FIXME handle missing segments
 
-		send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+		send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, ack_nr, &cur_session->my_seq_nr, nullptr, 0);
 
 		const uint8_t *data_start = &p[header_size];
 
