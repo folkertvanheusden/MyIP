@@ -384,7 +384,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			cur_session->unacked_size -= ack_n;
 
-			dolog("TCP[%012" PRIx64 "]: unacked left: %zu\n", id, cur_session->unacked_size);
+			dolog("TCP[%012" PRIx64 "]: unacked left: %zu, fin after empty: %d\n", id, cur_session->unacked_size, cur_session->fin_after_unacked_empty);
 
 			if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
 				dolog("TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n");
@@ -523,7 +523,8 @@ void tcp::session_cleaner()
 			now = get_us();
 
 			if (it->second->unacked_size) {
-				size_t send_n = std::min(size_t(it->second->window_size), it->second->unacked_size);
+				// FIXME 1024: what fits in an IP message
+				size_t send_n = std::min(size_t(1024), std::min(size_t(it->second->window_size), it->second->unacked_size));
 
 				dolog("tcp-clnr SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu)\n", send_n, it->second->my_seq_nr, it->second->window_size, it->second->unacked_size);
 
@@ -620,14 +621,15 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 		if (!in_cb)
 			lck = new std::unique_lock<std::mutex>(ts->tlock);
 
-		ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + p_len);
-		memcpy(&ts->unacked[ts->unacked_size], p, p_len);
-		ts->unacked_size += p_len;
+		// FIXME 1024: what fits in an IP message
+		size_t send_n = std::min(size_t(1024), std::max(size_t(0), std::min(p_len, ts->window_size - ts->unacked_size)));
 
-		size_t send_n = std::max(size_t(0), std::min(p_len, ts->window_size - ts->unacked_size));
+		ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + send_n);
+		memcpy(&ts->unacked[ts->unacked_size], p, send_n);
+		ts->unacked_size += send_n;
 
 		if (send_n > 0) {
-			uint32_t send_nr = ts->my_seq_nr + ts->unacked_size - p_len;
+			uint32_t send_nr = ts->my_seq_nr + ts->unacked_size - send_n;
 
 			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u, size: %zu\n", ts->id, ts->their_seq_nr, send_nr, send_n);
 
