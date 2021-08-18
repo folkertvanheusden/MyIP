@@ -111,11 +111,6 @@ void tcp::send_segment(const uint64_t session_id, const std::pair<const uint8_t 
 	size_t temp_len = 20 + data_len;
 	uint8_t *temp = new uint8_t[temp_len];
 
-	if (data_len) {
-		std::string content = bin_to_text(data, data_len);
-		dolog("TCP[%012" PRIx64 "]: Sending content: %s\n", session_id, content.c_str());
-	}
-
 	temp[0] = my_port >> 8;
 	temp[1] = my_port & 255;
 	temp[2] = peer_port >> 8;

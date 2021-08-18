@@ -378,7 +378,6 @@ void vnc_thread(void *ts_in)
 				if (vs->wq.empty() == false) {
 					work = vs->wq.front();
 					vs->wq.pop();
-					dolog("VNC: %zu have data %p %p\n", get_us(), work, work?work->pkt:nullptr);
 					break;
 				}
 
@@ -467,8 +466,7 @@ void vnc_thread(void *ts_in)
 			uint8_t *client_init = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 1);
 
 			if (client_init) {
-				if (*client_init)
-					dolog("VNC: client asks for desktop sharing\n");
+				dolog("VNC: client asks for %sdesktop sharing\n", *client_init ? "" : "NO ");
 
 				vs->state = vs_server_init;
 
@@ -523,6 +521,8 @@ void vnc_thread(void *ts_in)
 			bool proceed = false;
 			int ignore_n = 0;
 
+			dolog("VNC: waiting for data for command %d\n", running_cmd);
+
 			if (running_cmd == 0) {  // SetPixelFormat, 7.5.1
 				dolog("VNC: Retrieving pixelformat\n", n_encodings);
 
@@ -545,6 +545,7 @@ void vnc_thread(void *ts_in)
 				}
 			}
 			else if (running_cmd == 1) {  // ??? FIXME
+				dolog("VNC: STRANGE COMMAND\n");
 				// assume it is a keep-alive or so
 				vs->state = vs_running_waiting_cmd;
 			}
@@ -553,6 +554,7 @@ void vnc_thread(void *ts_in)
 
 				if (parameters) {
 					n_encodings = (parameters[1] << 8) | parameters[2];
+					dolog("VNC: Retrieving number of encodings (%d)\n", n_encodings);
 
 					vs->state = vs_running_waiting_data_extra;
 
@@ -586,18 +588,19 @@ void vnc_thread(void *ts_in)
 				}
 			}
 			else if (running_cmd == 4) {  // KeyEvent
-				dolog("VNC: CLIENT KeyEvent\n");
 				ignore_n = 7;
+				dolog("VNC: CLIENT KeyEvent (ignore %d)\n", ignore_n);
 			}
 			else if (running_cmd == 5) {  // PointerEvent
-				dolog("VNC: CLIENT PointerEvent\n");
 				ignore_n = 5;
+				dolog("VNC: CLIENT PointerEvent (ignore %d)\n", ignore_n);
 			}
 			else if (running_cmd == 6) {  // ClientCutText
 				uint8_t *parameters = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 7);
 
 				if (parameters) {
 					ignore_data_n = (parameters[3] << 24) | (parameters[4] << 16) | (parameters[5] << 8) | parameters[6];
+					dolog("VNC: ClientCutText (ignore %d)\n", ignore_data_n);
 
 					vs->state = vs_running_waiting_data_ignore;
 
