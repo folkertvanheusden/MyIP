@@ -67,43 +67,6 @@ struct frame_buffer_t
 
         mutable std::mutex fb_lock;
 	uint8_t *buffer;
-
-        mutable std::mutex cb_lock;
-	std::set<vnc_session_t *> callbacks;
-
-	void register_callback(vnc_session_t *p) {
-		dolog("register_callback %p\n", p);
-		const std::lock_guard<std::mutex> lck(cb_lock);
-
-		auto rc = callbacks.insert(p);
-		assert(rc.second);
-	}
-
-	void unregister_callback(vnc_session_t *p) {
-		dolog("unregister_callback %p\n", p);
-		const std::lock_guard<std::mutex> lck(cb_lock);
-
-		// may have not been registered if the connection
-		// is dropped before then handshake was fully
-		// performed
-		callbacks.erase(p);
-	}
-
-	void callback() {
-		const std::lock_guard<std::mutex> lck(cb_lock);
-
-		dolog("VNC: %zu callbacks\n", callbacks.size());
-
-		for(auto vs : callbacks) {
-			const std::lock_guard<std::mutex> lck(vs->w_lock);
-
-			dolog("VNC: %zu CALLBACK for %s (%p)\n", get_us(), vs->client_addr.c_str(), vs);
-
-			vs->wq.push(new vnc_thread_work_t());
-
-			vs->w_cond.notify_one();
-		}
-	}
 } fb;
 
 void vnc_thread(void *ts_in);
@@ -209,8 +172,6 @@ void frame_buffer_thread(void *fb_in)
 			free(text);
 
 			fb->fb_lock.unlock();
-
-			fb->callback();
 		}
 
 		usleep(1000);  // ignore any errors during usleep
@@ -498,8 +459,6 @@ void vnc_thread(void *ts_in)
 			dolog("VNC: server init, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message, false);
 
-			fb.register_callback(vs);
-
 			vs->state = vs_running_waiting_cmd;
 		}
 
@@ -680,8 +639,6 @@ void vnc_thread(void *ts_in)
 		delete [] work->data;
 		delete work;
 	}
-
-	fb.unregister_callback(vs);
 
 	dolog("VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
