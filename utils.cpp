@@ -172,3 +172,16 @@ void set_thread_name(const std::string & name)
 
 	pthread_setname_np(pthread_self(), full_name.c_str());
 }
+
+std::string bin_to_text(const uint8_t *p, const size_t len) {
+	char *temp = (char *)calloc(1, len * 6 + 1);
+
+	for(size_t i=0; i<len; i++)
+		snprintf(&temp[i * 6], 7, "%c[%02x] ", p[i] > 32 ? p[i] : '.', p[i]);
+
+	std::string out = temp;
+
+	free(temp);
+
+	return out;
+}

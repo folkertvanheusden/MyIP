@@ -14,19 +14,6 @@
 
 using namespace std::chrono_literals;
 
-std::string bin_to_text(const uint8_t *p, const size_t len) {
-	char *temp = (char *)calloc(1, len * 6 + 1);
-
-	for(size_t i=0; i<len; i++)
-		snprintf(&temp[i * 6], 7, "%c[%02x] ", p[i] > 32 ? p[i] : '.', p[i]);
-
-	std::string out = temp;
-
-	free(temp);
-
-	return out;
-}
-
 void free_tcp_session(tcp_session_t *const p)
 {
 	free(p->unacked);
@@ -381,7 +368,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			if (left_n > 0)
 				memmove(&cur_session->unacked[0], &cur_session->unacked[ack_n], left_n);
 			else if (left_n < 0) {
-				dolog("TCP[%012" PRIx64 "]: ack underrun? %d", left_n);
+				dolog("TCP[%012" PRIx64 "]: ack underrun? %d\n", left_n);
 				// terminate invalid session
 				// can happen for data coming in after finished
 				cur_session->unacked_size = ack_n = 0;

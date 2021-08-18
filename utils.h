@@ -14,3 +14,4 @@ std::vector<std::string> * split(std::string in, std::string splitter);
 uint8_t * get_from_buffer(uint8_t **p, size_t *len, size_t get_len);
 void dolog(const char *fmt, ...);
 void set_thread_name(const std::string & name);
+std::string bin_to_text(const uint8_t *p, const size_t len);
