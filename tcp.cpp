@@ -201,7 +201,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	dolog("TCP[%012" PRIx64 "]: packet %d->%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src_port, dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
 	free(flag_str);
 
-	dolog("TCP[%012" PRIx64 "]: sessions lock (by TID %d)\n", id, gettid());
 	sessions_lock.lock();
 
 	auto cur_it = sessions.find(id);
@@ -436,10 +435,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	cur_session->tlock.unlock();
 
 	sessions_lock.unlock();
-	dolog("sessions_lock.unlock TID %d net voor delete_entry\n", gettid());
 
 	if (delete_entry) {
-		dolog("TCP sessions_lock.lock by TID %d, in delete_entry\n", gettid());
 		sessions_lock.lock();
 
 		cur_it = sessions.find(id);
@@ -460,7 +457,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		stats_inc_counter(tcp_sessions_rem);
 
 		sessions_lock.unlock();
-		dolog("TCP sessions_lock.unlock by %d in delete_entry\n", gettid());
 	}
 
 	delete pkt;
@@ -627,7 +623,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 {
 	uint64_t internal_id = get_us();
 
-	dolog("TCP[%012" PRIx64 "]: send frame, %zu bytes, tid: %d, internal id: %lu, %u packets\n", ts->id, len, gettid(), internal_id, (len + ts->window_size - 1) / ts->window_size);
+	dolog("TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %u packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
 
 	for(size_t i=0; i<len;) {
 		const uint8_t *p = &data[i];
