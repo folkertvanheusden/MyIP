@@ -402,12 +402,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				cur_session->state_me = tcp_fin_wait1;
 			}
-
-			sessions_cv.notify_all();
 		}
 		else if (ack_n < 0) {
 			dolog("TCP[%012" PRIx64 "]: got ack for %u SIZE %d?!\n", id, ack_to, ack_n);
 		}
+
+		unacked_cv.notify_all();
 	}
 
 	int data_len = size - header_size;
@@ -425,6 +425,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.private_data) == false)
 			fail = true;
+
+		unacked_cv.notify_all();
 	}
 
 	if (fail) {
@@ -487,7 +489,7 @@ void tcp::session_cleaner()
 		using namespace std::chrono_literals;
 
 		std::unique_lock<std::mutex> lck(sessions_lock);
-		if (pkts_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
+		if (sessions_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
 			dolog("tcp-clnr woke-up after ack\n");
 
 		// find t/o'd sessions
@@ -528,14 +530,24 @@ void tcp::session_cleaner()
 		}
 
 		lck.unlock();
+	}
+}
+
+void tcp::unacked_sender()
+{
+	set_thread_name("tcp-us");
+
+	while(!stop_flag) {
+		using namespace std::chrono_literals;
+
+		std::unique_lock<std::mutex> lck(sessions_lock);
+		if (unacked_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
+			dolog("tcp-clnr woke-up after ack\n");
 
 		// go through all sessions and find if any has segments to resend
-		lck.lock();
 
 		for(auto it = sessions.cbegin(); it != sessions.cend(); it++) {
 			it->second->tlock.lock();
-
-			now = get_us();
 
 			if (it->second->unacked_size) {
 				// FIXME 1024: what fits in an IP message
@@ -549,8 +561,6 @@ void tcp::session_cleaner()
 				assert(resend_nr == it->second->my_seq_nr + send_n);
 			}
 
-			now = get_us();
-
 			it->second->tlock.unlock();
 		}
 
@@ -563,6 +573,8 @@ void tcp::operator()()
 	set_thread_name("tcp");
 
 	std::thread *cleaner = new std::thread(&tcp::session_cleaner, this);
+
+	std::thread *unacked_sender = new std::thread(&tcp::unacked_sender, this);
 
 	std::vector<tcp_packet_handle_thread_t *> threads;
 
@@ -606,9 +618,12 @@ void tcp::operator()()
 #endif
 		packet_handler(pkt, &handler_data->finished_flag);
 		delete handler_data;
+
+		sessions_cv.notify_all();
 	}
 
-	// FIXME stop the cleaner thread
+	// FIXME stop the threads
+	unacked_sender->join();
 	cleaner->join();
 	delete cleaner;
 }
@@ -643,7 +658,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 		memcpy(&ts->unacked[ts->unacked_size], p, send_n);
 		ts->unacked_size += send_n;
 
-		if (send_n > 0) {
+		if (ts->unacked_size == 0) {
 			uint32_t send_nr = ts->my_seq_nr + ts->unacked_size - send_n;
 
 			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u, size: %zu\n", ts->id, ts->their_seq_nr, send_nr, send_n);

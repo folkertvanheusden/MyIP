@@ -73,7 +73,7 @@ private:
 	icmp *const icmp_;
 
 	std::mutex sessions_lock;
-	std::condition_variable sessions_cv;
+	std::condition_variable sessions_cv, unacked_cv;
 	std::map<uint64_t, tcp_session_t *> sessions; // FIXME uint64_t? is that the seq nr and should it thus be uint32_t?
 
 	std::map<int, tcp_port_handler_t> listeners;
@@ -94,6 +94,7 @@ private:
 	void packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag);
 	void cleanup_session_helper(std::map<uint64_t, tcp_session_t *>::iterator *it);
 	void session_cleaner();
+	void unacked_sender();
 
 public:
 	tcp(stats *const s, icmp *const icmp_);
