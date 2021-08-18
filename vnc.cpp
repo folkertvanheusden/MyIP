@@ -28,12 +28,18 @@ typedef enum {  vs_initial_handshake_server_send = 0,
 		vs_terminate
 } vnc_state_t;
 
-typedef struct {
+typedef struct _vnc_thread_work_t_ {
 	// nullptr if update requested
 	packet *pkt;
 
 	char *data;
 	size_t data_len;
+
+	_vnc_thread_work_t_() {
+		pkt = nullptr;
+		data = nullptr;
+		data_len = 0;
+	}
 } vnc_thread_work_t;
 
 typedef struct {
@@ -66,6 +72,7 @@ struct frame_buffer_t
 	std::set<vnc_session_t *> callbacks;
 
 	void register_callback(vnc_session_t *p) {
+		dolog("register_callback %p\n", p);
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
 		auto rc = callbacks.insert(p);
@@ -73,6 +80,7 @@ struct frame_buffer_t
 	}
 
 	void unregister_callback(vnc_session_t *p) {
+		dolog("unregister_callback %p\n", p);
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
 		// may have not been registered if the connection
@@ -84,10 +92,12 @@ struct frame_buffer_t
 	void callback() {
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
+		dolog("VNC: %zu callbacks\n", callbacks.size());
+
 		for(auto vs : callbacks) {
 			const std::lock_guard<std::mutex> lck(vs->w_lock);
 
-			dolog("VNC: %zu CALLBACK for %s\n", get_us(), vs->client_addr.c_str());
+			dolog("VNC: %zu CALLBACK for %s (%p)\n", get_us(), vs->client_addr.c_str(), vs);
 
 			vs->wq.push(new vnc_thread_work_t());
 
@@ -257,6 +267,30 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 						  (fb->buffer[offset + 2] >> 6);  // blue
 			}
 		}
+	}
+	else if (depth == 1) {
+		uint8_t b_out = 0, b_n = 0;
+
+		for(int yo=y; yo<y + h; yo++) {
+			for(int xo=x; xo<x + w; xo++) {
+				int offset = yo * w * 3 + xo * 3;
+
+				int gray = (fb->buffer[offset + 0] + fb->buffer[offset + 1] + fb->buffer[offset + 2]) / 3;
+				uint8_t bit = gray >= 128;
+
+				b_out <<= 1;
+				b_out |= bit;
+				b_n++;
+
+				if (b_n == 8) {
+					(*message)[o++] = b_out;
+					b_n = 0;
+				}
+			}
+		}
+
+		if (b_n)
+			dolog("VNC: BITS LEFT: %d\n", b_n);
 	}
 	else {
 		dolog("VNC: depth=%d not supported\n", depth);
@@ -498,12 +532,21 @@ void vnc_thread(void *ts_in)
 					const uint8_t *data = &pf[3];  // skip padding
 
 					vs->depth = data[1];
-					dolog("VNC: Changed 'depth'(BPP) to %d (bpp: %d)\n", vs->depth, data[0]);
+
+					uint16_t rmax = (data[4] << 8) | data[5];
+					uint16_t gmax = (data[6] << 8) | data[7];
+					uint16_t bmax = (data[8] << 8) | data[9];
+
+					dolog("VNC: Changed 'depth'(BPP) to %d (bpp: %d, red/green/blue max: %d/%d/%d)\n", vs->depth, data[0], rmax, gmax, bmax);
 
 					vs->state = vs_running_waiting_cmd;
 
 					free(pf);
 				}
+			}
+			else if (running_cmd == 1) {  // ??? FIXME
+				// assume it is a keep-alive or so
+				vs->state = vs_running_waiting_cmd;
 			}
 			else if (running_cmd == 2) {  // SetEncodings, 7.5.2
 				uint8_t *parameters = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 3);
