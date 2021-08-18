@@ -658,7 +658,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 		memcpy(&ts->unacked[ts->unacked_size], p, send_n);
 		ts->unacked_size += send_n;
 
-		if (ts->unacked_size == 0) {
+		if (ts->unacked_size <= send_n && i == 0) {
 			uint32_t send_nr = ts->my_seq_nr + ts->unacked_size - send_n;
 
 			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u, size: %zu\n", ts->id, ts->their_seq_nr, send_nr, send_n);
