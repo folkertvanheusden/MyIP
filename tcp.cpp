@@ -396,17 +396,22 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	if (data_len > 0 && fail == false && cur_session) {
 		dolog("TCP[%012" PRIx64 "]: packet len %d, header size: %d, data size: %d\n", id, size, header_size, data_len);
 
-		uint32_t ack_nr = cur_session->their_seq_nr + data_len;  // FIXME handle missing segments
+		if (their_seq_nr >= cur_session->their_seq_nr) {
+			cur_session->their_seq_nr += data_len;  // FIXME handle missing segments
 
-		send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, ack_nr, &cur_session->my_seq_nr, nullptr, 0);
+			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 
-		const uint8_t *data_start = &p[header_size];
+			const uint8_t *data_start = &p[header_size];
 
-		std::string content = bin_to_text(data_start, data_len);
-		dolog("TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
+			std::string content = bin_to_text(data_start, data_len);
+			dolog("TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
 
-		if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.private_data) == false)
-			fail = true;
+			if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.private_data) == false)
+				fail = true;
+		}
+		else {
+			dolog("TCP[%012" PRIx64 "]: data already seen/resend\n");
+		}
 
 		unacked_cv.notify_all();
 	}
