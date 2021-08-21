@@ -139,6 +139,9 @@ void frame_buffer_thread(void *fb_in)
 
 void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len)
 {
+	if (fb->w < x + w || fb->h < y + h)
+		return;
+
 	*message = (uint8_t *)malloc(4 + 12 * 1 + w * h * 4); // at most
 
 	(*message)[0] = 0;  // FramebufferUpdate
