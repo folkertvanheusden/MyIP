@@ -174,8 +174,6 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 	if (get) {
 		if (reply) {
 			ts->t->send_data(ts, reply, content_len, true);
-
-			free(reply);
 		}
 		else {
 			const char err[] = "Something went wrong: you should not see this.";
@@ -187,6 +185,8 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 	ts->t->end_session(ts, pkt);
 
 	delete lines;
+
+	free(reply);
 }
 
 bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, private_data *pd)
