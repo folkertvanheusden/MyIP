@@ -3,7 +3,6 @@ language: cpp
 dist: focal
 
 before_install:
-  - sudo apt-get update
   - sudo apt-get -y install libiniparser-dev
 
 compiler:
