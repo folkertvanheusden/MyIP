@@ -75,6 +75,8 @@ int main(int argc, char *argv[])
 
 	dolog("*** START ***\n");
 
+	setlog(iniparser_getstring(ini, "cfg:logfile", "/tmp/myip.log"));
+
 	const char *mac_str = iniparser_getstring(ini, "cfg:mac-address", "52:34:84:16:44:22");
 	uint8_t mymac[6] { 0 };
 	parse_mac_address(mac_str, mymac);

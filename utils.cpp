@@ -121,9 +121,18 @@ std::vector<std::string> * split(std::string in, std::string splitter)
 	return out;
 }
 
+static const char *logfile = strdup("/tmp/myip.log");
+
+void setlog(const char *lf)
+{
+	free((void *)logfile);
+
+	logfile = lf;
+}
+
 void dolog(const char *fmt, ...)
 {
-	FILE *fh = fopen("/tmp/myip.log", "a+");
+	FILE *fh = fopen(logfile, "a+");
 
 	if (fh) {
 		uint64_t now = get_us();
