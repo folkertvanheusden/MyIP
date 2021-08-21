@@ -206,7 +206,7 @@ bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 	return true;
 }
 
-void http_close_session(tcp_session_t *ts, private_data *pd)
+void http_close_session_1(tcp_session_t *ts, private_data *pd)
 {
 	if (ts -> p) {
 		http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
@@ -218,6 +218,10 @@ void http_close_session(tcp_session_t *ts, private_data *pd)
 	}
 }
 
+void http_close_session_2(tcp_session_t *ts, private_data *pd)
+{
+}
+
 tcp_port_handler_t http_get_handler(const std::string & web_root, const std::string & logfile)
 {
 	tcp_port_handler_t tcp_http;
@@ -225,7 +229,8 @@ tcp_port_handler_t http_get_handler(const std::string & web_root, const std::str
 	tcp_http.init = nullptr;
 	tcp_http.new_session = http_new_session;
 	tcp_http.new_data = http_new_data;
-	tcp_http.session_closed = http_close_session;
+	tcp_http.session_closed_1 = http_close_session_1;
+	tcp_http.session_closed_2 = http_close_session_2;
 	http_private_data *hpd = new http_private_data();
 	tcp_http.pd = hpd;
 	hpd->logfile = logfile;

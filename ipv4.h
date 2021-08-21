@@ -30,7 +30,7 @@ private:
 	uint64_t *ipv4_unk_prot { nullptr };
 	uint64_t *ipv4_n_tx { nullptr };
 
-	void send_ttl_exceeded(const packet *const pkt);
+	void send_ttl_exceeded(const packet *const pkt) const;
 
 public:
 	ipv4(stats *const s, arp *const iarp, const uint8_t myip[4]);
@@ -38,7 +38,7 @@ public:
 
 	void transmit_packet(const uint8_t *dst_ip, const uint8_t *src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template = nullptr);
 
-	void register_protocol(const uint8_t i_p, ip_protocol *const p);
+	void register_protocol(const uint8_t protocol, ip_protocol *const p);
 
 	void register_icmp(icmp *const icmp_) { this->icmp_ = icmp_; }
 

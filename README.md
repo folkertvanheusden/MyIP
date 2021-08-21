@@ -44,13 +44,10 @@ response fits in 1 segment and is ACKed immediately).
 
 badges
 ------
-  * <a href="https://scan.coverity.com/projects/folkertvanheusden-myip"><img alt="Coverity Scan Build status" src="https://scan.coverity.com/projects/23472/badge.svg"/></a>
-
-  * <img src="https://img.shields.io/github/license/folkertvanheusden/MyIP">
-
-  * <img src="https://img.shields.io/travis/com/folkertvanheusden/MyIP">
-
-  * [![Codacy Badge](https://app.codacy.com/project/badge/Grade/9f791b96f10a48eba323215bc5feed1a)](https://www.codacy.com/gh/folkertvanheusden/MyIP/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=folkertvanheusden/MyIP&amp;utm_campaign=Badge_Grade)
+<a href="https://scan.coverity.com/projects/folkertvanheusden-myip"><img alt="Coverity Scan Build status" src="https://scan.coverity.com/projects/23472/badge.svg"/></a>
+<img src="https://img.shields.io/github/license/folkertvanheusden/MyIP">
+<img src="https://img.shields.io/travis/com/folkertvanheusden/MyIP">
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/9f791b96f10a48eba323215bc5feed1a)](https://www.codacy.com/gh/folkertvanheusden/MyIP/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=folkertvanheusden/MyIP&amp;utm_campaign=Badge_Grade)
 
 demo
 ----

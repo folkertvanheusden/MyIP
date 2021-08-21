@@ -311,18 +311,6 @@ void vnc_thread(void *ts_in)
 			break;
 		}
 
-		if (!work->pkt) {  // means "update"
-			uint8_t *message = nullptr;
-			size_t message_len = 0;
-
-			calculate_fb_update(&fb, encodings, true, 0, 0, fb.w, fb.h, vs->depth, &message, &message_len);
-
-			dolog("VNC: %zu will update for %s, output is %zu bytes\n", get_us(), vs->client_addr.c_str(), message_len);
-			ts->t->send_data(ts, message, message_len, false);
-
-			free(message);
-		}
-
 		vs->buffer = (char *)realloc(vs->buffer, vs->buffer_size + work->data_len);
 
 		memcpy(&vs->buffer[vs->buffer_size], work->data, work->data_len);
@@ -604,7 +592,7 @@ void vnc_thread(void *ts_in)
 	dolog("VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
 
-void vnc_close_session(tcp_session_t *ts, private_data *pd)
+void vnc_close_session_1(tcp_session_t *ts, private_data *pd)
 {
 	if (ts -> p) {
 		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
@@ -614,6 +602,13 @@ void vnc_close_session(tcp_session_t *ts, private_data *pd)
 			vs->wq.push(nullptr);
 			vs->w_cond.notify_one();
 		}
+	}
+}
+
+void vnc_close_session_2(tcp_session_t *ts, private_data *pd)
+{
+	if (ts -> p) {
+		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 
 		vs->th->join();
 		delete vs->th;
@@ -633,7 +628,8 @@ tcp_port_handler_t vnc_get_handler()
 	tcp_vnc.init = vnc_init;
 	tcp_vnc.new_session = vnc_new_session;
 	tcp_vnc.new_data = vnc_new_data;
-	tcp_vnc.session_closed = vnc_close_session;
+	tcp_vnc.session_closed_1 = vnc_close_session_1;
+	tcp_vnc.session_closed_2 = vnc_close_session_2;
 	tcp_vnc.pd = nullptr;
 
 	return tcp_vnc;

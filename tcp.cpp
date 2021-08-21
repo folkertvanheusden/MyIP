@@ -86,7 +86,8 @@ tcp::tcp(stats *const s, icmp *const icmp_) : icmp_(icmp_)
 	tcp_new_sessions = s->register_stat("tcp_new_sessions");
 	tcp_sessions_rem = s->register_stat("tcp_sessions_rem");
 	tcp_sessions_to = s->register_stat("tcp_sessions_to");
-	tcp_sessions_closed = s->register_stat("tcp_sessions_closed");
+	tcp_sessions_closed_1 = s->register_stat("tcp_sessions_closed1");
+	tcp_sessions_closed_2 = s->register_stat("tcp_sessions_closed2");
 	tcp_rst = s->register_stat("tcp_rst");
 
 	th = new std::thread(std::ref(*this));
@@ -291,7 +292,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			cur_session->my_seq_nr++;
 
-			cb_it->second.session_closed(cur_session, cb_it->second.pd);
+			cb_it->second.session_closed_1(cur_session, cb_it->second.pd);
+			delete_entry = true;
 		}
 		else {
 			dolog("TCP[%012" PRIx64 "]: FIN for unknown session\n", id);
@@ -417,7 +419,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 	if (fail) {
 		if (cb_it != listeners.end())
-			cb_it->second.session_closed(cur_session, cb_it->second.pd);
+			cb_it->second.session_closed_1(cur_session, cb_it->second.pd);
 
 		stats_inc_counter(tcp_errors);
 
@@ -442,11 +444,11 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		cur_it = sessions.find(id);
 
 		if (cur_it != sessions.end()) {
-			// call session_closed
+			// call session_closed_2
 			auto cb_org_it = listeners.find(cur_it->second->org_dst_port);
 
 			if (cb_org_it != listeners.end())  // session not initiated here?
-				cb_org_it->second.session_closed(cur_it->second, cb_org_it->second.pd);
+				cb_org_it->second.session_closed_2(cur_it->second, cb_org_it->second.pd);
 
 			// clean-up
 			free_tcp_session(cur_it->second);
@@ -487,8 +489,10 @@ void tcp::session_cleaner()
 				// call session_closed
 				auto cb_it = listeners.find(it->second->org_dst_port);
 
-				if (cb_it != listeners.end())  // session not initiated here?
-					cb_it->second.session_closed(it->second, cb_it->second.pd);
+				if (cb_it != listeners.end()) {  // session not initiated here?
+					cb_it->second.session_closed_1(it->second, cb_it->second.pd);
+					cb_it->second.session_closed_2(it->second, cb_it->second.pd);
+				}
 
 				// clean-up
 				free_tcp_session(it->second);
@@ -580,7 +584,7 @@ void tcp::operator()()
 		tcp_packet_handle_thread_t *handler_data = new tcp_packet_handle_thread_t;
 		handler_data->finished_flag = false;
 
-		// FIXME zolang tcp::packet_handler 1 grote lock heeft, niet dit
+		// FIXME as long as tcp::packet_handler has 1 lock: this has no use
 #if 0
 		handler_data->th = new std::thread(&tcp::packet_handler, this, pkt, &handler_data->finished_flag);
 
@@ -598,9 +602,10 @@ void tcp::operator()()
 				i++;
 			}
 		}
-#endif
+#else
 		packet_handler(pkt, &handler_data->finished_flag);
 		delete handler_data;
+#endif
 
 		sessions_cv.notify_all();
 	}
