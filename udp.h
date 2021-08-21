@@ -30,5 +30,5 @@ public:
 
 	void transmit_packet(const uint8_t *dst_ip, const int dst_port, const uint8_t *src_ip, const int src_port, const uint8_t *payload, const size_t pl_size);
 
-	virtual void operator()();
+	virtual void operator()() override;
 };

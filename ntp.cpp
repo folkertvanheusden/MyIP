@@ -63,7 +63,7 @@ void ntp::input(const uint8_t *src_ip, int src_port, const uint8_t *dst_ip, int 
 {
 	stats_inc_counter(ntp_requests);
 
-	sntp_datagram *sntp = (sntp_datagram *)p->get_data();
+	sntp_datagram *sntp = reinterpret_cast<sntp_datagram *>(p->get_data());
 
 	if (sntp->mode == 1 || sntp->mode == 3) { // time request
 		stats_inc_counter(ntp_time_req);

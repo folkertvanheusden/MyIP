@@ -122,7 +122,6 @@ std::vector<std::string> * split(std::string in, std::string splitter)
 
 void dolog(const char *fmt, ...)
 {
-        va_list ap;
 	FILE *fh = fopen("/tmp/myip.log", "a+");
 
 	if (fh) {
@@ -130,10 +129,11 @@ void dolog(const char *fmt, ...)
 		time_t t_now = now / 1000000;
 		struct tm *tm = localtime(&t_now);
 
-		fprintf(fh, "%04d-%02d-%02d %02d:%02d:%02d.%06u %.6f|%d] ",
+		fprintf(fh, "%04d-%02d-%02d %02d:%02d:%02d.%06d %.6f|%d] ",
 				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, int(now % 1000000),
 				get_us() / 1000000.0, gettid());
 
+		va_list ap;
 		va_start(ap, fmt);
 		(void)vfprintf(fh, fmt, ap);
 		va_end(ap);

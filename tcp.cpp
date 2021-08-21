@@ -443,10 +443,10 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		if (cur_it != sessions.end()) {
 			// call session_closed
-			auto cb_it = listeners.find(cur_it->second->org_dst_port);
+			auto cb_org_it = listeners.find(cur_it->second->org_dst_port);
 
-			if (cb_it != listeners.end())  // session not initiated here?
-				cb_it->second.session_closed(cur_it->second, cb_it->second.pd);
+			if (cb_org_it != listeners.end())  // session not initiated here?
+				cb_org_it->second.session_closed(cur_it->second, cb_org_it->second.pd);
 
 			// clean-up
 			free_tcp_session(cur_it->second);

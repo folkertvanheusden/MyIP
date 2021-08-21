@@ -12,7 +12,7 @@
 
 bool http_new_session(tcp_session_t *ts, const packet *pkt, private_data *pd)
 {
-	http_session_data *hs = new http_session_data;
+	http_session_data *hs = new http_session_data();
 	hs->req_data = nullptr;
 	hs->req_len = 0;
 
@@ -46,8 +46,8 @@ std::optional<std::string> find_header(std::vector<std::string> *lines, const st
 
 void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_data *pd)
 {
-	http_session_data *hs = (http_session_data *)ts->p;
-	http_private_data *hpd = (http_private_data *)pd;
+	http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
+	http_private_data *hpd = dynamic_cast<http_private_data *>(pd);
 	std::string logfile = hpd->logfile;
 	std::string web_root = hpd->web_root;
 
@@ -150,7 +150,7 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 
 			const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-			fprintf(fh, "%s - - [%02d/%s/%04d:%02d:%02d:%02d +0000] \"%s\" %d %zu \"-\" \"\"\n",
+			fprintf(fh, "%s - - [%02d/%s/%04d:%02d:%02d:%02d +0000] \"%s\" %d %ld \"-\" \"\"\n",
 					hs->client_addr.c_str(),
 					tm.tm_mday, month[tm.tm_mon], tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec,
 					hs->req_data,
@@ -191,7 +191,7 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 
 bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, private_data *pd)
 {
-	http_session_data *hs = (http_session_data *)ts->p;
+	http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
 
 	if (!hs) {
 		dolog("HTTP: Data for a non-existing session\n");
@@ -214,7 +214,7 @@ bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 void http_close_session(tcp_session_t *ts, private_data *pd)
 {
 	if (ts -> p) {
-		http_session_data *hs = (http_session_data *)ts->p;
+		http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
 		free(hs->req_data);
 
 		delete hs;

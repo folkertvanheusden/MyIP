@@ -24,6 +24,7 @@ private:
 
 public:
 	phys(stats *const s, const std::string & dev_name);
+	phys(const phys &) = delete;
 	virtual ~phys();
 
 	void register_protocol(const uint16_t ether_type, protocol *const p);

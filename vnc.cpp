@@ -67,9 +67,9 @@ void frame_buffer_thread(void *fb_in)
 {
 	set_thread_name("framebuf");
 
-	frame_buffer_t *fb = (frame_buffer_t *)fb_in;
+	frame_buffer_t *fb_work = reinterpret_cast<frame_buffer_t *>(fb_in);
 
-	int x = fb->w / 2, y = fb->h / 2;
+	int x = fb_work->w / 2, y = fb_work->h / 2;
 	int dx = 1, dy = 1;
 
 	uint64_t latest_update = 0;
@@ -78,20 +78,20 @@ void frame_buffer_thread(void *fb_in)
 		// should be locking for these as well
 
 		// increase green
-		assert(x < fb->w);
-		assert(y < fb->h);
-		fb->buffer[y * fb->w * 3 + x * 3 + 1]++;
+		assert(x < fb_work->w);
+		assert(y < fb_work->h);
+		fb_work->buffer[y * fb_work->w * 3 + x * 3 + 1]++;
 
 		x += dx;
 		y += dy;
 
-		if (x >= fb->w) {
-			x = fb->w - 1;
+		if (x >= fb_work->w) {
+			x = fb_work->w - 1;
 			dx = -((rand() % 3) + 1);
 		}
 
-		if (y >= fb->h) {
-			y = fb->h - 1;
+		if (y >= fb_work->h) {
+			y = fb_work->h - 1;
 			dy = -((rand() % 3) + 1);
 		}
 
@@ -106,35 +106,35 @@ void frame_buffer_thread(void *fb_in)
 		}
 
 		// increase red
-		int cx = rand() % fb -> w;
-		int cy = rand() % fb -> h;
-		fb->buffer[cy * fb->w * 3 + cx * 3 + 0]++;
+		int cx = rand() % fb_work -> w;
+		int cy = rand() % fb_work -> h;
+		fb_work->buffer[cy * fb_work->w * 3 + cx * 3 + 0]++;
 
 		uint64_t now = get_us();
 
 		if (now - latest_update >= 1000000) {  // 1 time per second
-			fb->fb_lock.lock();
+			fb_work->fb_lock.lock();
 
 			dolog("VNC: %zu FB UPDATE\n", now);
 			latest_update = now;
 
-			time_t now = time(nullptr);
-			struct tm *tm = gmtime(&now);
+			time_t tnow = time(nullptr);
+			struct tm *tm = gmtime(&tnow);
 
 			char *text = nullptr;
 			asprintf(&text, "%02d:%02d:%02d - MyIP", tm->tm_hour, tm->tm_min, tm->tm_sec);
 
-			draw_text(fb, fb->w / 2 - 15 * 8 / 4, fb->h / 2 - 8 / 2, text);
+			draw_text(fb_work, fb_work->w / 2 - 15 * 8 / 4, fb_work->h / 2 - 8 / 2, text);
 
 			free(text);
 
-			fb->fb_lock.unlock();
+			fb_work->fb_lock.unlock();
 		}
 
 		usleep(1000);  // ignore any errors during usleep
 	}
 
-	delete [] fb->buffer;
+	delete [] fb_work->buffer;
 }
 
 void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len)
@@ -254,7 +254,7 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 
 bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, void *private_data)
 {
-	vnc_session_data *vs = (vnc_session_data *)ts->p;
+	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 
 	if (!vs) {
 		dolog("VNC: Data for a non-existing session\n");
@@ -276,7 +276,7 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 void vnc_thread(void *ts_in)
 {
 	tcp_session_t *ts = (tcp_session_t *)ts_in;
-	vnc_session_data *vs = (vnc_session_data *)ts->p;
+	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 	bool rc = true;
 
 	set_thread_name("vnc");
@@ -603,7 +603,7 @@ void vnc_thread(void *ts_in)
 void vnc_close_session(tcp_session_t *ts, private_data *pd)
 {
 	if (ts -> p) {
-		vnc_session_data *vs = (vnc_session_data *)ts->p;
+		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 
 		{
 			const std::lock_guard<std::mutex> lck(vs->w_lock);

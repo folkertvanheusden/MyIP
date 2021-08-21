@@ -28,8 +28,7 @@ phys::phys(stats *const s, const std::string & dev_name)
 	ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 	strncpy(ifr.ifr_name, dev_name.c_str(), std::min(IFNAMSIZ, int(dev_name.size())));
 
-	int err = 0;
-	if ((err = ioctl(fd, TUNSETIFF, (void *) &ifr)) == -1 ) {
+	if (ioctl(fd, TUNSETIFF, (void *) &ifr) == -1 ) {
 		perror("ioctl TUNSETIFF");
 		close(fd);
 		exit(1);

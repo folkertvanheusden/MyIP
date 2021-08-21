@@ -26,6 +26,7 @@ private:
 
 public:
 	ntp(stats *const s, udp *const u, const uint8_t upstream_ntp_server[4], const bool broadcast);
+	ntp(const ntp &) = delete;
 	virtual ~ntp();
 
 	void input(const uint8_t *src_ip, int src_port, const uint8_t *dst_ip, int dst_port, packet *p);

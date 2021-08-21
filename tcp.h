@@ -106,5 +106,5 @@ public:
 	void send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len, const bool in_cb);
 	void end_session(tcp_session_t *const ts, const packet *const pkt);
 
-	virtual void operator()();
+	virtual void operator()() override;
 };

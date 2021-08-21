@@ -9,6 +9,7 @@ class private_data
 {
 public:
 	private_data() { }
+	virtual ~private_data() = default;
 };
 
 class http_private_data : public private_data
@@ -21,6 +22,7 @@ class session_data
 {
 public:
 	session_data() { }
+	virtual ~session_data() = default;
 
 	std::string client_addr;
 };

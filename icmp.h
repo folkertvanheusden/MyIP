@@ -11,10 +11,10 @@ private:
 	uint64_t *icmp_transmit { nullptr };
 
 public:
-	icmp(stats *const s);
+	explicit icmp(stats *const s);
 	virtual ~icmp();
 
 	void send_packet(const uint8_t *const dst_ip, const uint8_t *const src_ip, const uint8_t type, const uint8_t code, const packet *const p) const;
 
-	virtual void operator()();
+	virtual void operator()() override;
 };
