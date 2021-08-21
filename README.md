@@ -52,7 +52,7 @@ demo
 ----
 See http://myip.vanheusden.com/
 
-It also runs an NTP server.
+It also runs an NTP and VNC server.
 
 copyright
 ---------
