@@ -639,14 +639,20 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 		if (!in_cb)
 			lck = new std::unique_lock<std::mutex>(ts->tlock);
 
-		// FIXME 1024: what fits in an IP message
+		// FIXME 1024: what fits in an IP packet
 		size_t send_n = std::min(size_t(1024), std::max(size_t(0), std::min(p_len, ts->window_size - ts->unacked_size)));
+
+		bool window_full = false;
+		if (send_n == 0) { // TCP window is full, put it all in unacked
+			send_n = p_len;
+			window_full = true;
+		}
 
 		ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + send_n);
 		memcpy(&ts->unacked[ts->unacked_size], p, send_n);
 		ts->unacked_size += send_n;
 
-		if (ts->unacked_size <= send_n && i == 0) {
+		if (ts->unacked_size <= send_n && i == 0 && window_full == false) {
 			uint32_t send_nr = ts->my_seq_nr + ts->unacked_size - send_n;
 
 			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u, size: %zu\n", ts->id, ts->their_seq_nr, send_nr, send_n);
