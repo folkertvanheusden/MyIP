@@ -291,7 +291,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			cur_session->my_seq_nr++;
 
-			cb_it->second.session_closed(cur_session, cb_it->second.private_data);
+			cb_it->second.session_closed(cur_session, cb_it->second.pd);
 		}
 		else {
 			dolog("TCP[%012" PRIx64 "]: FIN for unknown session\n", id);
@@ -323,7 +323,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				dolog("TCP[%012" PRIx64 "]: session established\n", id);
 
-				if (cb_it->second.new_session(cur_session, pkt, cb_it->second.private_data) == false) {
+				if (cb_it->second.new_session(cur_session, pkt, cb_it->second.pd) == false) {
 					dolog("TCP[%012" PRIx64 "]: session terminated\n", id);
 					fail = true;
 				}
@@ -405,7 +405,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			std::string content = bin_to_text(data_start, data_len);
 			dolog("TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
 
-			if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.private_data) == false)
+			if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.pd) == false)
 				fail = true;
 		}
 		else {
@@ -417,7 +417,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 	if (fail) {
 		if (cb_it != listeners.end())
-			cb_it->second.session_closed(cur_session, cb_it->second.private_data);
+			cb_it->second.session_closed(cur_session, cb_it->second.pd);
 
 		stats_inc_counter(tcp_errors);
 
@@ -446,7 +446,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			auto cb_it = listeners.find(cur_it->second->org_dst_port);
 
 			if (cb_it != listeners.end())  // session not initiated here?
-				cb_it->second.session_closed(cur_it->second, cb_it->second.private_data);
+				cb_it->second.session_closed(cur_it->second, cb_it->second.pd);
 
 			// clean-up
 			free_tcp_session(cur_it->second);
@@ -488,7 +488,7 @@ void tcp::session_cleaner()
 				auto cb_it = listeners.find(it->second->org_dst_port);
 
 				if (cb_it != listeners.end())  // session not initiated here?
-					cb_it->second.session_closed(it->second, cb_it->second.private_data);
+					cb_it->second.session_closed(it->second, cb_it->second.pd);
 
 				// clean-up
 				free_tcp_session(it->second);

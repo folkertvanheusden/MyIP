@@ -14,50 +14,7 @@
 #include "utils.h"
 #include "ipv4.h"
 #include "font.h"
-
-typedef enum {  vs_initial_handshake_server_send = 0,
-		vs_initial_handshake_client_resp,
-		vs_security_handshake_server,
-		vs_security_handshake_client_resp,
-		vs_client_init,
-		vs_server_init,
-		vs_running_waiting_cmd,
-		vs_running_waiting_data,
-		vs_running_waiting_data_extra,
-		vs_running_waiting_data_ignore,
-		vs_terminate
-} vnc_state_t;
-
-typedef struct _vnc_thread_work_t_ {
-	// nullptr if update requested
-	packet *pkt;
-
-	char *data;
-	size_t data_len;
-
-	_vnc_thread_work_t_() {
-		pkt = nullptr;
-		data = nullptr;
-		data_len = 0;
-	}
-} vnc_thread_work_t;
-
-typedef struct {
-	std::string client_addr;
-
-	char *buffer;
-	size_t buffer_size;
-
-	vnc_state_t state;
-
-	uint8_t depth;  // 'bits per pixel' really
-
-	std::thread *th;
-
-	std::queue<vnc_thread_work_t *> wq;
-        std::condition_variable w_cond;
-        mutable std::mutex w_lock;
-} vnc_session_t;
+#include "types.h"
 
 struct frame_buffer_t
 {
@@ -264,7 +221,7 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 
 bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 {
-	vnc_session_t *vs = new vnc_session_t();
+	vnc_session_data *vs = new vnc_session_data();
 
 	std::pair<const uint8_t *, int> src_addr = pkt->get_src_addr();
 	vs->client_addr = ip_to_str(src_addr);
@@ -297,7 +254,7 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 
 bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, void *private_data)
 {
-	vnc_session_t *vs = (vnc_session_t *)ts->p;
+	vnc_session_data *vs = (vnc_session_data *)ts->p;
 
 	if (!vs) {
 		dolog("VNC: Data for a non-existing session\n");
@@ -319,7 +276,7 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 void vnc_thread(void *ts_in)
 {
 	tcp_session_t *ts = (tcp_session_t *)ts_in;
-	vnc_session_t *vs = (vnc_session_t *)ts->p;
+	vnc_session_data *vs = (vnc_session_data *)ts->p;
 	bool rc = true;
 
 	set_thread_name("vnc");
@@ -643,10 +600,10 @@ void vnc_thread(void *ts_in)
 	dolog("VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
 
-void vnc_close_session(tcp_session_t *ts, void *private_data)
+void vnc_close_session(tcp_session_t *ts, private_data *pd)
 {
 	if (ts -> p) {
-		vnc_session_t *vs = (vnc_session_t *)ts->p;
+		vnc_session_data *vs = (vnc_session_data *)ts->p;
 
 		{
 			const std::lock_guard<std::mutex> lck(vs->w_lock);
@@ -673,7 +630,7 @@ tcp_port_handler_t vnc_get_handler()
 	tcp_vnc.new_session = vnc_new_session;
 	tcp_vnc.new_data = vnc_new_data;
 	tcp_vnc.session_closed = vnc_close_session;
-	tcp_vnc.private_data = nullptr;
+	tcp_vnc.pd = nullptr;
 
 	return tcp_vnc;
 }

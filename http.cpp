@@ -10,15 +10,9 @@
 #include "ipv4.h"
 #include "types.h"
 
-typedef struct {
-	std::string client_addr;
-	char *req_data;
-	size_t req_len;
-} http_session_t;
-
-bool http_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
+bool http_new_session(tcp_session_t *ts, const packet *pkt, private_data *pd)
 {
-	http_session_t *hs = new http_session_t;
+	http_session_data *hs = new http_session_data;
 	hs->req_data = nullptr;
 	hs->req_len = 0;
 
@@ -50,10 +44,10 @@ std::optional<std::string> find_header(std::vector<std::string> *lines, const st
 	return value;
 }
 
-void send_response(tcp_session_t *ts, const packet *pkt, char *request, void *private_data)
+void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_data *pd)
 {
-	http_session_t *hs = (http_session_t* )ts->p;
-	http_private_data *hpd = (http_private_data *)private_data;
+	http_session_data *hs = (http_session_data *)ts->p;
+	http_private_data *hpd = (http_private_data *)pd;
 	std::string logfile = hpd->logfile;
 	std::string web_root = hpd->web_root;
 
@@ -195,9 +189,9 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, void *pr
 	delete lines;
 }
 
-bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, void *private_data)
+bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, private_data *pd)
 {
-	http_session_t *hs = (http_session_t* )ts->p;
+	http_session_data *hs = (http_session_data *)ts->p;
 
 	if (!hs) {
 		dolog("HTTP: Data for a non-existing session\n");
@@ -212,15 +206,15 @@ bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 
 	char *end_marker = strstr(hs->req_data, "\r\n\r\n");
 	if (end_marker)
-		send_response(ts, pkt, hs->req_data, private_data);
+		send_response(ts, pkt, hs->req_data, pd);
 
 	return true;
 }
 
-void http_close_session(tcp_session_t *ts, void *private_data)
+void http_close_session(tcp_session_t *ts, private_data *pd)
 {
 	if (ts -> p) {
-		http_session_t *hs = (http_session_t* )ts->p;
+		http_session_data *hs = (http_session_data *)ts->p;
 		free(hs->req_data);
 
 		delete hs;
@@ -238,7 +232,7 @@ tcp_port_handler_t http_get_handler(const std::string & web_root, const std::str
 	tcp_http.new_data = http_new_data;
 	tcp_http.session_closed = http_close_session;
 	http_private_data *hpd = new http_private_data();
-	tcp_http.private_data = hpd;
+	tcp_http.pd = hpd;
 	hpd->logfile = logfile;
 	hpd->web_root = web_root;
 

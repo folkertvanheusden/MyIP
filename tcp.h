@@ -11,6 +11,7 @@
 #include "ip_protocol.h"
 #include "packet.h"
 #include "stats.h"
+#include "types.h"
 
 class icmp;
 class ipv4;
@@ -51,15 +52,15 @@ typedef struct {
 	size_t unacked_size;
 	bool fin_after_unacked_empty;
 
-	void *p;
+	session_data *p;
 } tcp_session_t;
 
 typedef struct {
 	std::function<void()> init;
-	std::function<bool(tcp_session_t *, const packet *pkt, void *)> new_session;
-	std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, void *)> new_data;
-	std::function<void(tcp_session_t *, void *)> session_closed;
-	void *private_data;
+	std::function<bool(tcp_session_t *, const packet *pkt, private_data *)> new_session;
+	std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> new_data;
+	std::function<void(tcp_session_t *, private_data *)> session_closed;
+	private_data *pd;
 } tcp_port_handler_t;
 
 typedef struct {

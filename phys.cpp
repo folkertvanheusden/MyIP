@@ -81,7 +81,7 @@ void phys::transmit_packet(const uint8_t *dst_mac, const uint8_t *src_mac, const
 
 	int rc = write(fd, out, out_size);
 
-	if (rc != out_size) {
+	if (size_t(rc) != out_size) {
 		dolog("phys: problem sending packet (%d for %zu bytes)\n", rc, out_size);
 
 		if (rc == -1)
