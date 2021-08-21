@@ -47,6 +47,11 @@ VNC server implementation, the http-server works fine (as long as the
 response fits in 1 segment and is ACKed immediately).
 
 
+badges
+------
+<a href="https://scan.coverity.com/projects/folkertvanheusden-myip"><img alt="Coverity Scan Build status" src="https://scan.coverity.com/projects/23472/badge.svg"/></a>
+
+
 demo
 ----
 See http://myip.vanheusden.com/
