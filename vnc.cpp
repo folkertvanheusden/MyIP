@@ -483,7 +483,7 @@ void vnc_thread(void *ts_in)
 			dolog("VNC: waiting for data for command %d\n", running_cmd);
 
 			if (running_cmd == 0) {  // SetPixelFormat, 7.5.1
-				dolog("VNC: Retrieving pixelformat\n", n_encodings);
+				dolog("VNC: Retrieving pixelformat\n");
 
 				uint8_t *pf = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 19);
 

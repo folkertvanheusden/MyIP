@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 
 	constexpr uint8_t upstream_ntp_server[] = { 192, 168, 64, 1 }; // change this
 
-	tcp_port_handler_t http_handler = http_get_handler("/home/folkert/http_access.log"); // change this
+	tcp_port_handler_t http_handler = http_get_handler("/home/folkert/www", "/home/folkert/http_access.log"); // change this
 	t->add_handler(80, http_handler);
 
 	tcp_port_handler_t vnc_handler = vnc_get_handler();

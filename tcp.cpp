@@ -409,7 +409,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				fail = true;
 		}
 		else {
-			dolog("TCP[%012" PRIx64 "]: data already seen/resend\n");
+			dolog("TCP[%012" PRIx64 "]: data already seen/resend\n", id);
 		}
 
 		unacked_cv.notify_all();

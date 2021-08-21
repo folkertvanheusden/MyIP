@@ -177,7 +177,8 @@ void set_thread_name(const std::string & name)
 	pthread_setname_np(pthread_self(), full_name.c_str());
 }
 
-std::string bin_to_text(const uint8_t *p, const size_t len) {
+std::string bin_to_text(const uint8_t *p, const size_t len)
+{
 	char *temp = (char *)calloc(1, len * 6 + 1);
 
 	for(size_t i=0; i<len; i++)
@@ -188,4 +189,16 @@ std::string bin_to_text(const uint8_t *p, const size_t len) {
 	free(temp);
 
 	return out;
+}
+
+bool file_exists(const std::string & file, size_t *const file_size)
+{
+	struct stat st { 0 };
+
+	bool rc = stat(file.c_str(), &st) == 0;
+
+	if (rc && file_size)
+		*file_size = st.st_size;
+
+	return rc;
 }
