@@ -307,7 +307,7 @@ void vnc_thread(void *ts_in)
 		}
 
 		if (!work) {
-			dolog("VNC: %zu TERMINATE THREAD REQUESTED\n", get_us());
+			dolog("VNC: TERMINATE THREAD REQUESTED\n");
 			break;
 		}
 
