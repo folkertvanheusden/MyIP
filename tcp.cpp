@@ -362,7 +362,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			if (left_n > 0)
 				memmove(&cur_session->unacked[0], &cur_session->unacked[ack_n], left_n);
 			else if (left_n < 0) {
-				dolog("TCP[%012" PRIx64 "]: ack underrun? %d\n", left_n);
+				dolog("TCP[%012" PRIx64 "]: ack underrun? %d\n", id, left_n);
 				// terminate invalid session
 				// can happen for data coming in after finished
 				cur_session->unacked_size = ack_n = 0;
@@ -623,7 +623,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 {
 	uint64_t internal_id = get_us();
 
-	dolog("TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %u packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
+	dolog("TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %lu packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
 
 	for(size_t i=0; i<len;) {
 		const uint8_t *p = &data[i];
