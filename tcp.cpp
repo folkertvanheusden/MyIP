@@ -376,7 +376,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			cur_session->my_seq_nr += ack_n;
 
 			if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
-				dolog("TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n");
+				dolog("TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n", id);
 
 				send_segment(cur_session->id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) | (1 << 0) /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 				cur_session->my_seq_nr++;
