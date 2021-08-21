@@ -12,19 +12,20 @@ Linux and BSD, see https://en.wikipedia.org/wiki/TUN/TAP ).
 
 how to build
 ------------
-	mkdir build
-	cd build
-	cmake ..
-	make
+Make sure you have "libiniparser-dev" installed. Then:
+
+* mkdir build
+* cd build
+* cmake ..
+* make
 
 how to run
 ----------
 As root:
 
-	./myip
+	./myip configuration-file.ini
 
-Note: make sure you change the IP-address and such in main.cpp to reflect
-the network configuration you like to have.
+Look at 'example.ini' on how to configure the stack.
 
 After you have started `myip', a 'myip' network device has appeared.
 
