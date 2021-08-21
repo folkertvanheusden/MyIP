@@ -222,7 +222,7 @@ void ipv4::operator()()
 	}
 }
 
-void ipv4::send_ttl_exceeded(const packet *const pkt)
+void ipv4::send_ttl_exceeded(const packet *const pkt) const
 {
 	if (icmp_)
 		icmp_->send_packet(pkt->get_src_addr().first, pkt->get_dst_addr().first, 11, 0, pkt);

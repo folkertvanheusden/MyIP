@@ -81,8 +81,6 @@ int main(int argc, char *argv[])
 	dolog(" *** TERMINATING ***\n");
 	dolog("THIS IS THE END\n");
 
-	exit(0); // FIXME debug
-
 	delete dev;
 	delete a;
 	delete ipv4_instance;
