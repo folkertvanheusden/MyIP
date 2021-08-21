@@ -23,10 +23,14 @@ phys::phys(stats *const s, const std::string & dev_name)
 		exit(1);
 	}
 
-	struct ifreq ifr { 0 };
+	struct ifreq ifr;
 	memset(&ifr, 0, sizeof ifr);
+
 	ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
-	strncpy(ifr.ifr_name, dev_name.c_str(), std::min(IFNAMSIZ, int(dev_name.size())));
+
+	size_t copy_name_n = std::min(size_t(IFNAMSIZ), dev_name.size());
+	memcpy(ifr.ifr_name, dev_name.c_str(), copy_name_n);
+	ifr.ifr_name[IFNAMSIZ - 1] = 0x00;
 
 	if (ioctl(fd, TUNSETIFF, (void *) &ifr) == -1 ) {
 		perror("ioctl TUNSETIFF");
