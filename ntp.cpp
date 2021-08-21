@@ -1,4 +1,4 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under AGPL v3.0
+// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <stdint.h>
 #include <unistd.h>
 #include <arpa/inet.h>

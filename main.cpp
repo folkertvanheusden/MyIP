@@ -1,4 +1,4 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under AGPL v3.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>

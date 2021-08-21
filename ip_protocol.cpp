@@ -1,4 +1,4 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under AGPL v3.0
+// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <chrono>
 
 #include "ip_protocol.h"

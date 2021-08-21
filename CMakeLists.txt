@@ -1,4 +1,4 @@
-# (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under AGPL v3.0
+# (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 cmake_minimum_required(VERSION 3.9.4)
 
 project(myip VERSION 0.2)

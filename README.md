@@ -55,4 +55,4 @@ It also runs an NTP server.
 
 
 (C) 2021 by Folkert van Heusden <mail@vanheusden.com>
-Released under GPL v3.0
+Released under Apache License v2.0
