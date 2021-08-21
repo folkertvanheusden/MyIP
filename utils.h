@@ -16,3 +16,4 @@ void dolog(const char *fmt, ...);
 void set_thread_name(const std::string & name);
 std::string bin_to_text(const uint8_t *p, const size_t len);
 bool file_exists(const std::string & file, size_t *const file_size = nullptr);
+void myusleep(uint64_t us);

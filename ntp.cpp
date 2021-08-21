@@ -119,7 +119,7 @@ void ntp::operator()()
 			if (diff > 100000)
 				diff = 100000;
 
-			usleep(diff);
+			myusleep(diff);
 			
 			continue;
 		}

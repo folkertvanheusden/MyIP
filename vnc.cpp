@@ -131,7 +131,7 @@ void frame_buffer_thread(void *fb_in)
 			fb_work->fb_lock.unlock();
 		}
 
-		usleep(1000);  // ignore any errors during usleep
+		myusleep(1000);  // ignore any errors during usleep
 	}
 
 	delete [] fb_work->buffer;

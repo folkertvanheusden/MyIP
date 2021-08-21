@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <vector>
 #include <sys/stat.h>
@@ -201,4 +202,21 @@ bool file_exists(const std::string & file, size_t *const file_size)
 		*file_size = st.st_size;
 
 	return rc;
+}
+
+void myusleep(uint64_t us)
+{
+	struct timespec req;
+
+	req.tv_sec = us / 1000000l;
+	req.tv_nsec = (us % 1000000l) * 1000l;
+
+	for(;;) {
+		struct timespec rem { 0, 0 };
+
+		if (nanosleep(&req, &rem) == 0)
+			break;
+
+		memcpy(&req, &rem, sizeof(struct timespec));
+	}
 }
