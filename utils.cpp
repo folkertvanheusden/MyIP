@@ -14,7 +14,7 @@
 #include <sys/types.h>
 #if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
 #include <sys/syscall.h>
-#define gettid() syscall(SYS_gettid)
+#define gettid() pid_t(syscall(SYS_gettid))
 #endif
 
 void swap_mac(uint8_t *a, uint8_t *b)
@@ -129,7 +129,7 @@ void dolog(const char *fmt, ...)
 		time_t t_now = now / 1000000;
 		struct tm *tm = localtime(&t_now);
 
-		fprintf(fh, "%04d-%02d-%02d %02d:%02d:%02d.%06d %.6f|%ld] ",
+		fprintf(fh, "%04d-%02d-%02d %02d:%02d:%02d.%06d %.6f|%d] ",
 				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, int(now % 1000000),
 				get_us() / 1000000.0, gettid());
 
