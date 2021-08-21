@@ -139,32 +139,27 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 		header = myformat("HTTP/1.0 %d Something is wrong\r\nServer: MyIP\r\nConnection: close\r\n\r\n", rc);
 	}
 
-	if (parts->size() >= 2) {
-		dolog("HTTP: Send response %d for %s: %s\n", rc, hs->client_addr.c_str(), url.c_str());
+	dolog("HTTP: Send response %d for %s: %s\n", rc, hs->client_addr.c_str(), url.c_str());
 
-		FILE *fh = fopen(logfile.c_str(), "a+");
-		if (fh) {
-			auto tv = pkt->get_recv_ts();
-			struct tm tm { 0 };
-			gmtime_r(&tv.tv_sec, &tm);
+	FILE *fh = fopen(logfile.c_str(), "a+");
+	if (fh) {
+		auto tv = pkt->get_recv_ts();
+		struct tm tm { 0 };
+		gmtime_r(&tv.tv_sec, &tm);
 
-			const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+		const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-			fprintf(fh, "%s - - [%02d/%s/%04d:%02d:%02d:%02d +0000] \"%s\" %d %ld \"-\" \"\"\n",
-					hs->client_addr.c_str(),
-					tm.tm_mday, month[tm.tm_mon], tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec,
-					hs->req_data,
-					rc,
-					content_len);
+		fprintf(fh, "%s - - [%02d/%s/%04d:%02d:%02d:%02d +0000] \"%s\" %d %ld \"-\" \"\"\n",
+				hs->client_addr.c_str(),
+				tm.tm_mday, month[tm.tm_mon], tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec,
+				hs->req_data,
+				rc,
+				content_len);
 
-			fclose(fh);
-		}
-		else {
-			dolog("HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
-		}
+		fclose(fh);
 	}
 	else {
-		dolog("HTTP: Send response %d for request %s\n", rc, hs->req_data);
+		dolog("HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
 
 	delete parts;
