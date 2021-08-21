@@ -38,9 +38,7 @@ Run ./myiptop -j to see them as JSON.
 
 notes
 -----
-The TCP functionality has some issues. That especiallt is clear in the
-VNC server implementation, the http-server works fine (as long as the
-response fits in 1 segment and is ACKed immediately).
+The TCP functionality has some issues.
 
 badges
 ------
