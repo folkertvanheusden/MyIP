@@ -32,5 +32,7 @@ public:
 
 	void queue_packet(const packet *p);
 
+	virtual int get_max_packet_size() = 0;
+
 	virtual void operator()() = 0;
 };

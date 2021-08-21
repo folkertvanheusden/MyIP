@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "phys.h"
 #include "protocol.h"
 #include "ip_protocol.h"
 #include "stats.h"
@@ -41,6 +42,8 @@ public:
 	void register_protocol(const uint8_t protocol, ip_protocol *const p);
 
 	void register_icmp(icmp *const icmp_) { this->icmp_ = icmp_; }
+
+	int get_max_packet_size() override { return pdev->get_max_packet_size() - 20 /* 20 = size of IPv4 header (without options, as MyIP does) */; }
 
 	void operator()() override;
 };

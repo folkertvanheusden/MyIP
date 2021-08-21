@@ -20,6 +20,8 @@ private:
 	uint64_t *phys_ign_frame { nullptr };
 	uint64_t *phys_transmit { nullptr };
 
+	int mtu_size { 0 };
+
 	std::map<uint16_t, protocol *> prot_map;
 
 public:
@@ -30,6 +32,8 @@ public:
 	void register_protocol(const uint16_t ether_type, protocol *const p);
 
 	void transmit_packet(const uint8_t *dest_mac, const uint8_t *src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size);
+
+	int get_max_packet_size() { return mtu_size - 14 /* 14 = size of Ethernet header */; }
 
 	void operator()();
 };

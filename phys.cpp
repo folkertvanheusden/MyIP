@@ -16,6 +16,15 @@
 #include "packet.h"
 #include "utils.h"
 
+void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
+{
+	size_t copy_name_n = std::min(size_t(IFNAMSIZ), dev_name.size());
+
+	memcpy(ifr->ifr_name, dev_name.c_str(), copy_name_n);
+
+	ifr->ifr_name[IFNAMSIZ - 1] = 0x00;
+}
+
 phys::phys(stats *const s, const std::string & dev_name)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
@@ -23,16 +32,14 @@ phys::phys(stats *const s, const std::string & dev_name)
 		exit(1);
 	}
 
-	struct ifreq ifr;
-	memset(&ifr, 0, sizeof ifr);
+	struct ifreq ifr_tap;
+	memset(&ifr_tap, 0, sizeof ifr_tap);
 
-	ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
+	ifr_tap.ifr_flags = IFF_TAP | IFF_NO_PI;
 
-	size_t copy_name_n = std::min(size_t(IFNAMSIZ), dev_name.size());
-	memcpy(ifr.ifr_name, dev_name.c_str(), copy_name_n);
-	ifr.ifr_name[IFNAMSIZ - 1] = 0x00;
+	set_ifr_name(&ifr_tap, dev_name);
 
-	if (ioctl(fd, TUNSETIFF, (void *) &ifr) == -1 ) {
+	if (ioctl(fd, TUNSETIFF, &ifr_tap) == -1) {
 		perror("ioctl TUNSETIFF");
 		close(fd);
 		exit(1);
@@ -42,6 +49,10 @@ phys::phys(stats *const s, const std::string & dev_name)
 	phys_invl_frame = s->register_stat("phys_invl_frame");
 	phys_ign_frame = s->register_stat("phys_ign_frame");
 	phys_transmit = s->register_stat("phys_transmit");
+
+	// MTU size for Ethernet
+	mtu_size = 1500;
+	dolog("phys: MTU size: %d\n", mtu_size);
 
 	th = new std::thread(std::ref(*this));
 }

@@ -3,6 +3,7 @@
 #include <map>
 #include <shared_mutex>
 
+#include "phys.h"
 #include "protocol.h"
 #include "stats.h"
 
@@ -24,6 +25,9 @@ public:
 
 	void update_cache(const uint8_t *const mac, const uint8_t *const ip);
 	uint8_t * query_cache(const uint8_t *const ip);
+
+	// using this for ARP packets does not make sense
+	int get_max_packet_size() override { return pdev->get_max_packet_size() - 26 /* 26 = size of ARP */; }
 
 	void operator()() override;
 };
