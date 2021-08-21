@@ -444,21 +444,24 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		cur_it = sessions.find(id);
 
 		if (cur_it != sessions.end()) {
+			tcp_session_t *pointer = cur_it->second;
+			sessions.erase(cur_it);
+			sessions_lock.unlock();
+
 			// call session_closed_2
-			auto cb_org_it = listeners.find(cur_it->second->org_dst_port);
+			auto cb_org_it = listeners.find(pointer->org_dst_port);
 
 			if (cb_org_it != listeners.end())  // session not initiated here?
-				cb_org_it->second.session_closed_2(cur_it->second, cb_org_it->second.pd);
+				cb_org_it->second.session_closed_2(pointer, cb_org_it->second.pd);
 
 			// clean-up
-			free_tcp_session(cur_it->second);
-
-			sessions.erase(cur_it);
+			free_tcp_session(pointer);
+		}
+		else {
+			sessions_lock.unlock();
 		}
 
 		stats_inc_counter(tcp_sessions_rem);
-
-		sessions_lock.unlock();
 	}
 
 	delete pkt;
