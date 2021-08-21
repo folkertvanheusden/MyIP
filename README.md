@@ -49,7 +49,11 @@ response fits in 1 segment and is ACKed immediately).
 
 badges
 ------
-<a href="https://scan.coverity.com/projects/folkertvanheusden-myip"><img alt="Coverity Scan Build status" src="https://scan.coverity.com/projects/23472/badge.svg"/></a>
+* <a href="https://scan.coverity.com/projects/folkertvanheusden-myip"><img alt="Coverity Scan Build status" src="https://scan.coverity.com/projects/23472/badge.svg"/></a>
+
+* <img src="https://img.shields.io/github/license/folkertvanheusden/MyIP">
+
+* <img src="https://img.shields.io/travis/com/folkertvanheusden/MyIP">
 
 
 demo
