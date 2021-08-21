@@ -118,7 +118,7 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, void *pr
 
 		FILE *fh = fopen(path.c_str(), "rb");
 		if (fh) {
-			int frc = fread(reply, file_size, 1, fh);
+			int frc = fread(reply, 1, file_size, fh);
 			fclose(fh);
 
 			if (size_t(frc) != file_size) {
