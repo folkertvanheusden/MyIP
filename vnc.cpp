@@ -311,18 +311,6 @@ void vnc_thread(void *ts_in)
 			break;
 		}
 
-		if (!work->pkt) {  // means "update"
-			uint8_t *message = nullptr;
-			size_t message_len = 0;
-
-			calculate_fb_update(&fb, encodings, true, 0, 0, fb.w, fb.h, vs->depth, &message, &message_len);
-
-			dolog("VNC: %zu will update for %s, output is %zu bytes\n", get_us(), vs->client_addr.c_str(), message_len);
-			ts->t->send_data(ts, message, message_len, false);
-
-			free(message);
-		}
-
 		vs->buffer = (char *)realloc(vs->buffer, vs->buffer_size + work->data_len);
 
 		memcpy(&vs->buffer[vs->buffer_size], work->data, work->data_len);
