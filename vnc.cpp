@@ -554,6 +554,7 @@ void vnc_thread(void *ts_in)
 		if (vs->state == vs_running_waiting_data_ignore) {
 			dolog("VNC: Ignore %d command parameters\n", ignore_data_n);
 
+			assert(ignore_data_n > 0);
 			uint8_t *ignore = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, ignore_data_n);
 
 			if (ignore) {
