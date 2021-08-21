@@ -354,7 +354,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	if (flag_ack && cur_session) {
 		int ack_n = ack_to - cur_session->my_seq_nr;
 
-		if (ack_n > 0) {
+		if (ack_n > 0 && size_t(ack_n) <= cur_session->unacked_size) {
 			dolog("TCP[%012" PRIx64 "]: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", id, ack_to, cur_session->my_seq_nr, ack_n, cur_session->unacked_size);
 
 			// delete acked
