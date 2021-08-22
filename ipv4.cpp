@@ -87,18 +87,10 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	bool override_ip = !src_ip.is_set();
 
 	// source IPv4 address
-	uint8_t src_ip_addr[ANY_ADDR_SIZE] { 0 };
-	int src_ip_len { 0 };
-	(override_ip ? myip : src_ip).get(src_ip_addr, &src_ip_len);
-	assert(src_ip_len == 4);
-	memcpy(&out[12], src_ip_addr, src_ip_len);
+	(override_ip ? myip : src_ip).get(&out[12], 4);
 
 	// destination IPv4 address
-	uint8_t dst_ip_addr[ANY_ADDR_SIZE] { 0 };
-	int dst_ip_len { 0 };
-	dst_ip.get(dst_ip_addr, &dst_ip_len);
-	assert(dst_ip_len == 4);
-	memcpy(&out[16], dst_ip_addr, dst_ip_len);
+	dst_ip.get(&out[16], 4);
 
 	memcpy(&out[20], payload, pl_size);
 

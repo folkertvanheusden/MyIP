@@ -62,11 +62,7 @@ void arp::operator()()
 			swap_mac(&reply[8], &reply[18]); // arp addresses
 
 			// my MAC address
-			uint8_t mymac_bytes[ANY_ADDR_SIZE];
-			int mymac_size { 0 };
-			mymac.get(mymac_bytes, &mymac_size);
-			assert(mymac_size == 6);
-			memcpy(&reply[8], mymac_bytes, 6);
+			mymac.get(&reply[8], 6);
 
 			reply[7] = 0x02; // reply
 
