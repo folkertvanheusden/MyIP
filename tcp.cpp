@@ -283,7 +283,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			cur_session->my_seq_nr++;
 
 			cb_it->second.session_closed_1(cur_session, cb_it->second.pd);
-			delete_entry = true;
 		}
 		else {
 			dolog("TCP[%012" PRIx64 "]: FIN for unknown session\n", id);
