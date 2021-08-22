@@ -180,7 +180,7 @@ void ipv4::operator()()
 		iarp->update_cache(pkt->get_dst_addr(), pkt_dst);
 		iarp->update_cache(pkt->get_src_addr(), pkt_src);
 
-		dolog("IPv4[%04x]: packet %s => %s\n", pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
+		dolog("IPv4[%04x]: packet %s => %s\n", id, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
 		if (pkt_dst != myip) {
 			delete pkt;
