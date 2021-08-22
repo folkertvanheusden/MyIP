@@ -24,7 +24,7 @@ struct frame_buffer_t
 
         mutable std::mutex fb_lock;
 	uint8_t *buffer;
-} fb;
+} frame_buffer;
 
 void vnc_thread(void *ts_in);
 
@@ -32,14 +32,14 @@ void frame_buffer_thread(void *ts_in);
 
 void vnc_init()
 {
-	fb.w = 256;
-	fb.h = 48;
+	frame_buffer.w = 256;
+	frame_buffer.h = 48;
 
-	size_t n_bytes = fb.w * fb.h * 3;
-	fb.buffer = new uint8_t[n_bytes];
-	memset(fb.buffer, 0x00, n_bytes);
+	size_t n_bytes = frame_buffer.w * frame_buffer.h * 3;
+	frame_buffer.buffer = new uint8_t[n_bytes];
+	memset(frame_buffer.buffer, 0x00, n_bytes);
 
-	fb.th = new std::thread(frame_buffer_thread, &fb);
+	frame_buffer.th = new std::thread(frame_buffer_thread, &frame_buffer);
 }
 
 void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
@@ -119,10 +119,12 @@ void frame_buffer_thread(void *fb_in)
 			latest_update = now;
 
 			time_t tnow = time(nullptr);
-			struct tm *tm = gmtime(&tnow);
+
+			struct tm tm { 0 };
+			gmtime_r(&tnow, &tm);
 
 			char *text = nullptr;
-			asprintf(&text, "%02d:%02d:%02d - MyIP", tm->tm_hour, tm->tm_min, tm->tm_sec);
+			asprintf(&text, "%02d:%02d:%02d - MyIP", tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 			draw_text(fb_work, fb_work->w / 2 - 15 * 8 / 4, fb_work->h / 2 - 8 / 2, text);
 
@@ -385,8 +387,8 @@ void vnc_thread(void *ts_in)
 
 		if (vs->state == vs_server_init) {  // 7.3.2
 			uint8_t message[] = {
-				uint8_t(fb.w >> 8), uint8_t(fb.w & 255),
-				uint8_t(fb.h >> 8), uint8_t(fb.h & 255),
+				uint8_t(frame_buffer.w >> 8), uint8_t(frame_buffer.w & 255),
+				uint8_t(frame_buffer.h >> 8), uint8_t(frame_buffer.h & 255),
 				// PIXEL_FORMAT
 				32,  // bits per pixel
 				24,  // depth
@@ -481,7 +483,7 @@ void vnc_thread(void *ts_in)
 					int w = (parameters[5] << 8) | parameters[6];
 					int h = (parameters[7] << 8) | parameters[8];
 
-					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len);
+					calculate_fb_update(&frame_buffer, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len);
 
 					dolog("VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes\n", message_len, w, h, x, y, message_len);
 

@@ -137,10 +137,12 @@ void dolog(const char *fmt, ...)
 	if (fh) {
 		uint64_t now = get_us();
 		time_t t_now = now / 1000000;
-		struct tm *tm = localtime(&t_now);
+
+		struct tm tm { 0 };
+		localtime_r(&t_now, &tm);
 
 		fprintf(fh, "%04d-%02d-%02d %02d:%02d:%02d.%06d %.6f|%d] ",
-				tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, int(now % 1000000),
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(now % 1000000),
 				get_us() / 1000000.0, gettid());
 
 		va_list ap;
