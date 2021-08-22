@@ -103,7 +103,7 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 
 	const any_addr *dst_mac = iarp->query_cache(dst_ip);
 	if (!dst_mac) {
-		dolog("IPv4: cannot find dst IP (%s) in ARP table", dst_ip.to_str().c_str());
+		dolog("IPv4: cannot find dst IP (%s) in ARP table\n", dst_ip.to_str().c_str());
 		delete [] out;
 		stats_inc_counter(ipv4_tx_err);
 		return;
@@ -112,7 +112,7 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	any_addr q_addr = override_ip ? myip : src_ip;
 	const any_addr *src_mac = iarp->query_cache(q_addr);
 	if (!src_mac) {
-		dolog("IPv4: cannot find src IP (%s) in ARP table", q_addr.to_str().c_str());
+		dolog("IPv4: cannot find src IP (%s) in ARP table\n", q_addr.to_str().c_str());
 		delete [] out;
 		delete dst_mac;
 		stats_inc_counter(ipv4_tx_err);
@@ -180,7 +180,7 @@ void ipv4::operator()()
 		iarp->update_cache(pkt->get_dst_addr(), pkt_dst);
 		iarp->update_cache(pkt->get_src_addr(), pkt_src);
 
-		dolog("IPv4[%04x]: packet %s => %s\n", pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
+		dolog("IPv4[%04x]: packet %s => %s\n", id, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
 		if (pkt_dst != myip) {
 			delete pkt;

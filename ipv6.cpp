@@ -47,14 +47,14 @@ void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 		return;
 	}
 
-	size_t out_size = 20 + pl_size;
+	size_t out_size = 40 + pl_size;
 	uint8_t *out = new uint8_t[out_size];
 
 	out[0] = 0x60;  // IPv6
 
 	uint32_t flow_label = 0;
 	get_random((uint8_t *)&flow_label, sizeof flow_label); // FIXME onthouden in een ip/port versus flow_label tabel?
-	out[1] = flow_label >> 16;
+	out[1] = (flow_label >> 16) & 0x0f;
 	out[2] = flow_label >> 8;
 	out[3] = flow_label;
 
@@ -68,9 +68,22 @@ void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 
 	dst_ip.get(&out[24], 16);
 
-        const any_addr *dst_mac = indp->query_cache(dst_ip);
+	if (pl_size)
+		memcpy(&out[40], payload, pl_size);
+
+        const any_addr *dst_mac = nullptr;
+
+	if (dst_ip[0] == 0xff && dst_ip[1] == 0x02 && dst_ip[15] == 0x02) {  // all router IPv6 multicast address
+		uint8_t mac[6] = { 0x33, 0x33, dst_ip[12], dst_ip[13], dst_ip[14], dst_ip[15] };
+
+		dst_mac = new any_addr(mac, 6);
+	}
+	else {
+		dst_mac = indp->query_cache(dst_ip);
+	}
+
         if (!dst_mac) {
-                dolog("IPv6: cannot find dst IP (%s) in ARP table", dst_ip.to_str().c_str());
+                dolog("IPv6: cannot find dst IP (%s) in MAC lookup table\n", dst_ip.to_str().c_str());
                 delete [] out;
                 stats_inc_counter(ipv6_tx_err);
                 return;
@@ -78,7 +91,7 @@ void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 
         const any_addr *src_mac = indp->query_cache(src_ip);
         if (!src_mac) {
-                dolog("IPv6: cannot find src IP (%s) in ARP table", src_ip.to_str().c_str());
+                dolog("IPv6: cannot find src IP (%s) in MAC lookup table\n", src_ip.to_str().c_str());
                 delete [] out;
                 delete dst_mac;
                 stats_inc_counter(ipv6_tx_err);
@@ -146,10 +159,20 @@ void ipv6::operator()()
 			continue;
 		}
 
-		int header_size = (payload_header[0] & 15) * 4; // FIXME go through list
-		const uint8_t protocol = payload_header[9];
-
 		int ip_size = (payload_header[4] << 8) | payload_header[5];
+
+		uint8_t protocol = payload_header[6], next_header = protocol;
+		const uint8_t *const nh = &payload_header[40], *const eh = &payload_header[size - ip_size];
+		
+		while(eh - nh >= 8) {
+			// FIXME send "icmp6 Parameter Problem" for each unrecognized/unprocessed "next header"
+
+			protocol = nh[0];
+			next_header += (nh[1] + 1) * 8;
+		}
+
+		int header_size = nh - payload_header;
+
 		dolog("IPv6[%04x]: total packet size: %d, IP header says: %d, header size: %d\n", flow_label, size, ip_size, header_size);
 
 		if (ip_size > size) {

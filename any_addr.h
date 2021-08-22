@@ -38,3 +38,5 @@ public:
 
 	std::string to_str() const;
 };
+
+any_addr parse_address(const char *str, const size_t exp_size, const std::string & seperator, const int base);

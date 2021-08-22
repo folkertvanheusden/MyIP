@@ -18,6 +18,7 @@ add_executable(myip
 	font.cpp
 	http.cpp
 	icmp.cpp
+	icmp6.cpp
 	ip_protocol.cpp
 	ipv4.cpp
 	ipv6.cpp
