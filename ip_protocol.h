@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "packet.h"
+#include "protocol.h"
 
 class ipv4;
 
@@ -22,13 +23,13 @@ protected:
         std::condition_variable pkts_cv;
 	std::vector<const packet *> pkts;
 
-	ipv4 *idev { nullptr };
+	protocol *idev { nullptr };
 
 public:
 	ip_protocol();
 	virtual ~ip_protocol();
 
-	void register_ip(ipv4 *const p) { idev = p; }
+	void register_ip(protocol *const p) { idev = p; }
 
 	void queue_packet(const packet *p);
 

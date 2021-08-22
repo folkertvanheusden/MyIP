@@ -20,7 +20,9 @@ add_executable(myip
 	icmp.cpp
 	ip_protocol.cpp
 	ipv4.cpp
+	ipv6.cpp
 	main.cpp
+	ndp.cpp
 	ntp.cpp
 	packet.cpp
 	phys.cpp
