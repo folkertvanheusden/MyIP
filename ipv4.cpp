@@ -37,6 +37,7 @@ ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : iarp(iarp),
 	ipv4_ttl_ex   = s->register_stat("ipv4_ttl_ex");
 	ipv4_unk_prot = s->register_stat("ipv4_unk_prot");
 	ipv4_n_tx     = s->register_stat("ipv4_n_tx");
+	ipv4_tx_err   = s->register_stat("ipv4_tx_err");
 
 	th = new std::thread(std::ref(*this));
 }
@@ -59,8 +60,10 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 {
 	stats_inc_counter(ipv4_n_tx);
 
-	if (!pdev)
+	if (!pdev) {
+		stats_inc_counter(ipv4_tx_err);
 		return;
+	}
 
 	size_t out_size = 20 + pl_size;
 	uint8_t *out = new uint8_t[out_size];
@@ -102,6 +105,7 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	if (!dst_mac) {
 		dolog("IPv4: cannot find dst IP (%s) in ARP table", dst_ip.to_str().c_str());
 		delete [] out;
+		stats_inc_counter(ipv4_tx_err);
 		return;
 	}
 
@@ -111,6 +115,7 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 		dolog("IPv4: cannot find src IP (%s) in ARP table", q_addr.to_str().c_str());
 		delete [] out;
 		delete dst_mac;
+		stats_inc_counter(ipv4_tx_err);
 		return;
 	}
 
@@ -146,7 +151,7 @@ void ipv4::operator()()
 		int size = pkt->get_size();
 
 		if (size < 20) {
-			dolog("IP: not an IPv4 packet (size: %d)\n", size);
+			dolog("IPv4: not an IPv4 packet (size: %d)\n", size);
 			delete pkt;
 			continue;
 		}
@@ -159,8 +164,9 @@ void ipv4::operator()()
 
 		const uint16_t id = (payload_header[4] << 8) | payload_header[5];
 
-		if ((payload_header[0] >> 4) != 0x04) {
-			dolog("IP[%04x]: not an IPv4 packet (version: %d)\n", id, payload_header[0] >> 4);
+		uint8_t version = payload_header[0] >> 4;
+		if (version != 0x04) {
+			dolog("IPv4[%04x]: not an IPv4 packet (version: %d)\n", id, version);
 			delete pkt;
 			continue;
 		}
@@ -174,7 +180,7 @@ void ipv4::operator()()
 		iarp->update_cache(pkt->get_dst_addr(), pkt_dst);
 		iarp->update_cache(pkt->get_src_addr(), pkt_src);
 
-		dolog("IPv4[%04x]: packet %d.%d.%d.%d => %d.%d.%d.%d\n", id, payload_header[12], payload_header[13], payload_header[14], payload_header[15], payload_header[16], payload_header[17], payload_header[18], payload_header[19]);
+		dolog("IPv4[%04x]: packet %s => %s\n", pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
 		if (pkt_dst != myip) {
 			delete pkt;
@@ -187,7 +193,7 @@ void ipv4::operator()()
 		dolog("IPv4[%04x]: total packet size: %d, IP header says: %d, header size: %d\n", id, size, ip_size, header_size);
 
 		if (ip_size > size) {
-			dolog("IP[%04x] size (%d) > Ethernet size (%d)\n", id, ip_size, size);
+			dolog("IPv4[%04x] size (%d) > Ethernet size (%d)\n", id, ip_size, size);
 			delete pkt;
 			continue;
 		}
@@ -205,6 +211,14 @@ void ipv4::operator()()
 
 		const uint8_t protocol = payload_header[9];
 
+		auto it = prot_map.find(protocol);
+		if (it == prot_map.end()) {
+			dolog("IPv4[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", id, protocol, size);
+			stats_inc_counter(ipv4_unk_prot);
+			delete pkt;
+			continue;
+		}
+
 		int payload_size = size - header_size;
 
 		packet *ip_p = new packet(pkt->get_recv_ts(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
@@ -215,15 +229,6 @@ void ipv4::operator()()
 			stats_inc_counter(ipv4_ttl_ex);
 			delete ip_p;
 			delete pkt;
-			continue;
-		}
-
-		auto it = prot_map.find(protocol);
-		if (it == prot_map.end()) {
-			dolog("IPv4[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", id, protocol, size);
-			stats_inc_counter(ipv4_unk_prot);
-			delete pkt;
-			delete ip_p;
 			continue;
 		}
 
