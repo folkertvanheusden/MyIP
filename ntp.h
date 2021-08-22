@@ -1,8 +1,10 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 #include <atomic>
 #include <stdint.h>
 #include <thread>
+
+#include "any_addr.h"
 #include "stats.h"
 
 class packet;
@@ -13,7 +15,7 @@ class ntp
 private:
 	udp *const u;
 
-	uint8_t upstream_ntp_server[4] { 0 };
+	const any_addr upstream_ntp_server;
 
 	const bool broadcast;
 
@@ -25,11 +27,11 @@ private:
 	uint64_t *ntp_broadcast { nullptr };
 
 public:
-	ntp(stats *const s, udp *const u, const uint8_t upstream_ntp_server[4], const bool broadcast);
+	ntp(stats *const s, udp *const u, const any_addr & upstream_ntp_server, const bool broadcast);
 	ntp(const ntp &) = delete;
 	virtual ~ntp();
 
-	void input(const uint8_t *src_ip, int src_port, const uint8_t *dst_ip, int dst_port, packet *p);
+	void input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p);
 
 	void operator()();
 };

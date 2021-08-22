@@ -14,7 +14,7 @@ tcp_udp_fw::~tcp_udp_fw()
 {
 }
 
-void tcp_udp_fw::input(const uint8_t *src_ip, int src_port, const uint8_t *dst_ip, int dst_port, packet *p)
+void tcp_udp_fw::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p)
 {
 	// silently drop
 	stats_inc_counter(fw_n_dropped);

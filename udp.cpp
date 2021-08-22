@@ -58,7 +58,7 @@ void udp::operator()()
 
 		if (it == callbacks.end()) {
 			if (icmp_)
-				icmp_->send_packet(pkt->get_src_addr().first, pkt->get_dst_addr().first, 3, 3, pkt);
+				icmp_->send_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 3, 3, pkt);
 
 			stats_inc_counter(udp_refused);
 		}
@@ -68,8 +68,10 @@ void udp::operator()()
 
 			auto header = pkt->get_header();
 
-			packet *up = new packet(pkt->get_recv_ts(), src_addr.first, src_addr.second, dst_addr.first, dst_addr.second, &p[8], size - 8, header.first, header.second);
-			it->second(pkt->get_src_addr().first, src_port, pkt->get_dst_addr().first, dst_port, up);
+			packet *up = new packet(pkt->get_recv_ts(), src_addr, dst_addr, &p[8], size - 8, header.first, header.second);
+
+			it->second(pkt->get_src_addr(), src_port, pkt->get_dst_addr(), dst_port, up);
+
 			delete up;
 		}
 
@@ -77,12 +79,12 @@ void udp::operator()()
 	}
 }
 
-void udp::add_handler(const int port, std::function<void(const uint8_t *, int, const uint8_t *, int, packet *)> h)
+void udp::add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *)> h)
 {
 	callbacks.insert({ port, h });
 }
 
-void udp::transmit_packet(const uint8_t *dst_ip, const int dst_port, const uint8_t *src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
+void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
 {
 	dolog("UDP: transmit packet %d -> %d\n", src_port, dst_port);
 

@@ -32,10 +32,8 @@ struct sntp_datagram
         u_int32_t transmit_timestamp_fraq;
 };
 
-ntp::ntp(stats *const s, udp *const u, const uint8_t upstream_ntp_server[4], const bool broadcast) : u(u), broadcast(broadcast)
+ntp::ntp(stats *const s, udp *const u, const any_addr & upstream_ntp_server, const bool broadcast) : u(u), upstream_ntp_server(upstream_ntp_server), broadcast(broadcast)
 {
-	memcpy(this->upstream_ntp_server, upstream_ntp_server, sizeof(this->upstream_ntp_server));
-
 	ntp_requests = s->register_stat("ntp_requests");
 	ntp_invalid  = s->register_stat("ntp_invalid");
 	ntp_time_req = s->register_stat("ntp_time_req");
@@ -59,7 +57,7 @@ ntp::~ntp()
 	delete th;
 }
 
-void ntp::input(const uint8_t *src_ip, int src_port, const uint8_t *dst_ip, int dst_port, packet *p)
+void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p)
 {
 	stats_inc_counter(ntp_requests);
 
@@ -80,7 +78,13 @@ void ntp::input(const uint8_t *src_ip, int src_port, const uint8_t *dst_ip, int 
 		msgout.root_delay = 369098752; // not known
 		msgout.root_dispersion = 369098752; // not known
 		msgout.poll = 16;
-		memcpy(&msgout.reference_identifier, upstream_ntp_server, 4);
+
+		// what to do with IPv6 addresses?
+		uint8_t uns[ANY_ADDR_SIZE] { 0 };
+		int uns_size { 0 };
+		upstream_ntp_server.get(uns, &uns_size);
+		memcpy(&msgout.reference_identifier, uns, 4);
+
 		msgout.originate_timestamp_secs = sntp->transmit_timestamp_secs;
 		msgout.originate_timestamp_fraq = sntp->transmit_timestamp_fraq;
 
@@ -140,7 +144,13 @@ void ntp::operator()()
 		msgout.root_delay = 1; // not known
 		msgout.root_dispersion = 1; // not known
 		msgout.poll = 16;
-		memcpy(&msgout.reference_identifier, upstream_ntp_server, 4);
+
+		// what to do with IPv6 addresses?
+		uint8_t uns[ANY_ADDR_SIZE] { 0 };
+		int uns_size { 0 };
+		upstream_ntp_server.get(uns, &uns_size);
+		memcpy(&msgout.reference_identifier, uns, 4);
+
 		msgout.originate_timestamp_secs = 0;
 		msgout.originate_timestamp_fraq = 0;
                 msgout.receive_timestamp_seqs = 0;
@@ -158,6 +168,6 @@ void ntp::operator()()
 		constexpr uint8_t ip_src[] = { 0, 0, 0, 0 }; // will be set by IPv4 layer
 		constexpr uint8_t ip_tgt[] = { 224, 0, 1, 1 };
 
-		u->transmit_packet(ip_tgt, 123, ip_src, 123, (const uint8_t *)&msgout, sizeof msgout);
+		u->transmit_packet(any_addr(ip_tgt, 4), 123, any_addr(ip_src, 4), 123, (const uint8_t *)&msgout, sizeof msgout);
 	}
 }

@@ -8,6 +8,7 @@
 #include <mutex>
 #include <shared_mutex>
 
+#include "any_addr.h"
 #include "ip_protocol.h"
 #include "packet.h"
 #include "stats.h"
@@ -34,10 +35,10 @@ typedef struct {
 
 	tcp *t;
 
-	std::pair<uint8_t [4], int> org_src_addr;
+	any_addr org_src_addr;
 	int org_src_port;
 
-	std::pair<uint8_t [4], int> org_dst_addr;
+	any_addr org_dst_addr;
 	int org_dst_port;
 
 	uint64_t id;
@@ -92,7 +93,7 @@ private:
 	uint64_t *tcp_sessions_closed_1 { nullptr };
 	uint64_t *tcp_sessions_closed_2 { nullptr };
 
-	void send_segment(const uint64_t session_id, const std::pair<const uint8_t *, int> my_addr, const int my_port, const std::pair<const uint8_t *, int> peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
+	void send_segment(const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
 
 	void packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag);
 	void cleanup_session_helper(std::map<uint64_t, tcp_session_t *>::iterator *it);

@@ -16,8 +16,8 @@ bool http_new_session(tcp_session_t *ts, const packet *pkt, private_data *pd)
 	hs->req_data = nullptr;
 	hs->req_len = 0;
 
-	std::pair<const uint8_t *, int> src_addr = pkt->get_src_addr();
-	hs->client_addr = ip_to_str(src_addr);
+	any_addr src_addr = pkt->get_src_addr();
+	hs->client_addr = src_addr.to_str();
 
 	ts->p = hs;
 

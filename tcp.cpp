@@ -23,20 +23,14 @@ void free_tcp_session(tcp_session_t *const p)
 	delete p;
 }
 
-uint16_t tcp_checksum(const std::pair<const uint8_t *, int> src_addr, const std::pair<const uint8_t *, int> dst_addr, const uint8_t *const tcp_payload, const int len)
+uint16_t tcp_checksum(const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const tcp_payload, const int len)
 {
 	size_t temp_len = 12 + len + (len & 1);
 	uint8_t *temp = new uint8_t[temp_len]();
 
-	temp[0] = src_addr.first[0];
-	temp[1] = src_addr.first[1];
-	temp[2] = src_addr.first[2];
-	temp[3] = src_addr.first[3];
+	src_addr.get(&temp[0], 4);
 
-	temp[4] = dst_addr.first[0];
-	temp[5] = dst_addr.first[1];
-	temp[6] = dst_addr.first[2];
-	temp[7] = dst_addr.first[3];
+	dst_addr.get(&temp[4], 4);
 
 	temp[9] = 0x06; // TCP
 
@@ -103,7 +97,7 @@ tcp::~tcp()
 	delete th;
 }
 
-void tcp::send_segment(const uint64_t session_id, const std::pair<const uint8_t *, int> my_addr, const int my_port, const std::pair<const uint8_t *, int> peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len)
+void tcp::send_segment(const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len)
 {
 	char *flag_str = flags_to_str(flags);
 	dolog("TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str, ack_to, my_seq_nr ? *my_seq_nr : -1, data_len);
@@ -155,7 +149,7 @@ void tcp::send_segment(const uint64_t session_id, const std::pair<const uint8_t 
 	temp[16] = checksum >> 8;
 	temp[17] = checksum;
 
-	idev->transmit_packet(peer_addr.first, my_addr.first, 0x06, temp, temp_len);
+	idev->transmit_packet(peer_addr, my_addr, 0x06, temp, temp_len);
 
 	delete [] temp;
 
@@ -196,7 +190,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	auto cb_it = listeners.find(dst_port);
 
 	auto src = pkt->get_src_addr();
-	uint64_t id = src.first[0] | (src.first[1] << 8) | (src.first[2] << 16) | uint32_t(src.first[3] << 24) | (uint64_t(src_port) << 32);
+	uint64_t id = src.get_hash() ^ (uint64_t(src_port) << 31);
 
 	char *flag_str = flags_to_str(p[13]);
 	dolog("TCP[%012" PRIx64 "]: packet %d->%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src_port, dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
@@ -223,15 +217,11 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		new_session->window_size = win_size;
 
-		memcpy(new_session->org_src_addr.first, pkt->get_src_addr().first, 4);
-		new_session->org_src_addr.second = pkt->get_src_addr().second;
+		new_session->org_src_addr = pkt->get_src_addr();
 		new_session->org_src_port = src_port;
-		dolog("src: %08x %d\n", *(uint32_t *)new_session->org_src_addr.first, new_session->org_src_port);
 
-		memcpy(new_session->org_dst_addr.first, pkt->get_dst_addr().first, 4);
-		new_session->org_dst_addr.second = pkt->get_dst_addr().second;
+		new_session->org_dst_addr = pkt->get_dst_addr();
 		new_session->org_dst_port = dst_port;
-		dolog("dst: %08x %d\n", *(uint32_t *)new_session->org_dst_addr.first, new_session->org_dst_port);
 
 		new_session->p = nullptr;
 		new_session->t = this;

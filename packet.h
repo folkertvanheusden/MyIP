@@ -5,16 +5,14 @@
 #include <utility>
 #include <sys/time.h>
 
+#include "any_addr.h"
+
 class packet
 {
 private:
 	const struct timeval tv { 0, 0 };
 
-	uint8_t *src_addr;
-	int src_size;
-
-	uint8_t *dst_addr;
-	int dst_size;
+	const any_addr src_addr, dst_addr;
 
 	uint8_t *data;
 	int size;
@@ -24,17 +22,18 @@ private:
 	int header_size;
 
 public:
-	packet(const uint8_t *src_addr, const int src_size, const uint8_t *dst_addr, const int dst_size, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
-	packet(const struct timeval & tv, const uint8_t *src_addr, const int src_size, const uint8_t *dst_addr, const int dst_size, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
+	packet(const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
+	packet(const struct timeval & tv, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
 	virtual ~packet();
 
 	uint8_t *const get_data() const { return data; }
-	int get_size() const { return size; }
 	std::pair<const uint8_t *, int> get_payload() const { return { data, size }; }
 
-	std::pair<const uint8_t *, int> get_src_addr() const { return { src_addr, src_size }; }
+	int get_size() const { return size; }
 
-	std::pair<const uint8_t *, int> get_dst_addr() const { return { dst_addr, dst_size }; }
+	const any_addr & get_src_addr() const { return src_addr; }
+
+	const any_addr & get_dst_addr() const { return dst_addr; }
 
 	std::pair<const uint8_t *, int> get_header() const { return { header, header_size }; }
 

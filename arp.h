@@ -11,23 +11,23 @@ class arp : public protocol
 {
 private:
 	std::shared_mutex cache_lock;
-	std::map<uint32_t, uint8_t *> arp_cache;
+	std::map<any_addr, any_addr> arp_cache;
 
-	uint8_t mymac[6];
-	uint8_t myip[4];
+	const any_addr mymac;
+	const any_addr myip;
 
 	uint64_t *arp_requests { nullptr }, *arp_for_me { nullptr };
 	uint64_t *arp_cache_req { nullptr }, *arp_cache_hit { nullptr };
 
 public:
-	arp(stats *const s, const uint8_t mymac[6], const uint8_t myip[4]);
+	arp(stats *const s, const any_addr & mymac, const any_addr & ip);
 	virtual ~arp();
 
-	void update_cache(const uint8_t *const mac, const uint8_t *const ip);
-	uint8_t * query_cache(const uint8_t *const ip);
+	void update_cache(const any_addr & mac, const any_addr & ip);
+	any_addr * query_cache(const any_addr & ip);
 
 	// using this for ARP packets does not make sense
-	int get_max_packet_size() override { return pdev->get_max_packet_size() - 26 /* 26 = size of ARP */; }
+	virtual int get_max_packet_size() const override { return pdev->get_max_packet_size() - 26 /* 26 = size of ARP */; }
 
 	void operator()() override;
 };

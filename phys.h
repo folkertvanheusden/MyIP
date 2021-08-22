@@ -1,10 +1,11 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 #include <atomic>
 #include <map>
 #include <string>
 #include <thread>
 
+#include "any_addr.h"
 #include "protocol.h"
 #include "stats.h"
 
@@ -31,9 +32,9 @@ public:
 
 	void register_protocol(const uint16_t ether_type, protocol *const p);
 
-	void transmit_packet(const uint8_t *dest_mac, const uint8_t *src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size);
+	void transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size);
 
-	int get_max_packet_size() { return mtu_size - 14 /* 14 = size of Ethernet header */; }
+	virtual int get_max_packet_size() const { return mtu_size - 14 /* 14 = size of Ethernet header */; }
 
 	void operator()();
 };

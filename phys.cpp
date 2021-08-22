@@ -1,4 +1,4 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <algorithm>
 #include <errno.h>
 #include <fcntl.h>
@@ -75,17 +75,19 @@ void phys::register_protocol(const uint16_t ether_type, protocol *const p)
 	p->register_phys(this);
 }
 
-void phys::transmit_packet(const uint8_t *dst_mac, const uint8_t *src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
+void phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	dolog("phys: transmit packet %02x:%02x:%02x:%02x:%02x:%02x -> %02x:%02x:%02x:%02x:%02x:%02x\n", src_mac[0], src_mac[1], src_mac[2], src_mac[3], src_mac[4], src_mac[5], dst_mac[0], dst_mac[1], dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
+	dolog("phys: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	stats_inc_counter(phys_transmit);
 
 	size_t out_size = pl_size + 14;
 	uint8_t *out = new uint8_t[out_size];
 
-	memcpy(&out[0], dst_mac, 6);
-	memcpy(&out[6], src_mac, 6);
+	dst_mac.get(&out[0], 6);
+
+	src_mac.get(&out[6], 6);
+
 	out[12] = ether_type >> 8;
 	out[13] = ether_type;
 
@@ -139,15 +141,6 @@ void phys::operator()()
 			continue;
 		}
 
-#if 0
-		if (rand() & 1) {
-			int n_err = rand() % size;
-
-			for(int i=0; i<n_err; i++)
-				buffer[rand() % size] = rand();
-		}
-#endif
-
 		uint16_t ether_type = (buffer[12] << 8) | buffer[13];
 
 		// FIXME prot_map read lock
@@ -160,7 +153,7 @@ void phys::operator()()
 
 		dolog("phys: queing packet with ether type %04x and size %d\n", ether_type, size);
 
-		packet *p = new packet(tv, &buffer[6], 6, &buffer[0], 6, &buffer[14], size - 14, &buffer[0], 14);
+		packet *p = new packet(tv, any_addr(&buffer[6], 6), any_addr(&buffer[0], 6), &buffer[14], size - 14, &buffer[0], 14);
 
 		it->second->queue_packet(p);
 	}

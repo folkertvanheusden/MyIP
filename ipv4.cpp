@@ -1,4 +1,5 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+#include <assert.h>
 #include <chrono>
 #include <stdint.h>
 #include <string>
@@ -10,11 +11,6 @@
 #include "phys.h"
 #include "icmp.h"
 #include "utils.h"
-
-std::string ip_to_str(std::pair<const uint8_t *, int> & src_addr)
-{
-	return myformat("%d.%d.%d.%d", src_addr.first[0], src_addr.first[1], src_addr.first[2], src_addr.first[3]);
-}
 
 uint16_t ipv4_checksum(const uint16_t *p, const size_t n)
 {
@@ -33,7 +29,7 @@ uint16_t ipv4_checksum(const uint16_t *p, const size_t n)
         return ~sum;
 }
 
-ipv4::ipv4(stats *const s, arp *const iarp, const uint8_t myip[4]) : iarp(iarp)
+ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : iarp(iarp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt");
 	ipv4_n_pkt    = s->register_stat("ipv4_n_pkt");
@@ -41,8 +37,6 @@ ipv4::ipv4(stats *const s, arp *const iarp, const uint8_t myip[4]) : iarp(iarp)
 	ipv4_ttl_ex   = s->register_stat("ipv4_ttl_ex");
 	ipv4_unk_prot = s->register_stat("ipv4_unk_prot");
 	ipv4_n_tx     = s->register_stat("ipv4_n_tx");
-
-	memcpy(this->myip, myip, sizeof(this->myip));
 
 	th = new std::thread(std::ref(*this));
 }
@@ -61,7 +55,7 @@ void ipv4::register_protocol(const uint8_t protocol, ip_protocol *const p)
 	p->register_ip(this);
 }
 
-void ipv4::transmit_packet(const uint8_t *dst_ip, const uint8_t *src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv4_n_tx);
 
@@ -82,17 +76,29 @@ void ipv4::transmit_packet(const uint8_t *dst_ip, const uint8_t *src_ip, const u
 	else {
 		out[4] = out[5] = 0; // identification
 	}
-	dolog("IPv4[%04x]: transmit packet %d.%d.%d.%d -> %d.%d.%d.%d\n", (out[4] << 8) | out[5], src_ip[0], src_ip[1], src_ip[2], src_ip[3], dst_ip[0], dst_ip[1], dst_ip[2], dst_ip[3]);
+
+	dolog("IPv4[%04x]: transmit packet %s -> %s\n", (out[4] << 8) | out[5], src_ip.to_str().c_str(), dst_ip.to_str().c_str());
+
 	out[6] = out[7] = 0; // flags & fragment offset
 	out[8] = header_template ? header_template[8] : 255; // time to live
 	out[9] = protocol;
 	out[10] = out[11] = 0; // checksum
 
-	bool override_ip = src_ip[0] == 0 && src_ip[1] == 0 && src_ip[2] == 0 && src_ip[3] == 0;
+	bool override_ip = !src_ip.is_set();
 
-	memcpy(&out[12], override_ip ? myip : src_ip, 4);
+	// source IPv4 address
+	uint8_t src_ip_addr[ANY_ADDR_SIZE] { 0 };
+	int src_ip_len { 0 };
+	(override_ip ? myip : src_ip).get(src_ip_addr, &src_ip_len);
+	assert(src_ip_len == 4);
+	memcpy(&out[12], src_ip_addr, src_ip_len);
 
-	memcpy(&out[16], dst_ip, 4);
+	// destination IPv4 address
+	uint8_t dst_ip_addr[ANY_ADDR_SIZE] { 0 };
+	int dst_ip_len { 0 };
+	dst_ip.get(dst_ip_addr, &dst_ip_len);
+	assert(dst_ip_len == 4);
+	memcpy(&out[16], dst_ip_addr, dst_ip_len);
 
 	memcpy(&out[20], payload, pl_size);
 
@@ -100,14 +106,23 @@ void ipv4::transmit_packet(const uint8_t *dst_ip, const uint8_t *src_ip, const u
 	out[10] = checksum >> 8;
 	out[11] = checksum;
 
-	const uint8_t *dst_mac = iarp->query_cache(dst_ip);
+	const any_addr *dst_mac = iarp->query_cache(dst_ip);
+	if (!dst_mac) {
+		dolog("IPv4: cannot find dst IP (%s) in ARP table", dst_ip.to_str().c_str());
+		return;
+	}
 
-	const uint8_t *src_mac = iarp->query_cache(override_ip ? myip : src_ip);
+	any_addr q_addr = override_ip ? myip : src_ip;
+	const any_addr *src_mac = iarp->query_cache(q_addr);
+	if (!src_mac) {
+		dolog("IPv4: cannot find src IP (%s) in ARP table", q_addr.to_str().c_str());
+		return;
+	}
 
-	pdev->transmit_packet(dst_mac, src_mac, 0x0800, out, out_size);
+	pdev->transmit_packet(*dst_mac, *src_mac, 0x0800, out, out_size);
 
-	delete [] src_mac;
-	delete [] dst_mac;
+	delete src_mac;
+	delete dst_mac;
 
 	delete [] out;
 }
@@ -157,13 +172,16 @@ void ipv4::operator()()
 
 		stats_inc_counter(ipv4_n_pkt);
 
+		any_addr pkt_dst(&payload_header[16], 4);
+		any_addr pkt_src(&payload_header[12], 4);
+
 		// update arp cache
-		iarp->update_cache(pkt->get_dst_addr().first, &payload_header[16]);
-		iarp->update_cache(pkt->get_src_addr().first, &payload_header[12]);
+		iarp->update_cache(pkt->get_dst_addr(), pkt_dst);
+		iarp->update_cache(pkt->get_src_addr(), pkt_src);
 
 		dolog("IPv4[%04x]: packet %d.%d.%d.%d => %d.%d.%d.%d\n", id, payload_header[12], payload_header[13], payload_header[14], payload_header[15], payload_header[16], payload_header[17], payload_header[18], payload_header[19]);
 
-		if (memcmp(&payload_header[16], myip, 4) != 0) {
+		if (pkt_dst != myip) {
 			delete pkt;
 			stats_inc_counter(ipv4_not_me);
 			continue;
@@ -194,7 +212,7 @@ void ipv4::operator()()
 
 		int payload_size = size - header_size;
 
-		packet *ip_p = new packet(pkt->get_recv_ts(), &payload_header[12], 4, &payload_header[16], 4, payload_data, payload_size, payload_header, header_size);
+		packet *ip_p = new packet(pkt->get_recv_ts(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
 
 		if (payload_header[8] <= 1) { // check TTL
 			dolog("IPv4[%04x]: TTL exceeded\n", id);
@@ -225,5 +243,5 @@ void ipv4::operator()()
 void ipv4::send_ttl_exceeded(const packet *const pkt) const
 {
 	if (icmp_)
-		icmp_->send_packet(pkt->get_src_addr().first, pkt->get_dst_addr().first, 11, 0, pkt);
+		icmp_->send_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 11, 0, pkt);
 }

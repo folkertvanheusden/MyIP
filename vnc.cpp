@@ -226,8 +226,8 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 {
 	vnc_session_data *vs = new vnc_session_data();
 
-	std::pair<const uint8_t *, int> src_addr = pkt->get_src_addr();
-	vs->client_addr = ip_to_str(src_addr);
+	any_addr src_addr = pkt->get_src_addr();
+	vs->client_addr = src_addr.to_str();
 
 	vs->buffer = nullptr;
 	vs->buffer_size = 0;

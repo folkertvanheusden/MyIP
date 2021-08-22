@@ -9,7 +9,6 @@
 #include "ip_protocol.h"
 #include "stats.h"
 
-std::string ip_to_str(std::pair<const uint8_t *, int> & src_addr);
 uint16_t ipv4_checksum(const uint16_t *p, const size_t n);
 
 class arp;
@@ -22,7 +21,7 @@ private:
 	arp *const iarp;
 	icmp *icmp_ { nullptr };
 
-	uint8_t myip[4];
+	const any_addr myip;
 
 	uint64_t *ip_n_pkt { nullptr };
 	uint64_t *ipv4_n_pkt { nullptr };
@@ -34,16 +33,16 @@ private:
 	void send_ttl_exceeded(const packet *const pkt) const;
 
 public:
-	ipv4(stats *const s, arp *const iarp, const uint8_t myip[4]);
+	ipv4(stats *const s, arp *const iarp, const any_addr & myip);
 	virtual ~ipv4();
 
-	void transmit_packet(const uint8_t *dst_ip, const uint8_t *src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template = nullptr);
+	void transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template = nullptr);
 
 	void register_protocol(const uint8_t protocol, ip_protocol *const p);
 
 	void register_icmp(icmp *const icmp_) { this->icmp_ = icmp_; }
 
-	int get_max_packet_size() override { return pdev->get_max_packet_size() - 20 /* 20 = size of IPv4 header (without options, as MyIP does) */; }
+	virtual int get_max_packet_size() const override { return pdev->get_max_packet_size() - 20 /* 20 = size of IPv4 header (without options, as MyIP does) */; }
 
 	void operator()() override;
 };

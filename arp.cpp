@@ -1,4 +1,5 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+#include <assert.h>
 #include <chrono>
 #include <string.h>
 
@@ -6,15 +7,12 @@
 #include "phys.h"
 #include "utils.h"
 
-arp::arp(stats *const s, const uint8_t mymac[6], const uint8_t myip[4])
+arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip) : mymac(mymac), myip(myip)
 {
 	arp_requests  = s->register_stat("arp_requests");
 	arp_for_me    = s->register_stat("arp_for_me");
 	arp_cache_req = s->register_stat("arp_cache_req");
 	arp_cache_hit = s->register_stat("arp_cache_hit");
-
-	memcpy(this->mymac, mymac, sizeof(this->mymac));
-	memcpy(this->myip, myip, sizeof(this->myip));
 
 	update_cache(mymac, myip);
 
@@ -23,9 +21,6 @@ arp::arp(stats *const s, const uint8_t mymac[6], const uint8_t myip[4])
 
 arp::~arp()
 {
-	for(auto it : arp_cache)
-		delete [] it.second;
-
 	stop_flag = true;
 	th->join();
 	delete th;
@@ -58,21 +53,28 @@ void arp::operator()()
 
 		if (p[6] == 0x00 && p[7] == 0x01 && // request
 		    p[2] == 0x08 && p[3] == 0x00 && // ethertype IPv4
-		    memcmp(&p[24], myip, sizeof(myip)) == 0) // I am the target?
+		    any_addr(&p[24], 4) == myip) // I am the target?
 		{
 			stats_inc_counter(arp_for_me);
 
 			uint8_t *reply = duplicate(p, size);
 
 			swap_mac(&reply[8], &reply[18]); // arp addresses
-			memcpy(&reply[8], mymac, 6); // my mac
+
+			// my MAC address
+			uint8_t mymac_bytes[ANY_ADDR_SIZE];
+			int mymac_size { 0 };
+			mymac.get(mymac_bytes, &mymac_size);
+			assert(mymac_size == 6);
+			memcpy(&reply[8], mymac_bytes, 6);
 
 			reply[7] = 0x02; // reply
 
 			swap_ipv4(&reply[14], &reply[24]);
 
-			if (pdev)
-				pdev->transmit_packet(pkt->get_src_addr().first, mymac, 0x0806, reply, size);
+			if (pdev) {
+				pdev->transmit_packet(pkt->get_src_addr(), mymac, 0x0806, reply, size);
+			}
 
 			delete [] reply;
 		}
@@ -81,24 +83,19 @@ void arp::operator()()
 	}
 }
 
-void arp::update_cache(const uint8_t *const mac, const uint8_t *const ip)
+void arp::update_cache(const any_addr & mac, const any_addr & ip)
 {
 	const std::lock_guard<std::shared_mutex> lock(cache_lock);
 
-	uint32_t ip_word = (ip[0] << 24) | (ip[1] << 16) | (ip[2] << 8) | ip[3];
+	auto it = arp_cache.find(ip);
 
-	auto it = arp_cache.find(ip_word);
-	if (it == arp_cache.end()) {
-		uint8_t *mac_copy = duplicate(mac, 6);
-
-		arp_cache.insert({ ip_word, mac_copy });
-	}
-	else {
-		memcpy(it->second, mac, 6);
-	}
+	if (it == arp_cache.end())
+		arp_cache.insert({ ip, mac });
+	else
+		it->second = mac;
 }
 
-uint8_t * arp::query_cache(const uint8_t *const ip)
+any_addr * arp::query_cache(const any_addr & ip)
 {
 	const std::shared_lock<std::shared_mutex> lock(cache_lock);
 
@@ -109,18 +106,16 @@ uint8_t * arp::query_cache(const uint8_t *const ip)
 		stats_inc_counter(arp_cache_hit);
 
 		constexpr uint8_t multicast_mac[] { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-		return duplicate(multicast_mac, 6);
+		return new any_addr(multicast_mac, 6);
 	}
 
-	uint32_t ip_word = (ip[0] << 24) | (ip[1] << 16) | (ip[2] << 8) | ip[3];
-
-	auto it = arp_cache.find(ip_word);
+	auto it = arp_cache.find(ip);
 	if (it == arp_cache.end()) {
-		dolog("ARP: %d.%d.%d.%d is not in the cache\n", ip[0], ip[1], ip[2], ip[3]);
+		dolog("ARP: %s is not in the cache\n", ip.to_str().c_str());
 		return nullptr;
 	}
 
 	stats_inc_counter(arp_cache_hit);
 
-	return duplicate(it->second, 6);
+	return new any_addr(it->second);
 }

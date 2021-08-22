@@ -1,4 +1,4 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <chrono>
 
 #include "icmp.h"
@@ -57,8 +57,8 @@ void icmp::operator()()
 
 		stats_inc_counter(icmp_req_ping);
 
-		const uint8_t *src_ip = pkt->get_src_addr().first;
-		dolog("ICMP: request by %d.%d.%d.%d\n", src_ip[0], src_ip[1], src_ip[2], src_ip[3]);
+		const any_addr src_ip = pkt->get_src_addr();
+		dolog("ICMP: request by %s", src_ip.to_str().c_str());
 
 		uint8_t *reply = duplicate(p, size);
 
@@ -79,7 +79,7 @@ void icmp::operator()()
 
 		if (idev)
 			// this is the correct order! sending a reply!
-			idev->transmit_packet(src_ip, pkt->get_dst_addr().first, 0x01, reply, size, header_copy);
+			idev->transmit_packet(src_ip, pkt->get_dst_addr(), 0x01, reply, size, header_copy);
 
 		delete [] header_copy;
 
@@ -89,7 +89,7 @@ void icmp::operator()()
 	}
 }
 
-void icmp::send_packet(const uint8_t *const dst_ip, const uint8_t *const src_ip, const uint8_t type, const uint8_t code, const packet *const p) const
+void icmp::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const packet *const p) const
 {
 	stats_inc_counter(icmp_transmit);
 

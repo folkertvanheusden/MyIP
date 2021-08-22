@@ -17,7 +17,7 @@ private:
 	icmp *const icmp_;
 
 	// src ip, src port, dest ip (=local), dest port, payload-packet
-	std::map<int, std::function<void(const uint8_t *, int, const uint8_t *, int, packet *)> > callbacks;
+	std::map<int, std::function<void(const any_addr &, int, const any_addr &, int, packet *)> > callbacks;
 
 	uint64_t *udp_requests { nullptr };
 	uint64_t *udp_refused { nullptr };
@@ -26,9 +26,9 @@ public:
 	udp(stats *const s, icmp *const icmp_);
 	virtual ~udp();
 
-	void add_handler(const int port, std::function<void(const uint8_t *, int, const uint8_t *, int, packet *)> h);
+	void add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *)> h);
 
-	void transmit_packet(const uint8_t *dst_ip, const int dst_port, const uint8_t *src_ip, const int src_port, const uint8_t *payload, const size_t pl_size);
+	void transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size);
 
 	virtual void operator()() override;
 };

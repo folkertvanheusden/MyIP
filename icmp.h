@@ -1,6 +1,7 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
+#include "any_addr.h"
 #include "ip_protocol.h"
 #include "stats.h"
 
@@ -14,7 +15,7 @@ public:
 	explicit icmp(stats *const s);
 	virtual ~icmp();
 
-	void send_packet(const uint8_t *const dst_ip, const uint8_t *const src_ip, const uint8_t type, const uint8_t code, const packet *const p) const;
+	void send_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const packet *const p) const;
 
 	virtual void operator()() override;
 };

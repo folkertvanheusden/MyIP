@@ -7,10 +7,12 @@
 #include <vector>
 #include <sys/types.h>
 
+#include "any_addr.h"
 #include "stats.h"
 #include "phys.h"
 #include "arp.h"
 #include "ipv4.h"
+//#include "ipv6.h"
 #include "icmp.h"
 #include "udp.h"
 #include "ntp.h"
@@ -20,30 +22,24 @@
 #include "vnc.h"
 #include "utils.h"
 
-void parse_ip_address(const char *ip_str, uint8_t *const p)
+any_addr parse_address(const char *str, const size_t exp_size, const std::string & seperator, const int base)
 {
-	std::vector<std::string> *ip_parts = split(ip_str, ".");
+	std::vector<std::string> *parts = split(str, seperator);
 
-	if (ip_parts->size() != 4) {
-		fprintf(stderr, "An IPv4 address consists of 4 numbers\n");
+	if (parts->size() != exp_size) {
+		fprintf(stderr, "An address consists of %zu numbers\n", exp_size);
 		exit(1);
 	}
 
-	for(int i=0; i<4; i++)
-		p[i] = atoi(ip_parts->at(i).c_str());
-}
+	uint8_t *temp = new uint8_t[exp_size];
+	for(size_t i=0; i<exp_size; i++)
+		temp[i] = strtol(parts->at(i).c_str(), nullptr, base);
 
-void parse_mac_address(const char *mac_str, uint8_t *const mymac)
-{
-	std::vector<std::string> *mac_parts = split(mac_str, ":");
+	any_addr rc = any_addr(temp, exp_size);
 
-	if (mac_parts->size() != 6) {
-		fprintf(stderr, "An Ethernet MAC-address consists of 6 (hex-)values\n");
-		exit(1);
-	}
+	delete [] temp;
 
-	for(int i=0; i<6; i++)
-		mymac[i] = strtol(mac_parts->at(i).c_str(), nullptr, 16);
+	return rc;
 }
 
 void ss(int s)
@@ -78,16 +74,14 @@ int main(int argc, char *argv[])
 	setlog(iniparser_getstring(ini, "cfg:logfile", "/tmp/myip.log"));
 
 	const char *mac_str = iniparser_getstring(ini, "cfg:mac-address", "52:34:84:16:44:22");
-	uint8_t mymac[6] { 0 };
-	parse_mac_address(mac_str, mymac);
+	any_addr mymac = parse_address(mac_str, 6, ":", 16);
 
-	printf("Will listen on MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n", mymac[0], mymac[1], mymac[2], mymac[3], mymac[4], mymac[5]);
+	printf("Will listen on MAC address: %s\n", mymac.to_str().c_str());
 
 	const char *ip_str = iniparser_getstring(ini, "cfg:ip-address", "192.168.3.2");
-	uint8_t myip[4] { 0 };
-	parse_ip_address(ip_str, myip);
+	any_addr myip = parse_address(ip_str, 4, ".", 10);
 
-	printf("Will listen on IPv4 address: %d.%d.%d.%d\n", myip[0], myip[1], myip[2], myip[3]);
+	printf("Will listen on IPv4 address: %s\n", myip.to_str().c_str());
 
 	arp *a = new arp(&s, mymac, myip);
 	dev->register_protocol(0x0806, a);
@@ -106,9 +100,11 @@ int main(int argc, char *argv[])
 
 	dev->register_protocol(0x0800, ipv4_instance);
 
+//	ipv6 *ipv6_instance = new ipv6(&s, a, myip);
+//	dev->register_protocol(0x86dd, ipv6_instance);
+
 	const char *ntp_ip_str = iniparser_getstring(ini, "cfg:ntp-ip-address", "192.168.64.1");
-	uint8_t upstream_ntp_server[4] { 0 };
-	parse_ip_address(ntp_ip_str, upstream_ntp_server);
+	any_addr upstream_ntp_server = parse_address(ntp_ip_str, 4, ".", 10);
 
 	const char *web_root = iniparser_getstring(ini, "cfg:web-root", "/home/folkert/www");
 	const char *http_logfile = iniparser_getstring(ini, "cfg:web-logfile", "/home/folkert/http_access.log");
