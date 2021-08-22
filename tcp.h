@@ -78,7 +78,8 @@ private:
 
 	std::mutex sessions_lock;
 	std::condition_variable sessions_cv, unacked_cv;
-	std::map<uint64_t, tcp_session_t *> sessions; // FIXME uint64_t? is that the seq nr and should it thus be uint32_t?
+	// the key is an 'internal id'
+	std::map<uint64_t, tcp_session_t *> sessions;
 
 	std::map<int, tcp_port_handler_t> listeners;
 
