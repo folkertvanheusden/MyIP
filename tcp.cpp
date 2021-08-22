@@ -170,7 +170,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		return;
 	}
 
-	// FIXME verify checksum
+	// not verifying checksum: assuming that link layer takes care
+	// of corruptions
 
 	bool flag_fin = p[13] & 1;
 	bool flag_syn = p[13] & 2;
@@ -240,8 +241,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	dolog("TCP[%012" PRIx64 "]: start processing, state: %d, window size: %d\n", id, cur_session->state_me, win_size);
 	cur_session->tlock.lock();
 
-	// FIXME ask physical layer for max. size of packet and use that unless other send_segment() invocations pushes
-	// data of 512(?) bytes or less
 	cur_it->second->window_size = std::max(1, win_size);
 
 	bool fail = false;
@@ -324,7 +323,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				cur_session->state_me = tcp_wait;
 			}
 			else if (cur_session->state_me == tcp_established) {
-				// FIXME un-queue packet with acked seq-nr
 			}
 			else {
 				dolog("TCP[%012" PRIx64 "]: unexpected state %d during ACK handling\n", id, cur_session->state_me);
@@ -492,8 +490,6 @@ void tcp::session_cleaner()
 				it = sessions.erase(it);
 
 				stats_inc_counter(tcp_sessions_to);
-
-				// FIXME send a FIN? RST?
 			}
 			else if (it->second->state_me == tcp_wait && age >= 2) {
 				dolog("TCP[%012" PRIx64 "]: session clean-up after tcp_wait state\n", it->first);
@@ -575,8 +571,6 @@ void tcp::operator()()
 		tcp_packet_handle_thread_t *handler_data = new tcp_packet_handle_thread_t;
 		handler_data->finished_flag = false;
 
-		// FIXME as long as tcp::packet_handler has 1 lock: this has no use
-#if 0
 		handler_data->th = new std::thread(&tcp::packet_handler, this, pkt, &handler_data->finished_flag);
 
 		threads.push_back(handler_data);
@@ -593,15 +587,16 @@ void tcp::operator()()
 				i++;
 			}
 		}
-#else
-		packet_handler(pkt, &handler_data->finished_flag);
-		delete handler_data;
-#endif
 
 		sessions_cv.notify_all();
 	}
 
-	// FIXME stop the threads
+	for(auto t : threads) {
+		t->th->join();
+		delete t->th;
+		delete t;
+	}
+
 	unacked_sender->join();
 	cleaner->join();
 	delete cleaner;

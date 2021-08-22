@@ -132,6 +132,12 @@ int main(int argc, char *argv[])
 
 	dolog(" *** TERMINATING ***\n");
 
+	if (vnc_handler.deinit)
+		vnc_handler.deinit();
+
+	if (http_handler.deinit)
+		http_handler.deinit();
+
 	delete dev;
 	delete a;
 	delete ipv4_instance;

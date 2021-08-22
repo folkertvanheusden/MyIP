@@ -69,7 +69,6 @@ phys::~phys()
 
 void phys::register_protocol(const uint16_t ether_type, protocol *const p)
 {
-	// FIXME prot-map write lock
 	prot_map.insert({ ether_type, p });
 
 	p->register_phys(this);
@@ -143,7 +142,6 @@ void phys::operator()()
 
 		uint16_t ether_type = (buffer[12] << 8) | buffer[13];
 
-		// FIXME prot_map read lock
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
 			dolog("phys: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
