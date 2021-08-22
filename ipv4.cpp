@@ -109,6 +109,7 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	const any_addr *dst_mac = iarp->query_cache(dst_ip);
 	if (!dst_mac) {
 		dolog("IPv4: cannot find dst IP (%s) in ARP table", dst_ip.to_str().c_str());
+		delete [] out;
 		return;
 	}
 
@@ -116,6 +117,8 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	const any_addr *src_mac = iarp->query_cache(q_addr);
 	if (!src_mac) {
 		dolog("IPv4: cannot find src IP (%s) in ARP table", q_addr.to_str().c_str());
+		delete [] out;
+		delete dst_mac;
 		return;
 	}
 
