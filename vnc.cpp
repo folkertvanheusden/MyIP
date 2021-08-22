@@ -35,7 +35,7 @@ void vnc_init()
 	frame_buffer.w = 256;
 	frame_buffer.h = 48;
 
-	size_t n_bytes = frame_buffer.w * frame_buffer.h * 3;
+	size_t n_bytes = size_t(frame_buffer.w) * size_t(frame_buffer.h) * 3;
 	frame_buffer.buffer = new uint8_t[n_bytes];
 	memset(frame_buffer.buffer, 0x00, n_bytes);
 
