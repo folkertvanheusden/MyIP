@@ -26,7 +26,7 @@ udp::~udp()
 
 void udp::operator()()
 {
-	set_thread_name("udp");
+	set_thread_name("myip-udp");
 
 	while(!stop_flag) {
 		std::unique_lock<std::mutex> lck(pkts_lock);

@@ -159,6 +159,8 @@ void tcp::send_segment(const uint64_t session_id, const any_addr & my_addr, cons
 
 void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag)
 {
+	set_thread_name("myip-pkt-handler");
+
 	const uint8_t *const p = pkt->get_data();
 	const int size = pkt->get_size();
 
@@ -459,7 +461,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 void tcp::session_cleaner()
 {
-	set_thread_name("tcp-clnr");
+	set_thread_name("myip-tcp-clnr");
 
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
@@ -511,7 +513,7 @@ void tcp::session_cleaner()
 
 void tcp::unacked_sender()
 {
-	set_thread_name("tcp-us");
+	set_thread_name("myip-tcp-us");
 
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
@@ -545,7 +547,7 @@ void tcp::unacked_sender()
 
 void tcp::operator()()
 {
-	set_thread_name("tcp");
+	set_thread_name("myip-tcp");
 
 	std::thread *cleaner = new std::thread(&tcp::session_cleaner, this);
 

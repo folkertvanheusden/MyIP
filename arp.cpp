@@ -28,7 +28,7 @@ arp::~arp()
 
 void arp::operator()()
 {
-	set_thread_name("arp");
+	set_thread_name("myip-arp");
 
 	while(!stop_flag) {
 		std::unique_lock<std::mutex> lck(pkts_lock);

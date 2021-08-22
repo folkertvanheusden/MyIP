@@ -179,14 +179,12 @@ uint8_t * get_from_buffer(uint8_t **p, size_t *len, size_t get_len)
 	return out;
 }
 
-void set_thread_name(const std::string & name)
+void set_thread_name(std::string name)
 {
-	std::string full_name = "MIP:" + name;
+	if (name.length() > 15)
+		name = name.substr(0, 15);
 
-	if (full_name.length() > 15)
-		full_name = full_name.substr(0, 15);
-
-	pthread_setname_np(pthread_self(), full_name.c_str());
+	pthread_setname_np(pthread_self(), name.c_str());
 }
 
 std::string bin_to_text(const uint8_t *p, const size_t len)

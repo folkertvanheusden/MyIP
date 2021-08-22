@@ -110,7 +110,7 @@ void phys::operator()()
 {
 	dolog("phys: thread started\n");
 
-	set_thread_name("phys");
+	set_thread_name("myip-phys");
 
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 

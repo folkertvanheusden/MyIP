@@ -109,7 +109,7 @@ void ntp::operator()()
 {
 	uint64_t prev = 0;
 
-	set_thread_name("ntp");
+	set_thread_name("myip-ntp");
 
 	while(!stop_flag) {
 		uint64_t now = get_us();

@@ -76,7 +76,7 @@ void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
 
 void frame_buffer_thread(void *fb_in)
 {
-	set_thread_name("framebuf");
+	set_thread_name("myip-framebuf");
 
 	frame_buffer_t *fb_work = reinterpret_cast<frame_buffer_t *>(fb_in);
 
@@ -291,11 +291,11 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 
 void vnc_thread(void *ts_in)
 {
+	set_thread_name("myip-vnc");
+
 	tcp_session_t *ts = (tcp_session_t *)ts_in;
 	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 	bool rc = true;
-
-	set_thread_name("vnc");
 
 	std::vector<int32_t> encodings;
 	int n_encodings = -1;

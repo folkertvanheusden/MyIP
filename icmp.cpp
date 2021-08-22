@@ -26,7 +26,7 @@ icmp::~icmp()
 
 void icmp::operator()()
 {
-	set_thread_name("icmp");
+	set_thread_name("myip-icmp");
 
 	while(!stop_flag) {
 		std::unique_lock<std::mutex> lck(pkts_lock);

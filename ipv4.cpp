@@ -124,7 +124,7 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 
 void ipv4::operator()()
 {
-	set_thread_name("ipv4");
+	set_thread_name("myip-ipv4");
 
 	while(!stop_flag) {
 		std::unique_lock<std::mutex> lck(pkts_lock);
