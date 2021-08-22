@@ -28,6 +28,7 @@ As root:
 Look at 'example.ini' on how to configure the stack.
 
 After you have started `myip', a 'myip' network device has appeared.
+Of course, your "local IP address" must be configured (remote is the MyIP instance, local is the Linux system; so for the example.ini: 192.168.3.2 is the MyIP address and you could e.g. add 192.168.3.1 to the 'myip' network interface).
 
 Run:
 
