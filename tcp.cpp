@@ -323,6 +323,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				cur_session->state_me = tcp_wait;
 			}
 			else if (cur_session->state_me == tcp_established) {
+				// this is fine, see below where acks are processed
 			}
 			else {
 				dolog("TCP[%012" PRIx64 "]: unexpected state %d during ACK handling\n", id, cur_session->state_me);
