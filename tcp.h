@@ -62,6 +62,7 @@ typedef struct {
 	std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> new_data;
 	std::function<void(tcp_session_t *, private_data *)> session_closed_1;  // please terminate
 	std::function<void(tcp_session_t *, private_data *)> session_closed_2;  // should be terminated, clean up
+	std::function<void()> deinit;
 	private_data *pd;
 } tcp_port_handler_t;
 

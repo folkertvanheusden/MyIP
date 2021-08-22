@@ -1,5 +1,6 @@
 // (C) 2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
+#include <atomic>
 #include <climits>
 #include <errno.h>
 #include <queue>
@@ -19,6 +20,7 @@
 struct frame_buffer_t
 {
 	std::thread *th;
+	std::atomic_bool terminate;
 
 	int w, h;
 
@@ -39,7 +41,16 @@ void vnc_init()
 	frame_buffer.buffer = new uint8_t[n_bytes];
 	memset(frame_buffer.buffer, 0x00, n_bytes);
 
+	frame_buffer.terminate = false;
 	frame_buffer.th = new std::thread(frame_buffer_thread, &frame_buffer);
+}
+
+void vnc_deinit()
+{
+	frame_buffer.terminate = true;
+
+	frame_buffer.th->join();
+	delete frame_buffer.th;
 }
 
 void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
@@ -74,7 +85,7 @@ void frame_buffer_thread(void *fb_in)
 
 	uint64_t latest_update = 0;
 
-	for(;;) {  // FIXME terminate if requested
+	for(;!fb_work->terminate;) {
 		// should be locking for these as well
 
 		// increase green
@@ -453,11 +464,6 @@ void vnc_thread(void *ts_in)
 					free(pf);
 				}
 			}
-			else if (running_cmd == 1) {  // ??? FIXME
-				dolog("VNC: STRANGE COMMAND\n");
-				// assume it is a keep-alive or so
-				vs->state = vs_running_waiting_cmd;
-			}
 			else if (running_cmd == 2) {  // SetEncodings, 7.5.2
 				uint8_t *parameters = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 3);
 
@@ -632,6 +638,7 @@ tcp_port_handler_t vnc_get_handler()
 	tcp_vnc.new_data = vnc_new_data;
 	tcp_vnc.session_closed_1 = vnc_close_session_1;
 	tcp_vnc.session_closed_2 = vnc_close_session_2;
+	tcp_vnc.deinit = vnc_deinit;
 	tcp_vnc.pd = nullptr;
 
 	return tcp_vnc;

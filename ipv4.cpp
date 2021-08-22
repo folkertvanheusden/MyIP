@@ -159,7 +159,7 @@ void ipv4::operator()()
 			continue;
 		}
 
-		// FIXME verify checksum
+		// assuming link layer takes care of corruptions so no checksum verification
 
 		stats_inc_counter(ip_n_pkt);
 
