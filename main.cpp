@@ -39,6 +39,8 @@ any_addr parse_address(const char *str, const size_t exp_size, const std::string
 
 	delete [] temp;
 
+	delete parts;
+
 	return rc;
 }
 
