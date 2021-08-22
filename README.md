@@ -28,6 +28,7 @@ As root:
 Look at 'example.ini' on how to configure the stack.
 
 After you have started `myip', a 'myip' network device has appeared.
+Of course, your "local IP address" must be configured (remote is the MyIP instance, local is the Linux system; so for the example.ini: 192.168.3.2 is the MyIP address and you could e.g. add 192.168.3.1 to the 'myip' network interface).
 
 Run:
 
@@ -47,6 +48,8 @@ badges
 <img src="https://img.shields.io/github/license/folkertvanheusden/MyIP">
 <img src="https://img.shields.io/travis/com/folkertvanheusden/MyIP">
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/9f791b96f10a48eba323215bc5feed1a)](https://www.codacy.com/gh/folkertvanheusden/MyIP/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=folkertvanheusden/MyIP&amp;utm_campaign=Badge_Grade)
+[![Total alerts](https://img.shields.io/lgtm/alerts/g/folkertvanheusden/MyIP.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/folkertvanheusden/MyIP/alerts/)
+[![Language grade: C/C++](https://img.shields.io/lgtm/grade/cpp/g/folkertvanheusden/MyIP.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/folkertvanheusden/MyIP/context:cpp)
 
 demo
 ----

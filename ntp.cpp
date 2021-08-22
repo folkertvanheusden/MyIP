@@ -80,10 +80,7 @@ void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		msgout.poll = 16;
 
 		// what to do with IPv6 addresses?
-		uint8_t uns[ANY_ADDR_SIZE] { 0 };
-		int uns_size { 0 };
-		upstream_ntp_server.get(uns, &uns_size);
-		memcpy(&msgout.reference_identifier, uns, 4);
+		upstream_ntp_server.get((uint8_t *)&msgout.reference_identifier, 4);
 
 		msgout.originate_timestamp_secs = sntp->transmit_timestamp_secs;
 		msgout.originate_timestamp_fraq = sntp->transmit_timestamp_fraq;
@@ -112,7 +109,7 @@ void ntp::operator()()
 {
 	uint64_t prev = 0;
 
-	set_thread_name("ntp");
+	set_thread_name("myip-ntp");
 
 	while(!stop_flag) {
 		uint64_t now = get_us();
@@ -146,10 +143,7 @@ void ntp::operator()()
 		msgout.poll = 16;
 
 		// what to do with IPv6 addresses?
-		uint8_t uns[ANY_ADDR_SIZE] { 0 };
-		int uns_size { 0 };
-		upstream_ntp_server.get(uns, &uns_size);
-		memcpy(&msgout.reference_identifier, uns, 4);
+		upstream_ntp_server.get((uint8_t *)&msgout.reference_identifier, 4);
 
 		msgout.originate_timestamp_secs = 0;
 		msgout.originate_timestamp_fraq = 0;

@@ -145,3 +145,10 @@ uint64_t any_addr::get_hash() const
 {
 	return std::hash<std::string>{}(to_str());
 }
+
+any_addr & any_addr::operator =(const any_addr & other)
+{
+	other.get(addr, &addr_size);
+
+	return *this;
+}

@@ -26,7 +26,7 @@ public:
 	packet(const struct timeval & tv, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
 	virtual ~packet();
 
-	uint8_t *const get_data() const { return data; }
+	uint8_t *get_data() const { return data; }
 	std::pair<const uint8_t *, int> get_payload() const { return { data, size }; }
 
 	int get_size() const { return size; }

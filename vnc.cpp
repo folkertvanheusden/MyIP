@@ -1,5 +1,6 @@
 // (C) 2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
+#include <atomic>
 #include <climits>
 #include <errno.h>
 #include <queue>
@@ -19,12 +20,13 @@
 struct frame_buffer_t
 {
 	std::thread *th;
+	std::atomic_bool terminate;
 
 	int w, h;
 
         mutable std::mutex fb_lock;
 	uint8_t *buffer;
-} fb;
+} frame_buffer;
 
 void vnc_thread(void *ts_in);
 
@@ -32,14 +34,23 @@ void frame_buffer_thread(void *ts_in);
 
 void vnc_init()
 {
-	fb.w = 256;
-	fb.h = 48;
+	frame_buffer.w = 256;
+	frame_buffer.h = 48;
 
-	size_t n_bytes = fb.w * fb.h * 3;
-	fb.buffer = new uint8_t[n_bytes];
-	memset(fb.buffer, 0x00, n_bytes);
+	size_t n_bytes = size_t(frame_buffer.w) * size_t(frame_buffer.h) * 3;
+	frame_buffer.buffer = new uint8_t[n_bytes];
+	memset(frame_buffer.buffer, 0x00, n_bytes);
 
-	fb.th = new std::thread(frame_buffer_thread, &fb);
+	frame_buffer.terminate = false;
+	frame_buffer.th = new std::thread(frame_buffer_thread, &frame_buffer);
+}
+
+void vnc_deinit()
+{
+	frame_buffer.terminate = true;
+
+	frame_buffer.th->join();
+	delete frame_buffer.th;
 }
 
 void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
@@ -65,7 +76,7 @@ void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
 
 void frame_buffer_thread(void *fb_in)
 {
-	set_thread_name("framebuf");
+	set_thread_name("myip-framebuf");
 
 	frame_buffer_t *fb_work = reinterpret_cast<frame_buffer_t *>(fb_in);
 
@@ -74,7 +85,7 @@ void frame_buffer_thread(void *fb_in)
 
 	uint64_t latest_update = 0;
 
-	for(;;) {  // FIXME terminate if requested
+	for(;!fb_work->terminate;) {
 		// should be locking for these as well
 
 		// increase green
@@ -119,10 +130,12 @@ void frame_buffer_thread(void *fb_in)
 			latest_update = now;
 
 			time_t tnow = time(nullptr);
-			struct tm *tm = gmtime(&tnow);
+
+			struct tm tm { 0 };
+			gmtime_r(&tnow, &tm);
 
 			char *text = nullptr;
-			asprintf(&text, "%02d:%02d:%02d - MyIP", tm->tm_hour, tm->tm_min, tm->tm_sec);
+			asprintf(&text, "%02d:%02d:%02d - MyIP", tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 			draw_text(fb_work, fb_work->w / 2 - 15 * 8 / 4, fb_work->h / 2 - 8 / 2, text);
 
@@ -278,11 +291,11 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 
 void vnc_thread(void *ts_in)
 {
+	set_thread_name("myip-vnc");
+
 	tcp_session_t *ts = (tcp_session_t *)ts_in;
 	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 	bool rc = true;
-
-	set_thread_name("vnc");
 
 	std::vector<int32_t> encodings;
 	int n_encodings = -1;
@@ -385,8 +398,8 @@ void vnc_thread(void *ts_in)
 
 		if (vs->state == vs_server_init) {  // 7.3.2
 			uint8_t message[] = {
-				uint8_t(fb.w >> 8), uint8_t(fb.w & 255),
-				uint8_t(fb.h >> 8), uint8_t(fb.h & 255),
+				uint8_t(frame_buffer.w >> 8), uint8_t(frame_buffer.w & 255),
+				uint8_t(frame_buffer.h >> 8), uint8_t(frame_buffer.h & 255),
 				// PIXEL_FORMAT
 				32,  // bits per pixel
 				24,  // depth
@@ -451,11 +464,6 @@ void vnc_thread(void *ts_in)
 					free(pf);
 				}
 			}
-			else if (running_cmd == 1) {  // ??? FIXME
-				dolog("VNC: STRANGE COMMAND\n");
-				// assume it is a keep-alive or so
-				vs->state = vs_running_waiting_cmd;
-			}
 			else if (running_cmd == 2) {  // SetEncodings, 7.5.2
 				uint8_t *parameters = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 3);
 
@@ -481,7 +489,7 @@ void vnc_thread(void *ts_in)
 					int w = (parameters[5] << 8) | parameters[6];
 					int h = (parameters[7] << 8) | parameters[8];
 
-					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len);
+					calculate_fb_update(&frame_buffer, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len);
 
 					dolog("VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes\n", message_len, w, h, x, y, message_len);
 
@@ -630,6 +638,7 @@ tcp_port_handler_t vnc_get_handler()
 	tcp_vnc.new_data = vnc_new_data;
 	tcp_vnc.session_closed_1 = vnc_close_session_1;
 	tcp_vnc.session_closed_2 = vnc_close_session_2;
+	tcp_vnc.deinit = vnc_deinit;
 	tcp_vnc.pd = nullptr;
 
 	return tcp_vnc;
