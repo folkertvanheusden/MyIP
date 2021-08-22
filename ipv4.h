@@ -29,6 +29,7 @@ private:
 	uint64_t *ipv4_ttl_ex { nullptr };
 	uint64_t *ipv4_unk_prot { nullptr };
 	uint64_t *ipv4_n_tx { nullptr };
+	uint64_t *ipv4_tx_err { nullptr };
 
 	void send_ttl_exceeded(const packet *const pkt) const;
 
