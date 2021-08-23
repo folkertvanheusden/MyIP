@@ -122,6 +122,9 @@ int main(int argc, char *argv[])
 
 	tcp_port_handler_t http_handler6 = http_get_handler(&s, web_root, http_logfile);
 	t6->add_handler(80, http_handler6);
+
+	tcp_port_handler_t vnc_handler6 = vnc_get_handler();
+	t6->add_handler(5900, vnc_handler6);
 	/* **** */
 
 	dolog("*** STARTED ***\n");
@@ -131,6 +134,9 @@ int main(int argc, char *argv[])
 	getchar();
 
 	dolog(" *** TERMINATING ***\n");
+
+	if (vnc_handler6.deinit)
+		vnc_handler6.deinit();
 
 	if (vnc_handler.deinit)
 		vnc_handler.deinit();
