@@ -9,7 +9,6 @@
 
 #include "tcp.h"
 #include "ipv4.h"
-#include "icmp.h"
 #include "utils.h"
 
 using namespace std::chrono_literals;
@@ -25,23 +24,48 @@ void free_tcp_session(tcp_session_t *const p)
 
 uint16_t tcp_checksum(const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const tcp_payload, const int len)
 {
-	size_t temp_len = 12 + len + (len & 1);
-	uint8_t *temp = new uint8_t[temp_len]();
+	uint16_t checksum { 0 };
 
-	src_addr.get(&temp[0], 4);
+	if (dst_addr.get_len() == 16) {  // IPv6
+		size_t temp_len = 40 + len + (len & 1);
+		uint8_t *temp = new uint8_t[temp_len]();
 
-	dst_addr.get(&temp[4], 4);
+		src_addr.get(&temp[0], 16);
 
-	temp[9] = 0x06; // TCP
+		dst_addr.get(&temp[16], 16);
 
-	temp[10] = len >> 8; // TCP len
-	temp[11] = len;
+		temp[32] = len >> 24;
+		temp[33] = len >> 16;
+		temp[34] = len >>  8;
+		temp[35] = len;
 
-	memcpy(&temp[12], tcp_payload, len);
+		temp[39] = 0x06; // TCP
 
-	uint16_t checksum = ipv4_checksum((const uint16_t *)temp, temp_len / 2);
+		memcpy(&temp[40], tcp_payload, len);
 
-	delete [] temp;
+		checksum = ipv4_checksum((const uint16_t *)temp, temp_len / 2);
+
+		delete [] temp;
+	}
+	else {  // IPv4
+		size_t temp_len = 12 + len + (len & 1);
+		uint8_t *temp = new uint8_t[temp_len]();
+
+		src_addr.get(&temp[0], 4);
+
+		dst_addr.get(&temp[4], 4);
+
+		temp[9] = 0x06; // TCP
+
+		temp[10] = len >> 8; // TCP len
+		temp[11] = len;
+
+		memcpy(&temp[12], tcp_payload, len);
+
+		checksum = ipv4_checksum((const uint16_t *)temp, temp_len / 2);
+
+		delete [] temp;
+	}
 
 	return checksum;
 }
@@ -70,7 +94,7 @@ char *flags_to_str(uint8_t flags)
 	return out;
 }
 
-tcp::tcp(stats *const s, icmp *const icmp_) : icmp_(icmp_)
+tcp::tcp(stats *const s)
 {
 	tcp_packets = s->register_stat("tcp_packets");
 	tcp_errors = s->register_stat("tcp_errors");
@@ -149,7 +173,7 @@ void tcp::send_segment(const uint64_t session_id, const any_addr & my_addr, cons
 	temp[16] = checksum >> 8;
 	temp[17] = checksum;
 
-	idev->transmit_packet(peer_addr, my_addr, 0x06, temp, temp_len);
+	idev->transmit_packet(peer_addr, my_addr, 0x06, temp, temp_len, nullptr);
 
 	delete [] temp;
 
@@ -296,16 +320,22 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		if (!flag_ack)
 			stats_inc_counter(tcp_syn);
 
-		if (cur_session->state_me != tcp_listen)
+		if (cur_session->state_me != tcp_listen) {
 			dolog("TCP[%012" PRIx64 "]: session already on-going\n", id);
-		else {
-			cur_session->state_me = tcp_sync_recv;
 
-			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 1) | (1 << 4) /* SYN, ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
-			cur_session->my_seq_nr++;
+			uint32_t temp_my_seq_nr = cur_session->my_seq_nr - 1;  // it has been increased by 1 already at this point
 
-			dolog("TCP[%012" PRIx64 "]: SYN/ACK sent\n", id);
+			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 1) | (1 << 4) /* SYN, ACK */, cur_session->their_seq_nr, &temp_my_seq_nr, nullptr, 0);
 		}
+		else {
+			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 1) | (1 << 4) /* SYN, ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+
+			cur_session->my_seq_nr++;
+		}
+
+		cur_session->state_me = tcp_sync_recv;
+
+		dolog("TCP[%012" PRIx64 "]: SYN/ACK sent\n", id);
 	}
 	else if (flag_ack) {
 		if (cur_session->state_me != tcp_listen) {

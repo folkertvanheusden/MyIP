@@ -68,7 +68,7 @@ void udp::operator()()
 
 			auto header = pkt->get_header();
 
-			packet *up = new packet(pkt->get_recv_ts(), src_addr, dst_addr, &p[8], size - 8, header.first, header.second);
+			packet *up = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), src_addr, dst_addr, &p[8], size - 8, header.first, header.second);
 
 			it->second(pkt->get_src_addr(), src_port, pkt->get_dst_addr(), dst_port, up);
 
@@ -106,7 +106,7 @@ void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 	out[11] = checksum;
 
 	if (idev)
-		idev->transmit_packet(dst_ip, src_ip, 0x11, out, out_size);
+		idev->transmit_packet(dst_ip, src_ip, 0x11, out, out_size, nullptr);
 
 	delete [] out;
 }

@@ -12,6 +12,7 @@ class packet
 private:
 	const struct timeval tv { 0, 0 };
 
+	const any_addr src_mac_addr;
 	const any_addr src_addr, dst_addr;
 
 	uint8_t *data;
@@ -23,13 +24,15 @@ private:
 
 public:
 	packet(const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
-	packet(const struct timeval & tv, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
+	packet(const struct timeval & tv, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
 	virtual ~packet();
 
 	uint8_t *get_data() const { return data; }
 	std::pair<const uint8_t *, int> get_payload() const { return { data, size }; }
 
 	int get_size() const { return size; }
+
+	const any_addr & get_src_mac_addr() const { return src_mac_addr; }
 
 	const any_addr & get_src_addr() const { return src_addr; }
 

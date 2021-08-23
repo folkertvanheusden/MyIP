@@ -12,8 +12,11 @@
 #include "phys.h"
 #include "arp.h"
 #include "ipv4.h"
-//#include "ipv6.h"
+#include "ipv6.h"
 #include "icmp.h"
+#include "icmp6.h"
+#include "arp.h"
+#include "ndp.h"
 #include "udp.h"
 #include "ntp.h"
 #include "tcp.h"
@@ -21,28 +24,6 @@
 #include "http.h"
 #include "vnc.h"
 #include "utils.h"
-
-any_addr parse_address(const char *str, const size_t exp_size, const std::string & seperator, const int base)
-{
-	std::vector<std::string> *parts = split(str, seperator);
-
-	if (parts->size() != exp_size) {
-		fprintf(stderr, "An address consists of %zu numbers\n", exp_size);
-		exit(1);
-	}
-
-	uint8_t *temp = new uint8_t[exp_size];
-	for(size_t i=0; i<exp_size; i++)
-		temp[i] = strtol(parts->at(i).c_str(), nullptr, base);
-
-	any_addr rc = any_addr(temp, exp_size);
-
-	delete [] temp;
-
-	delete parts;
-
-	return rc;
-}
 
 void ss(int s)
 {
@@ -95,15 +76,12 @@ int main(int argc, char *argv[])
 	// rather ugly but that's how IP works
 	ipv4_instance->register_icmp(icmp_);
 
-	tcp *t = new tcp(&s, icmp_);
+	tcp *t = new tcp(&s);
 	ipv4_instance->register_protocol(0x06, t);
 	udp *u = new udp(&s, icmp_);
 	ipv4_instance->register_protocol(0x11, u);
 
 	dev->register_protocol(0x0800, ipv4_instance);
-
-//	ipv6 *ipv6_instance = new ipv6(&s, a, myip);
-//	dev->register_protocol(0x86dd, ipv6_instance);
 
 	const char *ntp_ip_str = iniparser_getstring(ini, "cfg:ntp-ip-address", "192.168.64.1");
 	any_addr upstream_ntp_server = parse_address(ntp_ip_str, 4, ".", 10);
@@ -124,6 +102,28 @@ int main(int argc, char *argv[])
 	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
 	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
+	/* IPv6 */
+	const char *ip6_str = iniparser_getstring(ini, "cfg:ip6-address", "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
+	any_addr myip6 = parse_address(ip6_str, 16, ":", 16);
+
+	printf("Will listen on IPv6 address: %s\n", myip6.to_str().c_str());
+
+	ndp *ndp_ = new ndp(&s, mymac, myip6);
+
+	ipv6 *ipv6_instance = new ipv6(&s, ndp_, myip6);
+	dev->register_protocol(0x86dd, ipv6_instance);
+
+	icmp6 *icmp6_ = new icmp6(&s, mymac, myip6);
+	ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
+	ipv6_instance->register_icmp(icmp6_);
+
+	tcp *t6 = new tcp(&s);
+	ipv6_instance->register_protocol(0x06, t6);  // TCP
+
+	tcp_port_handler_t http_handler6 = http_get_handler(web_root, http_logfile);
+	t6->add_handler(80, http_handler6);
+	/* **** */
+
 	dolog("*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
@@ -140,7 +140,10 @@ int main(int argc, char *argv[])
 
 	delete dev;
 	delete a;
+	delete ndp_;
+	delete ipv6_instance;
 	delete ipv4_instance;
+	delete icmp6_;
 	delete icmp_;
 	delete u;
 	delete ntp_;

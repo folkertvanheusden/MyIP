@@ -18,9 +18,12 @@ add_executable(myip
 	font.cpp
 	http.cpp
 	icmp.cpp
+	icmp6.cpp
 	ip_protocol.cpp
 	ipv4.cpp
+	ipv6.cpp
 	main.cpp
+	ndp.cpp
 	ntp.cpp
 	packet.cpp
 	phys.cpp
@@ -49,7 +52,7 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads)
 target_link_libraries(myip Threads::Threads)
 
-target_link_libraries(myip -lrt -rdynamic -liniparser)
+target_link_libraries(myip -lrt -liniparser)
 
 target_link_libraries(myiptop -lrt)
 

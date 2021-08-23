@@ -32,9 +32,13 @@ public:
 	void get(uint8_t *const tgt, int exp_size) const;
 	const uint8_t & operator[](const int index) const;
 
+	int get_len() const { return addr_size; }
+
 	uint64_t get_hash() const;
 
 	void set(const uint8_t src[], const int src_size);
 
 	std::string to_str() const;
 };
+
+any_addr parse_address(const char *str, const size_t exp_size, const std::string & seperator, const int base);

@@ -118,7 +118,7 @@ void icmp::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const u
 	out[3] = checksum;
 
 	if (idev)
-		idev->transmit_packet(dst_ip, src_ip, 0x01, out, out_size);
+		idev->transmit_packet(dst_ip, src_ip, 0x01, out, out_size, nullptr);
 
 	delete [] out;
 }

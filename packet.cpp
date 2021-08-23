@@ -2,7 +2,7 @@
 #include "packet.h"
 #include "utils.h"
 
-packet::packet(const struct timeval & tv_in, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size) : tv(tv_in), src_addr(src_addr), dst_addr(dst_addr)
+packet::packet(const struct timeval & tv_in, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size) : tv(tv_in), src_mac_addr(src_mac_addr), src_addr(src_addr), dst_addr(dst_addr)
 {
 	this->size = size;
 	data = ::duplicate(in, size);
@@ -28,5 +28,5 @@ packet::~packet()
 
 packet *packet::duplicate() const
 {
-	return new packet(tv, src_addr, dst_addr, data, size, header, header_size);
+	return new packet(tv, src_mac_addr, src_addr, dst_addr, data, size, header, header_size);
 }

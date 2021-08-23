@@ -74,8 +74,6 @@ typedef struct {
 class tcp : public ip_protocol
 {
 private:
-	icmp *const icmp_;
-
 	std::mutex sessions_lock;
 	std::condition_variable sessions_cv, unacked_cv;
 	// the key is an 'internal id'
@@ -103,7 +101,7 @@ private:
 	void unacked_sender();
 
 public:
-	tcp(stats *const s, icmp *const icmp_);
+	tcp(stats *const s);
 	virtual ~tcp();
 
 	void add_handler(const int port, tcp_port_handler_t & tph);
