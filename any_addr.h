@@ -21,6 +21,7 @@ public:
 
 	bool is_set() const { return !!addr_size; }
 
+	any_addr & operator =(const any_addr && other);
 	any_addr & operator =(const any_addr & other);
 	bool operator ==(const any_addr & other) const;
 	bool operator !=(const any_addr & other) const;

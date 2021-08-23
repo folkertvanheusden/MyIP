@@ -148,6 +148,14 @@ uint64_t any_addr::get_hash() const
 	return std::hash<std::string>{}(to_str());
 }
 
+// not useful, but to silence coverity
+any_addr & any_addr::operator =(const any_addr && other)
+{
+	other.get(addr, &addr_size);
+
+	return *this;
+}
+
 any_addr & any_addr::operator =(const any_addr & other)
 {
 	other.get(addr, &addr_size);
