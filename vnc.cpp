@@ -291,7 +291,6 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 
 	if (!vs) {
 		dolog("VNC: Data for a non-existing session\n");
-		stats_inc_counter(vs->vpd->vnc_err);
 		return false;
 	}
 

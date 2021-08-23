@@ -55,7 +55,7 @@ stats::~stats()
 	shm_unlink(shm_name);
 }
 
-uint64_t * stats::register_stat(const std::string name)
+uint64_t * stats::register_stat(const std::string & name)
 {
 	if (len + 32 > size) {
 		dolog("stats: shm is full\n");

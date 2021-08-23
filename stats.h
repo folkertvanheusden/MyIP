@@ -22,7 +22,7 @@ public:
 	stats(const int size);
 	virtual ~stats();
 
-	uint64_t * register_stat(const std::string name);
+	uint64_t * register_stat(const std::string & name);
 
 	std::string to_json() const;
 };
