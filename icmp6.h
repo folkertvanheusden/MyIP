@@ -29,6 +29,7 @@ public:
 
 	void send_packet_router_soliciation() const;
 	void send_packet_neighbor_advertisement(const any_addr & peer_mac, const any_addr & peer_ip) const;
+	void send_ping_reply(const packet *const pkt) const;
 
 	virtual void operator()() override;
 

@@ -58,7 +58,10 @@ void icmp6::operator()()
 
 		const uint8_t type = p[0];
 
-		if (type == 135) {  // neighbor soliciation
+		if (type == 128) {  // echo request (PING)
+			send_ping_reply(pkt);
+		}
+		else if (type == 135) {  // neighbor soliciation
 			send_packet_neighbor_advertisement(pkt->get_src_mac_addr(), pkt->get_src_addr());
 		}
 		else {
@@ -150,6 +153,18 @@ void icmp6::send_packet_neighbor_advertisement(const any_addr & peer_mac, const 
 	memcpy(&payload[16], target_link_layer_address, 8);
 
 	send_packet(&peer_mac, peer_ip, my_ip, 136, 0, 0x60000000, payload, 24);
+}
+
+void icmp6::send_ping_reply(const packet *const pkt) const
+{
+	auto request = pkt->get_payload();
+
+	const uint8_t *p = request.first;
+	uint32_t id_seq_nr = (p[4] << 24) | (p[5] << 16) | (p[6] << 8) | p[7];
+
+	const uint8_t *payload = request.second > 8 ? p + 8 : nullptr;
+
+	send_packet(&pkt->get_src_mac_addr(), pkt->get_src_addr(), my_ip, 129, 0, id_seq_nr, payload, request.second - 8);
 }
 
 void icmp6::router_solicitation()
