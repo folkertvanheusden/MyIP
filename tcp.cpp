@@ -320,8 +320,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		if (!flag_ack)
 			stats_inc_counter(tcp_syn);
 
-		cur_session->state_me = tcp_sync_recv;
-
 		if (cur_session->state_me != tcp_listen) {
 			dolog("TCP[%012" PRIx64 "]: session already on-going\n", id);
 
@@ -334,6 +332,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			cur_session->my_seq_nr++;
 		}
+
+		cur_session->state_me = tcp_sync_recv;
 
 		dolog("TCP[%012" PRIx64 "]: SYN/ACK sent\n", id);
 	}
