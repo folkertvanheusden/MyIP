@@ -16,6 +16,7 @@
 #include "ipv4.h"
 #include "font.h"
 #include "types.h"
+#include "stats.h"
 
 struct frame_buffer_t
 {
@@ -158,7 +159,7 @@ void frame_buffer_thread(void *fb_in)
 	}
 }
 
-void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len)
+void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len, vnc_private_data *vpd)
 {
 	if (fb->w < x + w || fb->h < y + h)
 		return;
@@ -231,11 +232,15 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 			}
 		}
 
-		if (b_n)
+		if (b_n) {
 			dolog("VNC: BITS LEFT: %d\n", b_n);
+			stats_inc_counter(vpd->vnc_err);
+		}
 	}
 	else {
 		dolog("VNC: depth=%d not supported\n", depth);
+
+		stats_inc_counter(vpd->vnc_err);
 	}
 
 	fb->fb_lock.unlock();
@@ -256,6 +261,10 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 	vs->state = vs_initial_handshake_server_send;
 
 	vs->depth = 32;
+
+	vs->vpd = static_cast<vnc_private_data *>(private_data);
+	printf("hier\n");
+	stats_inc_counter(vs->vpd->vnc_requests);
 
 	ts->p = vs;
 
@@ -282,6 +291,7 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 
 	if (!vs) {
 		dolog("VNC: Data for a non-existing session\n");
+		stats_inc_counter(vs->vpd->vnc_err);
 		return false;
 	}
 
@@ -303,6 +313,7 @@ void vnc_thread(void *ts_in)
 
 	tcp_session_t *ts = (tcp_session_t *)ts_in;
 	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
+	vnc_private_data *vpd = vs->vpd;
 	bool rc = true;
 
 	std::vector<int32_t> encodings;
@@ -352,6 +363,7 @@ void vnc_thread(void *ts_in)
 				else {
 					rc = false;
 					dolog("VNC: Unexpected/invalid protocol version: %s\n", handshake_str.c_str());
+					stats_inc_counter(vpd->vnc_err);
 				}
 
 				free(handshake);
@@ -386,6 +398,7 @@ void vnc_thread(void *ts_in)
 					uint8_t response[] = { 0, 0, 0, 1 };  // failed
 					dolog("VNC: Unexpected/invalid security type: %d (%zu bytes)\n", *chosen_sec, sizeof response);
 					ts->t->send_data(ts, response, sizeof response, false);
+					stats_inc_counter(vpd->vnc_err);
 				}
 
 				free(chosen_sec);
@@ -497,7 +510,7 @@ void vnc_thread(void *ts_in)
 					int w = (parameters[5] << 8) | parameters[6];
 					int h = (parameters[7] << 8) | parameters[8];
 
-					calculate_fb_update(&frame_buffer, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len);
+					calculate_fb_update(&frame_buffer, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd);
 
 					dolog("VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes\n", message_len, w, h, x, y, message_len);
 
@@ -532,6 +545,7 @@ void vnc_thread(void *ts_in)
 			}
 			else {
 				dolog("VNC: Command %d not known (data state)\n", running_cmd);
+				stats_inc_counter(vpd->vnc_err);
 				rc = false;
 			}
 
@@ -593,6 +607,7 @@ void vnc_thread(void *ts_in)
 			}
 			else {
 				dolog("VNC: Command %d not known (data-extra state)\n", running_cmd);
+				stats_inc_counter(vpd->vnc_err);
 				rc = false;
 			}
 		}
@@ -637,7 +652,7 @@ void vnc_close_session_2(tcp_session_t *ts, private_data *pd)
 	}
 }
 
-tcp_port_handler_t vnc_get_handler()
+tcp_port_handler_t vnc_get_handler(stats *const s)
 {
 	tcp_port_handler_t tcp_vnc;
 
@@ -647,7 +662,13 @@ tcp_port_handler_t vnc_get_handler()
 	tcp_vnc.session_closed_1 = vnc_close_session_1;
 	tcp_vnc.session_closed_2 = vnc_close_session_2;
 	tcp_vnc.deinit = vnc_deinit;
-	tcp_vnc.pd = nullptr;
+
+	vnc_private_data *vpd = new vnc_private_data();
+
+	vpd->vnc_requests = s->register_stat("vnc_requests");
+	vpd->vnc_err = s->register_stat("vnc_err");
+
+	tcp_vnc.pd = vpd;
 
 	return tcp_vnc;
 }

@@ -1,5 +1,6 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <algorithm>
+#include <assert.h>
 #include <cstring>
 #include <fcntl.h>
 #include <unistd.h>
@@ -41,6 +42,8 @@ stats::stats(const int size) : size(size)
 		exit(1);
 	}
 
+	memset(p, 0x00, size);
+
 	close(fd);
 }
 
@@ -52,10 +55,22 @@ stats::~stats()
 	shm_unlink(shm_name);
 }
 
-uint64_t * stats::register_stat(const std::string & name)
+uint64_t * stats::register_stat(const std::string name)
 {
-	if (len + 32 > size)
+	if (len + 32 > size) {
+		dolog("stats: shm is full\n");
 		return nullptr;
+	}
+
+	lock.lock();
+
+	auto it = lut.find(name);
+	if (it != lut.end()) {
+		uint64_t *rc = it->second;
+		lock.unlock();
+
+		return rc;
+	}
 
 	uint8_t *p_out = (uint8_t *)&p[len];
 
@@ -68,6 +83,11 @@ uint64_t * stats::register_stat(const std::string & name)
 	p_out[8 + copy_n] = 0x00;
 
 	len += 32;
+
+	auto rc = lut.insert(std::pair<std::string, uint64_t *>(name, reinterpret_cast<uint64_t *>(p_out)));
+	assert(rc.second);
+
+	lock.unlock();
 
 	return (uint64_t *)p_out;
 }

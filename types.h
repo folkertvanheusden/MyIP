@@ -27,6 +27,13 @@ public:
 	uint64_t *http_r_err { nullptr };
 };
 
+class vnc_private_data : public private_data
+{
+public:
+	uint64_t *vnc_requests { nullptr };
+	uint64_t *vnc_err { nullptr };
+};
+
 class session_data
 {
 public:
@@ -85,4 +92,6 @@ public:
 	std::queue<vnc_thread_work_t *> wq;
         std::condition_variable w_cond;
         mutable std::mutex w_lock;
+
+	vnc_private_data *vpd;
 };

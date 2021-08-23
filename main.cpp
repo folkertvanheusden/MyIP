@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
 	tcp_port_handler_t http_handler = http_get_handler(&s, web_root, http_logfile);
 	t->add_handler(80, http_handler);
 
-	tcp_port_handler_t vnc_handler = vnc_get_handler();
+	tcp_port_handler_t vnc_handler = vnc_get_handler(&s);
 	t->add_handler(5900, vnc_handler);
 
 	ntp *ntp_ = new ntp(&s, u, upstream_ntp_server, true);
@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
 	tcp_port_handler_t http_handler6 = http_get_handler(&s, web_root, http_logfile);
 	t6->add_handler(80, http_handler6);
 
-	tcp_port_handler_t vnc_handler6 = vnc_get_handler();
+	tcp_port_handler_t vnc_handler6 = vnc_get_handler(&s);
 	t6->add_handler(5900, vnc_handler6);
 	/* **** */
 
@@ -169,9 +169,9 @@ int main(int argc, char *argv[])
 	delete firewall;
 	delete dev;
 
-	iniparser_freedict(ini);
-
 	dolog("THIS IS THE END\n");
+
+	iniparser_freedict(ini);
 
 	return 0;
 }
