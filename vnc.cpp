@@ -131,7 +131,7 @@ void frame_buffer_thread(void *fb_in)
 		if (now - latest_update >= 1000000) {  // 1 time per second
 			fb_work->fb_lock.lock();
 
-			dolog("VNC: %zu FB UPDATE\n", now);
+			dolog(debug, "VNC: %zu FB UPDATE\n", now);
 			latest_update = now;
 
 			time_t tnow = time(nullptr);
@@ -233,12 +233,12 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 		}
 
 		if (b_n) {
-			dolog("VNC: BITS LEFT: %d\n", b_n);
+			dolog(error, "VNC: BITS LEFT: %d\n", b_n);
 			stats_inc_counter(vpd->vnc_err);
 		}
 	}
 	else {
-		dolog("VNC: depth=%d not supported\n", depth);
+		dolog(info, "VNC: depth=%d not supported\n", depth);
 
 		stats_inc_counter(vpd->vnc_err);
 	}
@@ -263,18 +263,17 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 	vs->depth = 32;
 
 	vs->vpd = static_cast<vnc_private_data *>(private_data);
-	printf("hier\n");
 	stats_inc_counter(vs->vpd->vnc_requests);
 
 	ts->p = vs;
 
-	dolog("VNC: new session with %s\n", vs->client_addr.c_str());
+	dolog(debug, "VNC: new session with %s\n", vs->client_addr.c_str());
 
 	// yes, this if is strictly seen not required
 	if (vs->state == vs_initial_handshake_server_send) {
 		const char initial_message[] = "RFB 003.008\n";
 
-		dolog("VNC: send handshake of 12 bytes\n");
+		dolog(debug, "VNC: send handshake of 12 bytes\n");
 		ts->t->send_data(ts, (const uint8_t *)initial_message, 12, true);  // must be 12 bytes
 
 		vs->state = vs_initial_handshake_client_resp;
@@ -290,7 +289,7 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 
 	if (!vs) {
-		dolog("VNC: Data for a non-existing session\n");
+		dolog(info, "VNC: Data for a non-existing session\n");
 		return false;
 	}
 
@@ -338,7 +337,7 @@ void vnc_thread(void *ts_in)
 		}
 
 		if (!work) {
-			dolog("VNC: TERMINATE THREAD REQUESTED\n");
+			dolog(info, "VNC: TERMINATE THREAD REQUESTED\n");
 			break;
 		}
 
@@ -347,7 +346,7 @@ void vnc_thread(void *ts_in)
 		memcpy(&vs->buffer[vs->buffer_size], work->data, work->data_len);
 		vs->buffer_size += work->data_len;
 
-		dolog("VNC: state: %d\n", vs->state);
+		dolog(debug, "VNC: state: %d\n", vs->state);
 	
 		if (vs->state == vs_initial_handshake_client_resp) {
 			char *handshake = (char *)get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 12);
@@ -356,12 +355,12 @@ void vnc_thread(void *ts_in)
 				std::string handshake_str = std::string(handshake, 12);
 
 				if (memcmp(handshake, "RFB", 3) == 0) {  // let's not be too picky
-					dolog("VNC: Client responded with protocol version: %s\n", handshake_str.c_str());
+					dolog(debug, "VNC: Client responded with protocol version: %s\n", handshake_str.c_str());
 					vs->state = vs_security_handshake_server;
 				}
 				else {
 					rc = false;
-					dolog("VNC: Unexpected/invalid protocol version: %s\n", handshake_str.c_str());
+					dolog(info, "VNC: Unexpected/invalid protocol version: %s\n", handshake_str.c_str());
 					stats_inc_counter(vpd->vnc_err);
 				}
 
@@ -374,7 +373,7 @@ void vnc_thread(void *ts_in)
 				1,  // 'None'
 			};
 
-			dolog("VNC: ack security types, %zu bytes\n", sizeof message);
+			dolog(debug, "VNC: ack security types, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message, false);
 
 			vs->state = vs_security_handshake_client_resp;
@@ -386,7 +385,7 @@ void vnc_thread(void *ts_in)
 			if (chosen_sec) {
 				if (*chosen_sec == 1) {  // must have chosen security type 'None'
 					uint8_t response[] = { 0, 0, 0, 0 };  // OK
-					dolog("VNC: Valid security type chosen, %zu bytes\n", sizeof response);
+					dolog(debug, "VNC: Valid security type chosen, %zu bytes\n", sizeof response);
 					ts->t->send_data(ts, response, sizeof response, false);
 
 					vs->state = vs_client_init;
@@ -395,7 +394,7 @@ void vnc_thread(void *ts_in)
 					rc = false;
 
 					uint8_t response[] = { 0, 0, 0, 1 };  // failed
-					dolog("VNC: Unexpected/invalid security type: %d (%zu bytes)\n", *chosen_sec, sizeof response);
+					dolog(info, "VNC: Unexpected/invalid security type: %d (%zu bytes)\n", *chosen_sec, sizeof response);
 					ts->t->send_data(ts, response, sizeof response, false);
 					stats_inc_counter(vpd->vnc_err);
 				}
@@ -408,7 +407,7 @@ void vnc_thread(void *ts_in)
 			uint8_t *client_init = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 1);
 
 			if (client_init) {
-				dolog("VNC: client asks for %sdesktop sharing\n", *client_init ? "" : "NO ");
+				dolog(debug, "VNC: client asks for %sdesktop sharing\n", *client_init ? "" : "NO ");
 
 				vs->state = vs_server_init;
 
@@ -437,7 +436,7 @@ void vnc_thread(void *ts_in)
 				'M', 'y', 'I', 'P'  // no "..."! that would include a 0x00!
 			};
 
-			dolog("VNC: server init, %zu bytes\n", sizeof message);
+			dolog(debug, "VNC: server init, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message, false);
 
 			vs->state = vs_running_waiting_cmd;
@@ -449,7 +448,7 @@ void vnc_thread(void *ts_in)
 			if (cmd) {
 				running_cmd = *cmd;
 
-				dolog("VNC: Received command %d\n", running_cmd);
+				dolog(debug, "VNC: Received command %d\n", running_cmd);
 
 				vs->state = vs_running_waiting_data;
 
@@ -461,10 +460,10 @@ void vnc_thread(void *ts_in)
 			bool proceed = false;
 			int ignore_n = 0;
 
-			dolog("VNC: waiting for data for command %d\n", running_cmd);
+			dolog(debug, "VNC: waiting for data for command %d\n", running_cmd);
 
 			if (running_cmd == 0) {  // SetPixelFormat, 7.5.1
-				dolog("VNC: Retrieving pixelformat\n");
+				dolog(debug, "VNC: Retrieving pixelformat\n");
 
 				uint8_t *pf = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 19);
 
@@ -477,7 +476,7 @@ void vnc_thread(void *ts_in)
 					uint16_t gmax = (data[6] << 8) | data[7];
 					uint16_t bmax = (data[8] << 8) | data[9];
 
-					dolog("VNC: Changed 'depth'(BPP) to %d (bpp: %d, red/green/blue max: %d/%d/%d)\n", vs->depth, data[0], rmax, gmax, bmax);
+					dolog(debug, "VNC: Changed 'depth'(BPP) to %d (bpp: %d, red/green/blue max: %d/%d/%d)\n", vs->depth, data[0], rmax, gmax, bmax);
 
 					vs->state = vs_running_waiting_cmd;
 
@@ -489,7 +488,7 @@ void vnc_thread(void *ts_in)
 
 				if (parameters) {
 					n_encodings = (parameters[1] << 8) | parameters[2];
-					dolog("VNC: Retrieving number of encodings (%d)\n", n_encodings);
+					dolog(debug, "VNC: Retrieving number of encodings (%d)\n", n_encodings);
 
 					vs->state = vs_running_waiting_data_extra;
 
@@ -511,7 +510,7 @@ void vnc_thread(void *ts_in)
 
 					calculate_fb_update(&frame_buffer, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd);
 
-					dolog("VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes\n", message_len, w, h, x, y, message_len);
+					dolog(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes\n", message_len, w, h, x, y, message_len);
 
 					ts->t->send_data(ts, message, message_len, false);
 
@@ -524,18 +523,18 @@ void vnc_thread(void *ts_in)
 			}
 			else if (running_cmd == 4) {  // KeyEvent
 				ignore_n = 7;
-				dolog("VNC: CLIENT KeyEvent (ignore %d)\n", ignore_n);
+				dolog(debug, "VNC: CLIENT KeyEvent (ignore %d)\n", ignore_n);
 			}
 			else if (running_cmd == 5) {  // PointerEvent
 				ignore_n = 5;
-				dolog("VNC: CLIENT PointerEvent (ignore %d)\n", ignore_n);
+				dolog(debug, "VNC: CLIENT PointerEvent (ignore %d)\n", ignore_n);
 			}
 			else if (running_cmd == 6) {  // ClientCutText
 				uint8_t *parameters = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 7);
 
 				if (parameters) {
 					ignore_data_n = (parameters[3] << 24) | (parameters[4] << 16) | (parameters[5] << 8) | parameters[6];
-					dolog("VNC: ClientCutText (ignore %d)\n", ignore_data_n);
+					dolog(debug, "VNC: ClientCutText (ignore %d)\n", ignore_data_n);
 
 					vs->state = vs_running_waiting_data_ignore;
 
@@ -543,14 +542,14 @@ void vnc_thread(void *ts_in)
 				}
 			}
 			else {
-				dolog("VNC: Command %d not known (data state)\n", running_cmd);
+				dolog(warning, "VNC: Command %d not known (data state)\n", running_cmd);
 				stats_inc_counter(vpd->vnc_err);
 				rc = false;
 			}
 
 			// part of the command
 			if (ignore_n) {
-				dolog("VNC: Ignore %d bytes from command\n", ignore_n);
+				dolog(debug, "VNC: Ignore %d bytes from command\n", ignore_n);
 
 				uint8_t *ignore = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, ignore_n);
 
@@ -569,7 +568,7 @@ void vnc_thread(void *ts_in)
 
 		// parameters of a command to ignore
 		if (vs->state == vs_running_waiting_data_ignore) {
-			dolog("VNC: Ignore %d command parameters\n", ignore_data_n);
+			dolog(debug, "VNC: Ignore %d command parameters\n", ignore_data_n);
 
 			assert(ignore_data_n > 0);
 			uint8_t *ignore = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, ignore_data_n);
@@ -585,7 +584,7 @@ void vnc_thread(void *ts_in)
 
 		if (vs->state == vs_running_waiting_data_extra) {
 			if (running_cmd == 2) {  // SetEncodings
-				dolog("VNC: Retrieving %d encodings\n", n_encodings);
+				dolog(debug, "VNC: Retrieving %d encodings\n", n_encodings);
 
 				uint8_t *encodings_bin = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, n_encodings * 4);
 
@@ -605,7 +604,7 @@ void vnc_thread(void *ts_in)
 				}
 			}
 			else {
-				dolog("VNC: Command %d not known (data-extra state)\n", running_cmd);
+				dolog(warning, "VNC: Command %d not known (data-extra state)\n", running_cmd);
 				stats_inc_counter(vpd->vnc_err);
 				rc = false;
 			}
@@ -619,7 +618,7 @@ void vnc_thread(void *ts_in)
 		delete work;
 	}
 
-	dolog("VNC: Thread terminating for %s\n", vs->client_addr.c_str());
+	dolog(info, "VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
 
 void vnc_close_session_1(tcp_session_t *ts, private_data *pd)

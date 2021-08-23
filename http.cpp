@@ -61,7 +61,7 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 	std::vector<std::string> *lines = split(request, "\r\n");
 
 	if (lines->size() == 0) {
-		dolog("HTTP: empty request?\n");
+		dolog(info, "HTTP: empty request?\n");
 		delete lines;
 		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
 		return;
@@ -70,7 +70,7 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 	auto parts = split(lines->at(0), " ");
 
 	if (parts->size() < 3) {
-		dolog("HTTP: invalid request: %s\n", lines->at(0).c_str());
+		dolog(warning, "HTTP: invalid request: %s\n", lines->at(0).c_str());
 		delete parts;
 		delete lines;
 		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
@@ -155,7 +155,7 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 			stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_500);
 	}
 
-	dolog("HTTP: Send response %d for %s: %s\n", rc, hs->client_addr.c_str(), url.c_str());
+	dolog(debug, "HTTP: Send response %d for %s: %s\n", rc, hs->client_addr.c_str(), url.c_str());
 
 	FILE *fh = fopen(logfile.c_str(), "a+");
 	if (fh) {
@@ -180,7 +180,7 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 		fclose(fh);
 	}
 	else {
-		dolog("HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
+		dolog(error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
 
 	delete parts;
@@ -210,7 +210,7 @@ bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 	http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
 
 	if (!hs) {
-		dolog("HTTP: Data for a non-existing session\n");
+		dolog(info, "HTTP: Data for a non-existing session\n");
 		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
 		return false;
 	}

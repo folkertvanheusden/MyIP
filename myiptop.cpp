@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 	}
 	else {
 		for(;;) {
-			dolog("\n");
+			printf("\n");
 
 			uint8_t *const p_end = &p[sb.st_size];
 			uint8_t *cur_p = p;

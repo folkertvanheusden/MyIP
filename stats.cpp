@@ -27,18 +27,18 @@ stats::stats(const int size) : size(size)
 {
 	fd = shm_open(shm_name, O_RDWR | O_CREAT, 0644);
 	if (fd == -1) {
-		perror("shm_open");
+		dolog(error, "shm_open: %s", strerror(errno));
 		exit(1);
 	}
 
 	if (ftruncate(fd, size) == -1) {
-		perror("ftruncate");
+		dolog(error, "truncate: %s", strerror(errno));
 		exit(1);
 	}
 
 	p = (uint8_t *)mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED) {
-		perror("mmap");
+		dolog(error, "mmap: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -49,7 +49,7 @@ stats::stats(const int size) : size(size)
 
 stats::~stats()
 {
-	dolog("Removing shared memory segment");
+	dolog(debug, "Removing shared memory segment");
 	munmap(p, size);
 
 	shm_unlink(shm_name);
@@ -58,7 +58,7 @@ stats::~stats()
 uint64_t * stats::register_stat(const std::string & name)
 {
 	if (len + 32 > size) {
-		dolog("stats: shm is full\n");
+		dolog(error, "stats: shm is full\n");
 		return nullptr;
 	}
 

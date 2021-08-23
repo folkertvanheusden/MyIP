@@ -107,7 +107,7 @@ any_addr * arp::query_cache(const any_addr & ip)
 
 	auto it = arp_cache.find(ip);
 	if (it == arp_cache.end()) {
-		dolog("ARP: %s is not in the cache\n", ip.to_str().c_str());
+		dolog(warning, "ARP: %s is not in the cache\n", ip.to_str().c_str());
 		return nullptr;
 	}
 

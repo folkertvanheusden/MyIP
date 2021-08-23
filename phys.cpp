@@ -28,7 +28,7 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 phys::phys(stats *const s, const std::string & dev_name)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
-		perror("open /dev/net/tun");
+		dolog(error, "open /dev/net/tun: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -40,7 +40,7 @@ phys::phys(stats *const s, const std::string & dev_name)
 	set_ifr_name(&ifr_tap, dev_name);
 
 	if (ioctl(fd, TUNSETIFF, &ifr_tap) == -1) {
-		perror("ioctl TUNSETIFF");
+		dolog(error, "ioctl TUNSETIFF: %s", strerror(errno));
 		close(fd);
 		exit(1);
 	}
@@ -52,7 +52,7 @@ phys::phys(stats *const s, const std::string & dev_name)
 
 	// MTU size for Ethernet
 	mtu_size = 1500;
-	dolog("phys: MTU size: %d\n", mtu_size);
+	dolog(debug, "phys: MTU size: %d\n", mtu_size);
 
 	th = new std::thread(std::ref(*this));
 }
@@ -81,7 +81,7 @@ void phys::register_protocol(const uint16_t ether_type, protocol *const p)
 
 void phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	dolog("phys: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	dolog(debug, "phys: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	stats_inc_counter(phys_transmit);
 
@@ -102,10 +102,10 @@ void phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, c
 	int rc = write(fd, out, out_size);
 
 	if (size_t(rc) != out_size) {
-		dolog("phys: problem sending packet (%d for %zu bytes)\n", rc, out_size);
+		dolog(error, "phys: problem sending packet (%d for %zu bytes)\n", rc, out_size);
 
 		if (rc == -1)
-			dolog("phys: %s\n", strerror(errno));
+			dolog(error, "phys: %s\n", strerror(errno));
 	}
 
 	delete [] out;
@@ -113,7 +113,7 @@ void phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, c
 
 void phys::operator()()
 {
-	dolog("phys: thread started\n");
+	dolog(debug, "phys: thread started\n");
 
 	set_thread_name("myip-phys");
 
@@ -125,7 +125,7 @@ void phys::operator()()
 			if (errno == EINTR)
 				continue;
 
-			perror("poll");
+			dolog(error, "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -149,7 +149,7 @@ void phys::operator()()
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
-			dolog("phys: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
+			dolog(info, "phys: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
 			stats_inc_counter(phys_ign_frame);
 			continue;
 		}
@@ -158,12 +158,12 @@ void phys::operator()()
 
 		any_addr src_mac(&buffer[6], 6);
 
-		dolog("phys: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
+		dolog(debug, "phys: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
 		packet *p = new packet(tv, src_mac, any_addr(&buffer[6], 6), any_addr(&buffer[0], 6), &buffer[14], size - 14, &buffer[0], 14);
 
 		it->second->queue_packet(p);
 	}
 
-	dolog("phys: thread stopped\n");
+	dolog(info, "phys: thread stopped\n");
 }

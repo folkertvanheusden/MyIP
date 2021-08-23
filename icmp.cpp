@@ -49,8 +49,8 @@ void icmp::operator()()
 
 		stats_inc_counter(icmp_requests);
 	
-		if (p[0] != 8) { // echo request
-			dolog("ICMP: dropping packet (type %d code %d)\n", p[0], p[1]);
+		if (p[0] != 8) { // not an echo request?
+			dolog(debug, "ICMP: dropping packet (type %d code %d)\n", p[0], p[1]);
 			delete pkt;
 			continue;
 		}
@@ -58,7 +58,7 @@ void icmp::operator()()
 		stats_inc_counter(icmp_req_ping);
 
 		const any_addr src_ip = pkt->get_src_addr();
-		dolog("ICMP: request by %s", src_ip.to_str().c_str());
+		dolog(debug, "ICMP: request by %s", src_ip.to_str().c_str());
 
 		uint8_t *reply = duplicate(p, size);
 

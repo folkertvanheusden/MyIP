@@ -75,7 +75,7 @@ any_addr * ndp::query_cache(const any_addr & ip6)
 
 	auto it = ndp_cache.find(ip6);
 	if (it == ndp_cache.end()) {
-		dolog("NDP: %s is not in the cache\n", ip6.to_str().c_str());
+		dolog(warning, "NDP: %s is not in the cache\n", ip6.to_str().c_str());
 		return nullptr;
 	}
 

@@ -75,7 +75,7 @@ void ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 
         const any_addr *src_mac = indp->query_cache(src_ip);
         if (!src_mac) {
-                dolog("IPv6: cannot find src IP (%s) in MAC lookup table\n", src_ip.to_str().c_str());
+                dolog(warning, "IPv6: cannot find src IP (%s) in MAC lookup table\n", src_ip.to_str().c_str());
                 delete [] out;
                 stats_inc_counter(ipv6_tx_err);
                 return;
@@ -97,7 +97,7 @@ void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 		delete dst_mac;
 	}
 	else {
-                dolog("IPv6: cannot find dst IP (%s) in MAC lookup table\n", dst_ip.to_str().c_str());
+                dolog(warning, "IPv6: cannot find dst IP (%s) in MAC lookup table\n", dst_ip.to_str().c_str());
                 stats_inc_counter(ipv6_tx_err);
         }
 }
@@ -126,7 +126,7 @@ void ipv6::operator()()
 		int size = pkt->get_size();
 
 		if (size < 40) {
-			dolog("IPv6: not an IPv6 packet (size: %d)\n", size);
+			dolog(info, "IPv6: not an IPv6 packet (size: %d)\n", size);
 			delete pkt;
 			continue;
 		}
@@ -139,7 +139,7 @@ void ipv6::operator()()
 
 		uint8_t version = payload_header[0] >> 4;
 		if (version != 0x06) {
-			dolog("IPv6[%04x]: not an IPv6 packet (version: %d)\n", flow_label, version);
+			dolog(info, "IPv6[%04x]: not an IPv6 packet (version: %d)\n", flow_label, version);
 			delete pkt;
 			continue;
 		}
@@ -149,12 +149,12 @@ void ipv6::operator()()
 		any_addr pkt_dst(&payload_header[24], 16);
 		any_addr pkt_src(&payload_header[8], 16);
 
-		dolog("IPv6[%04x]: packet %s => %s\n", flow_label, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
+		dolog(debug, "IPv6[%04x]: packet %s => %s\n", flow_label, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
 		bool link_local_scope_multicast_adress = pkt_dst[0] == 0xff && pkt_dst[1] == 0x02;
 
 		if (pkt_dst != myip && !link_local_scope_multicast_adress) {
-			dolog("IPv6[%04x]: packet not for me (=%s)\n", flow_label, myip.to_str().c_str());
+			dolog(info, "IPv6[%04x]: packet not for me (=%s)\n", flow_label, myip.to_str().c_str());
 			delete pkt;
 			stats_inc_counter(ipv6_not_me);
 			continue;
@@ -165,7 +165,7 @@ void ipv6::operator()()
 		int ip_size = (payload_header[4] << 8) | payload_header[5];
 
 		if (ip_size > size) {
-			dolog("IPv6[%04x]: packet is bigger on the inside (%d) than on the outside (%d)\n", flow_label, ip_size, size);
+			dolog(info, "IPv6[%04x]: packet is bigger on the inside (%d) than on the outside (%d)\n", flow_label, ip_size, size);
 			ip_size = size;
 		}
 
@@ -181,10 +181,10 @@ void ipv6::operator()()
 
 		int header_size = nh - payload_header;
 
-		dolog("IPv6[%04x]: total packet size: %d, IP header says: %d, header size: %d\n", flow_label, size, ip_size, header_size);
+		dolog(debug, "IPv6[%04x]: total packet size: %d, IP header says: %d, header size: %d\n", flow_label, size, ip_size, header_size);
 
 		if (ip_size > size) {
-			dolog("IPv6[%04x] size (%d) > Ethernet size (%d)\n", flow_label, ip_size, size);
+			dolog(info, "IPv6[%04x] size (%d) > Ethernet size (%d)\n", flow_label, ip_size, size);
 			delete pkt;
 			continue;
 		}
@@ -198,13 +198,13 @@ void ipv6::operator()()
 
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
-			dolog("IPv6[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", flow_label, protocol, size);
+			dolog(info, "IPv6[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", flow_label, protocol, size);
 			stats_inc_counter(ipv6_unk_prot);
 			delete pkt;
 			continue;
 		}
 
-		dolog("IPv6[%04x]: queing packet protocol %02x and size %d\n", flow_label, protocol, payload_size);
+		dolog(debug, "IPv6[%04x]: queing packet protocol %02x and size %d\n", flow_label, protocol, payload_size);
 
 		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
 

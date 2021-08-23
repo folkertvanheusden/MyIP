@@ -1,8 +1,10 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <iniparser/iniparser.h>
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string>
+#include <string.h>
 #include <unistd.h>
 #include <vector>
 #include <sys/types.h>
@@ -53,13 +55,13 @@ int main(int argc, char *argv[])
 
 	// change 1000 to UID to run under
 	if (setuid(iniparser_getint(ini, "cfg:run-as", 1000)) == -1) {
-		perror("setuid");
+		dolog(error, "setuid: %s", strerror(errno));
 		return 1;
 	}
 
-	dolog("*** START ***\n");
+	dolog(info, "*** START ***\n");
 
-	setlog(iniparser_getstring(ini, "cfg:logfile", "/tmp/myip.log"));
+	setlog(iniparser_getstring(ini, "cfg:logfile", "/tmp/myip.log"), info, warning);
 
 	const char *mac_str = iniparser_getstring(ini, "cfg:mac-address", "52:34:84:16:44:22");
 	any_addr mymac = parse_address(mac_str, 6, ":", 16);
@@ -132,13 +134,13 @@ int main(int argc, char *argv[])
 	t6->add_handler(5900, vnc_handler6);
 	/* **** */
 
-	dolog("*** STARTED ***\n");
+	dolog(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
 
 	getchar();
 
-	dolog(" *** TERMINATING ***\n");
+	dolog(info, " *** TERMINATING ***\n");
 
 	free_handler(http_handler6);
 	free_handler(http_handler);
@@ -169,7 +171,7 @@ int main(int argc, char *argv[])
 	delete firewall;
 	delete dev;
 
-	dolog("THIS IS THE END\n");
+	dolog(info, "THIS IS THE END\n");
 
 	iniparser_freedict(ini);
 

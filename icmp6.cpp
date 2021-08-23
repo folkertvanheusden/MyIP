@@ -69,7 +69,7 @@ void icmp6::operator()()
 			send_packet_neighbor_advertisement(pkt->get_src_mac_addr(), pkt->get_src_addr());
 		}
 		else {
-			dolog("ICMP6: type: %d / code: %d not known\n", p[0], p[1]);
+			dolog(warning, "ICMP6: type: %d / code: %d not known\n", p[0], p[1]);
 		}
 
 		delete pkt;

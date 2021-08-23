@@ -124,7 +124,7 @@ tcp::~tcp()
 void tcp::send_segment(const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len)
 {
 	char *flag_str = flags_to_str(flags);
-	dolog("TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str, ack_to, my_seq_nr ? *my_seq_nr : -1, data_len);
+	dolog(debug, "TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str, ack_to, my_seq_nr ? *my_seq_nr : -1, data_len);
 	free(flag_str);
 
 	size_t temp_len = 20 + data_len;
@@ -189,7 +189,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	const int size = pkt->get_size();
 
 	if (size < 20) {
-		dolog("TCP: packet too short\n");
+		dolog(info, "TCP: packet too short\n");
 		delete pkt;
 		stats_inc_counter(tcp_errors);
 		*finished_flag = true;
@@ -220,7 +220,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	uint64_t id = src.get_hash() ^ (uint64_t(src_port) << 31);
 
 	char *flag_str = flags_to_str(p[13]);
-	dolog("TCP[%012" PRIx64 "]: packet %d->%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src_port, dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
+	dolog(debug, "TCP[%012" PRIx64 "]: packet %d->%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src_port, dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
 	free(flag_str);
 
 	sessions_lock.lock();
@@ -257,14 +257,14 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		stats_inc_counter(tcp_new_sessions);
 
-		dolog("TCP[%012" PRIx64 "]: ...is a new session\n", id);
+		dolog(debug, "TCP[%012" PRIx64 "]: ...is a new session\n", id);
 
 		cur_it = sessions.find(id);
 	}
 
 	tcp_session_t *const cur_session = cur_it->second;
 
-	dolog("TCP[%012" PRIx64 "]: start processing, state: %d, window size: %d\n", id, cur_session->state_me, win_size);
+	dolog(debug, "TCP[%012" PRIx64 "]: start processing, state: %d, window size: %d\n", id, cur_session->state_me, win_size);
 	cur_session->tlock.lock();
 
 	cur_it->second->window_size = std::max(1, win_size);
@@ -273,16 +273,16 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	bool delete_entry = false;
 
 	if (header_size > size) {
-		dolog("TCP[%012" PRIx64 "]: header with options > packet size\n", id);
+		dolog(info, "TCP[%012" PRIx64 "]: header with options > packet size\n", id);
 		fail = true;
 	}
 	else if (cb_it == listeners.end()) {
-		dolog("TCP[%012" PRIx64 "]: no listener for that port\n", id);
+		dolog(info, "TCP[%012" PRIx64 "]: no listener for that port\n", id);
 		fail = true;
 	}
 	else if (flag_fin) {
 		if (cur_session->state_me != tcp_listen) {
-			dolog("TCP[%012" PRIx64 "]: FIN, send ACK + FIN\n", id);
+			dolog(debug, "TCP[%012" PRIx64 "]: FIN, send ACK + FIN\n", id);
 
 			cur_session->their_seq_nr = their_seq_nr + 1;
 
@@ -301,7 +301,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			else if (cur_session->state_me == tcp_fin_wait2)
 				cur_session->state_me = tcp_wait;
 			else {
-				dolog("TCP[%012" PRIx64 "]: unexpected state %d during FIN handling\n", id, cur_session->state_me);
+				dolog(warning, "TCP[%012" PRIx64 "]: unexpected state %d during FIN handling\n", id, cur_session->state_me);
 				stats_inc_counter(tcp_internal_err);
 			}
 
@@ -310,7 +310,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			cb_it->second.session_closed_1(cur_session, cb_it->second.pd);
 		}
 		else {
-			dolog("TCP[%012" PRIx64 "]: FIN for unknown session\n", id);
+			dolog(info, "TCP[%012" PRIx64 "]: FIN for unknown session\n", id);
 			fail = true;
 		}
 
@@ -321,7 +321,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			stats_inc_counter(tcp_syn);
 
 		if (cur_session->state_me != tcp_listen) {
-			dolog("TCP[%012" PRIx64 "]: session already on-going\n", id);
+			dolog(info, "TCP[%012" PRIx64 "]: session already on-going\n", id);
 
 			uint32_t temp_my_seq_nr = cur_session->my_seq_nr - 1;  // it has been increased by 1 already at this point
 
@@ -335,7 +335,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		cur_session->state_me = tcp_sync_recv;
 
-		dolog("TCP[%012" PRIx64 "]: SYN/ACK sent\n", id);
+		dolog(debug, "TCP[%012" PRIx64 "]: SYN/ACK sent\n", id);
 	}
 	else if (flag_ack) {
 		if (cur_session->state_me != tcp_listen) {
@@ -343,32 +343,32 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				cur_session->state_me = tcp_established;
 				stats_inc_counter(tcp_succ_estab);
 
-				dolog("TCP[%012" PRIx64 "]: session established\n", id);
+				dolog(debug, "TCP[%012" PRIx64 "]: session established\n", id);
 
 				if (cb_it->second.new_session(cur_session, pkt, cb_it->second.pd) == false) {
-					dolog("TCP[%012" PRIx64 "]: session terminated\n", id);
+					dolog(debug, "TCP[%012" PRIx64 "]: session terminated\n", id);
 					fail = true;
 				}
 			}
 			else if (cur_session->state_me == tcp_fin_wait2) {
-				dolog("TCP[%012" PRIx64 "]: final ACK received for FIN\n", id);
+				dolog(debug, "TCP[%012" PRIx64 "]: final ACK received for FIN\n", id);
 				cur_session->state_me = tcp_wait;
 			}
 			else if (cur_session->state_me == tcp_established) {
 				// this is fine, see below where acks are processed
 			}
 			else {
-				dolog("TCP[%012" PRIx64 "]: unexpected state %d during ACK handling\n", id, cur_session->state_me);
+				dolog(warning, "TCP[%012" PRIx64 "]: unexpected state %d during ACK handling\n", id, cur_session->state_me);
 				stats_inc_counter(tcp_internal_err);
 			}
 		}
 		else {
-			dolog("TCP[%012" PRIx64 "]: ACK in invalid state\n", id);
+			dolog(warning, "TCP[%012" PRIx64 "]: ACK in invalid state\n", id);
 			fail = true;
 		}
 	}
 	else if (flag_rst) {
-		dolog("TCP[%012" PRIx64 "]: RST\n", id);
+		dolog(debug, "TCP[%012" PRIx64 "]: RST\n", id);
 		delete_entry = true;
 		stats_inc_counter(tcp_rst);
 	}
@@ -377,14 +377,14 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		int ack_n = ack_to - cur_session->my_seq_nr;
 
 		if (ack_n > 0 && size_t(ack_n) <= cur_session->unacked_size) {
-			dolog("TCP[%012" PRIx64 "]: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", id, ack_to, cur_session->my_seq_nr, ack_n, cur_session->unacked_size);
+			dolog(debug, "TCP[%012" PRIx64 "]: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", id, ack_to, cur_session->my_seq_nr, ack_n, cur_session->unacked_size);
 
 			// delete acked
 			int left_n = cur_session->unacked_size - ack_n;
 			if (left_n > 0)
 				memmove(&cur_session->unacked[0], &cur_session->unacked[ack_n], left_n);
 			else if (left_n < 0) {
-				dolog("TCP[%012" PRIx64 "]: ack underrun? %d\n", id, left_n);
+				dolog(warning, "TCP[%012" PRIx64 "]: ack underrun? %d\n", id, left_n);
 				// terminate invalid session
 				// can happen for data coming in after finished
 				cur_session->unacked_size = ack_n = 0;
@@ -393,12 +393,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			cur_session->unacked_size -= ack_n;
 
-			dolog("TCP[%012" PRIx64 "]: unacked left: %zu, fin after empty: %d\n", id, cur_session->unacked_size, cur_session->fin_after_unacked_empty);
+			dolog(debug, "TCP[%012" PRIx64 "]: unacked left: %zu, fin after empty: %d\n", id, cur_session->unacked_size, cur_session->fin_after_unacked_empty);
 
 			cur_session->my_seq_nr += ack_n;
 
 			if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
-				dolog("TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n", id);
+				dolog(debug, "TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n", id);
 
 				send_segment(cur_session->id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) | (1 << 0) /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 				cur_session->my_seq_nr++;
@@ -407,7 +407,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			}
 		}
 		else if (ack_n < 0) {
-			dolog("TCP[%012" PRIx64 "]: got ack for %u SIZE %d?!\n", id, ack_to, ack_n);
+			dolog(warning, "TCP[%012" PRIx64 "]: got ack for %u SIZE %d?!\n", id, ack_to, ack_n);
 		}
 
 		unacked_cv.notify_all();
@@ -415,7 +415,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 	int data_len = size - header_size;
 	if (data_len > 0 && fail == false && cur_session) {
-		dolog("TCP[%012" PRIx64 "]: packet len %d, header size: %d, data size: %d\n", id, size, header_size, data_len);
+		dolog(debug, "TCP[%012" PRIx64 "]: packet len %d, header size: %d, data size: %d\n", id, size, header_size, data_len);
 
 		if (their_seq_nr >= cur_session->their_seq_nr) {
 			cur_session->their_seq_nr += data_len;  // FIXME handle missing segments
@@ -425,13 +425,13 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			const uint8_t *data_start = &p[header_size];
 
 			std::string content = bin_to_text(data_start, data_len);
-			dolog("TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
+			dolog(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
 
 			if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.pd) == false)
 				fail = true;
 		}
 		else {
-			dolog("TCP[%012" PRIx64 "]: data already seen/resend\n", id);
+			dolog(info, "TCP[%012" PRIx64 "]: data already seen/resend\n", id);
 		}
 
 		unacked_cv.notify_all();
@@ -446,7 +446,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		delete_entry = true;
 
 		if (idev) {
-			dolog("TCP[%012" PRIx64 "]: sending fail packet\n", id);
+			dolog(info, "TCP[%012" PRIx64 "]: sending fail packet\n", id);
 			send_segment(id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 2) | (1 << 4) /* RST, ACK */, their_seq_nr + 1, nullptr, nullptr, 0);
 		}
 	}
@@ -498,7 +498,7 @@ void tcp::session_cleaner()
 
 		std::unique_lock<std::mutex> lck(sessions_lock);
 		if (sessions_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
-			dolog("tcp-clnr woke-up after ack\n");
+			dolog(debug, "tcp-clnr woke-up after ack\n");
 
 		// find t/o'd sessions
 		uint64_t now = get_us();
@@ -507,7 +507,7 @@ void tcp::session_cleaner()
 			uint64_t age = (now - it->second->last_pkt) / 1000000;
 
 			if (age >= session_timeout) {
-				dolog("TCP[%012" PRIx64 "]: session timed out\n", it->first);
+				dolog(debug, "TCP[%012" PRIx64 "]: session timed out\n", it->first);
 
 				// call session_closed
 				auto cb_it = listeners.find(it->second->org_dst_port);
@@ -525,7 +525,7 @@ void tcp::session_cleaner()
 				stats_inc_counter(tcp_sessions_to);
 			}
 			else if (it->second->state_me == tcp_wait && age >= 2) {
-				dolog("TCP[%012" PRIx64 "]: session clean-up after tcp_wait state\n", it->first);
+				dolog(debug, "TCP[%012" PRIx64 "]: session clean-up after tcp_wait state\n", it->first);
 
 				// clean-up
 				free_tcp_session(it->second);
@@ -550,7 +550,7 @@ void tcp::unacked_sender()
 
 		std::unique_lock<std::mutex> lck(sessions_lock);
 		if (unacked_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
-			dolog("tcp-clnr woke-up after ack\n");
+			dolog(debug, "tcp-clnr woke-up after ack\n");
 
 		// go through all sessions and find if any has segments to resend
 
@@ -560,7 +560,7 @@ void tcp::unacked_sender()
 			if (it->second->unacked_size) {
 				size_t send_n = std::min(size_t(idev->get_max_packet_size() - 20/*TCP header size*/), std::min(size_t(it->second->window_size), it->second->unacked_size));
 
-				dolog("tcp-clnr SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu)\n", send_n, it->second->my_seq_nr, it->second->window_size, it->second->unacked_size);
+				dolog(debug, "tcp-clnr SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu)\n", send_n, it->second->my_seq_nr, it->second->window_size, it->second->unacked_size);
 
 				uint32_t resend_nr = it->second->my_seq_nr;
 				send_segment(it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, (1 << 4) /* ACK */, it->second->their_seq_nr, &resend_nr, it->second->unacked, send_n);
@@ -649,7 +649,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 {
 	uint64_t internal_id = get_us();
 
-	dolog("TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %lu packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
+	dolog(debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %lu packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
 
 	for(size_t i=0; i<len;) {
 		const uint8_t *p = &data[i];
@@ -675,7 +675,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 		if (ts->unacked_size <= send_n && i == 0 && window_full == false) {
 			uint32_t send_nr = ts->my_seq_nr + ts->unacked_size - send_n;
 
-			dolog("TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u, size: %zu\n", ts->id, ts->their_seq_nr, send_nr, send_n);
+			dolog(debug, "TCP[%012" PRIx64 "]: segment sent, peerseq: %u, myseq: %u, size: %zu\n", ts->id, ts->their_seq_nr, send_nr, send_n);
 
 			send_segment(ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, ts->window_size, (1 << 4) | (1 << 3) /* ACK, PSH */, ts->their_seq_nr, &send_nr, p, send_n);
 		}
@@ -692,7 +692,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 // this method requires tcp_session_t to be already locked
 void tcp::end_session(tcp_session_t *const ts, const packet *const pkt)
 {
-	dolog("TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, ts->my_seq_nr);
+	dolog(debug, "TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, ts->my_seq_nr);
 
 	if (ts->unacked_size == 0) {
 		send_segment(ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 1, (1 << 4) | (1 << 0) /* ACK, FIN */, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);

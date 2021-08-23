@@ -18,6 +18,8 @@
 #define gettid() pid_t(syscall(SYS_gettid))
 #endif
 
+#include "utils.h"
+
 void swap_mac(uint8_t *a, uint8_t *b)
 {
 	uint8_t temp[6];
@@ -69,7 +71,7 @@ void get_random(uint8_t *tgt, size_t n)
 {
 	int fd = open("/dev/urandom", O_RDONLY);
 	if (fd == -1) {
-		perror("open(\"/dev/urandom\", O_RDONLY)");
+		dolog(error, "open(\"/dev/urandom\"): %s", strerror(errno));
 		exit(1);
 	}
 
@@ -80,7 +82,7 @@ void get_random(uint8_t *tgt, size_t n)
 			if (errno == EINTR)
 				continue;
 
-			perror("read");
+			dolog(error, "read(\"/dev/urandom\"): %s", strerror(errno));
 			exit(1);
 		}
 
@@ -122,16 +124,24 @@ std::vector<std::string> * split(std::string in, std::string splitter)
 }
 
 static const char *logfile = strdup("/tmp/myip.log");
+static log_level_t log_level_file = warning;
+static log_level_t log_level_screen = warning;
 
-void setlog(const char *lf)
+void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen)
 {
 	free((void *)logfile);
 
 	logfile = lf;
+
+	log_level_file = ll_file;
+	log_level_screen = ll_screen;
 }
 
-void dolog(const char *fmt, ...)
+void dolog(const log_level_t ll, const char *fmt, ...)
 {
+	if (ll < log_level_file && ll < log_level_screen)
+		return;
+
 	FILE *fh = fopen(logfile, "a+");
 
 	if (fh) {
@@ -141,16 +151,34 @@ void dolog(const char *fmt, ...)
 		struct tm tm { 0 };
 		localtime_r(&t_now, &tm);
 
-		fprintf(fh, "%04d-%02d-%02d %02d:%02d:%02d.%06d %.6f|%d] ",
+		char *ts_str = nullptr;
+
+		const char *const ll_names[] = { "debug  ", "info   ", "warning", "error  " };
+
+		asprintf(&ts_str, "%04d-%02d-%02d %02d:%02d:%02d.%06d %.6f|%d] %s ",
 				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(now % 1000000),
-				get_us() / 1000000.0, gettid());
+				get_us() / 1000000.0, gettid(), ll_names[ll]);
+
+		char *str = nullptr;
 
 		va_list ap;
 		va_start(ap, fmt);
-		(void)vfprintf(fh, fmt, ap);
+		(void)vasprintf(&str, fmt, ap);
 		va_end(ap);
 
+		if (ll >= log_level_file)
+			fprintf(fh, "%s%s", ts_str, str);
+
+		if (ll >= log_level_screen)
+			printf("%s%s", ts_str, str);
+
+		free(str);
+		free(ts_str);
+
 		fclose(fh);
+	}
+	else {
+		fprintf(stderr, "Cannot access log-file %s: %s\n", logfile, strerror(errno));
 	}
 }
 
