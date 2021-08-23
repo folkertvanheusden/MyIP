@@ -30,6 +30,8 @@ public:
 	phys(const phys &) = delete;
 	virtual ~phys();
 
+	void stop();
+
 	void register_protocol(const uint16_t ether_type, protocol *const p);
 
 	void transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size);

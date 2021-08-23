@@ -67,6 +67,11 @@ phys::~phys()
 	delete th;
 }
 
+void phys::stop()
+{
+	stop_flag = true;
+}
+
 void phys::register_protocol(const uint16_t ether_type, protocol *const p)
 {
 	prot_map.insert({ ether_type, p });

@@ -47,10 +47,14 @@ void vnc_init()
 
 void vnc_deinit()
 {
-	frame_buffer.terminate = true;
+	if (frame_buffer.th) {
+		frame_buffer.terminate = true;
 
-	frame_buffer.th->join();
-	delete frame_buffer.th;
+		frame_buffer.th->join();
+
+		delete frame_buffer.th;
+		frame_buffer.th = nullptr;
+	}
 }
 
 void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
@@ -147,7 +151,11 @@ void frame_buffer_thread(void *fb_in)
 		myusleep(1000);  // ignore any errors during usleep
 	}
 
-	delete [] fb_work->buffer;
+	if (fb_work) {
+		delete [] fb_work->buffer;
+
+		fb_work->buffer = nullptr;
+	}
 }
 
 void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len)

@@ -25,6 +25,11 @@
 #include "vnc.h"
 #include "utils.h"
 
+void free_handler(tcp_port_handler_t & tph)
+{
+	delete tph.pd;
+}
+
 void ss(int s)
 {
 }
@@ -135,6 +140,12 @@ int main(int argc, char *argv[])
 
 	dolog(" *** TERMINATING ***\n");
 
+	free_handler(http_handler6);
+	free_handler(http_handler);
+
+	free_handler(vnc_handler6);
+	free_handler(vnc_handler);
+
 	if (vnc_handler6.deinit)
 		vnc_handler6.deinit();
 
@@ -144,7 +155,8 @@ int main(int argc, char *argv[])
 	if (http_handler.deinit)
 		http_handler.deinit();
 
-	delete dev;
+	dev->stop();
+
 	delete a;
 	delete ndp_;
 	delete ipv6_instance;
@@ -155,6 +167,9 @@ int main(int argc, char *argv[])
 	delete ntp_;
 	delete t;
 	delete firewall;
+	delete dev;
+
+	iniparser_freedict(ini);
 
 	dolog("THIS IS THE END\n");
 

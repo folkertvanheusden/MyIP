@@ -28,6 +28,10 @@ icmp6::~icmp6()
 		delete p;
 
 	stop_flag = true;
+
+	th2->join();
+	delete th2;
+
 	th->join();
 	delete th;
 }
@@ -65,7 +69,7 @@ void icmp6::operator()()
 			send_packet_neighbor_advertisement(pkt->get_src_mac_addr(), pkt->get_src_addr());
 		}
 		else {
-			printf("type: %d, code: %d\n", p[0], p[1]);
+			dolog("ICMP6: type: %d / code: %d not known\n", p[0], p[1]);
 		}
 
 		delete pkt;
@@ -176,11 +180,14 @@ void icmp6::router_solicitation()
 {
 	set_thread_name("myip-icmp6-133");
 
-	myusleep(500000);
+	int cnt = 0;
 
 	while(!stop_flag) {
-		send_packet_router_soliciation();
+		myusleep(500000);
 
-		sleep(30);
+		if (++cnt >= 60) {  // every 30s
+			send_packet_router_soliciation();
+			cnt = 0;
+		}
 	}
 }

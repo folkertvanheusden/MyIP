@@ -631,6 +631,8 @@ void tcp::operator()()
 	}
 
 	unacked_sender->join();
+	delete unacked_sender;
+
 	cleaner->join();
 	delete cleaner;
 }
