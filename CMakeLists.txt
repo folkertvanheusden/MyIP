@@ -29,6 +29,7 @@ add_executable(myip
 	phys.cpp
 	protocol.cpp
 	stats.cpp
+	stats-utils.cpp
 	tcp.cpp
 	tcp_udp_fw.cpp
 	udp.cpp
@@ -38,6 +39,7 @@ add_executable(myip
 
 add_executable(myiptop
 	myiptop.cpp
+	stats-utils.cpp
 	utils.cpp
 	)
 

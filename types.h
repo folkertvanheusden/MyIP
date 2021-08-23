@@ -5,6 +5,8 @@
 #include <queue>
 #include <thread>
 
+#include "stats.h"
+
 class private_data
 {
 public:
@@ -16,6 +18,13 @@ class http_private_data : public private_data
 {
 public:
 	std::string logfile, web_root;
+	stats *s;
+
+	uint64_t *http_requests { nullptr };
+	uint64_t *http_r_200 { nullptr };
+	uint64_t *http_r_404 { nullptr };
+	uint64_t *http_r_500 { nullptr };
+	uint64_t *http_r_err { nullptr };
 };
 
 class session_data

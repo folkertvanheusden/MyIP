@@ -8,6 +8,7 @@
 #include <sys/types.h>
 
 #include "stats.h"
+#include "stats-utils.h"
 #include "utils.h"
 
 constexpr char shm_name[] = "/myip";
@@ -69,4 +70,9 @@ uint64_t * stats::register_stat(const std::string & name)
 	len += 32;
 
 	return (uint64_t *)p_out;
+}
+
+std::string stats::to_json() const
+{
+	return stats_to_json(p, size);
 }

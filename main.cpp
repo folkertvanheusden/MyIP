@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 	const char *web_root = iniparser_getstring(ini, "cfg:web-root", "/home/folkert/www");
 	const char *http_logfile = iniparser_getstring(ini, "cfg:web-logfile", "/home/folkert/http_access.log");
 
-	tcp_port_handler_t http_handler = http_get_handler(web_root, http_logfile);
+	tcp_port_handler_t http_handler = http_get_handler(&s, web_root, http_logfile);
 	t->add_handler(80, http_handler);
 
 	tcp_port_handler_t vnc_handler = vnc_get_handler();
@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
 	tcp *t6 = new tcp(&s);
 	ipv6_instance->register_protocol(0x06, t6);  // TCP
 
-	tcp_port_handler_t http_handler6 = http_get_handler(web_root, http_logfile);
+	tcp_port_handler_t http_handler6 = http_get_handler(&s, web_root, http_logfile);
 	t6->add_handler(80, http_handler6);
 	/* **** */
 
