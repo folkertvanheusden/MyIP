@@ -9,7 +9,8 @@
 
 ndp::ndp(stats *const s, const any_addr & mymac, const any_addr & myip6)
 {
-	update_cache(mymac, myip6);
+	ndp_entry_t me { uint64_t(-1), mymac };  // may never be purged
+	ndp_cache.insert({ myip6, me });
 
         ndp_cache_req = s->register_stat("ndp_cache_req");
         ndp_cache_hit = s->register_stat("ndp_cache_hit");
@@ -52,14 +53,18 @@ void ndp::operator()()
 
 void ndp::update_cache(const any_addr & mac, const any_addr & ip6)
 {
+	assert(mac.get_len() == 6);
+
 	const std::lock_guard<std::shared_mutex> lock(cache_lock);
 
 	auto it = ndp_cache.find(ip6);
 
 	if (it == ndp_cache.end())
-		ndp_cache.insert({ ip6, mac });
-	else
-		it->second = mac;
+		ndp_cache.insert({ ip6, { get_us(), mac } });
+	else {
+		it->second.ts = get_us();
+		it->second.addr = mac;
+	}
 }
 
 any_addr * ndp::query_cache(const any_addr & ip6)
@@ -76,7 +81,7 @@ any_addr * ndp::query_cache(const any_addr & ip6)
 
 	stats_inc_counter(ndp_cache_hit);
 
-	return new any_addr(it->second);
+	return new any_addr(it->second.addr);
 }
 
 void ndp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)

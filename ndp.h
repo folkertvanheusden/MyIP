@@ -7,11 +7,16 @@
 #include "protocol.h"
 #include "stats.h"
 
+typedef struct {
+	uint64_t ts;
+	any_addr addr;
+} ndp_entry_t;
+
 class ndp : public protocol
 {
 private:
 	std::shared_mutex cache_lock;
-	std::map<any_addr, any_addr> ndp_cache;
+	std::map<any_addr, ndp_entry_t> ndp_cache;
 
         uint64_t *ndp_cache_req { nullptr }, *ndp_cache_hit { nullptr };
 

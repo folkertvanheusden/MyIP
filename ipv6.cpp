@@ -158,6 +158,8 @@ void ipv6::operator()()
 			continue;
 		}
 
+		indp->update_cache(pkt->get_src_addr(), pkt_src);
+
 		int ip_size = (payload_header[4] << 8) | payload_header[5];
 
 		uint8_t protocol = payload_header[6];
