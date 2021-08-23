@@ -84,6 +84,8 @@ void ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	pdev->transmit_packet(dst_mac, *src_mac, 0x86dd, out, out_size);
 
 	delete src_mac;
+
+	delete [] out;
 }
 
 void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
@@ -161,6 +163,11 @@ void ipv6::operator()()
 		indp->update_cache(pkt->get_src_addr(), pkt_src);
 
 		int ip_size = (payload_header[4] << 8) | payload_header[5];
+
+		if (ip_size > size) {
+			dolog("IPv6[%04x]: packet is bigger on the inside (%d) than on the outside (%d)\n", flow_label, ip_size, size);
+			ip_size = size;
+		}
 
 		uint8_t protocol = payload_header[6];
 		const uint8_t *nh = &payload_header[40], *const eh = &payload_header[size - ip_size];

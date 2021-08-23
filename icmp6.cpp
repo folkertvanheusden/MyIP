@@ -76,6 +76,11 @@ void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, 
 {
 	stats_inc_counter(icmp6_transmit);
 
+	if (idev == nullptr) {
+		stats_inc_counter(icmp6_error);
+		return;
+	}
+
 	int max_size = idev->get_max_packet_size() - 8;  // ICMPv6 are multiple of 8 bytes in size
 
 	if (payload_size > max_size) {
