@@ -21,6 +21,8 @@ ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : indp(indp),
 	ipv6_n_tx     = s->register_stat("ipv6_n_tx");
 	ipv6_tx_err   = s->register_stat("ipv6_tx_err");
 
+	assert(myip.get_len() == 16);
+
 	th = new std::thread(std::ref(*this));
 }
 
@@ -38,7 +40,7 @@ void ipv6::register_protocol(const uint8_t protocol, ip_protocol *const p)
 	p->register_ip(this);
 }
 
-void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+void ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv6_n_tx);
 
@@ -71,37 +73,31 @@ void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	if (pl_size)
 		memcpy(&out[40], payload, pl_size);
 
-        const any_addr *dst_mac = nullptr;
-
-	if (dst_ip[0] == 0xff && dst_ip[1] == 0x02 && dst_ip[15] == 0x02) {  // all router IPv6 multicast address
-		uint8_t mac[6] = { 0x33, 0x33, dst_ip[12], dst_ip[13], dst_ip[14], dst_ip[15] };
-
-		dst_mac = new any_addr(mac, 6);
-	}
-	else {
-		dst_mac = indp->query_cache(dst_ip);
-	}
-
-        if (!dst_mac) {
-                dolog("IPv6: cannot find dst IP (%s) in MAC lookup table\n", dst_ip.to_str().c_str());
-                delete [] out;
-                stats_inc_counter(ipv6_tx_err);
-                return;
-        }
-
         const any_addr *src_mac = indp->query_cache(src_ip);
         if (!src_mac) {
                 dolog("IPv6: cannot find src IP (%s) in MAC lookup table\n", src_ip.to_str().c_str());
                 delete [] out;
-                delete dst_mac;
                 stats_inc_counter(ipv6_tx_err);
                 return;
         }
 
-	pdev->transmit_packet(*dst_mac, *src_mac, 0x86dd, out, out_size);
+	pdev->transmit_packet(dst_mac, *src_mac, 0x86dd, out, out_size);
 
 	delete src_mac;
-	delete dst_mac;
+}
+
+void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+{
+        const any_addr *dst_mac = indp->query_cache(dst_ip);
+
+        if (dst_mac) {
+		transmit_packet(*dst_mac, dst_ip, src_ip, protocol, payload, pl_size, header_template);
+		delete dst_mac;
+	}
+	else {
+                dolog("IPv6: cannot find dst IP (%s) in MAC lookup table\n", dst_ip.to_str().c_str());
+                stats_inc_counter(ipv6_tx_err);
+        }
 }
 
 void ipv6::operator()()
@@ -153,7 +149,10 @@ void ipv6::operator()()
 
 		dolog("IPv6[%04x]: packet %s => %s\n", flow_label, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
-		if (pkt_dst != myip) {
+		bool link_local_scope_multicast_adress = pkt_dst[0] == 0xff && pkt_dst[1] == 0x02;
+
+		if (pkt_dst != myip && !link_local_scope_multicast_adress) {
+			dolog("IPv6[%04x]: packet not for me (=%s)\n", flow_label, myip.to_str().c_str());
 			delete pkt;
 			stats_inc_counter(ipv6_not_me);
 			continue;
@@ -161,14 +160,14 @@ void ipv6::operator()()
 
 		int ip_size = (payload_header[4] << 8) | payload_header[5];
 
-		uint8_t protocol = payload_header[6], next_header = protocol;
-		const uint8_t *const nh = &payload_header[40], *const eh = &payload_header[size - ip_size];
+		uint8_t protocol = payload_header[6];
+		const uint8_t *nh = &payload_header[40], *const eh = &payload_header[size - ip_size];
 		
 		while(eh - nh >= 8) {
 			// FIXME send "icmp6 Parameter Problem" for each unrecognized/unprocessed "next header"
 
 			protocol = nh[0];
-			next_header += (nh[1] + 1) * 8;
+			nh += (nh[1] + 1) * 8;
 		}
 
 		int header_size = nh - payload_header;
@@ -186,7 +185,7 @@ void ipv6::operator()()
 
 		const uint8_t *payload_data = &payload_header[header_size];
 
-		int payload_size = size - header_size;
+		int payload_size = size;
 
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
@@ -198,7 +197,7 @@ void ipv6::operator()()
 
 		dolog("IPv6[%04x]: queing packet protocol %02x and size %d\n", flow_label, protocol, payload_size);
 
-		packet *ip_p = new packet(pkt->get_recv_ts(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
+		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
 
 		it->second->queue_packet(ip_p);
 

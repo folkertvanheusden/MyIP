@@ -35,7 +35,8 @@ public:
 	ipv6(stats *const s, ndp *const indp, const any_addr & myip);
 	virtual ~ipv6();
 
-	void transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template = nullptr);
+	void transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
+	void transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 
 	void register_protocol(const uint8_t protocol, ip_protocol *const p);
 

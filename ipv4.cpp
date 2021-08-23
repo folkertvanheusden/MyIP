@@ -39,6 +39,8 @@ ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : iarp(iarp),
 	ipv4_n_tx     = s->register_stat("ipv4_n_tx");
 	ipv4_tx_err   = s->register_stat("ipv4_tx_err");
 
+	assert(myip.get_len() == 4);
+
 	th = new std::thread(std::ref(*this));
 }
 
@@ -56,7 +58,7 @@ void ipv4::register_protocol(const uint8_t protocol, ip_protocol *const p)
 	p->register_ip(this);
 }
 
-void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+void ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv4_n_tx);
 
@@ -101,30 +103,34 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	out[10] = checksum >> 8;
 	out[11] = checksum;
 
-	const any_addr *dst_mac = iarp->query_cache(dst_ip);
-	if (!dst_mac) {
-		dolog("IPv4: cannot find dst IP (%s) in ARP table\n", dst_ip.to_str().c_str());
-		delete [] out;
-		stats_inc_counter(ipv4_tx_err);
-		return;
-	}
-
 	any_addr q_addr = override_ip ? myip : src_ip;
 	const any_addr *src_mac = iarp->query_cache(q_addr);
 	if (!src_mac) {
 		dolog("IPv4: cannot find src IP (%s) in ARP table\n", q_addr.to_str().c_str());
 		delete [] out;
-		delete dst_mac;
 		stats_inc_counter(ipv4_tx_err);
 		return;
 	}
 
-	pdev->transmit_packet(*dst_mac, *src_mac, 0x0800, out, out_size);
+	pdev->transmit_packet(dst_mac, *src_mac, 0x0800, out, out_size);
 
 	delete src_mac;
-	delete dst_mac;
 
 	delete [] out;
+}
+
+void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+{
+	const any_addr *dst_mac = iarp->query_cache(dst_ip);
+	if (!dst_mac) {
+		dolog("IPv4: cannot find dst IP (%s) in ARP table\n", dst_ip.to_str().c_str());
+		stats_inc_counter(ipv4_tx_err);
+		return;
+	}
+
+	transmit_packet(*dst_mac, dst_ip, src_ip, protocol, payload, pl_size, header_template);
+
+	delete dst_mac;
 }
 
 void ipv4::operator()()
@@ -221,7 +227,7 @@ void ipv4::operator()()
 
 		int payload_size = size - header_size;
 
-		packet *ip_p = new packet(pkt->get_recv_ts(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
+		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
 
 		if (payload_header[8] <= 1) { // check TTL
 			dolog("IPv4[%04x]: TTL exceeded\n", id);

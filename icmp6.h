@@ -10,6 +10,7 @@
 class icmp6 : public ip_protocol
 {
 private:
+	const any_addr & my_mac;
 	const any_addr & my_ip;
 
 	std::thread *th2 { nullptr };
@@ -21,13 +22,15 @@ private:
 	any_addr all_router_multicast_addr;
 
 public:
-	explicit icmp6(stats *const s, const any_addr & my_ip);
+	explicit icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip);
 	virtual ~icmp6();
 
-	void send_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const uint8_t *const payload, const int payload_size) const;
-	void send_packet_router_solliciation() const;
+	void send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const uint32_t reserved, const uint8_t *const payload, const int payload_size) const;
+
+	void send_packet_router_soliciation() const;
+	void send_packet_neighbor_advertisement(const any_addr & peer_mac, const any_addr & peer_ip) const;
 
 	virtual void operator()() override;
 
-	void router_sollicitation();
+	void router_solicitation();
 };

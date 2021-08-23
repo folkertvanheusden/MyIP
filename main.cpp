@@ -90,11 +90,12 @@ int main(int argc, char *argv[])
 
 	ndp *ndp_ = new ndp(&s, mymac, myip6);
 
-	ipv6 *ipv6_instance = new ipv6(&s, ndp_, myip);
+	ipv6 *ipv6_instance = new ipv6(&s, ndp_, myip6);
 	dev->register_protocol(0x86dd, ipv6_instance);
 
-	icmp6 *icmp6_ = new icmp6(&s, myip6);
+	icmp6 *icmp6_ = new icmp6(&s, mymac, myip6);
 	ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
+	ipv6_instance->register_icmp(icmp6_);
 
 	const char *ntp_ip_str = iniparser_getstring(ini, "cfg:ntp-ip-address", "192.168.64.1");
 	any_addr upstream_ntp_server = parse_address(ntp_ip_str, 4, ".", 10);

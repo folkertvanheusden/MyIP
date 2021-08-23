@@ -5,9 +5,10 @@
 
 #include "icmp6.h"
 #include "ipv4.h"
+#include "ipv6.h"
 #include "utils.h"
 
-icmp6::icmp6(stats *const s, const any_addr & my_ip) : my_ip(my_ip)
+icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip) : my_mac(my_mac), my_ip(my_ip)
 {
 	icmp6_requests = s->register_stat("icmp6_requests");
 	icmp6_transmit = s->register_stat("icmp6_transmit");
@@ -18,7 +19,7 @@ icmp6::icmp6(stats *const s, const any_addr & my_ip) : my_ip(my_ip)
 
 	th = new std::thread(std::ref(*this));
 
-	th2 = new std::thread(&icmp6::router_sollicitation, this);
+	th2 = new std::thread(&icmp6::router_solicitation, this);
 }
 
 icmp6::~icmp6()
@@ -52,19 +53,23 @@ void icmp6::operator()()
 		lck.unlock();
 
 		const uint8_t *const p = pkt->get_data();
-		const int size = pkt->get_size();
 
 		stats_inc_counter(icmp6_requests);
 
-		// FIXME
+		const uint8_t type = p[0];
 
-		printf("type: %d, code: %d\n", p[0], p[1]);
+		if (type == 135) {  // neighbor soliciation
+			send_packet_neighbor_advertisement(pkt->get_src_mac_addr(), pkt->get_src_addr());
+		}
+		else {
+			printf("type: %d, code: %d\n", p[0], p[1]);
+		}
 
 		delete pkt;
 	}
 }
 
-void icmp6::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const uint8_t *const payload, const int payload_size) const
+void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const uint32_t reserved, const uint8_t *const payload, const int payload_size) const
 {
 	stats_inc_counter(icmp6_transmit);
 
@@ -81,11 +86,17 @@ void icmp6::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const 
 	out[1] = code;
 	out[2] = out[3] = 0; // checksum
 
-	if (payload_size)
-		memcpy(&out[4], payload, payload_size);
+	out[4] = reserved >> 24;
+	out[5] = reserved >> 16;
+	out[6] = reserved >>  8;
+	out[7] = reserved;
 
-	int out_size = 4 + payload_size;
-	out_size += 8 - (out_size & 7);
+	if (payload_size)
+		memcpy(&out[8], payload, payload_size);
+
+	int out_size = 8 + payload_size;
+	if (out_size & 7)
+		out_size += 8 - (out_size & 7);
 
 	// calc checksum over pseudo header
 	int temp_len = 40 + out_size;
@@ -108,26 +119,48 @@ void icmp6::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const 
 
 	delete [] temp;
 
-	if (idev)
-		idev->transmit_packet(dst_ip, src_ip, 0x3a, out, out_size);
+	if (idev) {
+		if (dst_mac)
+			((ipv6 *)idev)->transmit_packet(*dst_mac, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
+		else
+			idev->transmit_packet(dst_ip, src_ip, 0x3a, out, out_size, nullptr);
+	}
 
 	delete [] out;
 }
 
-void icmp6::send_packet_router_solliciation() const
+void icmp6::send_packet_router_soliciation() const
 {
-	send_packet(all_router_multicast_addr, my_ip, 133, 0, nullptr, 0);
+	uint8_t dst_mac[6] = { 0x33, 0x33, all_router_multicast_addr[12], all_router_multicast_addr[13], all_router_multicast_addr[14], all_router_multicast_addr[15] };
+	any_addr adst_mac(dst_mac, 6);
+
+	uint8_t source_link_layer_address[8] = { 0x01, 0x01 };
+	my_mac.get(&source_link_layer_address[2], 6);
+
+	send_packet(&adst_mac, all_router_multicast_addr, my_ip, 133, 0, 0, source_link_layer_address, 8);
 }
 
-void icmp6::router_sollicitation()
+void icmp6::send_packet_neighbor_advertisement(const any_addr & peer_mac, const any_addr & peer_ip) const
+{
+	uint8_t target_link_layer_address[8] { 0x02, 0x01 };
+	my_mac.get(&target_link_layer_address[2], 6);
+
+	uint8_t payload[16 + 8] { 0x00 };
+	my_ip.get(&payload[0], 16);
+	memcpy(&payload[16], target_link_layer_address, 8);
+
+	send_packet(&peer_mac, peer_ip, my_ip, 136, 0, 0x60000000, payload, 24);
+}
+
+void icmp6::router_solicitation()
 {
 	set_thread_name("myip-icmp6-133");
 
 	myusleep(500000);
 
 	while(!stop_flag) {
-		send_packet_router_solliciation();
+		send_packet_router_soliciation();
 
-		sleep(1);
+		sleep(30);
 	}
 }

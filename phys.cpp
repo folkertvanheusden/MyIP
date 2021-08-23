@@ -149,9 +149,13 @@ void phys::operator()()
 			continue;
 		}
 
-		dolog("phys: queing packet with ether type %04x and size %d\n", ether_type, size);
+		any_addr dst_mac(&buffer[0], 6);
 
-		packet *p = new packet(tv, any_addr(&buffer[6], 6), any_addr(&buffer[0], 6), &buffer[14], size - 14, &buffer[0], 14);
+		any_addr src_mac(&buffer[6], 6);
+
+		dolog("phys: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
+
+		packet *p = new packet(tv, src_mac, any_addr(&buffer[6], 6), any_addr(&buffer[0], 6), &buffer[14], size - 14, &buffer[0], 14);
 
 		it->second->queue_packet(p);
 	}
