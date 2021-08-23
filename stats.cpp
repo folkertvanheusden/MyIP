@@ -8,6 +8,7 @@
 #include <sys/types.h>
 
 #include "stats.h"
+#include "utils.h"
 
 constexpr char shm_name[] = "/myip";
 
@@ -34,17 +35,18 @@ stats::stats(const int size) : size(size)
 	}
 
 	p = (uint8_t *)mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == nullptr) {
+	if (p == MAP_FAILED) {
 		perror("mmap");
 		exit(1);
 	}
+
+	close(fd);
 }
 
 stats::~stats()
 {
+	dolog("Removing shared memory segment");
 	munmap(p, size);
-
-	close(fd);
 
 	shm_unlink(shm_name);
 }

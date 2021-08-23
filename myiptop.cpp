@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
 
 		out += " }";
 
-		dolog("%s\n", out.c_str());
+		printf("%s\n", out.c_str());
 	}
 	else {
 		for(;;) {
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 			while(cur_p < p_end && cur_p[8]) {
 				uint64_t *cnt_p = (uint64_t *)cur_p;
 
-				dolog("%s\t%lu\n", &cur_p[8], *cnt_p);
+				printf("%s\t%lu\n", &cur_p[8], *cnt_p);
 
 				cur_p += 32;
 			}
