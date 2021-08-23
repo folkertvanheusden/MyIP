@@ -166,14 +166,16 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 		const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
 		auto referer = find_header(lines, "Referer");
+		auto user_agent = find_header(lines, "User-Agent");
 
-		fprintf(fh, "%s - - [%02d/%s/%04d:%02d:%02d:%02d +0000] \"%s\" %d %ld \"%s\" \"\"\n",
+		fprintf(fh, "%s - - [%02d/%s/%04d:%02d:%02d:%02d +0000] \"%s\" %d %ld \"%s\" \"%s\"\n",
 				hs->client_addr.c_str(),
 				tm.tm_mday, month[tm.tm_mon], tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec,
 				(parts->at(0) + " " + parts->at(1) + " " + parts->at(2)).c_str(),
 				rc,
 				content_len,
-				(referer.has_value() ? referer.value() : "-").c_str());
+				(referer.has_value() ? referer.value() : "-").c_str(),
+				(user_agent.has_value() ? user_agent.value() : "-").c_str());
 
 		fclose(fh);
 	}
