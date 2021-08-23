@@ -76,26 +76,12 @@ int main(int argc, char *argv[])
 	// rather ugly but that's how IP works
 	ipv4_instance->register_icmp(icmp_);
 
-	tcp *t = new tcp(&s, icmp_);
+	tcp *t = new tcp(&s);
 	ipv4_instance->register_protocol(0x06, t);
 	udp *u = new udp(&s, icmp_);
 	ipv4_instance->register_protocol(0x11, u);
 
 	dev->register_protocol(0x0800, ipv4_instance);
-
-	const char *ip6_str = iniparser_getstring(ini, "cfg:ip6-address", "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
-	any_addr myip6 = parse_address(ip6_str, 16, ":", 16);
-
-	printf("Will listen on IPv6 address: %s\n", myip6.to_str().c_str());
-
-	ndp *ndp_ = new ndp(&s, mymac, myip6);
-
-	ipv6 *ipv6_instance = new ipv6(&s, ndp_, myip6);
-	dev->register_protocol(0x86dd, ipv6_instance);
-
-	icmp6 *icmp6_ = new icmp6(&s, mymac, myip6);
-	ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
-	ipv6_instance->register_icmp(icmp6_);
 
 	const char *ntp_ip_str = iniparser_getstring(ini, "cfg:ntp-ip-address", "192.168.64.1");
 	any_addr upstream_ntp_server = parse_address(ntp_ip_str, 4, ".", 10);
@@ -115,6 +101,28 @@ int main(int argc, char *argv[])
 	// something that silently drops packet for a port
 	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
 	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
+
+	/* IPv6 */
+	const char *ip6_str = iniparser_getstring(ini, "cfg:ip6-address", "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
+	any_addr myip6 = parse_address(ip6_str, 16, ":", 16);
+
+	printf("Will listen on IPv6 address: %s\n", myip6.to_str().c_str());
+
+	ndp *ndp_ = new ndp(&s, mymac, myip6);
+
+	ipv6 *ipv6_instance = new ipv6(&s, ndp_, myip6);
+	dev->register_protocol(0x86dd, ipv6_instance);
+
+	icmp6 *icmp6_ = new icmp6(&s, mymac, myip6);
+	ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
+	ipv6_instance->register_icmp(icmp6_);
+
+	tcp *t6 = new tcp(&s);
+	ipv6_instance->register_protocol(0x06, t6);  // TCP
+
+	tcp_port_handler_t http_handler6 = http_get_handler(web_root, http_logfile);
+	t6->add_handler(80, http_handler6);
+	/* **** */
 
 	dolog("*** STARTED ***\n");
 	printf("*** STARTED ***\n");
