@@ -52,7 +52,7 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 void create_response_headers(std::vector<std::string> *const target, const std::vector<std::string> *const source, const size_t c_size, const any_addr & my_ip)
 {
-	target->push_back("SIP/2 200 OK");
+	target->push_back("SIP/2.0 200 OK");
 
 	auto str_via = find_header(source, "Via");
 	auto str_from = find_header(source, "From");
