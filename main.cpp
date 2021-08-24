@@ -32,6 +32,25 @@ void free_handler(tcp_port_handler_t & tph)
 	delete tph.pd;
 }
 
+log_level_t parse_ll(const std::string & ll)
+{
+	if (ll == "debug")
+		return debug;
+
+	if (ll == "info")
+		return info;
+
+	if (ll == "warning")
+		return warning;
+
+	if (ll == "error")
+		return error;
+
+	fprintf(stderr, "Log-level \"%s\" not understood\n", ll.c_str());
+
+	return debug;
+}
+
 void ss(int s)
 {
 }
@@ -45,7 +64,17 @@ int main(int argc, char *argv[])
 
 	dictionary *ini = iniparser_load(argv[1]);
 
-	chdir(iniparser_getstring(ini, "cfg:chdir-path", "/tmp"));
+	std::string llf = iniparser_getstring(ini, "cfg:log_level_file", "debug");
+	std::string lls = iniparser_getstring(ini, "cfg:log_level_screen", "warning");
+
+	setlog(iniparser_getstring(ini, "cfg:logfile", "/tmp/myip.log"), parse_ll(llf), parse_ll(lls));
+
+	dolog(info, "*** START ***\n");
+
+	if (chdir(iniparser_getstring(ini, "cfg:chdir-path", "/tmp")) == -1) {
+		dolog(error, "chdir: %s", strerror(errno));
+		return 1;
+	}
 
 	signal(SIGINT, ss);
 
@@ -58,10 +87,6 @@ int main(int argc, char *argv[])
 		dolog(error, "setuid: %s", strerror(errno));
 		return 1;
 	}
-
-	dolog(info, "*** START ***\n");
-
-	setlog(iniparser_getstring(ini, "cfg:logfile", "/tmp/myip.log"), info, warning);
 
 	const char *mac_str = iniparser_getstring(ini, "cfg:mac-address", "52:34:84:16:44:22");
 	any_addr mymac = parse_address(mac_str, 6, ":", 16);

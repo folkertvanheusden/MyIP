@@ -131,7 +131,6 @@ void frame_buffer_thread(void *fb_in)
 		if (now - latest_update >= 1000000) {  // 1 time per second
 			fb_work->fb_lock.lock();
 
-			dolog(debug, "VNC: %zu FB UPDATE\n", now);
 			latest_update = now;
 
 			time_t tnow = time(nullptr);

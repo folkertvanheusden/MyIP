@@ -126,12 +126,16 @@ std::vector<std::string> * split(std::string in, std::string splitter)
 static const char *logfile = strdup("/tmp/myip.log");
 static log_level_t log_level_file = warning;
 static log_level_t log_level_screen = warning;
+static FILE *lfh = nullptr;
 
 void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen)
 {
+	if (lfh)
+		fclose(lfh);
+
 	free((void *)logfile);
 
-	logfile = lf;
+	logfile = strdup(lf);
 
 	log_level_file = ll_file;
 	log_level_screen = ll_screen;
@@ -142,44 +146,44 @@ void dolog(const log_level_t ll, const char *fmt, ...)
 	if (ll < log_level_file && ll < log_level_screen)
 		return;
 
-	FILE *fh = fopen(logfile, "a+");
+	if (!lfh) {
+		lfh = fopen(logfile, "a+");
 
-	if (fh) {
-		uint64_t now = get_us();
-		time_t t_now = now / 1000000;
-
-		struct tm tm { 0 };
-		localtime_r(&t_now, &tm);
-
-		char *ts_str = nullptr;
-
-		const char *const ll_names[] = { "debug  ", "info   ", "warning", "error  " };
-
-		asprintf(&ts_str, "%04d-%02d-%02d %02d:%02d:%02d.%06d %.6f|%d] %s ",
-				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(now % 1000000),
-				get_us() / 1000000.0, gettid(), ll_names[ll]);
-
-		char *str = nullptr;
-
-		va_list ap;
-		va_start(ap, fmt);
-		(void)vasprintf(&str, fmt, ap);
-		va_end(ap);
-
-		if (ll >= log_level_file)
-			fprintf(fh, "%s%s", ts_str, str);
-
-		if (ll >= log_level_screen)
-			printf("%s%s", ts_str, str);
-
-		free(str);
-		free(ts_str);
-
-		fclose(fh);
+		if (!lfh)
+			fprintf(stderr, "Cannot access log-file %s: %s\n", logfile, strerror(errno));
 	}
-	else {
-		fprintf(stderr, "Cannot access log-file %s: %s\n", logfile, strerror(errno));
+
+	uint64_t now = get_us();
+	time_t t_now = now / 1000000;
+
+	struct tm tm { 0 };
+	localtime_r(&t_now, &tm);
+
+	char *ts_str = nullptr;
+
+	const char *const ll_names[] = { "debug  ", "info   ", "warning", "error  " };
+
+	asprintf(&ts_str, "%04d-%02d-%02d %02d:%02d:%02d.%06d %.6f|%d] %s ",
+			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, int(now % 1000000),
+			get_us() / 1000000.0, gettid(), ll_names[ll]);
+
+	char *str = nullptr;
+
+	va_list ap;
+	va_start(ap, fmt);
+	(void)vasprintf(&str, fmt, ap);
+	va_end(ap);
+
+	if (ll >= log_level_file) {
+		fprintf(lfh, "%s%s", ts_str, str);
+		fflush(lfh);
 	}
+
+	if (ll >= log_level_screen)
+		printf("%s%s", ts_str, str);
+
+	free(str);
+	free(ts_str);
 }
 
 uint8_t * get_from_buffer(uint8_t **p, size_t *len, size_t get_len)
@@ -211,6 +215,8 @@ void set_thread_name(std::string name)
 {
 	if (name.length() > 15)
 		name = name.substr(0, 15);
+
+	dolog(debug, "Set name of thread %d to \"%s\"\n", gettid(), name.c_str());
 
 	pthread_setname_np(pthread_self(), name.c_str());
 }

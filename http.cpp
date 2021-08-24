@@ -115,6 +115,7 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 		rc = 404;
 		reply = (uint8_t *)strdup("File does not exist.");
 		content_len = strlen((const char *)reply);
+		dolog(debug, "HTTP: requested file \"%s\" does not exist", path.c_str());
 	}
 	else {
 		reply = (uint8_t *)calloc(1, file_size);
