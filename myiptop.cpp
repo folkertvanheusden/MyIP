@@ -86,19 +86,24 @@ int main(int argc, char *argv[])
 
 			mvwprintw(w, 0, 0, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-			while(cur_p < p_end && cur_p[8]) {
+			while(cur_p < p_end && cur_p[16]) {
 				uint64_t *cnt_p = (uint64_t *)cur_p;
+				uint64_t *cnt_p2 = (uint64_t *)(cur_p + 8);
 
 				if (nr & 1)
 					wattron(w, A_BOLD);
 
-				mvwprintw(w, nr % maxy, (nr / maxy) * 38, "%s\n", &cur_p[8]);
-				mvwprintw(w, nr % maxy, (nr / maxy) * 38 + 29, "%lu\n", *cnt_p);
+				mvwprintw(w, nr % maxy, (nr / maxy) * 38, "%s\n", &cur_p[16]);
+
+				if (*cnt_p2)
+					mvwprintw(w, nr % maxy, (nr / maxy) * 38 + 29, "%.2f\n", *cnt_p / double(*cnt_p2));
+				else
+					mvwprintw(w, nr % maxy, (nr / maxy) * 38 + 29, "%lu\n", *cnt_p);
 
 				if (nr & 1)
 					wattroff(w, A_BOLD);
 
-				cur_p += 32;
+				cur_p += 40;
 				nr++;
 			}
 
@@ -121,12 +126,16 @@ int main(int argc, char *argv[])
 			uint8_t *const p_end = &p[sb.st_size];
 			uint8_t *cur_p = p;
 
-			while(cur_p < p_end && cur_p[8]) {
+			while(cur_p < p_end && cur_p[16]) {
 				uint64_t *cnt_p = (uint64_t *)cur_p;
+				uint64_t *cnt_p2 = (uint64_t *)(cur_p + 8);
 
-				printf("%s\t%lu\n", &cur_p[8], *cnt_p);
+				if (*cnt_p2)
+					printf("%s\t%.2f\n", &cur_p[16], *cnt_p / double(*cnt_p2));
+				else
+					printf("%s\t%lu\n", &cur_p[16], *cnt_p);
 
-				cur_p += 32;
+				cur_p += 40;
 			}
 
 			if (nr < count || count == -1)

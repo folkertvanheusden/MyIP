@@ -23,6 +23,21 @@ void stats_inc_counter(uint64_t *const p)
 #endif
 }
 
+void stats_add_average(uint64_t *const p, const int val)
+{
+#if defined(GCC_VERSION) && GCC_VERSION >= 40700
+	// there's a small window where the values are
+	// not in sync
+	__atomic_add_fetch(p + 8, 1, __ATOMIC_SEQ_CST);
+	__atomic_add_fetch(p, val, __ATOMIC_SEQ_CST);
+#else
+	// hope for the best
+	(*(p + 8))++;
+	(*p) += val;
+#endif
+}
+
+
 stats::stats(const int size) : size(size)
 {
 	fd = shm_open(shm_name, O_RDWR | O_CREAT, 0644);
@@ -57,7 +72,7 @@ stats::~stats()
 
 uint64_t * stats::register_stat(const std::string & name)
 {
-	if (len + 32 > size) {
+	if (len + 40 > size) {
 		dolog(error, "stats: shm is full\n");
 		return nullptr;
 	}
@@ -77,12 +92,13 @@ uint64_t * stats::register_stat(const std::string & name)
 	// hopefully this platform allows atomic updates
 	// not using locking, for speed
 	*(uint64_t *)p_out = 0;
+	*(uint64_t *)(p_out + 8) = 0;
 
 	int copy_n = std::min(name.size(), size_t(23));
-	memcpy(&p_out[8], name.c_str(), copy_n);
-	p_out[8 + copy_n] = 0x00;
+	memcpy(&p_out[16], name.c_str(), copy_n);
+	p_out[16 + copy_n] = 0x00;
 
-	len += 32;
+	len += 40;
 
 	auto rc = lut.insert(std::pair<std::string, uint64_t *>(name, reinterpret_cast<uint64_t *>(p_out)));
 	assert(rc.second);

@@ -32,6 +32,7 @@ class vnc_private_data : public private_data
 public:
 	uint64_t *vnc_requests { nullptr };
 	uint64_t *vnc_err { nullptr };
+	uint64_t *vnc_duration { nullptr };
 };
 
 class session_data
@@ -88,6 +89,8 @@ public:
 	uint8_t depth;  // 'bits per pixel' really
 
 	std::thread *th;
+
+	time_t start;
 
 	std::queue<vnc_thread_work_t *> wq;
         std::condition_variable w_cond;

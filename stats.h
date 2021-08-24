@@ -6,6 +6,7 @@
 #include <string>
 
 void stats_inc_counter(uint64_t *const p);
+void stats_add_average(uint64_t *const p, const int val);
 
 class stats
 {

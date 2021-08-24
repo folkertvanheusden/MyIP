@@ -261,6 +261,8 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 
 	vs->depth = 32;
 
+	vs->start = time(nullptr);
+
 	vs->vpd = static_cast<vnc_private_data *>(private_data);
 	stats_inc_counter(vs->vpd->vnc_requests);
 
@@ -630,6 +632,8 @@ void vnc_close_session_1(tcp_session_t *ts, private_data *pd)
 			vs->wq.push(nullptr);
 			vs->w_cond.notify_one();
 		}
+
+		stats_add_average(vs->vpd->vnc_duration, time(nullptr) - vs->start);
 	}
 }
 
@@ -664,6 +668,7 @@ tcp_port_handler_t vnc_get_handler(stats *const s)
 
 	vpd->vnc_requests = s->register_stat("vnc_requests");
 	vpd->vnc_err = s->register_stat("vnc_err");
+	vpd->vnc_duration = s->register_stat("vnc_duration");
 
 	tcp_vnc.pd = vpd;
 
