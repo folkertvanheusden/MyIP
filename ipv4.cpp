@@ -12,23 +12,6 @@
 #include "icmp.h"
 #include "utils.h"
 
-uint16_t ipv4_checksum(const uint16_t *p, const size_t n)
-{
-        uint32_t sum = 0;
-
-        for(size_t i=0; i<n; i++) {
-                sum += htons(p[i]);
-
-                if (sum & 0x80000000)   /* if high order bit set, fold */
-                        sum = (sum & 0xFFFF) + (sum >> 16);
-        }
-
-        while(sum >> 16)
-                sum = (sum & 0xFFFF) + (sum >> 16);
-
-        return ~sum;
-}
-
 ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : iarp(iarp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt");
@@ -99,7 +82,7 @@ void ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 
 	memcpy(&out[20], payload, pl_size);
 
-	uint16_t checksum = ipv4_checksum((const uint16_t *)&out[0], 10);
+	uint16_t checksum = ip_checksum((const uint16_t *)&out[0], 10);
 	out[10] = checksum >> 8;
 	out[11] = checksum;
 

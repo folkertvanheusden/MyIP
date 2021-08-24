@@ -89,9 +89,8 @@ void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 	dolog(debug, "UDP: transmit packet %d -> %d\n", src_port, dst_port);
 
 	int out_size = 8 + pl_size;
-	out_size += out_size & 1;
 
-	uint8_t *out = new uint8_t[out_size]();
+	uint8_t *out = new uint8_t[out_size + 1]();
 	out[0] = src_port >> 8;
 	out[1] = src_port;
 	out[2] = dst_port >> 8;
@@ -101,9 +100,11 @@ void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 	out[6] = out[7] = 0;
 	memcpy(&out[8], payload, pl_size);
 
-	uint16_t checksum = ipv4_checksum((const uint16_t *)&out[0], out_size / 2);
-	out[10] = checksum >> 8;
-	out[11] = checksum;
+	out_size += out_size & 1;
+
+	uint16_t checksum = tcp_udp_checksum(dst_ip, src_ip, false, out, out_size);
+	out[6] = checksum >> 8;
+	out[7] = checksum;
 
 	if (idev)
 		idev->transmit_packet(dst_ip, src_ip, 0x11, out, out_size, nullptr);

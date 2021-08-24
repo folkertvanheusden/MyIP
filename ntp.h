@@ -15,7 +15,7 @@ class ntp
 private:
 	udp *const u;
 
-	const any_addr upstream_ntp_server;
+	const any_addr my_ip, upstream_ntp_server;
 
 	const bool broadcast;
 
@@ -27,7 +27,7 @@ private:
 	uint64_t *ntp_broadcast { nullptr };
 
 public:
-	ntp(stats *const s, udp *const u, const any_addr & upstream_ntp_server, const bool broadcast);
+	ntp(stats *const s, udp *const u, const any_addr & my_ip, const any_addr & upstream_ntp_server, const bool broadcast);
 	ntp(const ntp &) = delete;
 	virtual ~ntp();
 

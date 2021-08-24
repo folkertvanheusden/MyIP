@@ -125,7 +125,7 @@ void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, 
 	temp[39] = 58; // ICMP6 code
 	memcpy(&temp[40], out, out_size);
 
-	uint16_t checksum = ipv4_checksum((const uint16_t *)temp, temp_len / 2);
+	uint16_t checksum = ip_checksum((const uint16_t *)temp, temp_len / 2);
 	out[2] = checksum >> 8;
 	out[3] = checksum;
 

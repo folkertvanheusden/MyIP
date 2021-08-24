@@ -9,8 +9,6 @@
 #include "ip_protocol.h"
 #include "stats.h"
 
-uint16_t ipv4_checksum(const uint16_t *p, const size_t n);
-
 class arp;
 class icmp;
 

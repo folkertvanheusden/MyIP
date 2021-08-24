@@ -35,3 +35,5 @@ public:
 
 	virtual void operator()() = 0;
 };
+
+uint16_t tcp_udp_checksum(const any_addr & src_addr, const any_addr & dst_addr, const bool tcp, const uint8_t *const tcp_payload, const int len);
