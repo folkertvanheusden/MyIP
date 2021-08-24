@@ -18,7 +18,11 @@ private:
 	std::shared_mutex cache_lock;
 	std::map<any_addr, ndp_entry_t> ndp_cache;
 
+	std::thread *th2;
+
         uint64_t *ndp_cache_req { nullptr }, *ndp_cache_hit { nullptr };
+
+	void cache_cleaner();
 
 public:
 	ndp(stats *const s, const any_addr & mymac, const any_addr & ip6);

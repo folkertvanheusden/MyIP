@@ -16,6 +16,8 @@ ndp::ndp(stats *const s, const any_addr & mymac, const any_addr & myip6)
         ndp_cache_hit = s->register_stat("ndp_cache_hit");
 
 	th = new std::thread(std::ref(*this));
+
+	th2 = new std::thread(&ndp::cache_cleaner, this);
 }
 
 ndp::~ndp()
@@ -82,6 +84,41 @@ any_addr * ndp::query_cache(const any_addr & ip6)
 	stats_inc_counter(ndp_cache_hit);
 
 	return new any_addr(it->second.addr);
+}
+
+void ndp::cache_cleaner()
+{
+	uint64_t prev = get_us();
+
+	while(!stop_flag) {
+		myusleep(500000); // to allow quickly termination
+
+		uint64_t now = get_us();
+		if (now - prev < 30000000)
+			continue;
+
+		prev = now;
+
+		std::vector<any_addr> delete_;
+
+		const std::lock_guard<std::shared_mutex> lock(cache_lock);
+
+		for(auto e : ndp_cache) {
+			if (e.second.ts >= now)  // some are meant to stay forever
+				continue;
+
+			uint64_t age = now - e.second.ts;
+
+			if (age >= 3600000000ll)  // older than an hour?
+				delete_.push_back(e.first);
+		}
+
+		for(auto e : delete_) {
+			dolog(debug, "NDP: forgetting %s\n", e.to_str().c_str());
+
+			ndp_cache.erase(e);
+		}
+	}
 }
 
 void ndp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
