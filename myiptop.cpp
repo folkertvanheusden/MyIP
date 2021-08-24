@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
 				cur_p += 32;
 			}
 
-			if (nr < count)
+			if (nr < count || count == -1)
 				sleep(1);
 		}
 	}
