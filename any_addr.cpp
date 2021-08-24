@@ -19,6 +19,7 @@ any_addr::any_addr(const uint8_t src[], const int src_size)
 any_addr::any_addr(const any_addr & other)
 {
 	other.get(addr, &addr_size);
+	set_ = true;
 }
 
 any_addr::~any_addr()
@@ -27,6 +28,7 @@ any_addr::~any_addr()
 
 uint16_t any_addr::get_word(const int nr) const
 {
+	assert(set_);
 	assert(nr < addr_size - 1);  // !
 
 	return (addr[nr] << 8) | addr[nr + 1];
@@ -34,16 +36,20 @@ uint16_t any_addr::get_word(const int nr) const
 
 bool any_addr::operator ==(const any_addr & other) const
 {
+	assert(set_);
 	return compare_to(other);
 }
 
 bool any_addr::operator !=(const any_addr & other) const
 {
+	assert(set_);
 	return !compare_to(other);
 }
 
 bool any_addr::compare_to(const any_addr & other) const
 {
+	assert(set_);
+
 	uint8_t other_bytes[ANY_ADDR_SIZE] { 0 };
 	int other_size { 0 };
 	other.get(other_bytes, &other_size);
@@ -59,6 +65,8 @@ bool any_addr::compare_to(const any_addr & other) const
 // for std::map::find
 bool any_addr::operator () (const any_addr & lhs, const any_addr & rhs) const
 {
+	assert(set_);
+
 	uint8_t lhs_bytes[ANY_ADDR_SIZE] { 0 };
 	int lhs_size { 0 };
 	lhs.get(lhs_bytes, &lhs_size);
@@ -74,6 +82,8 @@ bool any_addr::operator () (const any_addr & lhs, const any_addr & rhs) const
 
 bool any_addr::operator <(const any_addr & rhs) const
 {
+	assert(set_);
+
 	uint8_t rhs_bytes[ANY_ADDR_SIZE] { 0 };
 	int rhs_size { 0 };
 	rhs.get(rhs_bytes, &rhs_size);
@@ -85,6 +95,8 @@ bool any_addr::operator <(const any_addr & rhs) const
 
 void any_addr::get(uint8_t *const tgt, int *tgt_size) const
 {
+	assert(set_);
+
 	memcpy(tgt, addr, addr_size);
 
 	*tgt_size = addr_size;
@@ -92,6 +104,8 @@ void any_addr::get(uint8_t *const tgt, int *tgt_size) const
 
 void any_addr::get(uint8_t *const tgt, int exp_size) const
 {
+	assert(set_);
+
 	assert(exp_size == addr_size);
 
 	memcpy(tgt, addr, exp_size);
@@ -103,6 +117,8 @@ void any_addr::set(const uint8_t src[], const int src_size)
 
 	memcpy(addr, src, src_size);
 	addr_size = src_size;
+
+	set_ = true;
 }
 
 std::string any_addr::to_str() const
@@ -131,6 +147,9 @@ std::string any_addr::to_str() const
 		return buffer;
 	}
 
+	if (!set_)
+		return "(not set)";
+
 	assert(false);
 
 	return "???";
@@ -138,6 +157,7 @@ std::string any_addr::to_str() const
 
 const uint8_t & any_addr::operator[](const int index) const
 {
+	assert(set_);
 	assert(index < addr_size);
 
 	return addr[index];
@@ -145,6 +165,7 @@ const uint8_t & any_addr::operator[](const int index) const
 
 uint64_t any_addr::get_hash() const
 {
+	assert(set_);
 	return std::hash<std::string>{}(to_str());
 }
 
@@ -153,12 +174,16 @@ any_addr & any_addr::operator =(const any_addr && other)
 {
 	other.get(addr, &addr_size);
 
+	set_ = true;
+
 	return *this;
 }
 
 any_addr & any_addr::operator =(const any_addr & other)
 {
 	other.get(addr, &addr_size);
+
+	set_ = true;
 
 	return *this;
 }

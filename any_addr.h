@@ -10,6 +10,7 @@ class any_addr {
 private:
 	uint8_t addr[ANY_ADDR_SIZE] { 0 };  // fits IPv4 & 6
 	int addr_size { 0 };
+	bool set_ { false };
 
 	uint16_t get_word(const int nr) const;
 
@@ -19,7 +20,7 @@ public:
 	any_addr(const any_addr & org);
 	virtual ~any_addr();
 
-	bool is_set() const { return !!addr_size; }
+	bool is_set() const { return set_; }
 
 	any_addr & operator =(const any_addr && other);
 	any_addr & operator =(const any_addr & other);

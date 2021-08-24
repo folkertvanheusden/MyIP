@@ -159,9 +159,9 @@ void ntp::operator()()
                 msgout.transmit_timestamp_secs = htonl(nowtv.tv_sec + NTP_EPOCH);
                 msgout.transmit_timestamp_fraq = htonl(nowtv.tv_usec * 4295);
 
-		constexpr uint8_t ip_src[] = { 0, 0, 0, 0 }; // will be set by IPv4 layer
+		any_addr ip_src; // will be set by IPv4 layer
 		constexpr uint8_t ip_tgt[] = { 224, 0, 1, 1 };
 
-		u->transmit_packet(any_addr(ip_tgt, 4), 123, any_addr(ip_src, 4), 123, (const uint8_t *)&msgout, sizeof msgout);
+		u->transmit_packet(any_addr(ip_tgt, 4), 123, ip_src, 123, (const uint8_t *)&msgout, sizeof msgout);
 	}
 }
