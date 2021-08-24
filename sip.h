@@ -2,7 +2,9 @@
 #pragma once
 #include <atomic>
 #include <stdint.h>
+#include <string>
 #include <thread>
+#include <vector>
 
 #include "any_addr.h"
 #include "stats.h"
@@ -17,6 +19,9 @@ private:
 
 	std::thread *th { nullptr };
 	std::atomic_bool stop_flag { false };
+
+	void reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers);
+	void reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers);
 
 public:
 	sip(stats *const s, udp *const u);
