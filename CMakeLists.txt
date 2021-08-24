@@ -28,6 +28,7 @@ add_executable(myip
 	packet.cpp
 	phys.cpp
 	protocol.cpp
+	sip.cpp
 	stats.cpp
 	stats-utils.cpp
 	tcp.cpp
