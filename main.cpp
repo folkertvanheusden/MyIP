@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
 	tcp_port_handler_t vnc_handler = vnc_get_handler(&s);
 	t->add_handler(5900, vnc_handler);
 
-	ntp *ntp_ = new ntp(&s, u, upstream_ntp_server, true);
+	ntp *ntp_ = new ntp(&s, u, myip, upstream_ntp_server, true);
 	u->add_handler(123, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
 	sip *sip_ = new sip(&s, u);

@@ -65,7 +65,7 @@ void icmp::operator()()
 		reply[0] = 0; // echo reply
 
 		reply[2] = reply[3] = 0;
-		uint16_t checksum = ipv4_checksum((const uint16_t *)reply, size / 2);
+		uint16_t checksum = ip_checksum((const uint16_t *)reply, size / 2);
 		reply[2] = checksum >> 8;
 		reply[3] = checksum;
 
@@ -113,7 +113,7 @@ void icmp::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const u
 	int out_size = 8 + org_header.second + pl_size;
 	out_size += out_size & 1;
 
-	uint16_t checksum = ipv4_checksum((const uint16_t *)out, (out_size + 1) / 2);
+	uint16_t checksum = ip_checksum((const uint16_t *)out, (out_size + 1) / 2);
 	out[2] = checksum >> 8;
 	out[3] = checksum;
 

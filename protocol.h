@@ -39,3 +39,5 @@ public:
 
 	virtual void operator()() = 0;
 };
+
+uint16_t ip_checksum(const uint16_t *p, const size_t n);

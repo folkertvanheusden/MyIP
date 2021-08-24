@@ -22,54 +22,6 @@ void free_tcp_session(tcp_session_t *const p)
 	delete p;
 }
 
-uint16_t tcp_checksum(const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const tcp_payload, const int len)
-{
-	uint16_t checksum { 0 };
-
-	if (dst_addr.get_len() == 16) {  // IPv6
-		size_t temp_len = 40 + len + (len & 1);
-		uint8_t *temp = new uint8_t[temp_len]();
-
-		src_addr.get(&temp[0], 16);
-
-		dst_addr.get(&temp[16], 16);
-
-		temp[32] = len >> 24;
-		temp[33] = len >> 16;
-		temp[34] = len >>  8;
-		temp[35] = len;
-
-		temp[39] = 0x06; // TCP
-
-		memcpy(&temp[40], tcp_payload, len);
-
-		checksum = ipv4_checksum((const uint16_t *)temp, temp_len / 2);
-
-		delete [] temp;
-	}
-	else {  // IPv4
-		size_t temp_len = 12 + len + (len & 1);
-		uint8_t *temp = new uint8_t[temp_len]();
-
-		src_addr.get(&temp[0], 4);
-
-		dst_addr.get(&temp[4], 4);
-
-		temp[9] = 0x06; // TCP
-
-		temp[10] = len >> 8; // TCP len
-		temp[11] = len;
-
-		memcpy(&temp[12], tcp_payload, len);
-
-		checksum = ipv4_checksum((const uint16_t *)temp, temp_len / 2);
-
-		delete [] temp;
-	}
-
-	return checksum;
-}
-
 char *flags_to_str(uint8_t flags)
 {
 	char *out = (char *)calloc(1, 128);
@@ -173,7 +125,7 @@ void tcp::send_segment(const tcp_session_t *const ts, const uint64_t session_id,
 	if (data_len)
 		memcpy(&temp[20], data, data_len);
 	
-	uint16_t checksum = tcp_checksum(peer_addr, my_addr, temp, temp_len);
+	uint16_t checksum = tcp_udp_checksum(peer_addr, my_addr, true, temp, temp_len);
 
 	temp[16] = checksum >> 8;
 	temp[17] = checksum;

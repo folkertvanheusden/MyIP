@@ -32,7 +32,7 @@ struct sntp_datagram
         u_int32_t transmit_timestamp_fraq;
 };
 
-ntp::ntp(stats *const s, udp *const u, const any_addr & upstream_ntp_server, const bool broadcast) : u(u), upstream_ntp_server(upstream_ntp_server), broadcast(broadcast)
+ntp::ntp(stats *const s, udp *const u, const any_addr & my_ip, const any_addr & upstream_ntp_server, const bool broadcast) : u(u), my_ip(my_ip), upstream_ntp_server(upstream_ntp_server), broadcast(broadcast)
 {
 	ntp_requests = s->register_stat("ntp_requests");
 	ntp_invalid  = s->register_stat("ntp_invalid");
@@ -159,9 +159,8 @@ void ntp::operator()()
                 msgout.transmit_timestamp_secs = htonl(nowtv.tv_sec + NTP_EPOCH);
                 msgout.transmit_timestamp_fraq = htonl(nowtv.tv_usec * 4295);
 
-		any_addr ip_src; // will be set by IPv4 layer
 		constexpr uint8_t ip_tgt[] = { 224, 0, 1, 1 };
 
-		u->transmit_packet(any_addr(ip_tgt, 4), 123, ip_src, 123, (const uint8_t *)&msgout, sizeof msgout);
+		u->transmit_packet(any_addr(ip_tgt, 4), 123, my_ip, 123, (const uint8_t *)&msgout, sizeof msgout);
 	}
 }
