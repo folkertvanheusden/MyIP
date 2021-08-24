@@ -1,5 +1,6 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <fcntl.h>
+#include <ncurses.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,13 +16,29 @@
 constexpr char shm_name[] = "/myip";
 constexpr int size = 4096;
 
+void help()
+{
+	printf("-j   json output (one-shot)\n");
+	printf("-c x display output x times and then exit (not for json)\n");
+	printf("-n   ncurses ui\n");
+}
+
 int main(int argc, char *argv[])
 {
-	bool json = false;
+	int count = -1;
+	bool json = false, nc = false;
 	int c = 0;
-	while((c = getopt(argc, argv, "-j")) != -1) {
+	while((c = getopt(argc, argv, "jc:nh")) != -1) {
 		if (c == 'j')
 			json = true;
+		else if (c == 'c')
+			count = atoi(optarg);
+		else if (c == 'n')
+			nc = true;
+		else if (c == 'h') {
+			help();
+			return 0;
+		}
 	}
 
 	int fd = shm_open(shm_name, O_RDONLY, 0444);
@@ -47,8 +64,58 @@ int main(int argc, char *argv[])
 
 		printf("%s\n", out.c_str());
 	}
+	else if (nc) {
+		WINDOW *w = initscr();
+
+		int maxx = 0, maxy = 0;
+		getmaxyx(w, maxy, maxx);
+
+		int cnt = 0;
+
+		for(;count == -1 || cnt++ < count;) {
+			werase(w);
+
+			uint8_t *const p_end = &p[sb.st_size];
+			uint8_t *cur_p = p;
+
+			int nr = 1;
+
+			time_t t = time(nullptr);
+			struct tm tm;
+			localtime_r(&t, &tm);
+
+			mvwprintw(w, 0, 0, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+			while(cur_p < p_end && cur_p[8]) {
+				uint64_t *cnt_p = (uint64_t *)cur_p;
+
+				if (nr & 1)
+					wattron(w, A_BOLD);
+
+				mvwprintw(w, nr % maxy, (nr / maxy) * 38, "%s\n", &cur_p[8]);
+				mvwprintw(w, nr % maxy, (nr / maxy) * 38 + 29, "%lu\n", *cnt_p);
+
+				if (nr & 1)
+					wattroff(w, A_BOLD);
+
+				cur_p += 32;
+				nr++;
+			}
+
+			wmove(w, 0, 37);
+
+			wrefresh(w);
+			doupdate();
+
+			sleep(1);
+		}
+
+		endwin();
+	}
 	else {
-		for(;;) {
+		int nr = 0;
+
+		for(;count == -1 || nr++ < count;) {
 			printf("\n");
 
 			uint8_t *const p_end = &p[sb.st_size];
@@ -62,7 +129,8 @@ int main(int argc, char *argv[])
 				cur_p += 32;
 			}
 
-			sleep(1);
+			if (nr < count)
+				sleep(1);
 		}
 	}
 

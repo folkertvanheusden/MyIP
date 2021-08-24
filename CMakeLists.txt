@@ -56,6 +56,10 @@ target_link_libraries(myip Threads::Threads)
 
 target_link_libraries(myip -lrt -liniparser)
 
+find_package(Curses REQUIRED)
+include_directories(${CURSES_INCLUDE_DIR})
+target_link_libraries(myiptop ${CURSES_LIBRARIES})
+
 target_link_libraries(myiptop -lrt)
 
 target_compile_options(myip PRIVATE "-Wall")
