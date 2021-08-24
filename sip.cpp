@@ -29,25 +29,34 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	auto pl = p->get_payload();
 
 	std::string pl_str = std::string((const char *)pl.first, pl.second);
-	std::vector<std::string> *lines = split(pl_str, "\r\n");
 
-	std::vector<std::string> *parts = split(lines->at(0), " ");
+	std::vector<std::string> *header_body = split(pl_str, "\r\n\r\n");
+
+	std::vector<std::string> *header_lines = split(header_body->at(0), "\r\n");
+
+	std::vector<std::string> *parts = split(header_lines->at(0), " ");
 
 	dolog(debug, "%s", std::string((const char *)pl.first, pl.second).c_str());
 
 	if (parts->size() == 3 && parts->at(0) == "OPTIONS" && parts->at(2) == "SIP/2.0") {
-		reply_to_OPTIONS(src_ip, src_port, dst_ip, dst_port, lines);
+		reply_to_OPTIONS(src_ip, src_port, dst_ip, dst_port, header_lines);
 	}
-	else if (parts->size() == 3 && parts->at(0) == "INVITE" && parts->at(2) == "SIP/2.0") {
-		reply_to_INVITE(src_ip, src_port, dst_ip, dst_port, lines);
+	else if (parts->size() == 3 && parts->at(0) == "INVITE" && parts->at(2) == "SIP/2.0" && header_body->size() == 2) {
+		std::vector<std::string> *body_lines = split(header_body->at(1), "\r\n");
+
+		reply_to_INVITE(src_ip, src_port, dst_ip, dst_port, header_lines, body_lines);
+
+		delete body_lines;
 	}
 	else {
-		dolog(info, "SIP request \"%s\" not understood\n", lines->at(0).c_str());
+		dolog(info, "SIP request \"%s\" not understood\n", header_lines->at(0).c_str());
 	}
 
 	delete parts;
 
-	delete lines;
+	delete header_lines;
+
+	delete header_body;
 }
 
 void create_response_headers(std::vector<std::string> *const target, const std::vector<std::string> *const source, const size_t c_size, const any_addr & my_ip)
@@ -64,16 +73,8 @@ void create_response_headers(std::vector<std::string> *const target, const std::
 		target->push_back("Via: " + str_via.value());
 
 	// swap from/to
-	if (str_to.has_value()) {
+	if (str_to.has_value())
 		target->push_back("From: " + str_to.value());
-
-		std::string::size_type lt = str_to.value().rfind('<');
-		std::string::size_type gt = str_to.value().rfind('>');
-
-		std::string contact = str_to.value().substr(lt, gt - lt + 1);
-
-		target->push_back(myformat("Contact: %s", contact.c_str()));
-	}
 	if (str_from.has_value())
 		target->push_back("To: " + str_from.value());
 
@@ -85,7 +86,8 @@ void create_response_headers(std::vector<std::string> *const target, const std::
 
 	target->push_back(myformat("Server: %s", my_ip.to_str().c_str()));
 
-	target->push_back("Allow: INVITE, ASK, CANCEL, OPTIONS, BYE");
+	//target->push_back("Allow: INVITE, ASK, CANCEL, OPTIONS, BYE");
+	target->push_back("Allow: INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, SUBSCRIBE, NOTIFY, INFO, PUBLISH, MESSAGE");
 
 	if (str_to.has_value()) {
 		std::string::size_type lt = str_to.value().rfind('<');
@@ -104,14 +106,15 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 {
 	std::vector<std::string> content;
 	content.push_back("v=0");
-	content.push_back("o=jdoe 0 0 IN IP4 " + src_ip.to_str());
+	content.push_back("o=jdoe 0 0 IN IP4 " + dst_ip.to_str()); // my ip
+	content.push_back("c=IN IP4 " + dst_ip.to_str()); // my ip
 	content.push_back("s=MyIP");
 	content.push_back("t=0 0");
-	// 1234 could be allocated but as this is send-only,
-	// it is not relevant
-	content.push_back("m=audio 1234 RTP/AVP 0");
+	// 1234 could be allocated but as this is send-
+	// only, it is not relevant
+	content.push_back("m=audio 1234 RTP/AVP 11");
 	content.push_back("a=sendonly");
-	content.push_back("a=rtpmap:0 PCMU/8000");
+	content.push_back("a=rtpmap:11 L16/8000");
 
 	std::string content_out = merge(content, "\r\n");
 
@@ -124,18 +127,18 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 }
 
-void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers)
+void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body)
 {
 	std::vector<std::string> content;
 	content.push_back("v=0");
-	content.push_back("o=jdoe 0 0 IN IP4 " + src_ip.to_str());
+	content.push_back("o=jdoe 0 0 IN IP4 " + dst_ip.to_str()); // my ip
 	content.push_back("s=MyIP");
 	content.push_back("t=0 0");
 	// 1234 could be allocated but as this is send-only,
 	// it is not relevant
-	content.push_back("m=audio 1234 RTP/AVP 0");
+	content.push_back("m=audio 1234 RTP/AVP 11");
 	content.push_back("a=sendonly");
-	content.push_back("a=rtpmap:0 PCMU/8000");
+	content.push_back("a=rtpmap:11 L16/8000");
 
 	std::string content_out = merge(content, "\r\n");
 
@@ -148,6 +151,19 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	dolog(debug, "%s", out.c_str());
 
 	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
+
+	auto m = find_header(body, "m", "=");
+
+	if (m.has_value()) {
+		std::vector<std::string> *m_parts = split(m.value(), " ");
+	
+		int tgt_rtp_port = m_parts->size() >= 2 ? atoi(m_parts->at(1).c_str()) : 8000;
+
+		// garbage FIXME
+		u->transmit_packet(src_ip, tgt_rtp_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
+
+		delete m_parts;
+	}
 }
 
 void sip::operator()()
