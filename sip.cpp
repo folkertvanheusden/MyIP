@@ -72,11 +72,10 @@ void create_response_headers(std::vector<std::string> *const target, const std::
 	if (str_via.has_value())
 		target->push_back("Via: " + str_via.value());
 
-	// swap from/to
-	if (str_to.has_value())
-		target->push_back("From: " + str_to.value());
 	if (str_from.has_value())
-		target->push_back("To: " + str_from.value());
+		target->push_back("From: " + str_from.value());
+	if (str_to.has_value())
+		target->push_back("To: " + str_to.value());
 
 	if (str_call_id.has_value())
 		target->push_back("Call-ID: " + str_call_id.value());
@@ -132,13 +131,15 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	std::vector<std::string> content;
 	content.push_back("v=0");
 	content.push_back("o=jdoe 0 0 IN IP4 " + dst_ip.to_str()); // my ip
+	content.push_back("c=IN IP4 " + dst_ip.to_str()); // my ip
 	content.push_back("s=MyIP");
 	content.push_back("t=0 0");
 	// 1234 could be allocated but as this is send-only,
 	// it is not relevant
-	content.push_back("m=audio 1234 RTP/AVP 11");
+	content.push_back("m=audio 1234 RTP/AVP 11 0");
 	content.push_back("a=sendonly");
 	content.push_back("a=rtpmap:11 L16/8000");
+	content.push_back("a=rtpmap:0 PCMU/8000");
 
 	std::string content_out = merge(content, "\r\n");
 
