@@ -280,8 +280,8 @@ std::optional<std::string> find_header(const std::vector<std::string> *const lin
 	for(auto line : *lines) {
 		auto parts = split(line, ":");
 
-		if (parts->size() == 2 && str_tolower(parts->at(0)) == lkey) {
-			value = parts->at(1);
+		if (parts->size() >= 2 && str_tolower(parts->at(0)) == lkey) {
+			value = line.substr(key.size() + 1);
 
 			while(value.value().empty() == false && value.value().at(0) == ' ')
 				value = value.value().substr(1);
