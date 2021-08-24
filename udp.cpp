@@ -100,11 +100,11 @@ void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 	out[6] = out[7] = 0;
 	memcpy(&out[8], payload, pl_size);
 
-	out_size += out_size & 1;
-
 	uint16_t checksum = tcp_udp_checksum(dst_ip, src_ip, false, out, out_size);
 	out[6] = checksum >> 8;
 	out[7] = checksum;
+
+	out_size += out_size & 1;
 
 	if (idev)
 		idev->transmit_packet(dst_ip, src_ip, 0x11, out, out_size, nullptr);
