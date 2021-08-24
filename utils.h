@@ -20,5 +20,5 @@ void set_thread_name(std::string name);
 std::string bin_to_text(const uint8_t *p, const size_t len);
 bool file_exists(const std::string & file, size_t *const file_size = nullptr);
 void myusleep(uint64_t us);
-std::optional<std::string> find_header(const std::vector<std::string> *const lines, const std::string & key);
+std::optional<std::string> find_header(const std::vector<std::string> *const lines, const std::string & key, const std::string & seperator = ":");
 std::string merge(const std::vector<std::string> & in, const std::string & seperator);

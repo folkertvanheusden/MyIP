@@ -272,13 +272,13 @@ std::string str_tolower(std::string s)
 	return s;
 }
 
-std::optional<std::string> find_header(const std::vector<std::string> *const lines, const std::string & key)
+std::optional<std::string> find_header(const std::vector<std::string> *const lines, const std::string & key, const std::string & seperator)
 {
 	const std::string lkey = str_tolower(key);
 	std::optional<std::string> value;
 
 	for(auto line : *lines) {
-		auto parts = split(line, ":");
+		auto parts = split(line, seperator);
 
 		if (parts->size() >= 2 && str_tolower(parts->at(0)) == lkey) {
 			value = line.substr(key.size() + 1);
