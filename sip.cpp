@@ -15,22 +15,22 @@
 // http://dystopiancode.blogspot.com/2012/02/pcm-law-and-u-law-companding-algorithms.html
 int8_t encode_alaw(int16_t number)
 {
-	const uint16_t ALAW_MAX = 0xFFF;
 	uint16_t mask = 0x800;
 	uint8_t sign = 0;
 	uint8_t position = 11;
 	uint8_t lsb = 0;
-	if (number < 0)
-	{
+
+	if (number < 0) {
 		number = -number;
 		sign = 0x80;
 	}
-	if (number > ALAW_MAX)
-	{
-		number = ALAW_MAX;
-	}
-	for (; ((number & mask) != mask && position >= 5); mask >>= 1, position--);
+
+	number >>= 4; // 16 -> 12
+
+	for(; ((number & mask) != mask && position >= 5); mask >>= 1, position--);
+
 	lsb = (number >> ((position == 4) ? (1) : (position - 4))) & 0x0f;
+
 	return (sign | ((position - 4) << 4) | lsb) ^ 0x55;
 }
 
@@ -168,9 +168,10 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	content.push_back("t=0 0");
 	// 1234 could be allocated but as this is send-
 	// only, it is not relevant
-	content.push_back("m=audio 1234 RTP/AVP 8");
+	content.push_back("m=audio 1234 RTP/AVP 8 11");
 	content.push_back("a=sendonly");
 	content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
+	content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
 
 	std::string content_out = merge(content, "\r\n");
 
@@ -210,6 +211,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 		if (schema != 255) {
 			content.push_back("a=sendonly");
 			content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
+			content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
 	
 			// 1234 could be allocated but as this is send-only,
 			// it is not relevant
