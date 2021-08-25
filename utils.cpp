@@ -1,4 +1,5 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+#include <algorithm>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -262,4 +263,42 @@ void myusleep(uint64_t us)
 
 		memcpy(&req, &rem, sizeof(struct timespec));
 	}
+}
+
+std::string str_tolower(std::string s)
+{
+	std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+
+	return s;
+}
+
+std::optional<std::string> find_header(const std::vector<std::string> *const lines, const std::string & key, const std::string & seperator)
+{
+	const std::string lkey = str_tolower(key);
+	std::optional<std::string> value;
+
+	for(auto line : *lines) {
+		auto parts = split(line, seperator);
+
+		if (parts->size() >= 2 && str_tolower(parts->at(0)) == lkey) {
+			value = line.substr(key.size() + 1);
+
+			while(value.value().empty() == false && value.value().at(0) == ' ')
+				value = value.value().substr(1);
+		}
+
+		delete parts;
+	}
+
+	return value;
+}
+
+std::string merge(const std::vector<std::string> & in, const std::string & seperator)
+{
+	std::string out;
+
+	for(auto l : in)
+		out += l + seperator;
+
+	return out;
 }

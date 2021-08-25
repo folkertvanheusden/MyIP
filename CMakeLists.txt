@@ -28,6 +28,7 @@ add_executable(myip
 	packet.cpp
 	phys.cpp
 	protocol.cpp
+	sip.cpp
 	stats.cpp
 	stats-utils.cpp
 	tcp.cpp
@@ -63,5 +64,3 @@ target_link_libraries(myiptop ${CURSES_LIBRARIES})
 target_link_libraries(myiptop -lrt)
 
 target_compile_options(myip PRIVATE "-Wall")
-
-set(CMAKE_CXX_FLAGS "-O0 -rdynamic")

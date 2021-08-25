@@ -27,26 +27,6 @@ bool http_new_session(tcp_session_t *ts, const packet *pkt, private_data *pd)
 	return true;
 }
 
-std::optional<std::string> find_header(std::vector<std::string> *lines, const std::string & key)
-{
-	std::optional<std::string> value;
-
-	for(auto line : *lines) {
-		auto parts = split(line, ":");
-
-		if (parts->size() == 2 && parts->at(0) == key) {
-			value = parts->at(1);
-
-			while(value.value().empty() == false && value.value().at(0) == ' ')
-				value = value.value().substr(1);
-		}
-
-		delete parts;
-	}
-
-	return value;
-}
-
 void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_data *pd)
 {
 	http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
