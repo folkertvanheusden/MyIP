@@ -64,5 +64,3 @@ target_link_libraries(myiptop ${CURSES_LIBRARIES})
 target_link_libraries(myiptop -lrt)
 
 target_compile_options(myip PRIVATE "-Wall")
-
-set(CMAKE_CXX_FLAGS "-O0 -rdynamic")

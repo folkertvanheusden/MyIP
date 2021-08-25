@@ -111,9 +111,9 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	content.push_back("t=0 0");
 	// 1234 could be allocated but as this is send-
 	// only, it is not relevant
-	content.push_back("m=audio 1234 RTP/AVP 11");
+	content.push_back("m=audio 1234 RTP/AVP 8");
 	content.push_back("a=sendonly");
-	content.push_back("a=rtpmap:11 L16/8000");
+	content.push_back("a=rtpmap:8 PCMA/8000");
 
 	std::string content_out = merge(content, "\r\n");
 
@@ -136,10 +136,9 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	content.push_back("t=0 0");
 	// 1234 could be allocated but as this is send-only,
 	// it is not relevant
-	content.push_back("m=audio 1234 RTP/AVP 11 0");
+	content.push_back("m=audio 1234 RTP/AVP 8");
 	content.push_back("a=sendonly");
-	content.push_back("a=rtpmap:11 L16/8000");
-	content.push_back("a=rtpmap:0 PCMU/8000");
+	content.push_back("a=rtpmap:8 PCMA/8000");
 
 	std::string content_out = merge(content, "\r\n");
 
@@ -160,11 +159,87 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	
 		int tgt_rtp_port = m_parts->size() >= 2 ? atoi(m_parts->at(1).c_str()) : 8000;
 
-		// garbage FIXME
-		u->transmit_packet(src_ip, tgt_rtp_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
+		sip_session_t *ss = new sip_session_t();
+		ss->start_ts = get_us();
+
+		// 1234: see m=... above
+		std::thread *th = new std::thread(&sip::transmit_wav, this, src_ip, tgt_rtp_port, dst_ip, 1234, ss);
+
+		slock.lock();
+		sessions.insert({ th, ss });
+		slock.unlock();
 
 		delete m_parts;
 	}
+}
+
+// from
+// http://dystopiancode.blogspot.com/2012/02/pcm-law-and-u-law-companding-algorithms.html
+int8_t encode_alaw(int16_t number)
+{
+	const uint16_t ALAW_MAX = 0xFFF;
+	uint16_t mask = 0x800;
+	uint8_t sign = 0;
+	uint8_t position = 11;
+	uint8_t lsb = 0;
+	if (number < 0)
+	{
+		number = -number;
+		sign = 0x80;
+	}
+	if (number > ALAW_MAX)
+	{
+		number = ALAW_MAX;
+	}
+	for (; ((number & mask) != mask && position >= 5); mask >>= 1, position--);
+	lsb = (number >> ((position == 4) ? (1) : (position - 4))) & 0x0f;
+	return (sign | ((position - 4) << 4) | lsb) ^ 0x55;
+}
+
+void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss)
+{
+	set_thread_name("myip-siprtp");
+
+	uint16_t seq_nr = 0;
+	uint32_t t = 0;
+
+	uint32_t ssrc;
+	get_random((uint8_t *)&ssrc, sizeof ssrc);
+
+	while(get_us() - ss->start_ts < 10000000l) {  // 10s
+		int n_samples = 500;
+
+		size_t size = 3 * 4 + n_samples * sizeof(uint8_t);
+		uint8_t *rtp_header = new uint8_t[size]();
+
+		rtp_header[0] |= 128;  // v2
+		rtp_header[1] = 8;  // a-law
+		rtp_header[2] = seq_nr >> 8;
+		rtp_header[3] = seq_nr;
+		rtp_header[4] = t >> 24;
+		rtp_header[5] = t >> 16;
+		rtp_header[6] = t >>  8;
+		rtp_header[7] = t;
+		rtp_header[8] = ssrc >> 24;
+		rtp_header[9] = ssrc >> 16;
+		rtp_header[10] = ssrc >>  8;
+		rtp_header[11] = ssrc;
+
+		// garbage FIXME
+		for(int i=0; i<n_samples; i++)
+			rtp_header[12 + i] = encode_alaw(int16_t(rand() & 65535));
+
+		u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, rtp_header, size);
+
+		delete [] rtp_header;
+
+		seq_nr++;
+		t += n_samples;
+
+		myusleep(1000000 / (8000 / n_samples));
+	}
+
+	ss->finished = true;
 }
 
 void sip::operator()()
@@ -174,6 +249,20 @@ void sip::operator()()
 	while(!stop_flag) {
 		myusleep(500000);
 
-		// FIXME something
+		slock.lock();
+		for(auto it=sessions.begin(); it!=sessions.end();) {
+			if (it->second->finished) {
+				it->first->join();
+
+				delete it->second;
+				delete it->first;
+
+				it = sessions.erase(it);
+			}
+			else {
+				it++;
+			}
+		}
+		slock.unlock();
 	}
 }
