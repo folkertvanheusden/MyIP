@@ -229,7 +229,7 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 
 		// garbage FIXME
 		for(int i=0; i<n_samples; i++)
-			rtp_header[12 + i] = encode_alaw(int16_t(rand() & 65535));
+			rtp_header[12 + i] = encode_alaw(int16_t(lrand48() & 65535));
 
 		u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, rtp_header, size);
 
