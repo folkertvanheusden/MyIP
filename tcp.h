@@ -14,7 +14,6 @@
 #include "stats.h"
 #include "types.h"
 
-class icmp;
 class ipv4;
 class tcp;
 
