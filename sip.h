@@ -37,11 +37,11 @@ private:
 	std::mutex slock;
 
 	int samplerate { 0 }, n_samples { 0 };
-	uint8_t *samples { nullptr };
+	short *samples { nullptr };
 
 	void reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers);
 	void reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body);
-	void transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss);
+	void transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, const uint8_t schema, sip_session_t *const ss);
 
 public:
 	sip(stats *const s, udp *const u, const std::string & sample);

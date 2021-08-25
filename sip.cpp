@@ -41,14 +41,14 @@ sip::sip(stats *const s, udp *const u, const std::string & sample) : u(u)
 	SF_INFO sfinfo { 0 };
 	SNDFILE *fh = sf_open(sample.c_str(), SFM_READ, &sfinfo);
 	if (!fh) {
-		dolog(error, "SIP \"%s\" cannot be opened\n", sample.c_str());
+		dolog(error, "SIP: \"%s\" cannot be opened\n", sample.c_str());
 		exit(1);
 	}
 
 	samplerate = sfinfo.samplerate;
 
 	if (sfinfo.channels != 1) {
-		dolog(error, "SIP \"%u\": should be mono sample (%s)\n", sfinfo.channels, sample.c_str());
+		dolog(error, "SIP: \"%u\": should be mono sample (%s)\n", sfinfo.channels, sample.c_str());
 		sf_close(fh);
 		exit(1);
 	}
@@ -56,19 +56,12 @@ sip::sip(stats *const s, udp *const u, const std::string & sample) : u(u)
 	n_samples = sf_seek(fh, 0, SEEK_END);
 	sf_seek(fh, 0, SEEK_SET);
 
-	samples = new uint8_t[n_samples];
-
-	short *temp = new short[n_samples];
-	if (sf_read_short(fh, temp, n_samples) != n_samples) {
-		dolog(error, "SIP short read on \"%s\"\n", sample.c_str());
+	samples = new short[n_samples + (n_samples & 1)]();
+	if (sf_read_short(fh, samples, n_samples) != n_samples) {
+		dolog(error, "SIP: short read on \"%s\"\n", sample.c_str());
 		sf_close(fh);
 		exit(1);
 	}
-
-	for(int i=0; i<n_samples; i++)
-		samples[i] = encode_alaw(temp[i]);
-
-	delete [] temp;
 
 	sf_close(fh);
 }
@@ -85,7 +78,7 @@ sip::~sip()
 
 void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p)
 {
-	dolog(info, "SIP packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
+	dolog(info, "SIP: packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
 
 	auto pl = p->get_payload();
 
@@ -110,7 +103,7 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		delete body_lines;
 	}
 	else {
-		dolog(info, "SIP request \"%s\" not understood\n", header_lines->at(0).c_str());
+		dolog(info, "SIP: request \"%s\" not understood\n", header_lines->at(0).c_str());
 	}
 
 	delete parts;
@@ -199,46 +192,105 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	content.push_back("c=IN " + proto + " " + dst_ip.to_str()); // my ip
 	content.push_back("s=MyIP");
 	content.push_back("t=0 0");
-	// 1234 could be allocated but as this is send-only,
-	// it is not relevant
-	content.push_back("m=audio 1234 RTP/AVP 8");
-	content.push_back("a=sendonly");
-	content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
-
-	std::string content_out = merge(content, "\r\n");
-
-	std::vector<std::string> hout;
-	create_response_headers(&hout, headers, content_out.size(), dst_ip);
-	std::string headers_out = merge(hout, "\r\n");
-
-	std::string out = headers_out + "\r\n" + content_out;
-
-	dolog(debug, "%s", out.c_str());
-
-	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 
 	auto m = find_header(body, "m", "=");
 
 	if (m.has_value()) {
 		std::vector<std::string> *m_parts = split(m.value(), " ");
+
+		uint8_t schema = 255;
+
+		for(size_t i=3; i<m_parts->size(); i++) {
+			if (m_parts->at(i) == "8" || m_parts->at(i) == "11") {
+				schema = atoi(m_parts->at(i).c_str());
+				break;
+			}
+		}
+
+		if (schema != 255) {
+			content.push_back("a=sendonly");
+			content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 	
-		int tgt_rtp_port = m_parts->size() >= 2 ? atoi(m_parts->at(1).c_str()) : 8000;
+			// 1234 could be allocated but as this is send-only,
+			// it is not relevant
+			content.push_back(myformat("m=audio 1234 RTP/AVP %u", schema));
 
-		sip_session_t *ss = new sip_session_t();
-		ss->start_ts = get_us();
+			std::string content_out = merge(content, "\r\n");
 
-		// 1234: see m=... above
-		std::thread *th = new std::thread(&sip::transmit_wav, this, src_ip, tgt_rtp_port, dst_ip, 1234, ss);
+			// merge headers
+			std::vector<std::string> hout;
+			create_response_headers(&hout, headers, content_out.size(), dst_ip);
+			std::string headers_out = merge(hout, "\r\n");
 
-		slock.lock();
-		sessions.insert({ th, ss });
-		slock.unlock();
+			std::string out = headers_out + "\r\n" + content_out;
+
+			dolog(debug, "%s", out.c_str());
+
+			// send INVITE reply
+			u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
+
+			// find port to transmit rtp data to and start send-thread
+			int tgt_rtp_port = m_parts->size() >= 2 ? atoi(m_parts->at(1).c_str()) : 8000;
+
+			sip_session_t *ss = new sip_session_t();
+			ss->start_ts = get_us();
+
+			// 1234: see m=... above
+			std::thread *th = new std::thread(&sip::transmit_wav, this, src_ip, tgt_rtp_port, dst_ip, 1234, schema, ss);
+
+			slock.lock();
+			sessions.insert({ th, ss });
+			slock.unlock();
+		}
 
 		delete m_parts;
 	}
 }
 
-void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss)
+std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const uint8_t schema, const short *const samples, const int n_samples)
+{
+	int sample_size = 0;
+
+	if (schema == 8)	// a-law
+		sample_size = sizeof(uint8_t);
+	else if (schema == 11)	// l16 mono
+		sample_size = sizeof(uint16_t);
+	else {
+		dolog(error, "SIP: Invalid rtp payload schema %d\n", schema);
+		return { nullptr, 0 };
+	}
+
+	size_t size = 3 * 4 + n_samples * sample_size;
+	uint8_t *rtp_packet = new uint8_t[size]();
+
+	rtp_packet[0] |= 128;  // v2
+	rtp_packet[1] = schema;  // a-law
+	rtp_packet[2] = seq_nr >> 8;
+	rtp_packet[3] = seq_nr;
+	rtp_packet[4] = t >> 24;
+	rtp_packet[5] = t >> 16;
+	rtp_packet[6] = t >>  8;
+	rtp_packet[7] = t;
+	rtp_packet[8] = ssrc >> 24;
+	rtp_packet[9] = ssrc >> 16;
+	rtp_packet[10] = ssrc >>  8;
+	rtp_packet[11] = ssrc;
+
+	if (schema == 8) {	// a-law
+		for(int i=0; i<n_samples; i++)
+			rtp_packet[12 + i] = encode_alaw(samples[i]);
+	}
+	else if (schema == 1) {	// l16 mono
+		for(int i=0; i<n_samples; i++) {
+			rtp_packet[12 + i * 2 + 0] = samples[i] >> 8;
+			rtp_packet[12 + i * 2 + 1] = samples[i];
+		}
+	}
+
+	return { rtp_packet, size };
+}
+
+void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, const uint8_t schema, sip_session_t *const ss)
 {
 	set_thread_name("myip-siprtp");
 
@@ -251,36 +303,24 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 	int n_work = n_samples, offset = 0;
 
 	while(n_work > 0) {
-		int cur_n = std::min(n_work, 500);
+		int cur_n = std::min(n_work, 500/* must be even */);
 
 		bool odd = cur_n & 1;
 
-		size_t size = 3 * 4 + (cur_n + odd) * sizeof(uint8_t);
-		uint8_t *rtp_packet = new uint8_t[size]();
+		auto rtpp = create_rtp_packet(ssrc, seq_nr, t, schema, &samples[offset], cur_n + odd);
 
-		rtp_packet[0] |= 128;  // v2
-		rtp_packet[1] = 8;  // a-law
-		rtp_packet[2] = seq_nr >> 8;
-		rtp_packet[3] = seq_nr;
-		rtp_packet[4] = t >> 24;
-		rtp_packet[5] = t >> 16;
-		rtp_packet[6] = t >>  8;
-		rtp_packet[7] = t;
-		rtp_packet[8] = ssrc >> 24;
-		rtp_packet[9] = ssrc >> 16;
-		rtp_packet[10] = ssrc >>  8;
-		rtp_packet[11] = ssrc;
-
-		memcpy(&rtp_packet[12], &samples[offset], cur_n);
 		offset += cur_n;
 		n_work -= cur_n;
+
 		t += cur_n;
 
-		u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, rtp_packet, size);
-
-		delete [] rtp_packet;
-
 		seq_nr++;
+
+		if (rtpp.second) {
+			u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, rtpp.first, rtpp.second);
+
+			delete [] rtpp.first;
+		}
 
 		double sleep = 1000000.0 / (samplerate / double(cur_n));
 		myusleep(sleep);
