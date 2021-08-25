@@ -131,7 +131,8 @@ int main(int argc, char *argv[])
 	ntp *ntp_ = new ntp(&s, u, myip, upstream_ntp_server, true);
 	u->add_handler(123, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
-	sip *sip_ = new sip(&s, u);
+	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"));
+
 	u->add_handler(5060, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
 
 	// something that silently drops packet for a port

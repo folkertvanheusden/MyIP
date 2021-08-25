@@ -1,5 +1,6 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <optional>
+#include <sndfile.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -10,16 +11,76 @@
 #include "utils.h"
 
 
-sip::sip(stats *const s, udp *const u) : u(u)
+// from
+// http://dystopiancode.blogspot.com/2012/02/pcm-law-and-u-law-companding-algorithms.html
+int8_t encode_alaw(int16_t number)
+{
+	const uint16_t ALAW_MAX = 0xFFF;
+	uint16_t mask = 0x800;
+	uint8_t sign = 0;
+	uint8_t position = 11;
+	uint8_t lsb = 0;
+	if (number < 0)
+	{
+		number = -number;
+		sign = 0x80;
+	}
+	if (number > ALAW_MAX)
+	{
+		number = ALAW_MAX;
+	}
+	for (; ((number & mask) != mask && position >= 5); mask >>= 1, position--);
+	lsb = (number >> ((position == 4) ? (1) : (position - 4))) & 0x0f;
+	return (sign | ((position - 4) << 4) | lsb) ^ 0x55;
+}
+
+sip::sip(stats *const s, udp *const u, const std::string & sample) : u(u)
 {
 	th = new std::thread(std::ref(*this));
+
+	SF_INFO sfinfo { 0 };
+	SNDFILE *fh = sf_open(sample.c_str(), SFM_READ, &sfinfo);
+	if (!fh) {
+		dolog(error, "SIP \"%s\" cannot be opened\n", sample.c_str());
+		exit(1);
+	}
+
+	samplerate = sfinfo.samplerate;
+
+	if (sfinfo.channels != 1) {
+		dolog(error, "SIP \"%u\": should be mono sample (%s)\n", sfinfo.channels, sample.c_str());
+		sf_close(fh);
+		exit(1);
+	}
+
+	int n_samples = sf_seek(fh, 0, SEEK_END);
+	sf_seek(fh, 0, SEEK_SET);
+
+	samples = new uint8_t[n_samples];
+
+	short *temp = new short[n_samples];
+	if (sf_read_short(fh, temp, n_samples) != n_samples) {
+		dolog(error, "SIP short read on \"%s\"\n", sample.c_str());
+		sf_close(fh);
+		exit(1);
+	}
+
+	for(int i=0; i<n_samples; i++)
+		samples[i] = encode_alaw(temp[i]);
+
+	delete [] temp;
+
+	sf_close(fh);
 }
 
 sip::~sip()
 {
 	stop_flag = true;
+
 	th->join();
 	delete th;
+
+	delete [] samples;
 }
 
 void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p)
@@ -115,7 +176,7 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	// only, it is not relevant
 	content.push_back("m=audio 1234 RTP/AVP 8");
 	content.push_back("a=sendonly");
-	content.push_back("a=rtpmap:8 PCMA/8000");
+	content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 
 	std::string content_out = merge(content, "\r\n");
 
@@ -140,7 +201,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	// it is not relevant
 	content.push_back("m=audio 1234 RTP/AVP 8");
 	content.push_back("a=sendonly");
-	content.push_back("a=rtpmap:8 PCMA/8000");
+	content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 
 	std::string content_out = merge(content, "\r\n");
 
@@ -175,29 +236,6 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	}
 }
 
-// from
-// http://dystopiancode.blogspot.com/2012/02/pcm-law-and-u-law-companding-algorithms.html
-int8_t encode_alaw(int16_t number)
-{
-	const uint16_t ALAW_MAX = 0xFFF;
-	uint16_t mask = 0x800;
-	uint8_t sign = 0;
-	uint8_t position = 11;
-	uint8_t lsb = 0;
-	if (number < 0)
-	{
-		number = -number;
-		sign = 0x80;
-	}
-	if (number > ALAW_MAX)
-	{
-		number = ALAW_MAX;
-	}
-	for (; ((number & mask) != mask && position >= 5); mask >>= 1, position--);
-	lsb = (number >> ((position == 4) ? (1) : (position - 4))) & 0x0f;
-	return (sign | ((position - 4) << 4) | lsb) ^ 0x55;
-}
-
 void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss)
 {
 	set_thread_name("myip-siprtp");
@@ -208,37 +246,40 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 	uint32_t ssrc;
 	get_random((uint8_t *)&ssrc, sizeof ssrc);
 
-	while(get_us() - ss->start_ts < 10000000l) {  // 10s
-		int n_samples = 500;
+	int n_work = n_samples, offset = 0;
 
-		size_t size = 3 * 4 + n_samples * sizeof(uint8_t);
-		uint8_t *rtp_header = new uint8_t[size]();
+	while(n_work > 0) {
+		int cur_n = std::min(n_work, 1200);
 
-		rtp_header[0] |= 128;  // v2
-		rtp_header[1] = 8;  // a-law
-		rtp_header[2] = seq_nr >> 8;
-		rtp_header[3] = seq_nr;
-		rtp_header[4] = t >> 24;
-		rtp_header[5] = t >> 16;
-		rtp_header[6] = t >>  8;
-		rtp_header[7] = t;
-		rtp_header[8] = ssrc >> 24;
-		rtp_header[9] = ssrc >> 16;
-		rtp_header[10] = ssrc >>  8;
-		rtp_header[11] = ssrc;
+		bool odd = cur_n & 1;
 
-		// garbage FIXME
-		for(int i=0; i<n_samples; i++)
-			rtp_header[12 + i] = encode_alaw(int16_t(lrand48() & 65535));
+		size_t size = 3 * 4 + (cur_n + odd) * sizeof(uint8_t);
+		uint8_t *rtp_packet = new uint8_t[size]();
 
-		u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, rtp_header, size);
+		rtp_packet[0] |= 128;  // v2
+		rtp_packet[1] = 8;  // a-law
+		rtp_packet[2] = seq_nr >> 8;
+		rtp_packet[3] = seq_nr;
+		rtp_packet[4] = t >> 24;
+		rtp_packet[5] = t >> 16;
+		rtp_packet[6] = t >>  8;
+		rtp_packet[7] = t;
+		rtp_packet[8] = ssrc >> 24;
+		rtp_packet[9] = ssrc >> 16;
+		rtp_packet[10] = ssrc >>  8;
+		rtp_packet[11] = ssrc;
 
-		delete [] rtp_header;
+		memcpy(&rtp_packet[12], &samples[offset], cur_n);
+		offset += cur_n;
+		n_work -= cur_n;
+
+		u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, rtp_packet, size);
+
+		delete [] rtp_packet;
 
 		seq_nr++;
-		t += n_samples;
 
-		myusleep(1000000 / (8000 / n_samples));
+		myusleep(1000000 / (samplerate / n_samples) * 0.9);
 	}
 
 	ss->finished = true;
