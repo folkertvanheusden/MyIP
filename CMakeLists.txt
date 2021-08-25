@@ -61,6 +61,7 @@ find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
 target_link_libraries(myiptop ${CURSES_LIBRARIES})
 
+include(FindPkgConfig)
 pkg_check_modules(SNDFILE REQUIRED sndfile)
 target_link_libraries(myip ${SNDFILE_LIBRARIES})
 target_include_directories(myip PUBLIC ${SNDFILE_INCLUDE_DIRS})
