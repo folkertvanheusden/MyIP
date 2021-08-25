@@ -53,7 +53,7 @@ sip::sip(stats *const s, udp *const u, const std::string & sample) : u(u)
 		exit(1);
 	}
 
-	int n_samples = sf_seek(fh, 0, SEEK_END);
+	n_samples = sf_seek(fh, 0, SEEK_END);
 	sf_seek(fh, 0, SEEK_SET);
 
 	samples = new uint8_t[n_samples];
@@ -249,7 +249,7 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 	int n_work = n_samples, offset = 0;
 
 	while(n_work > 0) {
-		int cur_n = std::min(n_work, 1200);
+		int cur_n = std::min(n_work, 500);
 
 		bool odd = cur_n & 1;
 
@@ -272,6 +272,7 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 		memcpy(&rtp_packet[12], &samples[offset], cur_n);
 		offset += cur_n;
 		n_work -= cur_n;
+		t += cur_n;
 
 		u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, rtp_packet, size);
 
@@ -279,7 +280,8 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 
 		seq_nr++;
 
-		myusleep(1000000 / (samplerate / n_samples) * 0.9);
+		double sleep = 1000000.0 / (samplerate / double(cur_n));
+		myusleep(sleep);
 	}
 
 	ss->finished = true;
