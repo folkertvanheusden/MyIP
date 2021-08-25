@@ -168,8 +168,9 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 {
 	std::vector<std::string> content;
 	content.push_back("v=0");
-	content.push_back("o=jdoe 0 0 IN IP4 " + dst_ip.to_str()); // my ip
-	content.push_back("c=IN IP4 " + dst_ip.to_str()); // my ip
+	std::string proto = dst_ip.get_len() == 4 ? "IP4" : "IP6";
+	content.push_back("o=jdoe 0 0 IN " + proto + " " + dst_ip.to_str()); // my ip
+	content.push_back("c=IN " + proto + " " + dst_ip.to_str()); // my ip
 	content.push_back("s=MyIP");
 	content.push_back("t=0 0");
 	// 1234 could be allocated but as this is send-
@@ -193,8 +194,9 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 {
 	std::vector<std::string> content;
 	content.push_back("v=0");
-	content.push_back("o=jdoe 0 0 IN IP4 " + dst_ip.to_str()); // my ip
-	content.push_back("c=IN IP4 " + dst_ip.to_str()); // my ip
+	std::string proto = dst_ip.get_len() == 4 ? "IP4" : "IP6";
+	content.push_back("o=jdoe 0 0 IN " + proto + " " + dst_ip.to_str()); // my ip
+	content.push_back("c=IN " + proto + " " + dst_ip.to_str()); // my ip
 	content.push_back("s=MyIP");
 	content.push_back("t=0 0");
 	// 1234 could be allocated but as this is send-only,
