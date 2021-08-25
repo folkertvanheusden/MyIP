@@ -97,6 +97,8 @@ void create_response_headers(std::vector<std::string> *const target, const std::
 		target->push_back(myformat("Contact: %s", contact.c_str()));
 	}
 
+	target->push_back("User-Agent: MyIP - https://github.com/folkertvanheusden/myip");
+
 	target->push_back("Content-Type: application/sdp");
 	target->push_back(myformat("Content-Length: %zu", c_size));
 }
