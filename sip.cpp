@@ -113,9 +113,9 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	delete header_body;
 }
 
-void create_response_headers(std::vector<std::string> *const target, const std::vector<std::string> *const source, const size_t c_size, const any_addr & my_ip)
+void create_response_headers(const std::string & request, std::vector<std::string> *const target, const bool upd_cseq, const std::vector<std::string> *const source, const size_t c_size, const any_addr & my_ip)
 {
-	target->push_back("SIP/2.0 200 OK");
+	target->push_back(request);
 
 	auto str_via = find_header(source, "Via");
 	auto str_from = find_header(source, "From");
@@ -134,8 +134,18 @@ void create_response_headers(std::vector<std::string> *const target, const std::
 	if (str_call_id.has_value())
 		target->push_back("Call-ID: " + str_call_id.value());
 
-	if (str_cseq.has_value())
-		target->push_back("CSeq: " + str_cseq.value());
+	if (str_cseq.has_value()) {
+		if (upd_cseq) {
+			std::string request_method = request.substr(0, request.find(' '));
+
+			int cseq = str_cseq.has_value() ? atoi(str_cseq.value().c_str()) : 0;
+
+			target->push_back(myformat("CSeq: %u %s", cseq + 1, request_method.c_str()));
+		}
+		else {
+			target->push_back("CSeq: " + str_cseq.value());
+		}
+	}
 
 	target->push_back(myformat("Server: %s", my_ip.to_str().c_str()));
 
@@ -176,7 +186,7 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	std::string content_out = merge(content, "\r\n");
 
 	std::vector<std::string> hout;
-	create_response_headers(&hout, headers, content_out.size(), dst_ip);
+	create_response_headers("SIP/2.0 200 OK", &hout, false, headers, content_out.size(), dst_ip);
 	std::string headers_out = merge(hout, "\r\n");
 
 	std::string out = headers_out + "\r\n" + content_out;
@@ -221,7 +231,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 
 			// merge headers
 			std::vector<std::string> hout;
-			create_response_headers(&hout, headers, content_out.size(), dst_ip);
+			create_response_headers("SIP/2.0 200 OK", &hout, false, headers, content_out.size(), dst_ip);
 			std::string headers_out = merge(hout, "\r\n");
 
 			std::string out = headers_out + "\r\n" + content_out;
@@ -236,6 +246,11 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 
 			sip_session_t *ss = new sip_session_t();
 			ss->start_ts = get_us();
+			ss->headers = *headers;
+			ss->sip_addr_peer = src_ip;
+			ss->sip_port_peer = src_port;
+			ss->sip_addr_me = dst_ip;
+			ss->sip_port_me = dst_port;
 
 			std::thread *th = new std::thread(&sip::transmit_wav, this, src_ip, tgt_rtp_port, dst_ip, recv_port, schema, ss);
 
@@ -291,6 +306,26 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 	return { rtp_packet, size };
 }
 
+void sip::send_BYE(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, const std::vector<std::string> & headers)
+{
+	std::string number = "0";
+
+	auto str_to = find_header(&headers, "To");
+	if (str_to.has_value()) {
+		std::string::size_type lt = str_to.value().rfind('<');
+		std::string::size_type gt = str_to.value().rfind('>');
+
+		number = str_to.value().substr(lt + 1, gt - lt - 1);
+	}
+
+	std::vector<std::string> hout;
+	create_response_headers(myformat("BYE %s SIP/2.0", number.c_str()), &hout, true, &headers, 0, src_addr);
+
+	std::string out = merge(hout, "\r\n") + "\r\n";
+
+	u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, (const uint8_t *)out.c_str(), out.size());
+}
+
 void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, const uint8_t schema, sip_session_t *const ss)
 {
 	set_thread_name("myip-siprtp");
@@ -326,6 +361,8 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 		double sleep = 1000000.0 / (samplerate / double(cur_n));
 		myusleep(sleep);
 	}
+
+	send_BYE(ss->sip_addr_peer, ss->sip_port_peer, ss->sip_addr_me, ss->sip_port_me, ss->headers);
 
 	u->unallocate_port(src_port);
 
