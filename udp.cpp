@@ -111,3 +111,45 @@ void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 
 	delete [] out;
 }
+
+int udp::allocate_port()
+{
+	int port = -1;
+
+	ports_lock.lock();
+
+	for(int i=0; i<10; i++) {
+		int test_port = (lrand48() % 32000) + 1000;
+
+		if (allocated_ports.find(test_port) == allocated_ports.end()) {
+			port = test_port;
+			allocated_ports.insert({ port, get_us() });
+			break;
+		}
+	}
+
+	ports_lock.unlock();
+
+	return port;
+}
+
+void udp::unallocate_port(const int port)
+{
+	ports_lock.lock();
+
+	allocated_ports.erase(port);
+
+	ports_lock.unlock();
+}
+
+void udp::update_port_ts(const int port)
+{
+	ports_lock.lock();
+
+	auto it = allocated_ports.find(port);
+
+	if (it != allocated_ports.end())
+		it->second = get_us();
+
+	ports_lock.unlock();
+}

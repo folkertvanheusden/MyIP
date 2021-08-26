@@ -212,10 +212,10 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 			content.push_back("a=sendonly");
 			content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 			content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
+			
+			int recv_port = u->allocate_port();
 	
-			// 1234 could be allocated but as this is send-only,
-			// it is not relevant
-			content.push_back(myformat("m=audio 1234 RTP/AVP %u", schema));
+			content.push_back(myformat("m=audio %d RTP/AVP %u", recv_port, schema));
 
 			std::string content_out = merge(content, "\r\n");
 
@@ -237,8 +237,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 			sip_session_t *ss = new sip_session_t();
 			ss->start_ts = get_us();
 
-			// 1234: see m=... above
-			std::thread *th = new std::thread(&sip::transmit_wav, this, src_ip, tgt_rtp_port, dst_ip, 1234, schema, ss);
+			std::thread *th = new std::thread(&sip::transmit_wav, this, src_ip, tgt_rtp_port, dst_ip, recv_port, schema, ss);
 
 			slock.lock();
 			sessions.insert({ th, ss });
@@ -327,6 +326,8 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 		double sleep = 1000000.0 / (samplerate / double(cur_n));
 		myusleep(sleep);
 	}
+
+	u->unallocate_port(src_port);
 
 	ss->finished = true;
 }
