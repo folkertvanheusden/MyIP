@@ -377,8 +377,6 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 
 	u->add_handler(src_port, std::bind(&sip::input_recv, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), ss);
 
-	ss->latest_pkt = get_us();
-
 	uint16_t seq_nr = 0;
 	uint32_t t = 0;
 
@@ -411,9 +409,12 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 		myusleep(sleep);
 	}
 
+	// in case the peer starts to send only after the recorded message
+	ss->latest_pkt = get_us();
+
 	// session time-out
 	while(get_us() - ss->latest_pkt < 5000000l && !stop_flag)
-		usleep(500000);
+		myusleep(500000);
 
 	send_BYE(ss->sip_addr_peer, ss->sip_port_peer, ss->sip_addr_me, ss->sip_port_me, ss->headers);
 
