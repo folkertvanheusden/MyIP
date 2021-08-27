@@ -41,6 +41,7 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 	sip_rtp_sessions= s->register_stat("sip_rtp_sessions");
 	sip_rtp_codec_8	= s->register_stat("sip_rtp_codec_8");
 	sip_rtp_codec_11= s->register_stat("sip_rtp_codec_11");
+	sip_rtp_duration= s->register_stat("sip_rtp_duration");
 
 	th = new std::thread(std::ref(*this));
 
@@ -341,10 +342,10 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 
 	SF_INFO si { .frames = 0, .samplerate = samplerate, .channels = 1, .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16, .sections = 0, .seekable = 0 };
 
-	time_t now = time(nullptr);
+	time_t start = time(nullptr);
 
 	struct tm tm;
-	localtime_r(&now, &tm);
+	localtime_r(&start, &tm);
 
 	std::string filename = myformat("%04d-%02d-%02d_%02d-%02d-%02d_%s_%u.wav",
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
@@ -376,6 +377,8 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 
 	u->add_handler(src_port, std::bind(&sip::input_recv, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), ss);
 
+	ss->latest_pkt = get_us();
+
 	uint16_t seq_nr = 0;
 	uint32_t t = 0;
 
@@ -384,7 +387,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 
 	int n_work = n_samples, offset = 0;
 
-	while(n_work > 0) {
+	while(n_work > 0 && !stop_flag) {
 		int cur_n = std::min(n_work, 500/* must be even */);
 
 		bool odd = cur_n & 1;
@@ -408,7 +411,16 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 		myusleep(sleep);
 	}
 
+	// session time-out
+	while(get_us() - ss->latest_pkt < 5000000l && !stop_flag)
+		usleep(500000);
+
 	send_BYE(ss->sip_addr_peer, ss->sip_port_peer, ss->sip_addr_me, ss->sip_port_me, ss->headers);
+
+	long int took = time(nullptr) - start;
+	dolog(info, "SIP: Recording stopped after %lu seconds\n", took);
+
+	stats_add_average(sip_rtp_duration, took);
 
 	u->remove_handler(src_port);
 
@@ -452,6 +464,8 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 
 	if (!ss->sf)
 		return;
+
+	ss->latest_pkt = get_us();
 
 	if (!ss->stats_done) {
 		ss->stats_done = true;

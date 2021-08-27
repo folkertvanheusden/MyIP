@@ -25,6 +25,7 @@ typedef struct _sip_session_ {
 	uint8_t schema { 255 };
 	SNDFILE *sf { nullptr };
 	bool stats_done { false };
+	std::atomic_uint64_t latest_pkt { 0 };
 
 	_sip_session_() {
 	}
@@ -52,6 +53,7 @@ private:
 	uint64_t *sip_rtp_sessions { nullptr };
 	uint64_t *sip_rtp_codec_8 { nullptr };
 	uint64_t *sip_rtp_codec_11 { nullptr };
+	uint64_t *sip_rtp_duration { nullptr };
 
 	void reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers);
 	void reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body, void *const pd);
