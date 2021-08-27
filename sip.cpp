@@ -343,7 +343,21 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 			tm.tm_hour, tm.tm_min, tm.tm_sec,
 			tgt_addr.to_str().c_str(), tgt_port);
 
-	ss->sf = sf_open((mailbox_path + "/" + filename).c_str(), SFM_WRITE, &si);
+	std::string full_fname = mailbox_path + "/" + filename;
+
+	ss->sf = sf_open(full_fname.c_str(), SFM_WRITE, &si);
+
+	if (ss->sf) {
+		std::string merged = merge(ss->headers, "\n");
+
+		int rc = sf_set_string(ss->sf, SF_STR_COMMENT, merged.c_str());
+
+		if (rc)
+			dolog(warning, "SIP: cannot add SF_STR_COMMENT to .wav: %s\n", sf_error_number(rc));
+	}
+	else {
+		dolog(error, "SIP: cannot create %s (%s)\n", full_fname.c_str(), strerror(errno));
+	}
 
 	u->add_handler(src_port, std::bind(&sip::input_recv, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), ss);
 
@@ -421,6 +435,9 @@ int16_t decode_alaw(int8_t number)
 void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
 {
 	sip_session_t *ss = static_cast<sip_session_t *>(pd);
+
+	if (!ss->sf)
+		return;
 
 	auto pl = p->get_payload();
 
