@@ -36,6 +36,12 @@ int8_t encode_alaw(int16_t number)
 
 sip::sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path) : u(u), mailbox_path(mailbox_path)
 {
+	sip_requests	= s->register_stat("sip_requests");
+	sip_requests_unk= s->register_stat("sip_requests_unk");
+	sip_rtp_sessions= s->register_stat("sip_rtp_sessions");
+	sip_rtp_codec_8	= s->register_stat("sip_rtp_codec_8");
+	sip_rtp_codec_11= s->register_stat("sip_rtp_codec_11");
+
 	th = new std::thread(std::ref(*this));
 
 	SF_INFO sfinfo { 0 };
@@ -90,7 +96,7 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 	std::vector<std::string> *parts = split(header_lines->at(0), " ");
 
-	dolog(debug, "%s", std::string((const char *)pl.first, pl.second).c_str());
+	stats_inc_counter(sip_requests);
 
 	if (parts->size() == 3 && parts->at(0) == "OPTIONS" && parts->at(2) == "SIP/2.0") {
 		reply_to_OPTIONS(src_ip, src_port, dst_ip, dst_port, header_lines);
@@ -104,6 +110,7 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	}
 	else {
 		dolog(info, "SIP: request \"%s\" not understood\n", header_lines->at(0).c_str());
+		stats_inc_counter(sip_requests_unk);
 	}
 
 	delete parts;
@@ -235,8 +242,6 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 			std::string headers_out = merge(hout, "\r\n");
 
 			std::string out = headers_out + "\r\n" + content_out;
-
-			dolog(debug, "%s", out.c_str());
 
 			// send INVITE reply
 			u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
@@ -421,18 +426,17 @@ int16_t decode_alaw(int8_t number)
 
 	number^=0x55;
 
-	if(number&0x80) {
+	if (number&0x80) {
 		number&=~(1<<7);
 		sign = -1;
 	}
 
 	position = ((number & 0xF0) >>4) + 4;
 
-	if(position!=4) {
+	if (position!=4) {
 		decoded = ((1<<position)|((number&0x0F)<<(position-4)) |(1<<(position-5)));
 	}
-	else
-	{
+	else {
 		decoded = (number<<1)|1;
 	}
 
@@ -445,6 +449,17 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 
 	if (!ss->sf)
 		return;
+
+	if (!ss->stats_done) {
+		ss->stats_done = true;
+
+		stats_inc_counter(sip_rtp_sessions);
+
+		if (ss->schema == 8)
+			stats_inc_counter(sip_rtp_codec_8);
+		else if (ss->schema == 11)
+			stats_inc_counter(sip_rtp_codec_11);
+	}
 
 	auto pl = p->get_payload();
 
