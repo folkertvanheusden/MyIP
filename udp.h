@@ -12,13 +12,18 @@
 class icmp;
 class ipv4;
 
+typedef struct {
+	std::function<void(const any_addr &, int, const any_addr &, int, packet *, void *private_data)> cb;
+	void *private_data;
+} cb_t;
+
 class udp : public ip_protocol
 {
 private:
 	icmp *const icmp_;
 
 	// src ip, src port, dest ip (=local), dest port, payload-packet
-	std::map<int, std::function<void(const any_addr &, int, const any_addr &, int, packet *)> > callbacks;
+	std::map<int, cb_t> callbacks;
 	std::shared_mutex cb_lock;
 
 	std::map<int, uint64_t> allocated_ports;
@@ -33,7 +38,7 @@ public:
 	udp(stats *const s, icmp *const icmp_);
 	virtual ~udp();
 
-	void add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *)> h);
+	void add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *, void *const pd)> h, void *const pd);
 
 	void transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size);
 

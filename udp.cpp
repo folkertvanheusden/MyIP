@@ -76,7 +76,7 @@ void udp::operator()()
 
 			packet *up = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), src_addr, dst_addr, &p[8], size - 8, header.first, header.second);
 
-			cb(pkt->get_src_addr(), src_port, pkt->get_dst_addr(), dst_port, up);
+			cb.cb(pkt->get_src_addr(), src_port, pkt->get_dst_addr(), dst_port, up, cb.private_data);
 
 			delete up;
 		}
@@ -85,10 +85,10 @@ void udp::operator()()
 	}
 }
 
-void udp::add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *)> h)
+void udp::add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *, void *const pd)> h, void *pd)
 {
 	cb_lock.lock();
-	callbacks.insert({ port, h });
+	callbacks.insert({ port, { h, pd } });
 	cb_lock.unlock();
 }
 

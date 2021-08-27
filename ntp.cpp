@@ -57,7 +57,7 @@ ntp::~ntp()
 	delete th;
 }
 
-void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p)
+void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
 {
 	stats_inc_counter(ntp_requests);
 

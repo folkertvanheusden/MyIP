@@ -76,7 +76,7 @@ sip::~sip()
 	delete [] samples;
 }
 
-void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p)
+void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
 {
 	dolog(info, "SIP: packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
 
