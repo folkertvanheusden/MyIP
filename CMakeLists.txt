@@ -67,6 +67,11 @@ target_link_libraries(myip ${SNDFILE_LIBRARIES})
 target_include_directories(myip PUBLIC ${SNDFILE_INCLUDE_DIRS})
 target_compile_options(myip PUBLIC ${SNDFILE_CFLAGS_OTHER})
 
+pkg_check_modules(SPEEX REQUIRED speex)
+target_link_libraries(myip ${SPEEX_LIBRARIES})
+target_include_directories(myip PUBLIC ${SPEEX_INCLUDE_DIRS})
+target_compile_options(myip PUBLIC ${SPEEX_CFLAGS_OTHER})
+
 target_link_libraries(myiptop -lrt)
 
 target_compile_options(myip PRIVATE "-Wall")

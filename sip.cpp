@@ -4,12 +4,17 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <speex/speex.h>
 #include <sys/time.h>
 
 #include "sip.h"
 #include "udp.h"
 #include "utils.h"
 
+typedef struct {
+	void *state;
+	SpeexBits bits;
+} speex_t;
 
 // from
 // http://dystopiancode.blogspot.com/2012/02/pcm-law-and-u-law-companding-algorithms.html
@@ -41,6 +46,7 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 	sip_rtp_sessions= s->register_stat("sip_rtp_sessions");
 	sip_rtp_codec_8	= s->register_stat("sip_rtp_codec_8");
 	sip_rtp_codec_11= s->register_stat("sip_rtp_codec_11");
+	sip_rtp_codec_97= s->register_stat("sip_rtp_codec_97");
 	sip_rtp_duration= s->register_stat("sip_rtp_duration");
 
 	th = new std::thread(std::ref(*this));
@@ -193,6 +199,8 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	content.push_back("a=sendrecv");
 	content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 	content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
+	content.push_back(myformat("a=rtpmap:96 speex/%u", samplerate));
+	content.push_back("a=fmtp:97 mode=\"1,any\";vbr=on");
 
 	std::string content_out = merge(content, "\r\n");
 
@@ -223,7 +231,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 		uint8_t schema = 255;
 
 		for(size_t i=3; i<m_parts->size(); i++) {
-			if (m_parts->at(i) == "8" || m_parts->at(i) == "11") {
+			if (m_parts->at(i) == "8" || m_parts->at(i) == "11" || m_parts->at(i) == "97") {
 				schema = atoi(m_parts->at(i).c_str());
 				break;
 			}
@@ -233,6 +241,8 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 			content.push_back("a=sendrecv");
 			content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 			content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
+			content.push_back(myformat("a=rtpmap:97 speex/%u", samplerate));
+			content.push_back("a=fmtp:97 mode=\"1,any\";vbr=on");
 			
 			int recv_port = u->allocate_port();
 	
@@ -281,13 +291,15 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 		sample_size = sizeof(uint8_t);
 	else if (schema == 11)	// l16 mono
 		sample_size = sizeof(uint16_t);
+	else if (schema == 97)	// speex
+		sample_size = sizeof(uint8_t);
 	else {
 		dolog(error, "SIP: Invalid rtp payload schema %d\n", schema);
 		return { nullptr, 0 };
 	}
 
 	size_t size = 3 * 4 + n_samples * sample_size;
-	uint8_t *rtp_packet = new uint8_t[size]();
+	uint8_t *rtp_packet = new uint8_t[size * 2](); // *2 for speex (is this required?)
 
 	rtp_packet[0] |= 128;  // v2
 	rtp_packet[1] = schema;  // a-law
@@ -311,6 +323,28 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 			rtp_packet[12 + i * 2 + 0] = samples[i] >> 8;
 			rtp_packet[12 + i * 2 + 1] = samples[i];
 		}
+	}
+	else if (schema == 97) { // speex
+		speex_t spx { 0 };
+
+		spx.state = speex_encoder_init(&speex_nb_mode);
+
+		int tmp = 8; // set the quality to 8 (15 kbps)
+		speex_encoder_ctl(spx.state, SPEEX_SET_QUALITY, &tmp);
+
+		// is this required?
+		short *input = new short[n_samples];
+		memcpy(input, samples, n_samples * sizeof(short));
+
+		speex_bits_reset(&spx.bits);
+		speex_encode_int(spx.state, input, &spx.bits);
+
+		size = 12 + speex_bits_write(&spx.bits, (char *)&rtp_packet[12], n_samples);
+
+		delete [] input;
+
+		speex_encoder_destroy(spx.state);
+		speex_bits_destroy(&spx.bits);
 	}
 
 	return { rtp_packet, size };
@@ -476,6 +510,8 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 			stats_inc_counter(sip_rtp_codec_8);
 		else if (ss->schema == 11)
 			stats_inc_counter(sip_rtp_codec_11);
+		else if (ss->schema == 97)
+			stats_inc_counter(sip_rtp_codec_97);
 	}
 
 	auto pl = p->get_payload();
@@ -504,6 +540,9 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 			if ((rc = sf_write_short(ss->sf, (const short *)&pl.first[12], n_samples)) != n_samples)
 				dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, n_samples);
 		}
+	}
+	else if (ss->schema == 97) { // speex
+		// FIXME
 	}
 	else {
 		dolog(warning, "SIP: unsupported incoming schema %u\n", ss->schema);
