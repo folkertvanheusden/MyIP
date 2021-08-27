@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.9.4)
 
 project(myip VERSION 6.0)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_definitions("-D_FILE_OFFSET_BITS=64")

@@ -3,6 +3,7 @@
 #include <atomic>
 #include <map>
 #include <mutex>
+#include <sndfile.h>
 #include <stdint.h>
 #include <string>
 #include <thread>
@@ -15,15 +16,16 @@ class packet;
 class udp;
 
 typedef struct _sip_session_ {
-	uint64_t start_ts;
-	std::atomic_bool finished;
+	uint64_t start_ts { 0 };
+	std::atomic_bool finished { false };
 	std::vector<std::string> headers;
 	any_addr sip_addr_peer, sip_addr_me;
-	int sip_port_peer, sip_port_me;
+	int sip_port_peer { 0 }, sip_port_me { 0 };
+	std::thread *recorder { nullptr };
+	uint8_t schema { 255 };
+	SNDFILE *sf { nullptr };
 
 	_sip_session_() {
-		start_ts = 0;
-		finished = false;
 	}
 
 } sip_session_t;
@@ -43,8 +45,8 @@ private:
 	short *samples { nullptr };
 
 	void reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers);
-	void reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body);
-	void transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, const uint8_t schema, sip_session_t *const ss);
+	void reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body, void *const pd);
+	void voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss, void *const pd);
 	void send_BYE(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, const std::vector<std::string> & headers);
 
 public:
@@ -53,6 +55,8 @@ public:
 	virtual ~sip();
 
 	void input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd);
+
+	void input_recv(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd);
 
 	void operator()();
 };

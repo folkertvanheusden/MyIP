@@ -98,7 +98,7 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	else if (parts->size() == 3 && parts->at(0) == "INVITE" && parts->at(2) == "SIP/2.0" && header_body->size() == 2) {
 		std::vector<std::string> *body_lines = split(header_body->at(1), "\r\n");
 
-		reply_to_INVITE(src_ip, src_port, dst_ip, dst_port, header_lines, body_lines);
+		reply_to_INVITE(src_ip, src_port, dst_ip, dst_port, header_lines, body_lines, pd);
 
 		delete body_lines;
 	}
@@ -179,7 +179,7 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	// 1234 could be allocated but as this is send-
 	// only, it is not relevant
 	content.push_back("m=audio 1234 RTP/AVP 8 11");
-	content.push_back("a=sendonly");
+	content.push_back("a=sendrecv");
 	content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 	content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
 
@@ -194,7 +194,7 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 }
 
-void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body)
+void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body, void *const pd)
 {
 	std::vector<std::string> content;
 	content.push_back("v=0");
@@ -219,7 +219,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 		}
 
 		if (schema != 255) {
-			content.push_back("a=sendonly");
+			content.push_back("a=sendrecv");
 			content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 			content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
 			
@@ -251,8 +251,9 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 			ss->sip_port_peer = src_port;
 			ss->sip_addr_me = dst_ip;
 			ss->sip_port_me = dst_port;
+			ss->schema = schema;
 
-			std::thread *th = new std::thread(&sip::transmit_wav, this, src_ip, tgt_rtp_port, dst_ip, recv_port, schema, ss);
+			std::thread *th = new std::thread(&sip::voicemailbox, this, src_ip, tgt_rtp_port, dst_ip, recv_port, ss, pd);
 
 			slock.lock();
 			sessions.insert({ th, ss });
@@ -326,9 +327,17 @@ void sip::send_BYE(const any_addr & tgt_addr, const int tgt_port, const any_addr
 	u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, (const uint8_t *)out.c_str(), out.size());
 }
 
-void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, const uint8_t schema, sip_session_t *const ss)
+void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss, void *const pd)
 {
 	set_thread_name("myip-siprtp");
+
+	SF_INFO si { .frames = 0, .samplerate = samplerate, .channels = 1, .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16, .sections = 0, .seekable = 0 };
+
+	std::string filename = myformat("%s_%u.wav", tgt_addr.to_str().c_str(), tgt_port);
+
+	ss->sf = sf_open(filename.c_str(), SFM_WRITE, &si);
+
+	u->add_handler(src_port, std::bind(&sip::input_recv, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), ss);
 
 	uint16_t seq_nr = 0;
 	uint32_t t = 0;
@@ -343,7 +352,7 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 
 		bool odd = cur_n & 1;
 
-		auto rtpp = create_rtp_packet(ssrc, seq_nr, t, schema, &samples[offset], cur_n + odd);
+		auto rtpp = create_rtp_packet(ssrc, seq_nr, t, ss->schema, &samples[offset], cur_n + odd);
 
 		offset += cur_n;
 		n_work -= cur_n;
@@ -364,9 +373,77 @@ void sip::transmit_wav(const any_addr & tgt_addr, const int tgt_port, const any_
 
 	send_BYE(ss->sip_addr_peer, ss->sip_port_peer, ss->sip_addr_me, ss->sip_port_me, ss->headers);
 
+	u->remove_handler(src_port);
+
 	u->unallocate_port(src_port);
 
+	sf_close(ss->sf);
+
 	ss->finished = true;
+}
+
+// from
+// http://dystopiancode.blogspot.com/2012/02/pcm-law-and-u-law-companding-algorithms.html
+int16_t decode_alaw(int8_t number)
+{
+	uint8_t sign = 0x00;
+	uint8_t position = 0;
+	int16_t decoded = 0;
+
+	number^=0x55;
+
+	if(number&0x80) {
+		number&=~(1<<7);
+		sign = -1;
+	}
+
+	position = ((number & 0xF0) >>4) + 4;
+
+	if(position!=4) {
+		decoded = ((1<<position)|((number&0x0F)<<(position-4)) |(1<<(position-5)));
+	}
+	else
+	{
+		decoded = (number<<1)|1;
+	}
+
+	return sign == 0 ? decoded:-decoded;
+}
+
+void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
+{
+	sip_session_t *ss = static_cast<sip_session_t *>(pd);
+
+	auto pl = p->get_payload();
+
+	if (ss->schema == 8) {  // a-law
+		int n_samples = pl.second - 12;
+
+		if (n_samples > 0) {
+			short *temp = new short[n_samples];
+
+			for(int i=0; i<n_samples; i++)
+				temp[i] = decode_alaw(pl.first[12 + i]);
+
+			int rc = 0;
+			if ((rc = sf_write_short(ss->sf, temp, n_samples)) != n_samples)
+				dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, n_samples);
+
+			delete [] temp;
+		}
+	}
+	else if (ss->schema == 11) { // l16 mono
+		int n_samples = (pl.second - 12) / 2;
+
+		if (n_samples > 0) {
+			int rc = 0;
+			if ((rc = sf_write_short(ss->sf, (const short *)&pl.first[12], n_samples)) != n_samples)
+				dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, n_samples);
+		}
+	}
+	else {
+		dolog(warning, "SIP: unsupported incoming schema %u\n", ss->schema);
+	}
 }
 
 void sip::operator()()
