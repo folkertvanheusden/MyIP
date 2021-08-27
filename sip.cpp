@@ -333,7 +333,15 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 
 	SF_INFO si { .frames = 0, .samplerate = samplerate, .channels = 1, .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16, .sections = 0, .seekable = 0 };
 
-	std::string filename = myformat("%s_%u.wav", tgt_addr.to_str().c_str(), tgt_port);
+	time_t now = time(nullptr);
+
+	struct tm tm;
+	localtime_r(&now, &tm);
+
+	std::string filename = myformat("%04d-%02d-%02d_%02d-%02d-%02d_%s_%u.wav",
+			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+			tm.tm_hour, tm.tm_min, tm.tm_sec,
+			tgt_addr.to_str().c_str(), tgt_port);
 
 	ss->sf = sf_open(filename.c_str(), SFM_WRITE, &si);
 
