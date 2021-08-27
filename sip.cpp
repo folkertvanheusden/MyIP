@@ -110,6 +110,7 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	}
 	else if (parts->size() == 3 && parts->at(0) == "BYE" && parts->at(2) == "SIP/2.0") {
 		// OK
+	}
 	else {
 		dolog(info, "SIP: request \"%s\" not understood\n", header_lines->at(0).c_str());
 		stats_inc_counter(sip_requests_unk);
