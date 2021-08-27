@@ -351,9 +351,16 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 		std::string merged = merge(ss->headers, "\n");
 
 		int rc = sf_set_string(ss->sf, SF_STR_COMMENT, merged.c_str());
-
 		if (rc)
 			dolog(warning, "SIP: cannot add SF_STR_COMMENT to .wav: %s\n", sf_error_number(rc));
+
+		auto str_from = find_header(&ss->headers, "From");
+		if (str_from.has_value()) {
+			rc = sf_set_string(ss->sf, SF_STR_ARTIST, str_from.value().c_str());
+
+			if (rc)
+				dolog(warning, "SIP: cannot add SF_STR_ARTIST to .wav: %s\n", sf_error_number(rc));
+		}
 	}
 	else {
 		dolog(error, "SIP: cannot create %s (%s)\n", full_fname.c_str(), strerror(errno));
