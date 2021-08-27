@@ -199,7 +199,7 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	content.push_back("a=sendrecv");
 	content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 	content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
-	content.push_back(myformat("a=rtpmap:96 speex/%u", samplerate));
+	content.push_back(myformat("a=rtpmap:97 speex/%u", samplerate));
 	content.push_back("a=fmtp:97 mode=\"1,any\";vbr=on");
 
 	std::string content_out = merge(content, "\r\n");
