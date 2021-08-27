@@ -54,6 +54,7 @@ void udp::operator()()
 
 		dolog(debug, "UDP: packet for port %d from port %d\n", dst_port, src_port);
 
+		cb_lock.lock_shared();
 		auto it = callbacks.find(dst_port);
 
 		if (it == callbacks.end()) {
@@ -61,8 +62,13 @@ void udp::operator()()
 				icmp_->send_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 3, 3, pkt);
 
 			stats_inc_counter(udp_refused);
+
+			cb_lock.unlock_shared();
 		}
 		else {
+			auto cb = it->second;
+			cb_lock.unlock_shared();
+
 			auto src_addr = pkt->get_src_addr();
 			auto dst_addr = pkt->get_dst_addr();
 
@@ -70,7 +76,7 @@ void udp::operator()()
 
 			packet *up = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), src_addr, dst_addr, &p[8], size - 8, header.first, header.second);
 
-			it->second(pkt->get_src_addr(), src_port, pkt->get_dst_addr(), dst_port, up);
+			cb(pkt->get_src_addr(), src_port, pkt->get_dst_addr(), dst_port, up);
 
 			delete up;
 		}
@@ -81,7 +87,9 @@ void udp::operator()()
 
 void udp::add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *)> h)
 {
+	cb_lock.lock();
 	callbacks.insert({ port, h });
+	cb_lock.unlock();
 }
 
 void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)

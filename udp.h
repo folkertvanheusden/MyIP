@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <map>
+#include <shared_mutex>
 
 #include "ip_protocol.h"
 #include "packet.h"
@@ -18,6 +19,7 @@ private:
 
 	// src ip, src port, dest ip (=local), dest port, payload-packet
 	std::map<int, std::function<void(const any_addr &, int, const any_addr &, int, packet *)> > callbacks;
+	std::shared_mutex cb_lock;
 
 	std::map<int, uint64_t> allocated_ports;
 	std::mutex ports_lock;
