@@ -15,7 +15,6 @@ class icmp;
 class ipv4 : public protocol
 {
 private:
-	std::map<uint8_t, ip_protocol *> prot_map;
 	arp *const iarp;
 	icmp *icmp_ { nullptr };
 
@@ -37,8 +36,6 @@ public:
 
 	void transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 	void transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
-
-	void register_protocol(const uint8_t protocol, ip_protocol *const p);
 
 	void register_icmp(icmp *const icmp_) { this->icmp_ = icmp_; }
 

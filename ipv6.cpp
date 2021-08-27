@@ -33,13 +33,6 @@ ipv6::~ipv6()
 	delete th;
 }
 
-void ipv6::register_protocol(const uint8_t protocol, ip_protocol *const p)
-{
-	prot_map.insert({ protocol, p });
-
-	p->register_ip(this);
-}
-
 void ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv6_n_tx);

@@ -2,6 +2,7 @@
 #include <chrono>
 #include <arpa/inet.h>
 
+#include "ip_protocol.h"
 #include "protocol.h"
 
 constexpr size_t pkts_max_size { 512 };
@@ -12,6 +13,13 @@ protocol::protocol()
 
 protocol::~protocol()
 {
+}
+
+void protocol::register_protocol(const uint8_t protocol, ip_protocol *const p)
+{
+	prot_map.insert({ protocol, p });
+
+	p->register_ip(this);
 }
 
 void protocol::queue_packet(const packet *p)

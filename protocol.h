@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <map>
 #include <mutex>
 #include <stdint.h>
 #include <thread>
@@ -10,6 +11,7 @@
 
 #include "packet.h"
 
+class ip_protocol;
 class phys;
 
 class protocol
@@ -24,11 +26,15 @@ protected:
 
 	phys *pdev { nullptr };
 
+	std::map<uint8_t, ip_protocol *> prot_map;
+
 public:
 	protocol();
 	virtual ~protocol();
 
 	void register_phys(phys *const p) { pdev = p; }
+
+	void register_protocol(const uint8_t protocol, ip_protocol *const p);
 
 	void queue_packet(const packet *p);
 
