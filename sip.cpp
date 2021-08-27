@@ -543,7 +543,26 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 		}
 	}
 	else if (ss->schema == 97) { // speex
-		// FIXME
+		speex_t spx { 0 };
+		speex_bits_init(&spx.bits);
+		spx.state = speex_decoder_init(&speex_nb_mode);
+
+		speex_bits_read_from(&spx.bits, (char *)&pl.first[12], pl.second - 12);
+
+		int frame_size = 0;
+		speex_decoder_ctl(spx.state, SPEEX_GET_FRAME_SIZE, &frame_size);
+
+		short *of = new short[frame_size];
+		speex_decode_int(spx.state, &spx.bits, of);
+
+		int rc = 0;
+		if ((rc = sf_write_short(ss->sf, of, frame_size)) != frame_size)
+			dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, frame_size);
+
+		delete [] of;
+
+		speex_bits_destroy(&spx.bits);
+		speex_decoder_destroy(spx.state);
 	}
 	else {
 		dolog(warning, "SIP: unsupported incoming schema %u\n", ss->schema);
