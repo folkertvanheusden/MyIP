@@ -34,7 +34,7 @@ int8_t encode_alaw(int16_t number)
 	return (sign | ((position - 4) << 4) | lsb) ^ 0x55;
 }
 
-sip::sip(stats *const s, udp *const u, const std::string & sample) : u(u)
+sip::sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path) : u(u), mailbox_path(mailbox_path)
 {
 	th = new std::thread(std::ref(*this));
 
@@ -343,7 +343,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 			tm.tm_hour, tm.tm_min, tm.tm_sec,
 			tgt_addr.to_str().c_str(), tgt_port);
 
-	ss->sf = sf_open(filename.c_str(), SFM_WRITE, &si);
+	ss->sf = sf_open((mailbox_path + "/" + filename).c_str(), SFM_WRITE, &si);
 
 	u->add_handler(src_port, std::bind(&sip::input_recv, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), ss);
 

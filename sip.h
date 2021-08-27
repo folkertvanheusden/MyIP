@@ -44,13 +44,15 @@ private:
 	int samplerate { 0 }, n_samples { 0 };
 	short *samples { nullptr };
 
+	std::string mailbox_path { "/tmp" };
+
 	void reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers);
 	void reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body, void *const pd);
 	void voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss, void *const pd);
 	void send_BYE(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, const std::vector<std::string> & headers);
 
 public:
-	sip(stats *const s, udp *const u, const std::string & sample);
+	sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path);
 	sip(const sip &) = delete;
 	virtual ~sip();
 
