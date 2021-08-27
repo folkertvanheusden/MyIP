@@ -92,6 +92,13 @@ void udp::add_handler(const int port, std::function<void(const any_addr &, int, 
 	cb_lock.unlock();
 }
 
+void udp::remove_handler(const int port)
+{
+	cb_lock.lock();
+	callbacks.erase(port);
+	cb_lock.unlock();
+}
+
 void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
 {
 	dolog(debug, "UDP: transmit packet %d -> %d\n", src_port, dst_port);

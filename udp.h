@@ -39,6 +39,7 @@ public:
 	virtual ~udp();
 
 	void add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *, void *const pd)> h, void *const pd);
+	void remove_handler(const int port);
 
 	void transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size);
 
