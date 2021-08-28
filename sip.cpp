@@ -26,7 +26,15 @@ void resample(const short *const in, const int in_rate, const int n_samples, sho
 	*out_n_samples = n_samples * ratio;
 	float *out_float = new float[*out_n_samples];
 
-	SRC_DATA sd { .data_in = in_float, .data_out = out_float, .input_frames = n_samples, .output_frames = *out_n_samples, .input_frames_used = 0, .output_frames_gen = 0, .end_of_input = 0, .src_ratio = ratio };
+	SRC_DATA sd;
+	sd.data_in = in_float;
+	sd.data_out = out_float;
+	sd.input_frames = n_samples;
+	sd.output_frames = *out_n_samples;
+	sd.input_frames_used = 0;
+	sd.output_frames_gen = 0;
+	sd.end_of_input = 0;
+	sd.src_ratio = ratio;
 
 	int rc = -1;
 	if ((rc = src_simple(&sd, SRC_SINC_BEST_QUALITY, 1)) != 0)
@@ -460,7 +468,13 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 {
 	set_thread_name("myip-siprtp");
 
-	SF_INFO si { .frames = 0, .samplerate = ss->schema.rate, .channels = 1, .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16, .sections = 0, .seekable = 0 };
+	SF_INFO si;
+	si.frames = 0;
+	si.samplerate = ss->schema.rate;
+	si.channels = 1;
+	si.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
+	si.sections = 0;
+	si.seekable = 0;
 
 	time_t start = time(nullptr);
 

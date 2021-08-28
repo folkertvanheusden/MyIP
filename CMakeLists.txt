@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.9.4)
 
 project(myip VERSION 6.0)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_definitions("-D_FILE_OFFSET_BITS=64")
@@ -79,5 +79,3 @@ target_include_directories(myip PUBLIC ${SPEEX_INCLUDE_DIRS})
 target_compile_options(myip PUBLIC ${SPEEX_CFLAGS_OTHER})
 
 target_link_libraries(myiptop -lrt)
-
-target_compile_options(myip PRIVATE "-Wall")
