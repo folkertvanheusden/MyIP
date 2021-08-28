@@ -62,10 +62,16 @@ include_directories(${CURSES_INCLUDE_DIR})
 target_link_libraries(myiptop ${CURSES_LIBRARIES})
 
 include(FindPkgConfig)
+
 pkg_check_modules(SNDFILE REQUIRED sndfile)
 target_link_libraries(myip ${SNDFILE_LIBRARIES})
 target_include_directories(myip PUBLIC ${SNDFILE_INCLUDE_DIRS})
 target_compile_options(myip PUBLIC ${SNDFILE_CFLAGS_OTHER})
+
+pkg_check_modules(SAMPLERATE REQUIRED samplerate)
+target_link_libraries(myip ${SAMPLERATE_LIBRARIES})
+target_include_directories(myip PUBLIC ${SAMPLERATE_INCLUDE_DIRS})
+target_compile_options(myip PUBLIC ${SAMPLERATE_CFLAGS_OTHER})
 
 pkg_check_modules(SPEEX REQUIRED speex)
 target_link_libraries(myip ${SPEEX_LIBRARIES})

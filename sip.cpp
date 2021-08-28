@@ -1,5 +1,6 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <optional>
+#include <samplerate.h>
 #include <sndfile.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -15,6 +16,29 @@ typedef struct {
 	void *state;
 	SpeexBits bits;
 } speex_t;
+
+void resample(const short *const in, const int in_rate, const int n_samples, short **const out, const int out_rate, int *const out_n_samples)
+{
+	float *in_float = new float[n_samples];
+	src_short_to_float_array(in, in_float, n_samples);
+
+	double ratio = out_rate / double(in_rate);
+	*out_n_samples = n_samples * ratio;
+	float *out_float = new float[*out_n_samples];
+
+	SRC_DATA sd { .data_in = in_float, .data_out = out_float, .input_frames = n_samples, .output_frames = *out_n_samples, .input_frames_used = 0, .output_frames_gen = 0, .end_of_input = 0, .src_ratio = ratio };
+
+	int rc = -1;
+	if ((rc = src_simple(&sd, SRC_SINC_BEST_QUALITY, 1)) != 0)
+		dolog(warning, "SIP: resample failed: %s", src_strerror(rc));
+
+	*out = new short[*out_n_samples];
+	src_float_to_short_array(out_float, *out, *out_n_samples);
+
+	delete [] out_float;
+
+	delete [] in_float;
+}
 
 // from
 // http://dystopiancode.blogspot.com/2012/02/pcm-law-and-u-law-companding-algorithms.html
