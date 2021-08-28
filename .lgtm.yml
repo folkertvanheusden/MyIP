@@ -3,6 +3,9 @@ extraction:
     prepare:
       packages:
         - libiniparser-dev
+        - libsndfile1-dev
+        - libspeex-dev
+        - libsamplerate0-dev
     configure:
       command:
         - mkdir _lgtm_build_dir
