@@ -433,12 +433,20 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 
 		speex_encode_int(spx.state, input, &spx.bits);
 
-		size = 12 + speex_bits_write(&spx.bits, (char *)&rtp_packet[12], size - 12);
+		int new_size = 12 + speex_bits_write(&spx.bits, (char *)&rtp_packet[12], size - 12);
 
 		delete [] input;
 
 		speex_encoder_destroy(spx.state);
 		speex_bits_destroy(&spx.bits);
+
+		if (new_size > size) {
+			dolog(error, "SIP: speex decoded data too big (%d > %d)\n", new_size, size);
+			delete [] rtp_packet;
+			return { nullptr, 0 };
+		}
+
+		size = new_size;
 	}
 
 	return { rtp_packet, size };

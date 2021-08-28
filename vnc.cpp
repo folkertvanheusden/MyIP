@@ -151,11 +151,9 @@ void frame_buffer_thread(void *fb_in)
 		myusleep(1000);  // ignore any errors during usleep
 	}
 
-	if (fb_work) {
-		delete [] fb_work->buffer;
+	delete [] fb_work->buffer;
 
-		fb_work->buffer = nullptr;
-	}
+	fb_work->buffer = nullptr;
 }
 
 void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len, vnc_private_data *vpd)

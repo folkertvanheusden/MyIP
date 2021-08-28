@@ -134,7 +134,10 @@ int udp::allocate_port()
 	ports_lock.lock();
 
 	for(int i=0; i<10; i++) {
-		int test_port = (lrand48() % 32000) + 1000;
+		uint16_t rnd;
+		get_random((uint8_t *)&rnd, sizeof rnd);
+
+		int test_port = (rnd & 32767) + 1000;
 
 		if (allocated_ports.find(test_port) == allocated_ports.end()) {
 			port = test_port;
