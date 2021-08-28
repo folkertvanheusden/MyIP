@@ -55,7 +55,7 @@ demo
 ----
 See http://myip.vanheusden.com/
 
-It also runs an NTP and VNC server.
+It also runs an NTP, SIP and VNC server.
 
 copyright
 ---------
