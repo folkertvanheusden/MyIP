@@ -1,15 +1,44 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <optional>
+#include <samplerate.h>
 #include <sndfile.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <speex/speex.h>
 #include <sys/time.h>
 
 #include "sip.h"
 #include "udp.h"
 #include "utils.h"
 
+typedef struct {
+	void *state;
+	SpeexBits bits;
+} speex_t;
+
+void resample(const short *const in, const int in_rate, const int n_samples, short **const out, const int out_rate, int *const out_n_samples)
+{
+	float *in_float = new float[n_samples];
+	src_short_to_float_array(in, in_float, n_samples);
+
+	double ratio = out_rate / double(in_rate);
+	*out_n_samples = n_samples * ratio;
+	float *out_float = new float[*out_n_samples];
+
+	SRC_DATA sd { .data_in = in_float, .data_out = out_float, .input_frames = n_samples, .output_frames = *out_n_samples, .input_frames_used = 0, .output_frames_gen = 0, .end_of_input = 0, .src_ratio = ratio };
+
+	int rc = -1;
+	if ((rc = src_simple(&sd, SRC_SINC_BEST_QUALITY, 1)) != 0)
+		dolog(warning, "SIP: resample failed: %s", src_strerror(rc));
+
+	*out = new short[*out_n_samples];
+	src_float_to_short_array(out_float, *out, *out_n_samples);
+
+	delete [] out_float;
+
+	delete [] in_float;
+}
 
 // from
 // http://dystopiancode.blogspot.com/2012/02/pcm-law-and-u-law-companding-algorithms.html
@@ -41,6 +70,7 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 	sip_rtp_sessions= s->register_stat("sip_rtp_sessions");
 	sip_rtp_codec_8	= s->register_stat("sip_rtp_codec_8");
 	sip_rtp_codec_11= s->register_stat("sip_rtp_codec_11");
+	sip_rtp_codec_97= s->register_stat("sip_rtp_codec_97");
 	sip_rtp_duration= s->register_stat("sip_rtp_duration");
 
 	th = new std::thread(std::ref(*this));
@@ -193,6 +223,8 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	content.push_back("a=sendrecv");
 	content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 	content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
+	content.push_back(myformat("a=rtpmap:97 speex/%u", samplerate));
+	content.push_back("a=fmtp:97 mode=\"1,any\";vbr=on");
 
 	std::string content_out = merge(content, "\r\n");
 
@@ -203,6 +235,73 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	std::string out = headers_out + "\r\n" + content_out;
 
 	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
+}
+
+codec_t chose_schema(const std::vector<std::string> *const body, const int max_rate)
+{
+	codec_t best { 255, "", -1 };
+
+	for(std::string line : *body) {
+		if (line.substr(0, 9) != "a=rtpmap:")
+			continue;
+
+		std::string pars = line.substr(9);
+
+		std::size_t lspace = pars.find(' ');
+		if (lspace == std::string::npos)
+			continue;
+
+		std::string type_rate = pars.substr(lspace + 1);
+
+		std::size_t slash = type_rate.find('/');
+		if (slash == std::string::npos)
+			continue;
+
+		uint8_t id = atoi(pars.substr(0, lspace).c_str());
+
+		std::string name = str_tolower(type_rate.substr(0, slash));
+		int rate = atoi(type_rate.substr(slash + 1).c_str());
+
+		bool pick = false;
+
+		if (rate >= max_rate) {
+			if (abs(rate - max_rate) < abs(rate - best.rate) || best.rate == -1)
+				pick = true;
+		}
+		else if (rate == best.rate) {
+			if (name == "l16")
+				pick = true;
+			else if (name != "l16" && name.substr(0, 5) == "speex")
+				pick = true;
+			else if (best.id == 255)
+				pick = true;
+		}
+
+		if (pick) {
+			best.rate = rate;
+			best.id = id;
+			best.name = name;
+		}
+	}
+
+	if (best.id == 255) {
+		best.id = 8;
+		best.name = "alaw";  // safe choice
+		best.rate = 8000;
+	}
+
+	if (best.name.substr(0, 5) == "speex") {
+		void *enc_state = speex_encoder_init(&speex_nb_mode);
+		speex_encoder_ctl(enc_state,SPEEX_GET_FRAME_SIZE, &best.frame_size);
+		speex_encoder_destroy(enc_state);
+	}
+	else {
+		best.frame_size = 500;
+	}
+
+	dolog(info, "SIP: CODEC chosen: %s/%d (id: %u), frame size: %d\n", best.name.c_str(), best.rate, best.id, best.frame_size);
+
+	return best;
 }
 
 void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body, void *const pd)
@@ -220,23 +319,18 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	if (m.has_value()) {
 		std::vector<std::string> *m_parts = split(m.value(), " ");
 
-		uint8_t schema = 255;
+		codec_t schema = chose_schema(body, samplerate);
 
-		for(size_t i=3; i<m_parts->size(); i++) {
-			if (m_parts->at(i) == "8" || m_parts->at(i) == "11") {
-				schema = atoi(m_parts->at(i).c_str());
-				break;
-			}
-		}
-
-		if (schema != 255) {
+		if (schema.id != 255) {
 			content.push_back("a=sendrecv");
-			content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
-			content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
+			content.push_back(myformat("a=rtpmap:%u %s/%u", schema.id, schema.name.c_str(), schema.rate));
+
+			if (schema.name.substr(0, 5) == "speex")
+				content.push_back(myformat("a=fmtp:%u mode=\"1,any\";vbr=on", schema.id));
 			
 			int recv_port = u->allocate_port();
 	
-			content.push_back(myformat("m=audio %d RTP/AVP %u", recv_port, schema));
+			content.push_back(myformat("m=audio %d RTP/AVP %u", recv_port, schema.id));
 
 			std::string content_out = merge(content, "\r\n");
 
@@ -273,24 +367,26 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	}
 }
 
-std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const uint8_t schema, const short *const samples, const int n_samples)
+std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const codec_t schema, const short *const samples, const int n_samples)
 {
 	int sample_size = 0;
 
-	if (schema == 8)	// a-law
+	if (schema.name == "alaw")// a-law
 		sample_size = sizeof(uint8_t);
-	else if (schema == 11)	// l16 mono
+	else if (schema.name == "l16")	// l16 mono
 		sample_size = sizeof(uint16_t);
+	else if (schema.name.substr(0, 5) == "speex")	// speex
+		sample_size = sizeof(uint8_t);
 	else {
-		dolog(error, "SIP: Invalid rtp payload schema %d\n", schema);
+		dolog(error, "SIP: Invalid rtp payload schema %s/%d\n", schema.name.c_str(), schema.rate);
 		return { nullptr, 0 };
 	}
 
 	size_t size = 3 * 4 + n_samples * sample_size;
-	uint8_t *rtp_packet = new uint8_t[size]();
+	uint8_t *rtp_packet = new uint8_t[size * 2](); // *2 for speex (is this required?)
 
 	rtp_packet[0] |= 128;  // v2
-	rtp_packet[1] = schema;  // a-law
+	rtp_packet[1] = schema.id;  // a-law
 	rtp_packet[2] = seq_nr >> 8;
 	rtp_packet[3] = seq_nr;
 	rtp_packet[4] = t >> 24;
@@ -302,15 +398,39 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 	rtp_packet[10] = ssrc >>  8;
 	rtp_packet[11] = ssrc;
 
-	if (schema == 8) {	// a-law
+	if (schema.name == "alaw") {	// a-law
 		for(int i=0; i<n_samples; i++)
 			rtp_packet[12 + i] = encode_alaw(samples[i]);
 	}
-	else if (schema == 1) {	// l16 mono
+	else if (schema.name == "l16") {	// l16 mono
 		for(int i=0; i<n_samples; i++) {
 			rtp_packet[12 + i * 2 + 0] = samples[i] >> 8;
 			rtp_packet[12 + i * 2 + 1] = samples[i];
 		}
+	}
+	else if (schema.name.substr(0, 5) == "speex") { // speex
+		speex_t spx { 0 };
+
+		speex_bits_init(&spx.bits);
+		speex_bits_reset(&spx.bits);
+
+		spx.state = speex_encoder_init(&speex_nb_mode);
+
+		int tmp = 10;
+		speex_encoder_ctl(spx.state, SPEEX_SET_QUALITY, &tmp);
+
+		// is this required?
+		short *input = new short[n_samples];
+		memcpy(input, samples, n_samples * sizeof(short));
+
+		speex_encode_int(spx.state, input, &spx.bits);
+
+		size = 12 + speex_bits_write(&spx.bits, (char *)&rtp_packet[12], size - 12);
+
+		delete [] input;
+
+		speex_encoder_destroy(spx.state);
+		speex_bits_destroy(&spx.bits);
 	}
 
 	return { rtp_packet, size };
@@ -340,7 +460,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 {
 	set_thread_name("myip-siprtp");
 
-	SF_INFO si { .frames = 0, .samplerate = samplerate, .channels = 1, .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16, .sections = 0, .seekable = 0 };
+	SF_INFO si { .frames = 0, .samplerate = ss->schema.rate, .channels = 1, .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16, .sections = 0, .seekable = 0 };
 
 	time_t start = time(nullptr);
 
@@ -386,14 +506,28 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 	int n_work = n_samples, offset = 0;
 
 	while(n_work > 0 && !stop_flag) {
-		int cur_n = std::min(n_work, 500/* must be even */);
+		int cur_n = 0;
+		int cur_n_before = std::min(n_work, ss->schema.frame_size);
+		std::pair<uint8_t *, int> rtpp;
 
-		bool odd = cur_n & 1;
+		if (samplerate != ss->schema.rate) {
+			short *resampled = nullptr;
+			resample(&samples[offset], samplerate, cur_n_before, &resampled, ss->schema.rate, &cur_n);
 
-		auto rtpp = create_rtp_packet(ssrc, seq_nr, t, ss->schema, &samples[offset], cur_n + odd);
+			bool odd = cur_n & 1;
+			rtpp = create_rtp_packet(ssrc, seq_nr, t, ss->schema, &samples[offset], cur_n + odd);
 
-		offset += cur_n;
-		n_work -= cur_n;
+			delete [] resampled;
+		}
+		else {
+			bool odd = cur_n_before & 1;
+			rtpp = create_rtp_packet(ssrc, seq_nr, t, ss->schema, &samples[offset], cur_n_before + odd);
+
+			cur_n = cur_n_before;
+		}
+
+		offset += cur_n_before;
+		n_work -= cur_n_before;
 
 		t += cur_n;
 
@@ -405,7 +539,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 			delete [] rtpp.first;
 		}
 
-		double sleep = 1000000.0 / (samplerate / double(cur_n));
+		double sleep = 1000000.0 / (samplerate / double(cur_n_before));
 		myusleep(sleep);
 	}
 
@@ -473,15 +607,17 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 
 		stats_inc_counter(sip_rtp_sessions);
 
-		if (ss->schema == 8)
+		if (ss->schema.name == "alaw")
 			stats_inc_counter(sip_rtp_codec_8);
-		else if (ss->schema == 11)
+		else if (ss->schema.name == "l16")
 			stats_inc_counter(sip_rtp_codec_11);
+		else if (ss->schema.name.substr(0, 5) == "speex")
+			stats_inc_counter(sip_rtp_codec_97);
 	}
 
 	auto pl = p->get_payload();
 
-	if (ss->schema == 8) {  // a-law
+	if (ss->schema.name == "alaw") {  // a-law
 		int n_samples = pl.second - 12;
 
 		if (n_samples > 0) {
@@ -497,7 +633,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 			delete [] temp;
 		}
 	}
-	else if (ss->schema == 11) { // l16 mono
+	else if (ss->schema.name == "l16") { // l16 mono
 		int n_samples = (pl.second - 12) / 2;
 
 		if (n_samples > 0) {
@@ -506,8 +642,30 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 				dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, n_samples);
 		}
 	}
+	else if (ss->schema.name.substr(0, 5) == "speex") { // speex
+		speex_t spx { 0 };
+		speex_bits_init(&spx.bits);
+		spx.state = speex_decoder_init(&speex_nb_mode);
+
+		speex_bits_read_from(&spx.bits, (char *)&pl.first[12], pl.second - 12);
+
+		int frame_size = 0;
+		speex_decoder_ctl(spx.state, SPEEX_GET_FRAME_SIZE, &frame_size);
+
+		short *of = new short[frame_size];
+		speex_decode_int(spx.state, &spx.bits, of);
+
+		int rc = 0;
+		if ((rc = sf_write_short(ss->sf, of, frame_size)) != frame_size)
+			dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, frame_size);
+
+		delete [] of;
+
+		speex_bits_destroy(&spx.bits);
+		speex_decoder_destroy(spx.state);
+	}
 	else {
-		dolog(warning, "SIP: unsupported incoming schema %u\n", ss->schema);
+		dolog(warning, "SIP: unsupported incoming schema %s/%d\n", ss->schema.name.c_str(), ss->schema.rate);
 	}
 }
 

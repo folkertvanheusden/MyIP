@@ -15,6 +15,13 @@
 class packet;
 class udp;
 
+typedef struct {
+	uint8_t id;
+	std::string name;
+	int rate;
+	int frame_size;
+} codec_t;
+
 typedef struct _sip_session_ {
 	uint64_t start_ts { 0 };
 	std::atomic_bool finished { false };
@@ -22,7 +29,7 @@ typedef struct _sip_session_ {
 	any_addr sip_addr_peer, sip_addr_me;
 	int sip_port_peer { 0 }, sip_port_me { 0 };
 	std::thread *recorder { nullptr };
-	uint8_t schema { 255 };
+	codec_t schema { 255, "", -1 };
 	SNDFILE *sf { nullptr };
 	bool stats_done { false };
 	std::atomic_uint64_t latest_pkt { 0 };
@@ -53,6 +60,7 @@ private:
 	uint64_t *sip_rtp_sessions { nullptr };
 	uint64_t *sip_rtp_codec_8 { nullptr };
 	uint64_t *sip_rtp_codec_11 { nullptr };
+	uint64_t *sip_rtp_codec_97 { nullptr };
 	uint64_t *sip_rtp_duration { nullptr };
 
 	void reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers);

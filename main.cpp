@@ -179,6 +179,7 @@ int main(int argc, char *argv[])
 	getchar();
 
 	dolog(info, " *** TERMINATING ***\n");
+	fprintf(stderr, "terminating\n");
 
 	free_handler(http_handler6);
 	free_handler(http_handler);
