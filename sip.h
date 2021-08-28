@@ -19,6 +19,7 @@ typedef struct {
 	uint8_t id;
 	std::string name;
 	int rate;
+	int frame_size;
 } codec_t;
 
 typedef struct _sip_session_ {

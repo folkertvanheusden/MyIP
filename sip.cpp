@@ -237,7 +237,7 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 }
 
-codec_t choose_schema(const std::vector<std::string> *const body)
+codec_t chose_schema(const std::vector<std::string> *const body, const int max_rate)
 {
 	codec_t best { 255, "", -1 };
 
@@ -264,8 +264,10 @@ codec_t choose_schema(const std::vector<std::string> *const body)
 
 		bool pick = false;
 
-		if (rate > best.rate)
-			pick = true;
+		if (rate >= max_rate) {
+			if (abs(rate - max_rate) < abs(rate - best.rate) || best.rate == -1)
+				pick = true;
+		}
 		else if (rate == best.rate) {
 			if (name == "l16")
 				pick = true;
@@ -288,7 +290,16 @@ codec_t choose_schema(const std::vector<std::string> *const body)
 		best.rate = 8000;
 	}
 
-	dolog(info, "SIP: CODEC chosen: %s/%d (%u)\n", best.name.c_str(), best.rate, best.id);
+	if (best.name.substr(0, 5) == "speex") {
+		void *enc_state = speex_encoder_init(&speex_nb_mode);
+		speex_encoder_ctl(enc_state,SPEEX_GET_FRAME_SIZE, &best.frame_size);
+		speex_encoder_destroy(enc_state);
+	}
+	else {
+		best.frame_size = 500;
+	}
+
+	dolog(info, "SIP: CODEC chosen: %s/%d (id: %u), frame size: %d\n", best.name.c_str(), best.rate, best.id, best.frame_size);
 
 	return best;
 }
@@ -308,7 +319,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	if (m.has_value()) {
 		std::vector<std::string> *m_parts = split(m.value(), " ");
 
-		codec_t schema = choose_schema(body);
+		codec_t schema = chose_schema(body, samplerate);
 
 		if (schema.id != 255) {
 			content.push_back("a=sendrecv");
@@ -401,20 +412,20 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 		speex_t spx { 0 };
 
 		speex_bits_init(&spx.bits);
+		speex_bits_reset(&spx.bits);
 
 		spx.state = speex_encoder_init(&speex_nb_mode);
 
-		int tmp = 8; // set the quality to 8 (15 kbps)
+		int tmp = 10;
 		speex_encoder_ctl(spx.state, SPEEX_SET_QUALITY, &tmp);
 
 		// is this required?
 		short *input = new short[n_samples];
 		memcpy(input, samples, n_samples * sizeof(short));
 
-		speex_bits_reset(&spx.bits);
 		speex_encode_int(spx.state, input, &spx.bits);
 
-		size = 12 + speex_bits_write(&spx.bits, (char *)&rtp_packet[12], n_samples);
+		size = 12 + speex_bits_write(&spx.bits, (char *)&rtp_packet[12], size - 12);
 
 		delete [] input;
 
@@ -449,7 +460,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 {
 	set_thread_name("myip-siprtp");
 
-	SF_INFO si { .frames = 0, .samplerate = samplerate, .channels = 1, .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16, .sections = 0, .seekable = 0 };
+	SF_INFO si { .frames = 0, .samplerate = ss->schema.rate, .channels = 1, .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16, .sections = 0, .seekable = 0 };
 
 	time_t start = time(nullptr);
 
@@ -495,14 +506,28 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 	int n_work = n_samples, offset = 0;
 
 	while(n_work > 0 && !stop_flag) {
-		int cur_n = std::min(n_work, 500/* must be even */);
+		int cur_n = 0;
+		int cur_n_before = std::min(n_work, ss->schema.frame_size);
+		std::pair<uint8_t *, int> rtpp;
 
-		bool odd = cur_n & 1;
+		if (samplerate != ss->schema.rate) {
+			short *resampled = nullptr;
+			resample(&samples[offset], samplerate, cur_n_before, &resampled, ss->schema.rate, &cur_n);
 
-		auto rtpp = create_rtp_packet(ssrc, seq_nr, t, ss->schema, &samples[offset], cur_n + odd);
+			bool odd = cur_n & 1;
+			rtpp = create_rtp_packet(ssrc, seq_nr, t, ss->schema, &samples[offset], cur_n + odd);
 
-		offset += cur_n;
-		n_work -= cur_n;
+			delete [] resampled;
+		}
+		else {
+			bool odd = cur_n_before & 1;
+			rtpp = create_rtp_packet(ssrc, seq_nr, t, ss->schema, &samples[offset], cur_n_before + odd);
+
+			cur_n = cur_n_before;
+		}
+
+		offset += cur_n_before;
+		n_work -= cur_n_before;
 
 		t += cur_n;
 
@@ -514,7 +539,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 			delete [] rtpp.first;
 		}
 
-		double sleep = 1000000.0 / (samplerate / double(cur_n));
+		double sleep = 1000000.0 / (samplerate / double(cur_n_before));
 		myusleep(sleep);
 	}
 
