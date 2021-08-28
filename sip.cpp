@@ -237,6 +237,59 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 }
 
+uint8_t choose_schema(const std::vector<std::string> *const body)
+{
+	uint8_t best_id = 255;
+	int best_rate = -1;
+	std::string best_name;
+
+	for(std::string line : *body) {
+		if (line.substr(0, 9) != "a=rtpmap:")
+			continue;
+
+		std::string pars = line.substr(9);
+
+		std::size_t lspace = pars.find(' ');
+		if (lspace == std::string::npos)
+			continue;
+
+		std::string type_rate = pars.substr(lspace + 1);
+
+		std::size_t slash = type_rate.find('/');
+		if (slash == std::string::npos)
+			continue;
+
+		uint8_t id = atoi(pars.substr(0, lspace).c_str());
+
+		std::string name = str_tolower(type_rate.substr(0, slash));
+		int rate = atoi(type_rate.substr(slash + 1).c_str());
+
+		bool pick = false;
+
+		if (rate > best_rate)
+			pick = true;
+		else if (rate == best_rate) {
+			if (name == "l16")
+				pick = true;
+			else if (name != "l16" && name.substr(0, 5) == "speex")
+				pick = true;
+			else if (best_id == 255)
+				pick = true;
+		}
+
+		if (pick) {
+			best_rate = rate;
+			best_id = id;
+			best_name = name;
+		}
+	}
+
+	if (best_id == 255)
+		best_id = 8;
+
+	return best_id;
+}
+
 void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body, void *const pd)
 {
 	std::vector<std::string> content;
@@ -252,14 +305,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	if (m.has_value()) {
 		std::vector<std::string> *m_parts = split(m.value(), " ");
 
-		uint8_t schema = 255;
-
-		for(size_t i=3; i<m_parts->size(); i++) {
-			if (m_parts->at(i) == "8" || m_parts->at(i) == "11" || m_parts->at(i) == "97") {
-				schema = atoi(m_parts->at(i).c_str());
-				break;
-			}
-		}
+		uint8_t schema = choose_schema(body);
 
 		if (schema != 255) {
 			content.push_back("a=sendrecv");
