@@ -15,6 +15,12 @@
 class packet;
 class udp;
 
+typedef struct {
+	uint8_t id;
+	std::string name;
+	int rate;
+} codec_t;
+
 typedef struct _sip_session_ {
 	uint64_t start_ts { 0 };
 	std::atomic_bool finished { false };
@@ -22,7 +28,7 @@ typedef struct _sip_session_ {
 	any_addr sip_addr_peer, sip_addr_me;
 	int sip_port_peer { 0 }, sip_port_me { 0 };
 	std::thread *recorder { nullptr };
-	uint8_t schema { 255 };
+	codec_t schema { 255, "", -1 };
 	SNDFILE *sf { nullptr };
 	bool stats_done { false };
 	std::atomic_uint64_t latest_pkt { 0 };

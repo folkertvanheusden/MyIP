@@ -237,11 +237,9 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 }
 
-uint8_t choose_schema(const std::vector<std::string> *const body)
+codec_t choose_schema(const std::vector<std::string> *const body)
 {
-	uint8_t best_id = 255;
-	int best_rate = -1;
-	std::string best_name;
+	codec_t best { 255, "", -1 };
 
 	for(std::string line : *body) {
 		if (line.substr(0, 9) != "a=rtpmap:")
@@ -266,28 +264,33 @@ uint8_t choose_schema(const std::vector<std::string> *const body)
 
 		bool pick = false;
 
-		if (rate > best_rate)
+		if (rate > best.rate)
 			pick = true;
-		else if (rate == best_rate) {
+		else if (rate == best.rate) {
 			if (name == "l16")
 				pick = true;
 			else if (name != "l16" && name.substr(0, 5) == "speex")
 				pick = true;
-			else if (best_id == 255)
+			else if (best.id == 255)
 				pick = true;
 		}
 
 		if (pick) {
-			best_rate = rate;
-			best_id = id;
-			best_name = name;
+			best.rate = rate;
+			best.id = id;
+			best.name = name;
 		}
 	}
 
-	if (best_id == 255)
-		best_id = 8;
+	if (best.id == 255) {
+		best.id = 8;
+		best.name = "alaw";  // safe choice
+		best.rate = 8000;
+	}
 
-	return best_id;
+	dolog(info, "SIP: CODEC chosen: %s/%d (%u)\n", best.name.c_str(), best.rate, best.id);
+
+	return best;
 }
 
 void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body, void *const pd)
@@ -305,18 +308,18 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	if (m.has_value()) {
 		std::vector<std::string> *m_parts = split(m.value(), " ");
 
-		uint8_t schema = choose_schema(body);
+		codec_t schema = choose_schema(body);
 
-		if (schema != 255) {
+		if (schema.id != 255) {
 			content.push_back("a=sendrecv");
-			content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
-			content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
-			content.push_back(myformat("a=rtpmap:97 speex/%u", samplerate));
-			content.push_back("a=fmtp:97 mode=\"1,any\";vbr=on");
+			content.push_back(myformat("a=rtpmap:%u %s/%u", schema.id, schema.name.c_str(), schema.rate));
+
+			if (schema.name.substr(0, 5) == "speex")
+				content.push_back(myformat("a=fmtp:%u mode=\"1,any\";vbr=on", schema.id));
 			
 			int recv_port = u->allocate_port();
 	
-			content.push_back(myformat("m=audio %d RTP/AVP %u", recv_port, schema));
+			content.push_back(myformat("m=audio %d RTP/AVP %u", recv_port, schema.id));
 
 			std::string content_out = merge(content, "\r\n");
 
@@ -353,18 +356,18 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	}
 }
 
-std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const uint8_t schema, const short *const samples, const int n_samples)
+std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const codec_t schema, const short *const samples, const int n_samples)
 {
 	int sample_size = 0;
 
-	if (schema == 8)	// a-law
+	if (schema.name == "alaw")// a-law
 		sample_size = sizeof(uint8_t);
-	else if (schema == 11)	// l16 mono
+	else if (schema.name == "l16")	// l16 mono
 		sample_size = sizeof(uint16_t);
-	else if (schema == 97)	// speex
+	else if (schema.name.substr(0, 5) == "speex")	// speex
 		sample_size = sizeof(uint8_t);
 	else {
-		dolog(error, "SIP: Invalid rtp payload schema %d\n", schema);
+		dolog(error, "SIP: Invalid rtp payload schema %s/%d\n", schema.name.c_str(), schema.rate);
 		return { nullptr, 0 };
 	}
 
@@ -372,7 +375,7 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 	uint8_t *rtp_packet = new uint8_t[size * 2](); // *2 for speex (is this required?)
 
 	rtp_packet[0] |= 128;  // v2
-	rtp_packet[1] = schema;  // a-law
+	rtp_packet[1] = schema.id;  // a-law
 	rtp_packet[2] = seq_nr >> 8;
 	rtp_packet[3] = seq_nr;
 	rtp_packet[4] = t >> 24;
@@ -384,18 +387,20 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 	rtp_packet[10] = ssrc >>  8;
 	rtp_packet[11] = ssrc;
 
-	if (schema == 8) {	// a-law
+	if (schema.name == "alaw") {	// a-law
 		for(int i=0; i<n_samples; i++)
 			rtp_packet[12 + i] = encode_alaw(samples[i]);
 	}
-	else if (schema == 1) {	// l16 mono
+	else if (schema.name == "l16") {	// l16 mono
 		for(int i=0; i<n_samples; i++) {
 			rtp_packet[12 + i * 2 + 0] = samples[i] >> 8;
 			rtp_packet[12 + i * 2 + 1] = samples[i];
 		}
 	}
-	else if (schema == 97) { // speex
+	else if (schema.name.substr(0, 5) == "speex") { // speex
 		speex_t spx { 0 };
+
+		speex_bits_init(&spx.bits);
 
 		spx.state = speex_encoder_init(&speex_nb_mode);
 
@@ -577,17 +582,17 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 
 		stats_inc_counter(sip_rtp_sessions);
 
-		if (ss->schema == 8)
+		if (ss->schema.name == "alaw")
 			stats_inc_counter(sip_rtp_codec_8);
-		else if (ss->schema == 11)
+		else if (ss->schema.name == "l16")
 			stats_inc_counter(sip_rtp_codec_11);
-		else if (ss->schema == 97)
+		else if (ss->schema.name.substr(0, 5) == "speex")
 			stats_inc_counter(sip_rtp_codec_97);
 	}
 
 	auto pl = p->get_payload();
 
-	if (ss->schema == 8) {  // a-law
+	if (ss->schema.name == "alaw") {  // a-law
 		int n_samples = pl.second - 12;
 
 		if (n_samples > 0) {
@@ -603,7 +608,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 			delete [] temp;
 		}
 	}
-	else if (ss->schema == 11) { // l16 mono
+	else if (ss->schema.name == "l16") { // l16 mono
 		int n_samples = (pl.second - 12) / 2;
 
 		if (n_samples > 0) {
@@ -612,7 +617,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 				dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, n_samples);
 		}
 	}
-	else if (ss->schema == 97) { // speex
+	else if (ss->schema.name.substr(0, 5) == "speex") { // speex
 		speex_t spx { 0 };
 		speex_bits_init(&spx.bits);
 		spx.state = speex_decoder_init(&speex_nb_mode);
@@ -635,7 +640,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 		speex_decoder_destroy(spx.state);
 	}
 	else {
-		dolog(warning, "SIP: unsupported incoming schema %u\n", ss->schema);
+		dolog(warning, "SIP: unsupported incoming schema %s/%d\n", ss->schema.name.c_str(), ss->schema.rate);
 	}
 }
 
