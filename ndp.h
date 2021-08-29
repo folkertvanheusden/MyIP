@@ -21,6 +21,7 @@ private:
 	std::thread *th2;
 
         uint64_t *ndp_cache_req { nullptr }, *ndp_cache_hit { nullptr };
+        uint64_t *ndp_cache_store { nullptr }, *ndp_cache_update { nullptr };
 
 	void cache_cleaner();
 

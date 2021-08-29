@@ -14,6 +14,8 @@ ndp::ndp(stats *const s, const any_addr & mymac, const any_addr & myip6)
 
         ndp_cache_req = s->register_stat("ndp_cache_req");
         ndp_cache_hit = s->register_stat("ndp_cache_hit");
+        ndp_cache_store = s->register_stat("ndp_cache_store");
+        ndp_cache_update = s->register_stat("ndp_cache_update");
 
 	th = new std::thread(std::ref(*this));
 
@@ -61,11 +63,16 @@ void ndp::update_cache(const any_addr & mac, const any_addr & ip6)
 
 	auto it = ndp_cache.find(ip6);
 
-	if (it == ndp_cache.end())
+	if (it == ndp_cache.end()) {
 		ndp_cache.insert({ ip6, { get_us(), mac } });
+
+		stats_inc_counter(ndp_cache_store);
+	}
 	else {
 		it->second.ts = get_us();
 		it->second.addr = mac;
+
+		stats_inc_counter(ndp_cache_update);
 	}
 }
 
@@ -123,10 +130,8 @@ void ndp::cache_cleaner()
 
 void ndp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
-	// FIXME
 }
 
 void ndp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
-	// FIXME
 }
