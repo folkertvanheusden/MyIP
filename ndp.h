@@ -5,6 +5,7 @@
 
 #include "phys.h"
 #include "protocol.h"
+#include "address_cache.h"
 #include "stats.h"
 
 typedef struct {
@@ -12,25 +13,13 @@ typedef struct {
 	any_addr addr;
 } ndp_entry_t;
 
-class ndp : public protocol
+class ndp : public protocol, public address_cache
 {
-private:
-	std::shared_mutex cache_lock;
-	std::map<any_addr, ndp_entry_t> ndp_cache;
-
-	std::thread *th2;
-
         uint64_t *ndp_cache_req { nullptr }, *ndp_cache_hit { nullptr };
-        uint64_t *ndp_cache_store { nullptr }, *ndp_cache_update { nullptr };
-
-	void cache_cleaner();
 
 public:
 	ndp(stats *const s, const any_addr & mymac, const any_addr & ip6);
 	virtual ~ndp();
-
-	void update_cache(const any_addr & mac, const any_addr & ip6);
-	any_addr * query_cache(const any_addr & ip6);
 
 	void transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 	void transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;

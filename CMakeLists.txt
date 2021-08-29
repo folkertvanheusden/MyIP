@@ -13,6 +13,7 @@ set(CMAKE_BUILD_TYPE Debug)
 add_compile_options(-Wall -pedantic)
 
 add_executable(myip
+	address_cache.cpp
 	any_addr.cpp
 	arp.cpp
 	font.cpp
