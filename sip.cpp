@@ -449,7 +449,7 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 		speex_bits_destroy(&spx.bits);
 
 		if (new_size > size) {
-			dolog(error, "SIP: speex decoded data too big (%d > %d)\n", new_size, size);
+			dolog(error, "SIP: speex decoded data too big (%ld > %ld)\n", new_size, size);
 			delete [] rtp_packet;
 			return { nullptr, 0 };
 		}
