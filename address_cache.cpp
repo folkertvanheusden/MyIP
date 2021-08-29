@@ -16,7 +16,7 @@ address_cache::address_cache(stats *const s, const any_addr & mymac, const any_a
 	address_cache_store    = s->register_stat("address_cache_store");
 	address_cache_update   = s->register_stat("address_cache_cache_update");
 
-	address_entry_t me { uint64_t(-1), mymac };  // may never be purged
+	address_entry_t me { 0, mymac };  // must never be purged
 	cache.insert({ myip, me });
 
 	th2 = new std::thread(&address_cache::cache_cleaner, this);
@@ -81,7 +81,7 @@ void address_cache::cache_cleaner()
 		const std::lock_guard<std::shared_mutex> lock(cache_lock);
 
 		for(auto e : cache) {
-			if (e.second.ts >= now)  // some are meant to stay forever
+			if (e.second.ts == 0)  // some are meant to stay forever
 				continue;
 
 			uint64_t age = now - e.second.ts;
