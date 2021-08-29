@@ -28,7 +28,7 @@ public:
 	// using this for ARP packets does not make sense
 	virtual int get_max_packet_size() const override { return pdev->get_max_packet_size() - 26 /* 26 = size of ARP */; }
 
-	any_addr * query_cache(const any_addr & ip);
+	any_addr * query_cache(const any_addr & ip) override;
 
 	void operator()() override;
 };

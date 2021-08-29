@@ -383,7 +383,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	}
 }
 
-std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const codec_t schema, const short *const samples, const int n_samples)
+std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const codec_t & schema, const short *const samples, const int n_samples)
 {
 	int sample_size = 0;
 

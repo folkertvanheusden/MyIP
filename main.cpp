@@ -28,7 +28,7 @@
 #include "vnc.h"
 #include "utils.h"
 
-void free_handler(tcp_port_handler_t & tph)
+void free_handler(const tcp_port_handler_t & tph)
 {
 	delete tph.pd;
 }
