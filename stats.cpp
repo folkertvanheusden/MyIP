@@ -28,11 +28,11 @@ void stats_add_average(uint64_t *const p, const int val)
 #if defined(GCC_VERSION) && GCC_VERSION >= 40700
 	// there's a small window where the values are
 	// not in sync
-	__atomic_add_fetch(p + 8, 1, __ATOMIC_SEQ_CST);
+	__atomic_add_fetch(p + 1, 1, __ATOMIC_SEQ_CST);
 	__atomic_add_fetch(p, val, __ATOMIC_SEQ_CST);
 #else
 	// hope for the best
-	(*(p + 8))++;
+	(*(p + 1))++;
 	(*p) += val;
 #endif
 }
