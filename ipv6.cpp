@@ -47,8 +47,9 @@ void ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 
 	out[0] = 0x60;  // IPv6
 
+	// not sure if this should be stored per session
 	uint32_t flow_label = 0;
-	get_random((uint8_t *)&flow_label, sizeof flow_label); // FIXME onthouden in een ip/port versus flow_label tabel?
+	get_random((uint8_t *)&flow_label, sizeof flow_label);
 	out[1] = (flow_label >> 16) & 0x0f;
 	out[2] = flow_label >> 8;
 	out[3] = flow_label;
@@ -166,8 +167,6 @@ void ipv6::operator()()
 		const uint8_t *nh = &payload_header[40], *const eh = &payload_header[size - ip_size];
 		
 		while(eh - nh >= 8) {
-			// FIXME send "icmp6 Parameter Problem" for each unrecognized/unprocessed "next header"
-
 			protocol = nh[0];
 			nh += (nh[1] + 1) * 8;
 		}
