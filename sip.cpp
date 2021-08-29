@@ -206,9 +206,11 @@ void create_response_headers(const std::string & request, std::vector<std::strin
 		std::string::size_type lt = str_to.value().rfind('<');
 		std::string::size_type gt = str_to.value().rfind('>');
 
-		std::string contact = str_to.value().substr(lt, gt - lt + 1);
+		if (lt != std::string::npos && gt != std::string::npos) {
+			std::string contact = str_to.value().substr(lt, gt - lt + 1);
 
-		target->push_back(myformat("Contact: %s", contact.c_str()));
+			target->push_back(myformat("Contact: %s", contact.c_str()));
+		}
 	}
 
 	target->push_back("User-Agent: MyIP - https://github.com/folkertvanheusden/myip");
@@ -462,7 +464,8 @@ void sip::send_BYE(const any_addr & tgt_addr, const int tgt_port, const any_addr
 		std::string::size_type lt = str_to.value().rfind('<');
 		std::string::size_type gt = str_to.value().rfind('>');
 
-		number = str_to.value().substr(lt + 1, gt - lt - 1);
+		if (lt != std::string::npos && gt != std::string::npos)
+			number = str_to.value().substr(lt + 1, gt - lt - 1);
 	}
 
 	std::vector<std::string> hout;
