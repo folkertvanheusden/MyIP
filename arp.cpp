@@ -85,10 +85,14 @@ void arp::update_cache(const any_addr & mac, const any_addr & ip)
 
 	auto it = arp_cache.find(ip);
 
-	if (it == arp_cache.end())
+	if (it == arp_cache.end()) {
 		arp_cache.insert({ ip, mac });
-	else
+		stats_inc_counter(arp_cache_store);
+	}
+	else {
 		it->second = mac;
+		stats_inc_counter(arp_cache_update);
+	}
 }
 
 any_addr * arp::query_cache(const any_addr & ip)

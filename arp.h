@@ -18,6 +18,7 @@ private:
 
 	uint64_t *arp_requests { nullptr }, *arp_for_me { nullptr };
 	uint64_t *arp_cache_req { nullptr }, *arp_cache_hit { nullptr };
+        uint64_t *arp_cache_store { nullptr }, *arp_cache_update { nullptr };
 
 public:
 	arp(stats *const s, const any_addr & mymac, const any_addr & ip);
