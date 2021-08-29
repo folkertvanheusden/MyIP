@@ -9,10 +9,12 @@
 
 arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip) : mymac(mymac), myip(myip)
 {
-	arp_requests  = s->register_stat("arp_requests");
-	arp_for_me    = s->register_stat("arp_for_me");
-	arp_cache_req = s->register_stat("arp_cache_req");
-	arp_cache_hit = s->register_stat("arp_cache_hit");
+	arp_requests     = s->register_stat("arp_requests");
+	arp_for_me       = s->register_stat("arp_for_me");
+	arp_cache_req    = s->register_stat("arp_cache_req");
+	arp_cache_hit    = s->register_stat("arp_cache_hit");
+	arp_cache_store  = s->register_stat("arp_cache_store");
+	arp_cache_update = s->register_stat("arp_cache_update");
 
 	update_cache(mymac, myip);
 
