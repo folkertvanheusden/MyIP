@@ -55,6 +55,8 @@ void vnc_deinit()
 
 		delete frame_buffer.th;
 		frame_buffer.th = nullptr;
+
+		delete [] frame_buffer.buffer;
 	}
 }
 

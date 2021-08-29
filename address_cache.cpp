@@ -19,15 +19,15 @@ address_cache::address_cache(stats *const s, const any_addr & mymac, const any_a
 	address_entry_t me { 0, mymac };  // must never be purged
 	cache.insert({ myip, me });
 
-	th2 = new std::thread(&address_cache::cache_cleaner, this);
+	cleaner_th = new std::thread(&address_cache::cache_cleaner, this);
 }
 
 address_cache::~address_cache()
 {
-	stop_flag2 = true;
+	cleaner_stop_flag = true;
 
-	th2->join();
-	delete th2;
+	cleaner_th->join();
+	delete cleaner_th;
 }
 
 void address_cache::update_cache(const any_addr & mac, const any_addr & ip)
@@ -67,7 +67,7 @@ void address_cache::cache_cleaner()
 {
 	uint64_t prev = get_us();
 
-	while(!stop_flag2) {
+	while(!cleaner_stop_flag) {
 		myusleep(500000); // to allow quickly termination
 
 		uint64_t now = get_us();

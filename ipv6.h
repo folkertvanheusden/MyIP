@@ -30,6 +30,9 @@ private:
 	uint64_t *ipv6_n_tx { nullptr };
 	uint64_t *ipv6_tx_err { nullptr };
 
+	std::thread *ipv6_th { nullptr };
+	std::atomic_bool ipv6_stop_flag { false };
+
 public:
 	ipv6(stats *const s, ndp *const indp, const any_addr & myip);
 	virtual ~ipv6();

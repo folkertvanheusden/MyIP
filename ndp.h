@@ -15,7 +15,11 @@ typedef struct {
 
 class ndp : public protocol, public address_cache
 {
+private:
         uint64_t *ndp_cache_req { nullptr }, *ndp_cache_hit { nullptr };
+
+	std::thread *ndp_th { nullptr };
+	std::atomic_bool ndp_stop_flag { false };
 
 public:
 	ndp(stats *const s, const any_addr & mymac, const any_addr & ip6);

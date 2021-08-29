@@ -198,16 +198,16 @@ int main(int argc, char *argv[])
 
 	dev->stop();
 
-	delete a;
-	delete ndp_;
-	delete ipv6_instance;
-	delete ipv4_instance;
-	delete icmp6_;
-	delete icmp_;
-	delete u;
 	delete ntp_;
-	delete t;
+	delete u;
 	delete firewall;
+	delete icmp6_;
+	delete ipv6_instance;
+	delete ndp_;
+	delete icmp_;
+	delete t;
+	delete ipv4_instance;
+	delete a;
 	delete dev;
 
 	dolog(info, "THIS IS THE END\n");

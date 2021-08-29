@@ -24,14 +24,14 @@ ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : iarp(iarp),
 
 	assert(myip.get_len() == 4);
 
-	th = new std::thread(std::ref(*this));
+	ipv4_th = new std::thread(std::ref(*this));
 }
 
 ipv4::~ipv4()
 {
-	stop_flag = true;
-	th->join();
-	delete th;
+	ipv4_stop_flag = true;
+	ipv4_th->join();
+	delete ipv4_th;
 }
 
 void ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
@@ -113,15 +113,15 @@ void ipv4::operator()()
 {
 	set_thread_name("myip-ipv4");
 
-	while(!stop_flag) {
+	while(!ipv4_stop_flag) {
 		std::unique_lock<std::mutex> lck(pkts_lock);
 
 		using namespace std::chrono_literals;
 
-		while(pkts.empty() && !stop_flag)
+		while(pkts.empty() && !ipv4_stop_flag)
 			pkts_cv.wait_for(lck, 500ms);
 
-		if (pkts.empty() || stop_flag)
+		if (pkts.empty() || ipv4_stop_flag)
 			continue;
 
 		const packet *pkt = pkts.at(0);

@@ -69,6 +69,7 @@ tcp::~tcp()
 		delete p;
 
 	stop_flag = true;
+
 	th->join();
 	delete th;
 }

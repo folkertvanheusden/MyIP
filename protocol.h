@@ -17,9 +17,6 @@ class phys;
 class protocol
 {
 protected:
-	std::thread *th { nullptr };
-	std::atomic_bool stop_flag { false };
-
         std::mutex pkts_lock;
         std::condition_variable pkts_cv;
 	std::vector<const packet *> pkts;

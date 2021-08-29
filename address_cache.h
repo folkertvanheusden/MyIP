@@ -22,8 +22,8 @@ protected:
 	const any_addr mymac;
 	const any_addr myip;
 
-	std::atomic_bool stop_flag2 { false };
-	std::thread *th2 { nullptr };
+	std::atomic_bool cleaner_stop_flag { false };
+	std::thread *cleaner_th { nullptr };
 
 	uint64_t *address_cache_requests { nullptr }, *address_cache_for_me { nullptr };
 	uint64_t *address_cache_req { nullptr }, *address_cache_hit { nullptr };

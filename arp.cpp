@@ -12,29 +12,29 @@ arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip) : addres
 	arp_requests     = s->register_stat("arp_requests");
 	arp_for_me       = s->register_stat("arp_for_me");
 
-	th = new std::thread(std::ref(*this));
+	arp_th = new std::thread(std::ref(*this));
 }
 
 arp::~arp()
 {
-	stop_flag = true;
-	th->join();
-	delete th;
+	arp_stop_flag = true;
+	arp_th->join();
+	delete arp_th;
 }
 
 void arp::operator()()
 {
 	set_thread_name("myip-arp");
 
-	while(!stop_flag) {
+	while(!arp_stop_flag) {
 		std::unique_lock<std::mutex> lck(pkts_lock);
 
 		using namespace std::chrono_literals;
 
-		while(pkts.empty() && !stop_flag)
+		while(pkts.empty() && !arp_stop_flag)
 			pkts_cv.wait_for(lck, 500ms);
 
-		if (pkts.empty() || stop_flag)
+		if (pkts.empty() || arp_stop_flag)
 			continue;
 
 		const packet *pkt = pkts.at(0);

@@ -23,14 +23,14 @@ ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : indp(indp),
 
 	assert(myip.get_len() == 16);
 
-	th = new std::thread(std::ref(*this));
+	ipv6_th = new std::thread(std::ref(*this));
 }
 
 ipv6::~ipv6()
 {
-	stop_flag = true;
-	th->join();
-	delete th;
+	ipv6_stop_flag = true;
+	ipv6_th->join();
+	delete ipv6_th;
 }
 
 void ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
@@ -100,15 +100,15 @@ void ipv6::operator()()
 {
 	set_thread_name("myip-ipv6");
 
-	while(!stop_flag) {
+	while(!ipv6_stop_flag) {
 		std::unique_lock<std::mutex> lck(pkts_lock);
 
 		using namespace std::chrono_literals;
 
-		while(pkts.empty() && !stop_flag)
+		while(pkts.empty() && !ipv6_stop_flag)
 			pkts_cv.wait_for(lck, 500ms);
 
-		if (pkts.empty() || stop_flag)
+		if (pkts.empty() || ipv6_stop_flag)
 			continue;
 
 		const packet *pkt = pkts.at(0);

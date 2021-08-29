@@ -18,6 +18,9 @@ class arp : public protocol, public address_cache
 private:
 	uint64_t *arp_requests { nullptr }, *arp_for_me { nullptr };
 
+	std::thread *arp_th { nullptr };
+	std::atomic_bool arp_stop_flag { false };
+
 public:
 	arp(stats *const s, const any_addr & mymac, const any_addr & ip);
 	virtual ~arp();

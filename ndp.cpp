@@ -12,30 +12,30 @@ ndp::ndp(stats *const s, const any_addr & mymac, const any_addr & myip6) : addre
         ndp_cache_req = s->register_stat("ndp_cache_req");
         ndp_cache_hit = s->register_stat("ndp_cache_hit");
 
-	th2 = new std::thread(&ndp::cache_cleaner, this);
+	ndp_th = new std::thread(std::ref(*this));
 }
 
 ndp::~ndp()
 {
-	stop_flag = true;
+	ndp_stop_flag = true;
 
-	th->join();
-	delete th;
+	ndp_th->join();
+	delete ndp_th;
 }
 
 void ndp::operator()()
 {
 	set_thread_name("myip-ndp");
 
-	while(!stop_flag) {
+	while(!ndp_stop_flag) {
 		std::unique_lock<std::mutex> lck(pkts_lock);
 
 		using namespace std::chrono_literals;
 
-		while(pkts.empty() && !stop_flag)
+		while(pkts.empty() && !ndp_stop_flag)
 			pkts_cv.wait_for(lck, 500ms);
 
-		if (pkts.empty() || stop_flag)
+		if (pkts.empty() || ndp_stop_flag)
 			continue;
 
 		const packet *pkt = pkts.at(0);

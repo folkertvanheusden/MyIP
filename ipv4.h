@@ -1,5 +1,6 @@
 // (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
+#include <atomic>
 #include <map>
 #include <stdint.h>
 #include <string>
@@ -27,6 +28,9 @@ private:
 	uint64_t *ipv4_unk_prot { nullptr };
 	uint64_t *ipv4_n_tx { nullptr };
 	uint64_t *ipv4_tx_err { nullptr };
+
+	std::thread *ipv4_th { nullptr };
+	std::atomic_bool ipv4_stop_flag { false };
 
 	void send_ttl_exceeded(const packet *const pkt) const;
 
