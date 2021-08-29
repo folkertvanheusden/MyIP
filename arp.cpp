@@ -16,9 +16,12 @@ arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip) : mymac(
 	arp_cache_store  = s->register_stat("arp_cache_store");
 	arp_cache_update = s->register_stat("arp_cache_update");
 
-	update_cache(mymac, myip);
+	arp_entry_t me { uint64_t(-1), mymac };  // may never be purged
+	arp_cache.insert({ myip, me });
 
 	th = new std::thread(std::ref(*this));
+
+	th2 = new std::thread(&arp::cache_cleaner, this);
 }
 
 arp::~arp()
@@ -88,11 +91,11 @@ void arp::update_cache(const any_addr & mac, const any_addr & ip)
 	auto it = arp_cache.find(ip);
 
 	if (it == arp_cache.end()) {
-		arp_cache.insert({ ip, mac });
+		arp_cache.insert({ ip, { get_us(), mac } });
 		stats_inc_counter(arp_cache_store);
 	}
 	else {
-		it->second = mac;
+		it->second = { get_us(), mac };
 		stats_inc_counter(arp_cache_update);
 	}
 }
@@ -119,7 +122,7 @@ any_addr * arp::query_cache(const any_addr & ip)
 
 	stats_inc_counter(arp_cache_hit);
 
-	return new any_addr(it->second);
+	return new any_addr(it->second.addr);
 }
 
 void arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
@@ -132,4 +135,39 @@ void arp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, cons
 {
 	// for requests
 	assert(0);
+}
+
+void arp::cache_cleaner()
+{
+	uint64_t prev = get_us();
+
+	while(!stop_flag) {
+		myusleep(500000); // to allow quickly termination
+
+		uint64_t now = get_us();
+		if (now - prev < 30000000)
+			continue;
+
+		prev = now;
+
+		std::vector<any_addr> delete_;
+
+		const std::lock_guard<std::shared_mutex> lock(cache_lock);
+
+		for(auto e : arp_cache) {
+			if (e.second.ts >= now)  // some are meant to stay forever
+				continue;
+
+			uint64_t age = now - e.second.ts;
+
+			if (age >= 3600000000ll)  // older than an hour?
+				delete_.push_back(e.first);
+		}
+
+		for(auto e : delete_) {
+			dolog(debug, "ARP: forgetting %s\n", e.to_str().c_str());
+
+			arp_cache.erase(e);
+		}
+	}
 }

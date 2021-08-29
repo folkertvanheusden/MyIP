@@ -1,4 +1,4 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 #include <map>
 #include <shared_mutex>
@@ -7,18 +7,27 @@
 #include "protocol.h"
 #include "stats.h"
 
+typedef struct {
+	uint64_t ts;
+	any_addr addr;
+} arp_entry_t;
+
 class arp : public protocol
 {
 private:
 	std::shared_mutex cache_lock;
-	std::map<any_addr, any_addr> arp_cache;
+	std::map<any_addr, arp_entry_t> arp_cache;
 
 	const any_addr mymac;
 	const any_addr myip;
 
+	std::thread *th2;
+
 	uint64_t *arp_requests { nullptr }, *arp_for_me { nullptr };
 	uint64_t *arp_cache_req { nullptr }, *arp_cache_hit { nullptr };
         uint64_t *arp_cache_store { nullptr }, *arp_cache_update { nullptr };
+
+	void cache_cleaner();
 
 public:
 	arp(stats *const s, const any_addr & mymac, const any_addr & ip);
