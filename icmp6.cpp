@@ -65,6 +65,9 @@ void icmp6::operator()()
 		if (type == 128) {  // echo request (PING)
 			send_ping_reply(pkt);
 		}
+		else if (type == 133) {  // router soliciation
+			// can be ignored
+		}
 		else if (type == 135) {  // neighbor soliciation
 			send_packet_neighbor_advertisement(pkt->get_src_mac_addr(), pkt->get_src_addr());
 		}
