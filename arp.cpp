@@ -77,6 +77,8 @@ void arp::operator()()
 
 any_addr * arp::query_cache(const any_addr & ip)
 {
+	assert(ip.get_len() == 4);
+
 	// multicast
 	if (ip[0] >= 224 && ip[0] <= 239) {
 		stats_inc_counter(address_cache_hit);
