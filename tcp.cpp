@@ -84,6 +84,11 @@ void tcp::send_segment(const tcp_session_t *const ts, const uint64_t session_id,
 	dolog(debug, "TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str, rel_seqnr(ts, false, ack_to), my_seq_nr ? rel_seqnr(ts, true, *my_seq_nr) : -1, data_len);
 	free(flag_str);
 
+	if (!idev) {
+		dolog(debug, "TCP[%012" PRIx64 "]: Dropping packet, no physical device assigned (yet)\n", session_id);
+		return;
+	}
+
 	size_t temp_len = 20 + data_len;
 	uint8_t *temp = new uint8_t[temp_len];
 
@@ -250,8 +255,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			if (cur_session->state_me != tcp_fin_wait1)
 				flags |= 1 << 0; // FIN
 
-			if (idev)
-				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, flags, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+			send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, flags, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 
 			if (cur_session->state_me == tcp_established)
 				cur_session->state_me = tcp_fin_wait1;
@@ -373,7 +377,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	}
 
 	int data_len = size - header_size;
-	if (data_len > 0 && fail == false && cur_session) {
+	if (data_len > 0 && fail == false) {
 		dolog(debug, "TCP[%012" PRIx64 "]: packet len %d, header size: %d, data size: %d\n", id, size, header_size, data_len);
 
 		if (their_seq_nr >= cur_session->their_seq_nr) {
@@ -404,10 +408,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		delete_entry = true;
 
-		if (idev) {
-			dolog(info, "TCP[%012" PRIx64 "]: sending fail packet\n", id);
-			send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 2) | (1 << 4) /* RST, ACK */, their_seq_nr + 1, nullptr, nullptr, 0);
-		}
+		dolog(info, "TCP[%012" PRIx64 "]: sending fail packet\n", id);
+		send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 2) | (1 << 4) /* RST, ACK */, their_seq_nr + 1, nullptr, nullptr, 0);
 	}
 	else {
 		cur_session->last_pkt = get_us();
