@@ -128,6 +128,11 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 	auto pl = p->get_payload();
 
+	if (pl.second == 0) {
+		dolog(info, "SIP: empty packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
+		return;
+	}
+
 	std::string pl_str = std::string((const char *)pl.first, pl.second);
 
 	std::vector<std::string> *header_body = split(pl_str, "\r\n\r\n");
