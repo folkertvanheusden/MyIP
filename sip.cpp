@@ -1,4 +1,5 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+#include <math.h>
 #include <optional>
 #include <samplerate.h>
 #include <sndfile.h>
@@ -433,7 +434,7 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 
 		speex_encode_int(spx.state, input, &spx.bits);
 
-		int new_size = 12 + speex_bits_write(&spx.bits, (char *)&rtp_packet[12], size - 12);
+		size_t new_size = 12 + speex_bits_write(&spx.bits, (char *)&rtp_packet[12], size - 12);
 
 		delete [] input;
 
@@ -470,6 +471,60 @@ void sip::send_BYE(const any_addr & tgt_addr, const int tgt_port, const any_addr
 	std::string out = merge(hout, "\r\n") + "\r\n";
 
 	u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, (const uint8_t *)out.c_str(), out.size());
+}
+
+void sip::transmit_audio(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss, const short *const audio, const int n_audio, uint16_t *const seq_nr, uint32_t *const t, const uint32_t ssrc)
+{
+	int n_work = n_audio, offset = 0;
+
+	while(n_work > 0 && !stop_flag) {
+		int cur_n = 0;
+		int cur_n_before = std::min(n_work, ss->schema.frame_size);
+		std::pair<uint8_t *, int> rtpp;
+
+		if (samplerate != ss->schema.rate) {
+			short *resampled = nullptr;
+			resample(&audio[offset], samplerate, cur_n_before, &resampled, ss->schema.rate, &cur_n);
+
+			bool odd = cur_n & 1;
+			rtpp = create_rtp_packet(ssrc, *seq_nr, *t, ss->schema, &audio[offset], cur_n + odd);
+
+			delete [] resampled;
+		}
+		else {
+			bool odd = cur_n_before & 1;
+			rtpp = create_rtp_packet(ssrc, *seq_nr, *t, ss->schema, &audio[offset], cur_n_before + odd);
+
+			cur_n = cur_n_before;
+		}
+
+		offset += cur_n_before;
+		n_work -= cur_n_before;
+
+		(*t) += cur_n;
+
+		(*seq_nr)++;
+
+		if (rtpp.second) {
+			u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, rtpp.first, rtpp.second);
+
+			delete [] rtpp.first;
+		}
+
+		double sleep = 1000000.0 / (samplerate / double(cur_n_before));
+		myusleep(sleep);
+	}
+}
+
+void generate_beep(const double f, const double duration, const int samplerate, short **const beep, size_t *const beep_n)
+{
+	*beep_n = samplerate * duration;
+	*beep = new short[*beep_n];
+
+	double mul = 2.0 * M_PI * f;
+
+	for(size_t i=0; i<*beep_n; i++)
+		(*beep)[i] = 32767 * sin(mul * (i + i / double(*beep_n)));
 }
 
 void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss, void *const pd)
@@ -525,45 +580,15 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 	uint32_t ssrc;
 	get_random((uint8_t *)&ssrc, sizeof ssrc);
 
-	int n_work = n_samples, offset = 0;
+	transmit_audio(tgt_addr, tgt_port, src_addr, src_port, ss, samples, n_samples, &seq_nr, &t, ssrc);
 
-	while(n_work > 0 && !stop_flag) {
-		int cur_n = 0;
-		int cur_n_before = std::min(n_work, ss->schema.frame_size);
-		std::pair<uint8_t *, int> rtpp;
+	short *beep = nullptr;
+	size_t beep_n = 0;
+	generate_beep(825, 0.9, ss->schema.rate, &beep, &beep_n);
 
-		if (samplerate != ss->schema.rate) {
-			short *resampled = nullptr;
-			resample(&samples[offset], samplerate, cur_n_before, &resampled, ss->schema.rate, &cur_n);
+	transmit_audio(tgt_addr, tgt_port, src_addr, src_port, ss, beep, beep_n, &seq_nr, &t, ssrc);
 
-			bool odd = cur_n & 1;
-			rtpp = create_rtp_packet(ssrc, seq_nr, t, ss->schema, &samples[offset], cur_n + odd);
-
-			delete [] resampled;
-		}
-		else {
-			bool odd = cur_n_before & 1;
-			rtpp = create_rtp_packet(ssrc, seq_nr, t, ss->schema, &samples[offset], cur_n_before + odd);
-
-			cur_n = cur_n_before;
-		}
-
-		offset += cur_n_before;
-		n_work -= cur_n_before;
-
-		t += cur_n;
-
-		seq_nr++;
-
-		if (rtpp.second) {
-			u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, rtpp.first, rtpp.second);
-
-			delete [] rtpp.first;
-		}
-
-		double sleep = 1000000.0 / (samplerate / double(cur_n_before));
-		myusleep(sleep);
-	}
+	delete [] beep;
 
 	// in case the peer starts to send only after the recorded message
 	ss->latest_pkt = get_us();
