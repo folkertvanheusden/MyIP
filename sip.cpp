@@ -133,6 +133,8 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		return;
 	}
 
+	u->update_port_ts(dst_port);
+
 	std::string pl_str = std::string((const char *)pl.first, pl.second);
 
 	std::vector<std::string> *header_body = split(pl_str, "\r\n\r\n");
