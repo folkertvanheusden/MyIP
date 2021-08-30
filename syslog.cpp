@@ -9,19 +9,19 @@
 #include "utils.h"
 
 
-syslog::syslog(stats *const s, udp *const u) : u(u)
+syslog_srv::syslog_srv(stats *const s, udp *const u) : u(u)
 {
-	syslog_requests = s->register_stat("syslog_requests");
+	syslog_srv_requests = s->register_stat("syslog_srv_requests");
 }
 
-syslog::~syslog()
+syslog_srv::~syslog_srv()
 {
 	stop_flag = true;
 }
 
-void syslog::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
+void syslog_srv::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
 {
-	stats_inc_counter(syslog_requests);
+	stats_inc_counter(syslog_srv_requests);
 
 	auto pl = p->get_payload();
 
