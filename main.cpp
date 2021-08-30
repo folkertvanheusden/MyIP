@@ -22,6 +22,7 @@
 #include "sip.h"
 #include "udp.h"
 #include "ntp.h"
+#include "syslog.h"
 #include "tcp.h"
 #include "tcp_udp_fw.h"
 #include "http.h"
@@ -130,6 +131,9 @@ int main(int argc, char *argv[])
 
 	ntp *ntp_ = new ntp(&s, u, myip, upstream_ntp_server, true);
 	u->add_handler(123, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+	syslog *syslog_ = new syslog(&s, u);
+	u->add_handler(514, std::bind(&syslog::input, syslog_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"));
 

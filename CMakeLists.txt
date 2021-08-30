@@ -32,6 +32,7 @@ add_executable(myip
 	sip.cpp
 	stats.cpp
 	stats-utils.cpp
+	syslog.cpp
 	tcp.cpp
 	tcp_udp_fw.cpp
 	udp.cpp
