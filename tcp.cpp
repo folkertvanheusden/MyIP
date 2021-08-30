@@ -337,7 +337,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		stats_inc_counter(tcp_rst);
 	}
 
-	if (flag_ack && cur_session) {
+	if (flag_ack) {
 		int ack_n = ack_to - cur_session->my_seq_nr;
 
 		if (ack_n > 0 && size_t(ack_n) <= cur_session->unacked_size) {
