@@ -83,7 +83,7 @@ bool snmp::get_OID(const uint8_t *p, const size_t length, std::string *const oid
 	return true;
 }
 
-bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids_req)
+bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext)
 {
 	uint8_t type = 0, length = 0;
 
@@ -143,7 +143,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 		}
 
 		if (type == 0x30) {  // sequence
-			process_BER(pnt, length, oids_req);
+			process_BER(pnt, length, oids_req, is_getnext);
 			pnt += length;
 		}
 		else {
@@ -155,7 +155,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 	return true;
 }
 
-bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids_req)
+bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext)
 {
 	const uint8_t *pnt = p;
 
@@ -186,28 +186,41 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 			if (!get_OID(pnt, length, &oid_out))
 				return false;
 
-			oids_req->oids.push_back({ oid_out, 0 });
+			if (is_getnext) {
+				std::string oid_next = s->find_next_oid(oid_out);
+
+				if (oid_next.empty()) {
+					oids_req->err = 2;
+					oids_req->err_idx = 1;
+				}
+				else {
+					oids_req->oids.push_back(oid_next);
+				}
+			}
+			else {
+				oids_req->oids.push_back(oid_out);
+			}
 
 			pnt += length;
 		}
 		else if (type == 0x30) {  // sequence
-			if (!process_BER(pnt, length, oids_req))
+			if (!process_BER(pnt, length, oids_req, is_getnext))
 				return false;
 
 			pnt += length;
 		}
 		else if (type == 0xa0) {  // GetRequest PDU
-			if (!process_PDU(pnt, length, oids_req))
+			if (!process_PDU(pnt, length, oids_req, is_getnext))
 				return false;
 			pnt += length;
 		}
-		else if (type == 0xa2) {  // GetResponse PDU
-			if (!process_PDU(pnt, length, oids_req))
+		else if (type == 0xa1) {  // GetNextRequest PDU
+			if (!process_PDU(pnt, length, oids_req, true))
 				return false;
 			pnt += length;
 		}
 		else if (type == 0xa3) {  // SetRequest PDU
-			if (!process_PDU(pnt, length, oids_req))
+			if (!process_PDU(pnt, length, oids_req, is_getnext))
 				return false;
 			pnt += length;
 		}
@@ -234,9 +247,9 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 	GetResponsePDU->add(new snmp_integer(oids_req.req_id));  // ID
 
-	GetResponsePDU->add(new snmp_integer(0));  // error
+	GetResponsePDU->add(new snmp_integer(oids_req.err));  // error
 
-	GetResponsePDU->add(new snmp_integer(0));  // error index
+	GetResponsePDU->add(new snmp_integer(oids_req.err_idx));  // error index
 
 	snmp_sequence *varbind_list = new snmp_sequence();
 	GetResponsePDU->add(varbind_list);
@@ -245,11 +258,20 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 		snmp_sequence *varbind = new snmp_sequence();
 		varbind_list->add(varbind);
 
-		uint64_t v = s->find_by_oid(e);
-
 		varbind->add(new snmp_oid(e));
 
-		varbind->add(new snmp_integer(v));
+		uint64_t *vp = s->find_by_oid(e);
+
+		if (vp) {
+			dolog(debug, "SNMP: requested %s gives %lu\n", e.c_str(), *vp);
+
+			varbind->add(new snmp_integer(*vp));
+		}
+		else {
+			dolog(debug, "SNMP: requested %s not found, returning 0\n", e.c_str());
+
+			varbind->add(new snmp_integer(0));
+		}
 	}
 
 	auto rc = se->get_payload();
@@ -273,7 +295,7 @@ void snmp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip,
 
 	oid_req_t or_;
 
-	if (!process_BER(pl.first, pl.second, &or_)) {
+	if (!process_BER(pl.first, pl.second, &or_, false)) {
                 dolog(info, "SNMP: failed processing request\n");
 		stats_inc_counter(snmp_invalid);
                 return;

@@ -12,9 +12,13 @@
 class packet;
 class udp;
 
-typedef struct {
+typedef struct _oid_req_t_ {
 	std::vector<std::string> oids;
-	uint64_t req_id;
+	uint64_t req_id { 0 };
+	int err { 0 }, err_idx { 0 };
+
+	_oid_req_t_() {
+	}
 } oid_req_t;
 
 class snmp
@@ -25,11 +29,11 @@ private:
 
 	uint64_t *snmp_requests { nullptr }, *snmp_invalid { nullptr };
 
-	bool process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids_req);
+	bool process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext);
 	uint64_t get_INTEGER(const uint8_t *p, const size_t len);
 	bool get_OID(const uint8_t *p, const size_t length, std::string *const oid_out);
 	bool get_type_length(const uint8_t *p, const size_t len, uint8_t *const type, uint8_t *const length);
-	bool process_PDU(const uint8_t*, const size_t, oid_req_t *const oids_req);
+	bool process_PDU(const uint8_t*, const size_t, oid_req_t *const oids_req, const bool is_getnext);
 
 	void add_oid(uint8_t **const packet_out, size_t *const output_size, const std::string & oid);
 	void add_octet_string(uint8_t **const packet_out, size_t *const output_size, const char *const str);

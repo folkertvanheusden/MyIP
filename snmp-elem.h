@@ -45,7 +45,7 @@ public:
 
 	void add(const snmp_elem * const e);
 
-	uint8_t get_size() const;
+	uint8_t get_size() const override;
 
 	std::pair<uint8_t *, uint8_t> get_payload() const override;
 };
