@@ -6,7 +6,7 @@
 class snmp_elem
 {
 protected:
-	uint8_t len { 0 };
+	uint8_t len { 255 };
 
 public:
 	snmp_elem();

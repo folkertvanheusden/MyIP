@@ -25,13 +25,7 @@ snmp_integer::snmp_integer(const uint64_t v, const int len) : v(v)
 
 snmp_integer::snmp_integer(const uint64_t v)
 {
-	if (v <= 255)
-		this->v = v, len = 1;
-	else if (v <= 65535)
-		this->v = v, len = 2;
-	else if (v <= 16777215)
-		this->v = v, len = 3;
-	else if (v <= 0xffffffff)
+	if (v <= 0xffffffff)
 		this->v = v, len = 4;
 	else
 		this->v = v, len = 8;
@@ -135,6 +129,7 @@ snmp_octet_string::snmp_octet_string(const uint8_t *const v, const int len)
 {
 	this->v = (uint8_t *)malloc(len);
 	memcpy(this->v, v, len);
+	this->len = len;
 }
 
 snmp_octet_string::~snmp_octet_string()
