@@ -13,7 +13,7 @@
 
 ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : indp(indp), myip(myip)
 {
-	ip_n_pkt      = s->register_stat("ip_n_pkt");
+	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ipv6_n_pkt    = s->register_stat("ipv6_n_pkt");
 	ipv6_not_me   = s->register_stat("ipv6_not_me");
 	ipv6_ttl_ex   = s->register_stat("ipv6_ttl_ex");

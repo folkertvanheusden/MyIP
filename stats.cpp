@@ -70,7 +70,7 @@ stats::~stats()
 	shm_unlink(shm_name);
 }
 
-uint64_t * stats::register_stat(const std::string & name)
+uint64_t * stats::register_stat(const std::string & name, const std::string & oid)
 {
 	if (len + 40 > size) {
 		dolog(error, "stats: shm is full\n");
@@ -81,7 +81,7 @@ uint64_t * stats::register_stat(const std::string & name)
 
 	auto it = lut.find(name);
 	if (it != lut.end()) {
-		uint64_t *rc = it->second;
+		uint64_t *rc = it->second.p;
 		lock.unlock();
 
 		return rc;
@@ -100,8 +100,17 @@ uint64_t * stats::register_stat(const std::string & name)
 
 	len += 40;
 
-	auto rc = lut.insert(std::pair<std::string, uint64_t *>(name, reinterpret_cast<uint64_t *>(p_out)));
+	stats_t st;
+	st.p = reinterpret_cast<uint64_t *>(p_out);
+	st.oid = oid;
+
+	auto rc = lut.insert(std::pair<std::string, stats_t>(name, st));
 	assert(rc.second);
+
+	if (oid.empty() == false) {
+		auto rc2 = lut_oid.insert(std::pair<std::string, uint64_t *>(oid, st.p));
+		assert(rc2.second);
+	}
 
 	lock.unlock();
 
@@ -111,4 +120,18 @@ uint64_t * stats::register_stat(const std::string & name)
 std::string stats::to_json() const
 {
 	return stats_to_json(p, size);
+}
+
+uint64_t stats::find_by_oid(const std::string & oid)
+{
+	lock.lock();
+
+	auto rc = lut_oid.find(oid);
+
+	lock.unlock();
+
+	if (rc != lut_oid.end())
+		return *rc->second;
+
+	return -1;
 }

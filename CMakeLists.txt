@@ -30,6 +30,8 @@ add_executable(myip
 	phys.cpp
 	protocol.cpp
 	sip.cpp
+	snmp.cpp
+	snmp-elem.cpp
 	stats.cpp
 	stats-utils.cpp
 	syslog.cpp

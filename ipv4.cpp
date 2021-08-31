@@ -14,7 +14,7 @@
 
 ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : iarp(iarp), myip(myip)
 {
-	ip_n_pkt      = s->register_stat("ip_n_pkt");
+	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ipv4_n_pkt    = s->register_stat("ipv4_n_pkt");
 	ipv4_not_me   = s->register_stat("ipv4_not_me");
 	ipv4_ttl_ex   = s->register_stat("ipv4_ttl_ex");
