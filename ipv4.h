@@ -24,6 +24,8 @@ private:
 	uint64_t *ip_n_pkt { nullptr };
 	uint64_t *ip_n_disc { nullptr };
 	uint64_t *ip_n_del { nullptr };
+	uint64_t *ip_n_out_req { nullptr };
+	uint64_t *ip_n_out_disc { nullptr };
 	uint64_t *ipv4_n_pkt { nullptr };
 	uint64_t *ipv4_not_me { nullptr };
 	uint64_t *ipv4_ttl_ex { nullptr };

@@ -17,6 +17,8 @@ ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : iarp(iarp),
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
 	ip_n_del      = s->register_stat("ip_n_delivers", "1.3.6.1.2.1.4.9");
+	ip_n_out_req  = s->register_stat("ip_n_out_req", "1.3.6.1.2.1.4.10");
+	ip_n_out_disc = s->register_stat("ip_n_out_req", "1.3.6.1.2.1.4.11");
 	ipv4_n_pkt    = s->register_stat("ipv4_n_pkt");
 	ipv4_not_me   = s->register_stat("ipv4_not_me");
 	ipv4_ttl_ex   = s->register_stat("ipv4_ttl_ex");
@@ -39,9 +41,11 @@ ipv4::~ipv4()
 void ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv4_n_tx);
+	stats_inc_counter(ip_n_out_req);
 
 	if (!pdev) {
 		stats_inc_counter(ipv4_tx_err);
+		stats_inc_counter(ip_n_out_disc);
 		return;
 	}
 
@@ -87,6 +91,7 @@ void ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 		dolog(warning, "IPv4: cannot find src IP (%s) in ARP table\n", q_addr.to_str().c_str());
 		delete [] out;
 		stats_inc_counter(ipv4_tx_err);
+		stats_inc_counter(ip_n_out_disc);
 		return;
 	}
 
@@ -103,6 +108,7 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	if (!dst_mac) {
 		dolog(warning, "IPv4: cannot find dst IP (%s) in ARP table\n", dst_ip.to_str().c_str());
 		stats_inc_counter(ipv4_tx_err);
+		stats_inc_counter(ip_n_out_disc);
 		return;
 	}
 
