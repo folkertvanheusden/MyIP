@@ -59,13 +59,9 @@ bool snmp::get_OID(const uint8_t *p, const size_t length, std::string *const oid
 			v |= p[i];
 
 			if (i == 0 && v == 43)
-				*oid_out += "1.3.";
-			else {
-				*oid_out += myformat("%d", v);
-
-				if (i < length - 1)
-					*oid_out += ".";
-			}
+				*oid_out += "1.3";
+			else
+				*oid_out += myformat(".%d", v);
 
 			v = 0;
 		}
