@@ -25,7 +25,7 @@ uint64_t snmp::get_INTEGER(const uint8_t *p, const size_t length)
 	uint64_t v = 0;
 
 	if (length > 8)
-		dolog(info, "SNMP: INTEGER truncated (%d bytes)", length);
+		dolog(info, "SNMP: INTEGER truncated (%zu bytes)", length);
 
 	for(size_t i=0; i<length; i++) {
 		v <<= 8;
