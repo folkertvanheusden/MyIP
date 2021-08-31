@@ -14,6 +14,8 @@
 ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : indp(indp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
+	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
+	ip_n_del      = s->register_stat("ip_n_delivers", "1.3.6.1.2.1.4.9");
 	ipv6_n_pkt    = s->register_stat("ipv6_n_pkt");
 	ipv6_not_me   = s->register_stat("ipv6_not_me");
 	ipv6_ttl_ex   = s->register_stat("ipv6_ttl_ex");
@@ -116,16 +118,17 @@ void ipv6::operator()()
 
 		lck.unlock();
 
+		stats_inc_counter(ip_n_pkt);
+
 		const uint8_t *const p = pkt->get_data();
 		int size = pkt->get_size();
 
 		if (size < 40) {
 			dolog(info, "IPv6: not an IPv6 packet (size: %d)\n", size);
+			stats_inc_counter(ip_n_disc);
 			delete pkt;
 			continue;
 		}
-
-		stats_inc_counter(ip_n_pkt);
 
 		const uint8_t *const payload_header = &p[0];
 
@@ -134,6 +137,7 @@ void ipv6::operator()()
 		uint8_t version = payload_header[0] >> 4;
 		if (version != 0x06) {
 			dolog(info, "IPv6[%04x]: not an IPv6 packet (version: %d)\n", flow_label, version);
+			stats_inc_counter(ip_n_disc);
 			delete pkt;
 			continue;
 		}
@@ -151,6 +155,7 @@ void ipv6::operator()()
 			dolog(info, "IPv6[%04x]: packet not for me (=%s)\n", flow_label, myip.to_str().c_str());
 			delete pkt;
 			stats_inc_counter(ipv6_not_me);
+			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
@@ -178,6 +183,7 @@ void ipv6::operator()()
 		if (ip_size > size) {
 			dolog(info, "IPv6[%04x] size (%d) > Ethernet size (%d)\n", flow_label, ip_size, size);
 			delete pkt;
+			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
@@ -191,8 +197,9 @@ void ipv6::operator()()
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
 			dolog(info, "IPv6[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", flow_label, protocol, size);
-			stats_inc_counter(ipv6_unk_prot);
 			delete pkt;
+			stats_inc_counter(ipv6_unk_prot);
+			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
@@ -201,6 +208,8 @@ void ipv6::operator()()
 		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
 
 		it->second->queue_packet(ip_p);
+
+		stats_inc_counter(ip_n_del);
 
 		delete pkt;
 	}
