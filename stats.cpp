@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <cstring>
 #include <fcntl.h>
+#include <iterator>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -70,7 +71,28 @@ stats::~stats()
 	shm_unlink(shm_name);
 }
 
-uint64_t * stats::register_stat(const std::string & name)
+void walk_tree(const std::map<std::string, oid_t> & tree, const std::string & parent)
+{
+	for(auto k : tree) {
+		std::string child = parent + "." + k.first;
+
+		fprintf(stderr, " \"%s\" [shape=circle];\n", child.c_str());
+
+		fprintf(stderr, " \"%s\" -> \"%s\";\n", parent.c_str(), child.c_str());
+
+		walk_tree(k.second.children, k.second.s.oid);
+	}
+}
+
+void dump_tree(const std::map<std::string, oid_t> & tree)
+{
+	fprintf(stderr, "digraph test {\n");
+	fprintf(stderr, " top [shape=circle];\n");
+	walk_tree(tree, "top");
+	fprintf(stderr, "}\n");
+}
+
+uint64_t * stats::register_stat(const std::string & name, const std::string & oid)
 {
 	if (len + 40 > size) {
 		dolog(error, "stats: shm is full\n");
@@ -81,7 +103,7 @@ uint64_t * stats::register_stat(const std::string & name)
 
 	auto it = lut.find(name);
 	if (it != lut.end()) {
-		uint64_t *rc = it->second;
+		uint64_t *rc = it->second.p;
 		lock.unlock();
 
 		return rc;
@@ -100,8 +122,49 @@ uint64_t * stats::register_stat(const std::string & name)
 
 	len += 40;
 
-	auto rc = lut.insert(std::pair<std::string, uint64_t *>(name, reinterpret_cast<uint64_t *>(p_out)));
+	stats_t st;
+	st.p = reinterpret_cast<uint64_t *>(p_out);
+	st.oid = oid;
+
+	auto rc = lut.insert(std::pair<std::string, stats_t>(name, st));
 	assert(rc.second);
+
+	if (oid.empty() == false) {
+		std::map<std::string, oid_t> *p_lut = &lut_oid;
+
+		std::vector<std::string> *parts = split(oid, ".");
+
+		std::string cur_oid;
+
+		for(size_t i=0; i<parts->size(); i++) {
+			auto it = p_lut->find(parts->at(i));
+
+			if (cur_oid.empty() == false)
+				cur_oid += ".";
+
+			cur_oid += parts->at(i);
+
+			if (it == p_lut->end()) {
+				oid_t o;
+				o.s.oid = cur_oid;
+				o.index = atoi(parts->at(i).c_str());
+
+				auto rc = p_lut->insert(std::pair<std::string, oid_t>(parts->at(i), o));
+
+				it = rc.first;
+			}
+
+			if (i == parts->size() - 1) {
+				it->second.s = st;
+				it->second.index = atoi(parts->at(i).c_str());
+			}
+			else {
+				p_lut = &it->second.children;
+			}
+		}
+
+		delete parts;
+	}
 
 	lock.unlock();
 
@@ -111,4 +174,95 @@ uint64_t * stats::register_stat(const std::string & name)
 std::string stats::to_json() const
 {
 	return stats_to_json(p, size);
+}
+
+uint64_t * stats::find_by_oid(const std::string & oid)
+{
+	uint64_t *rc = nullptr;
+
+	lock.lock();
+
+	std::map<std::string, oid_t> *p_lut = &lut_oid;
+
+	std::vector<std::string> *parts = split(oid, ".");
+
+	for(size_t i=0; i<parts->size(); i++) {
+		auto it = p_lut->find(parts->at(i));
+
+		if (it == p_lut->end())
+			break;
+
+		if (i == parts->size() - 1)
+			rc = it->second.s.p;
+		else
+			p_lut = &it->second.children;
+	}
+
+	delete parts;
+
+	lock.unlock();
+
+	return rc;
+}
+
+std::string get_sibling(std::map<std::string, oid_t> & m, const int who)
+{
+	if (m.empty())
+		return "";
+
+	struct int_cmp {
+		bool operator()(const std::pair<std::string, oid_t> & lhs, const std::pair<std::string, oid_t> & rhs) {
+			return lhs.second.index < rhs.second.index;
+		}
+	};
+
+	std::vector<std::pair<std::string, oid_t> > temp(m.begin(), m.end());
+	std::stable_sort(temp.begin(), temp.end(), int_cmp());
+
+	for(size_t i=0; i<temp.size(); i++) {
+		if (temp.at(i).second.index > who)
+			return temp.at(i).second.s.oid;
+	}
+
+	return "";
+}
+
+std::string stats::find_next_oid(const std::string & oid)
+{
+	std::string out;
+
+	lock.lock();
+
+//	dump_tree(lut_oid);
+
+	std::map<std::string, oid_t> *p_lut = &lut_oid;
+
+	std::vector<std::string> *parts = split(oid, ".");
+
+	for(size_t i=0; i<parts->size(); i++) {
+		auto it = p_lut->find(parts->at(i));
+
+		if (it == p_lut->end())
+			break;
+
+		if (i == parts->size() - 1) {
+			out = get_sibling(*p_lut, atoi(parts->at(i).c_str()));
+
+			if (out.empty() == true) {
+				p_lut = &it->second.children;
+
+				out = get_sibling(*p_lut, -1);
+			}
+
+			break;
+		}
+
+		p_lut = &it->second.children;
+	}
+
+	delete parts;
+
+	lock.unlock();
+
+	return out;
 }

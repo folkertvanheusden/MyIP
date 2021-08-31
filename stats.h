@@ -8,6 +8,20 @@
 void stats_inc_counter(uint64_t *const p);
 void stats_add_average(uint64_t *const p, const int val);
 
+typedef struct _stats_t_{
+	uint64_t *p { nullptr };
+	std::string oid;
+
+	_stats_t_() {
+	}
+} stats_t;
+
+typedef struct _oid_t_ {
+	stats_t s;
+	int index;
+	std::map<std::string, _oid_t_> children;
+} oid_t;
+
 class stats
 {
 private:
@@ -16,14 +30,20 @@ private:
 	uint8_t *p { nullptr };
 	int len { 0 };
 
-	std::map<std::string, uint64_t *> lut;
+	std::map<std::string, stats_t> lut;
+
+	std::map<std::string, oid_t> lut_oid;
+
 	std::mutex lock;
 
 public:
 	stats(const int size);
 	virtual ~stats();
 
-	uint64_t * register_stat(const std::string & name);
+	uint64_t * register_stat(const std::string & name, const std::string & oid = "");
+
+	uint64_t * find_by_oid(const std::string & oid);
+	std::string find_next_oid(const std::string & oid);
 
 	std::string to_json() const;
 };

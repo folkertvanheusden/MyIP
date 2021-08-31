@@ -14,7 +14,11 @@
 
 ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : iarp(iarp), myip(myip)
 {
-	ip_n_pkt      = s->register_stat("ip_n_pkt");
+	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
+	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
+	ip_n_del      = s->register_stat("ip_n_delivers", "1.3.6.1.2.1.4.9");
+	ip_n_out_req  = s->register_stat("ip_n_out_req", "1.3.6.1.2.1.4.10");
+	ip_n_out_disc = s->register_stat("ip_n_out_req", "1.3.6.1.2.1.4.11");
 	ipv4_n_pkt    = s->register_stat("ipv4_n_pkt");
 	ipv4_not_me   = s->register_stat("ipv4_not_me");
 	ipv4_ttl_ex   = s->register_stat("ipv4_ttl_ex");
@@ -37,9 +41,11 @@ ipv4::~ipv4()
 void ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv4_n_tx);
+	stats_inc_counter(ip_n_out_req);
 
 	if (!pdev) {
 		stats_inc_counter(ipv4_tx_err);
+		stats_inc_counter(ip_n_out_disc);
 		return;
 	}
 
@@ -85,6 +91,7 @@ void ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 		dolog(warning, "IPv4: cannot find src IP (%s) in ARP table\n", q_addr.to_str().c_str());
 		delete [] out;
 		stats_inc_counter(ipv4_tx_err);
+		stats_inc_counter(ip_n_out_disc);
 		return;
 	}
 
@@ -101,6 +108,7 @@ void ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	if (!dst_mac) {
 		dolog(warning, "IPv4: cannot find dst IP (%s) in ARP table\n", dst_ip.to_str().c_str());
 		stats_inc_counter(ipv4_tx_err);
+		stats_inc_counter(ip_n_out_disc);
 		return;
 	}
 
@@ -146,14 +154,15 @@ void ipv4::operator()()
 
 		const uint16_t id = (payload_header[4] << 8) | payload_header[5];
 
+		stats_inc_counter(ipv4_n_pkt);
+
 		uint8_t version = payload_header[0] >> 4;
 		if (version != 0x04) {
-			dolog(info, "IPv4[%04x]: not an IPv4 packet (version: %d)\n", id, version);
 			delete pkt;
+			stats_inc_counter(ip_n_disc);
+			dolog(info, "IPv4[%04x]: not an IPv4 packet (version: %d)\n", id, version);
 			continue;
 		}
-
-		stats_inc_counter(ipv4_n_pkt);
 
 		any_addr pkt_dst(&payload_header[16], 4);
 		any_addr pkt_src(&payload_header[12], 4);
@@ -166,6 +175,7 @@ void ipv4::operator()()
 
 		if (pkt_dst != myip) {
 			delete pkt;
+			stats_inc_counter(ip_n_disc);
 			stats_inc_counter(ipv4_not_me);
 			continue;
 		}
@@ -175,8 +185,9 @@ void ipv4::operator()()
 		dolog(debug, "IPv4[%04x]: total packet size: %d, IP header says: %d, header size: %d\n", id, size, ip_size, header_size);
 
 		if (ip_size > size) {
-			dolog(info, "IPv4[%04x] size (%d) > Ethernet size (%d)\n", id, ip_size, size);
 			delete pkt;
+			dolog(info, "IPv4[%04x] size (%d) > Ethernet size (%d)\n", id, ip_size, size);
+			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
@@ -184,8 +195,9 @@ void ipv4::operator()()
 		size = ip_size;
 
 		if (header_size > size) {
-			dolog(info, "IPv4[%04x] Header size (%d) > size (%d)\n", id, header_size, size);
 			delete pkt;
+			dolog(info, "IPv4[%04x] Header size (%d) > size (%d)\n", id, header_size, size);
+			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
@@ -195,9 +207,10 @@ void ipv4::operator()()
 
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
+			delete pkt;
 			dolog(info, "IPv4[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", id, protocol, size);
 			stats_inc_counter(ipv4_unk_prot);
-			delete pkt;
+			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
@@ -206,17 +219,20 @@ void ipv4::operator()()
 		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
 
 		if (payload_header[8] <= 1) { // check TTL
-			dolog(debug, "IPv4[%04x]: TTL exceeded\n", id);
 			send_ttl_exceeded(ip_p);
-			stats_inc_counter(ipv4_ttl_ex);
 			delete ip_p;
 			delete pkt;
+			dolog(debug, "IPv4[%04x]: TTL exceeded\n", id);
+			stats_inc_counter(ipv4_ttl_ex);
+			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
 		dolog(debug, "IPv4[%04x]: queing packet protocol %02x and size %d\n", id, protocol, payload_size);
 
 		it->second->queue_packet(ip_p);
+
+		stats_inc_counter(ip_n_del);
 
 		delete pkt;
 	}

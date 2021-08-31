@@ -13,15 +13,12 @@ class udp;
 class syslog_srv
 {
 private:
-	udp *const u;
-
-	std::thread *th { nullptr };
 	std::atomic_bool stop_flag { false };
 
 	uint64_t *syslog_srv_requests { nullptr };
 
 public:
-	syslog_srv(stats *const s, udp *const u);
+	syslog_srv(stats *const s);
 	syslog_srv(const syslog_srv &) = delete;
 	virtual ~syslog_srv();
 

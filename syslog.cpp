@@ -9,7 +9,7 @@
 #include "utils.h"
 
 
-syslog_srv::syslog_srv(stats *const s, udp *const u) : u(u)
+syslog_srv::syslog_srv(stats *const s)
 {
 	syslog_srv_requests = s->register_stat("syslog_srv_requests");
 }
