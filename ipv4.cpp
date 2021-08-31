@@ -56,18 +56,14 @@ void ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	out[1] = header_template ? header_template[1] : 0; // qos, ecn
 	out[2] = out_size >> 8;
 	out[3] = out_size;
-	if (header_template) {
-		out[4] = header_template[4]; // identification
-		out[5] = header_template[5]; // identification
-	}
-	else {
-		out[4] = out[5] = 0; // identification
-	}
+
+	out[4] = out[5] = 0; // identification
 
 	dolog(debug, "IPv4[%04x]: transmit packet %s -> %s\n", (out[4] << 8) | out[5], src_ip.to_str().c_str(), dst_ip.to_str().c_str());
 
-	out[6] = out[7] = 0; // flags & fragment offset
-	out[8] = header_template ? header_template[8] : 255; // time to live
+	out[6] = 0x40;
+	out[7] = 0; // flags (DF) & fragment offset
+	out[8] = 64; // time to live
 	out[9] = protocol;
 	out[10] = out[11] = 0; // checksum
 
