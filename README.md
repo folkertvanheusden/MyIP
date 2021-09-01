@@ -12,7 +12,7 @@ Linux and BSD, see https://en.wikipedia.org/wiki/TUN/TAP ).
 
 how to build
 ------------
-Make sure you have "libiniparser-dev", "libspeex-dev", "libsamplerate0-dev" and "libsndfile1-dev" installed. Then:
+Make sure you have "libncurses-dev", "libiniparser-dev", "libspeex-dev", "libsamplerate0-dev" and "libsndfile1-dev" installed. Then:
 
 * mkdir build
 * cd build

@@ -58,7 +58,7 @@ void icmp::operator()()
 		stats_inc_counter(icmp_req_ping);
 
 		const any_addr src_ip = pkt->get_src_addr();
-		dolog(debug, "ICMP: request by %s", src_ip.to_str().c_str());
+		dolog(debug, "ICMP: request by %s\n", src_ip.to_str().c_str());
 
 		uint8_t *reply = duplicate(p, size);
 
