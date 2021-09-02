@@ -233,7 +233,7 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 {
 	snmp_sequence *se = new snmp_sequence();
 
-	se->add(new snmp_integer(0));  // version
+	se->add(new snmp_integer(1));  // version 2c
 
 	se->add(new snmp_octet_string((const uint8_t *)"public", 6));  // community string
 
@@ -263,7 +263,7 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 			varbind->add(new snmp_integer(*vp));
 		}
-		else {
+		else {  // FIXME snmp_null?
 			dolog(debug, "SNMP: requested %s not found, returning 0\n", e.c_str());
 
 			varbind->add(new snmp_integer(0));
