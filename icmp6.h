@@ -5,9 +5,10 @@
 
 #include "any_addr.h"
 #include "ip_protocol.h"
+#include "icmp.h"
 #include "stats.h"
 
-class icmp6 : public ip_protocol
+class icmp6 : public icmp
 {
 private:
 	const any_addr & my_mac;
@@ -30,6 +31,8 @@ public:
 	void send_packet_router_soliciation() const;
 	void send_packet_neighbor_advertisement(const any_addr & peer_mac, const any_addr & peer_ip) const;
 	void send_ping_reply(const packet *const pkt) const;
+
+	void send_destination_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const p) const override;
 
 	virtual void operator()() override;
 

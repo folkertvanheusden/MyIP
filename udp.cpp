@@ -59,7 +59,7 @@ void udp::operator()()
 
 		if (it == callbacks.end()) {
 			if (icmp_)
-				icmp_->send_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 3, 3, pkt);
+				icmp_->send_destination_unreachable(pkt->get_src_addr(), pkt->get_dst_addr(), pkt);
 
 			stats_inc_counter(udp_refused);
 

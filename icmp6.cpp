@@ -8,7 +8,7 @@
 #include "ipv6.h"
 #include "utils.h"
 
-icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip) : my_mac(my_mac), my_ip(my_ip)
+icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip) : icmp(s), my_mac(my_mac), my_ip(my_ip)
 {
 	icmp6_requests = s->register_stat("icmp6_requests");
 	icmp6_transmit = s->register_stat("icmp6_transmit");
@@ -17,23 +17,15 @@ icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip) : 
 	constexpr const char rs_addr[] = "FF02:0000:0000:0000:000:0000:0000:0002";
 	all_router_multicast_addr = parse_address(rs_addr, 16, ":", 16);
 
-	th = new std::thread(std::ref(*this));
-
 	th2 = new std::thread(&icmp6::router_solicitation, this);
 }
 
 icmp6::~icmp6()
 {
-	for(auto p : pkts)
-		delete p;
-
 	stop_flag = true;
 
 	th2->join();
 	delete th2;
-
-	th->join();
-	delete th;
 }
 
 void icmp6::operator()()
@@ -193,4 +185,9 @@ void icmp6::router_solicitation()
 			cnt = 0;
 		}
 	}
+}
+
+void icmp6::send_destination_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const pkt) const
+{
+	send_packet(&pkt->get_src_mac_addr(), pkt->get_src_addr(), my_ip, 1, 4, 0, nullptr, 0);
 }

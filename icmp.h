@@ -17,5 +17,7 @@ public:
 
 	void send_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const packet *const p) const;
 
+	virtual void send_destination_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const p) const;
+
 	virtual void operator()() override;
 };

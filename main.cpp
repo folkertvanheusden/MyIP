@@ -140,7 +140,6 @@ int main(int argc, char *argv[])
 	u->add_handler(161, std::bind(&snmp::input, snmp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"));
-
 	u->add_handler(5060, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 	// something that silently drops packet for a port
@@ -171,13 +170,14 @@ int main(int argc, char *argv[])
 	tcp_port_handler_t vnc_handler6 = vnc_get_handler(&s);
 	t6->add_handler(5900, vnc_handler6);
 
-	/*
 	udp *u6 = new udp(&s, icmp6_);
 	ipv6_instance->register_protocol(0x11, u6);
 
-	sip *sip6_ = new sip(&s, u6, iniparser_getstring(ini, "cfg:sample", "test.wav"));
-	u6->add_handler(5060, std::bind(&sip::input, sip6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
-	*/
+	sip *sip6_ = new sip(&s, u6, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"));
+	u6->add_handler(5060, std::bind(&sip::input, sip6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+	snmp *snmp6_ = new snmp(&s, u6);
+	u6->add_handler(161, std::bind(&snmp::input, snmp6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 	/* **** */
 
 	dolog(debug, "*** STARTED ***\n");
