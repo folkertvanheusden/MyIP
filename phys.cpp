@@ -45,6 +45,12 @@ phys::phys(stats *const s, const std::string & dev_name)
 		exit(1);
 	}
 
+	if (ioctl(fd, TUNSETNOCSUM, 1) == -1) {
+		dolog(error, "ioctl TUNSETNOCSUM: %s", strerror(errno));
+		close(fd);
+		exit(1);
+	}
+
 	phys_recv_frame = s->register_stat("phys_recv_frame");
 	phys_invl_frame = s->register_stat("phys_invl_frame");
 	phys_ign_frame = s->register_stat("phys_ign_frame");
