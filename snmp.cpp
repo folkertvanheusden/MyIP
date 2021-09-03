@@ -81,45 +81,45 @@ bool snmp::get_OID(const uint8_t *p, const size_t length, std::string *const oid
 
 bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext)
 {
-	uint8_t type = 0, length = 0;
+	uint8_t pdu_type = 0, pdu_length = 0;
 
 	// ID
-	if (!get_type_length(p, len, &type, &length))
+	if (!get_type_length(p, len, &pdu_type, &pdu_length))
 		return false;
 
-	if (type != 0x02) // expecting an integer here)
+	if (pdu_type != 0x02) // expecting an integer here)
 		return false;
 
 	p += 2;
 
-	oids_req->req_id = get_INTEGER(p, length);
-	p += length;
+	oids_req->req_id = get_INTEGER(p, pdu_length);
+	p += pdu_length;
 
 	// error
-	if (!get_type_length(p, len, &type, &length))
+	if (!get_type_length(p, len, &pdu_type, &pdu_length))
 		return false;
 
-	if (type != 0x02) // expecting an integer here)
+	if (pdu_type != 0x02) // expecting an integer here)
 		return false;
 
 	p += 2;
 
-	uint64_t error = get_INTEGER(p, length);
+	uint64_t error = get_INTEGER(p, pdu_length);
 	(void)error;
-	p += length;
+	p += pdu_length;
 
 	// error index
-	if (!get_type_length(p, len, &type, &length))
+	if (!get_type_length(p, len, &pdu_type, &pdu_length))
 		return false;
 
-	if (type != 0x02) // expecting an integer here)
+	if (pdu_type != 0x02) // expecting an integer here)
 		return false;
 
 	p += 2;
 
-	uint64_t error_index = get_INTEGER(p, length);
+	uint64_t error_index = get_INTEGER(p, pdu_length);
 	(void)error_index;
-	p += length;
+	p += pdu_length;
 
 	// varbind list sequence
 	uint8_t type_vb_list = *p++;
@@ -130,20 +130,20 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 	const uint8_t *pnt = p;
 
 	while(pnt < &p[len_vb_list]) {
-		uint8_t type = *pnt++;
-		uint8_t length = *pnt++;
+		uint8_t seq_type = *pnt++;
+		uint8_t seq_length = *pnt++;
 
-		if (&pnt[length] > &p[len_vb_list]) {
+		if (&pnt[seq_length] > &p[len_vb_list]) {
 			dolog(warning, "SNMP: length field out of bounds\n");
 			return false;
 		}
 
-		if (type == 0x30) {  // sequence
-			process_BER(pnt, length, oids_req, is_getnext, 0);
-			pnt += length;
+		if (seq_type == 0x30) {  // sequence
+			process_BER(pnt, seq_length, oids_req, is_getnext, 0);
+			pnt += seq_length;
 		}
 		else {
-			dolog(warning, "SNMP: unexpected/invalid type %02x\n", type);
+			dolog(warning, "SNMP: unexpected/invalid type %02x\n", seq_type);
 			return false;
 		}
 	}
