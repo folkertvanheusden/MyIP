@@ -30,6 +30,17 @@
 #include "vnc.h"
 #include "utils.h"
 
+void run(const std::string & what)
+{
+	pid_t pid = fork();
+
+	if (pid == 0)
+		exit(system(what.c_str()));
+
+	else if (pid == -1)
+		dolog(error, "Failed invoking \"%s\"", what.c_str());
+}
+
 void free_handler(const tcp_port_handler_t & tph)
 {
 	delete tph.pd;
@@ -179,6 +190,10 @@ int main(int argc, char *argv[])
 	snmp *snmp6_ = new snmp(&s, u6);
 	u6->add_handler(161, std::bind(&snmp::input, snmp6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 	/* **** */
+
+	std::string run_at_started = iniparser_getstring(ini, "cfg:ifup", "");
+	if (run_at_started.empty() == false)
+		run(run_at_started);
 
 	dolog(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
