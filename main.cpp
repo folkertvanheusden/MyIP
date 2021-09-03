@@ -213,6 +213,10 @@ int main(int argc, char *argv[])
 	dolog(info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating\n");
 
+	std::string run_at_shutdown = iniparser_getstring(ini, "cfg:ifdown", "");
+	if (run_at_shutdown.empty() == false)
+		run(run_at_shutdown);
+
 	free_handler(http_handler6);
 	free_handler(http_handler);
 
