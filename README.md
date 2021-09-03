@@ -55,6 +55,8 @@ demo
 ----
 See http://myip.vanheusden.com/
 
+Use myip6.vanheusden.com for IPv6 access.
+
 It also runs an NTP, SIP, SNMP and VNC server.
 
 copyright

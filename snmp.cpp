@@ -139,7 +139,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 		}
 
 		if (type == 0x30) {  // sequence
-			process_BER(pnt, length, oids_req, is_getnext);
+			process_BER(pnt, length, oids_req, is_getnext, 0);
 			pnt += length;
 		}
 		else {
@@ -151,9 +151,11 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 	return true;
 }
 
-bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext)
+bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext, const int is_top)
 {
 	const uint8_t *pnt = p;
+	bool first_integer = true;
+	bool first_octet_str = true;
 
 	while(pnt < &p[len]) {
 		uint8_t type = *pnt++;
@@ -165,10 +167,20 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 		}
 
 		if (type == 0x02) {  // integer
+			if (is_top && first_integer)
+				oids_req->version = get_INTEGER(pnt, length);
+
+			first_integer = false;
+
 			pnt += length;
 		}
 		else if (type == 0x04) {  // octet string
 			std::string v((const char *)pnt, length);
+
+			if (is_top && first_octet_str)
+				oids_req->community = v;
+
+			first_octet_str = false;
 
 			pnt += length;
 		}
@@ -200,7 +212,7 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 			pnt += length;
 		}
 		else if (type == 0x30) {  // sequence
-			if (!process_BER(pnt, length, oids_req, is_getnext))
+			if (!process_BER(pnt, length, oids_req, is_getnext, is_top - 1))
 				return false;
 
 			pnt += length;
@@ -233,9 +245,13 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 {
 	snmp_sequence *se = new snmp_sequence();
 
-	se->add(new snmp_integer(1));  // version 2c
+	se->add(new snmp_integer(oids_req.version));  // version
 
-	se->add(new snmp_octet_string((const uint8_t *)"public", 6));  // community string
+	std::string community = oids_req.community;
+	if (community.empty())
+		community = "public";
+
+	se->add(new snmp_octet_string((const uint8_t *)community.c_str(), community.size()));  // community string
 
 	// request pdu
 	snmp_pdu *GetResponsePDU = new snmp_pdu(0xa2);
@@ -291,7 +307,7 @@ void snmp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip,
 
 	oid_req_t or_;
 
-	if (!process_BER(pl.first, pl.second, &or_, false)) {
+	if (!process_BER(pl.first, pl.second, &or_, false, 2)) {
                 dolog(info, "SNMP: failed processing request\n");
 		stats_inc_counter(snmp_invalid);
                 return;
