@@ -43,7 +43,7 @@ void ndp::operator()()
 
 		lck.unlock();
 
-		// FIXME
+		// NDP packets are not processed here
 
 		delete pkt;
 	}
