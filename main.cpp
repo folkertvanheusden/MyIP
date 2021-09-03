@@ -1,12 +1,14 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <iniparser/iniparser.h>
 #include <errno.h>
+#include <mutex>
 #include <signal.h>
 #include <stdio.h>
 #include <string>
 #include <string.h>
 #include <unistd.h>
 #include <vector>
+#include <sys/fsuid.h>
 #include <sys/types.h>
 
 #include "any_addr.h"
@@ -101,12 +103,35 @@ int main(int argc, char *argv[])
 
 	phys *dev = new phys(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
 
-	if (setgid(gid) == -1) {
+	// these two thread will start as root
+	std::mutex ifup_wait, ifdown_wait;
+	ifup_wait.lock();
+	ifdown_wait.lock();
+
+	std::string run_at_started = iniparser_getstring(ini, "cfg:ifup", "");
+	std::thread ifup_thread([&ifup_wait, run_at_started] { 
+		if (run_at_started.empty() == false) {
+				ifup_wait.lock();
+				run(run_at_started);
+				ifup_wait.unlock();
+		}
+	});
+
+	std::string run_at_shutdown = iniparser_getstring(ini, "cfg:ifdown", "");
+	std::thread ifdown_thread([&ifdown_wait, run_at_shutdown] { 
+		if (run_at_shutdown.empty() == false) {
+				ifdown_wait.lock();
+				run(run_at_shutdown);
+				ifdown_wait.unlock();
+		}
+	});
+
+	if (setfsgid(gid) == -1) {
 		dolog(error, "setgid: %s", strerror(errno));
 		return 1;
 	}
 
-	if (setuid(uid) == -1) {
+	if (setfsuid(uid) == -1) {
 		dolog(error, "setuid: %s", strerror(errno));
 		return 1;
 	}
@@ -200,9 +225,8 @@ int main(int argc, char *argv[])
 	u6->add_handler(161, std::bind(&snmp::input, snmp6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 	/* **** */
 
-	std::string run_at_started = iniparser_getstring(ini, "cfg:ifup", "");
-	if (run_at_started.empty() == false)
-		run(run_at_started);
+	ifup_wait.unlock();
+	ifup_thread.join();
 
 	dolog(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
@@ -213,9 +237,8 @@ int main(int argc, char *argv[])
 	dolog(info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating\n");
 
-	std::string run_at_shutdown = iniparser_getstring(ini, "cfg:ifdown", "");
-	if (run_at_shutdown.empty() == false)
-		run(run_at_shutdown);
+	ifdown_wait.unlock();
+	ifdown_thread.join();
 
 	free_handler(http_handler6);
 	free_handler(http_handler);
