@@ -25,7 +25,7 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 	ifr->ifr_name[IFNAMSIZ - 1] = 0x00;
 }
 
-phys::phys(stats *const s, const std::string & dev_name)
+phys::phys(stats *const s, const std::string & dev_name, const int uid)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
 		dolog(error, "open /dev/net/tun: %s", strerror(errno));
@@ -47,6 +47,12 @@ phys::phys(stats *const s, const std::string & dev_name)
 
 	if (ioctl(fd, TUNSETNOCSUM, 1) == -1) {
 		dolog(error, "ioctl TUNSETNOCSUM: %s", strerror(errno));
+		close(fd);
+		exit(1);
+	}
+
+	if (ioctl(fd, TUNSETOWNER, uid) == -1) {
+		dolog(error, "ioctl TUNSETOWNER: %s", strerror(errno));
 		close(fd);
 		exit(1);
 	}

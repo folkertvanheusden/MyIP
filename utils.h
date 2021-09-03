@@ -15,6 +15,7 @@ std::vector<std::string> * split(std::string in, std::string splitter);
 uint8_t * get_from_buffer(uint8_t **p, size_t *len, size_t get_len);
 typedef enum { debug, info, warning, error } log_level_t;
 void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen);
+void setloguid(const int uid, const int gid);
 void closelog();
 void dolog(const log_level_t ll, const char *fmt, ...);
 void set_thread_name(std::string name);

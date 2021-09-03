@@ -142,6 +142,12 @@ void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_scre
 	log_level_screen = ll_screen;
 }
 
+void setloguid(const int uid, const int gid)
+{
+	if (fchown(fileno(lfh), uid, gid) == -1)
+		fprintf(stderr, "Cannot change logfile (%s) ownership: %s\n", logfile, strerror(errno));
+}
+
 void closelog()
 {
 	fclose(lfh);

@@ -65,7 +65,7 @@ stats::stats(const int size) : size(size)
 
 stats::~stats()
 {
-	dolog(debug, "Removing shared memory segment");
+	dolog(debug, "Removing shared memory segment\n");
 	munmap(p, size);
 
 	shm_unlink(shm_name);
