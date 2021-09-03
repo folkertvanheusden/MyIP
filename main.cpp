@@ -94,13 +94,18 @@ int main(int argc, char *argv[])
 
 	stats s(4096);
 
-	const int uid = iniparser_getint(ini, "cfg:run-as", 1000);
+	const int uid = iniparser_getint(ini, "cfg:run-as", 1000);  // uid
+	const int gid = iniparser_getint(ini, "cfg:run-in", 1000);  // gid
 
-	setloguid(uid, 0);
+	setloguid(uid, gid);
 
-	phys *dev = new phys(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid);
+	phys *dev = new phys(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
 
-	// change 1000 to UID to run under
+	if (setgid(gid) == -1) {
+		dolog(error, "setgid: %s", strerror(errno));
+		return 1;
+	}
+
 	if (setuid(uid) == -1) {
 		dolog(error, "setuid: %s", strerror(errno));
 		return 1;

@@ -25,7 +25,7 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 	ifr->ifr_name[IFNAMSIZ - 1] = 0x00;
 }
 
-phys::phys(stats *const s, const std::string & dev_name, const int uid)
+phys::phys(stats *const s, const std::string & dev_name, const int uid, const int gid)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
 		dolog(error, "open /dev/net/tun: %s", strerror(errno));
@@ -45,8 +45,15 @@ phys::phys(stats *const s, const std::string & dev_name, const int uid)
 		exit(1);
 	}
 
+	// myip calcs checksums by itself
 	if (ioctl(fd, TUNSETNOCSUM, 1) == -1) {
 		dolog(error, "ioctl TUNSETNOCSUM: %s", strerror(errno));
+		close(fd);
+		exit(1);
+	}
+
+	if (ioctl(fd, TUNSETGROUP, gid) == -1) {
+		dolog(error, "ioctl TUNSETGROUP: %s", strerror(errno));
 		close(fd);
 		exit(1);
 	}

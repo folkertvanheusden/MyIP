@@ -26,7 +26,7 @@ private:
 	std::map<uint16_t, protocol *> prot_map;
 
 public:
-	phys(stats *const s, const std::string & dev_name, const int uid);
+	phys(stats *const s, const std::string & dev_name, const int uid, const int gid);
 	phys(const phys &) = delete;
 	virtual ~phys();
 
