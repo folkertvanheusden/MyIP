@@ -161,9 +161,15 @@ void dolog(const log_level_t ll, const char *fmt, ...)
 
 	if (!lfh) {
 		lfh = fopen(logfile, "a+");
-
-		if (!lfh)
+		if (!lfh) {
 			fprintf(stderr, "Cannot access log-file %s: %s\n", logfile, strerror(errno));
+			exit(1);
+		}
+
+		if (fcntl(fileno(lfh), F_SETFD, FD_CLOEXEC) == -1) {
+			fprintf(stderr, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+			exit(1);
+		}
 	}
 
 	uint64_t now = get_us();

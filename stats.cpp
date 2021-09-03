@@ -47,6 +47,11 @@ stats::stats(const int size) : size(size)
 		exit(1);
 	}
 
+	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
+		dolog(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+		exit(1);
+	}
+
 	if (ftruncate(fd, size) == -1) {
 		dolog(error, "truncate: %s", strerror(errno));
 		exit(1);

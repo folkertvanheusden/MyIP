@@ -32,6 +32,11 @@ phys::phys(stats *const s, const std::string & dev_name, const int uid, const in
 		exit(1);
 	}
 
+	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
+		dolog(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+		exit(1);
+	}
+
 	struct ifreq ifr_tap;
 	memset(&ifr_tap, 0, sizeof ifr_tap);
 
@@ -41,26 +46,22 @@ phys::phys(stats *const s, const std::string & dev_name, const int uid, const in
 
 	if (ioctl(fd, TUNSETIFF, &ifr_tap) == -1) {
 		dolog(error, "ioctl TUNSETIFF: %s", strerror(errno));
-		close(fd);
 		exit(1);
 	}
 
 	// myip calcs checksums by itself
 	if (ioctl(fd, TUNSETNOCSUM, 1) == -1) {
 		dolog(error, "ioctl TUNSETNOCSUM: %s", strerror(errno));
-		close(fd);
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETGROUP, gid) == -1) {
 		dolog(error, "ioctl TUNSETGROUP: %s", strerror(errno));
-		close(fd);
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETOWNER, uid) == -1) {
 		dolog(error, "ioctl TUNSETOWNER: %s", strerror(errno));
-		close(fd);
 		exit(1);
 	}
 
