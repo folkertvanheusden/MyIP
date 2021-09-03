@@ -289,6 +289,8 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 	auto rc = se->get_payload();
 	*packet_out = rc.first;
 	*output_size = rc.second;
+
+	delete se;
 }
 
 void snmp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)

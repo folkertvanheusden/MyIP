@@ -142,6 +142,12 @@ void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_scre
 	log_level_screen = ll_screen;
 }
 
+void closelog()
+{
+	fclose(lfh);
+	lfh = nullptr;
+}
+
 void dolog(const log_level_t ll, const char *fmt, ...)
 {
 	if (ll < log_level_file && ll < log_level_screen)

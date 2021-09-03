@@ -235,6 +235,8 @@ int main(int argc, char *argv[])
 
 	dolog(info, "THIS IS THE END\n");
 
+	closelog();
+
 	iniparser_freedict(ini);
 
 	return 0;
