@@ -101,9 +101,9 @@ uint64_t * stats::register_stat(const std::string & name, const std::string & oi
 
 	lock.lock();
 
-	auto it = lut.find(name);
-	if (it != lut.end()) {
-		uint64_t *rc = it->second.p;
+	auto lut_it = lut.find(name);
+	if (lut_it != lut.end()) {
+		uint64_t *rc = lut_it->second.p;
 		lock.unlock();
 
 		return rc;
@@ -126,8 +126,8 @@ uint64_t * stats::register_stat(const std::string & name, const std::string & oi
 	st.p = reinterpret_cast<uint64_t *>(p_out);
 	st.oid = oid;
 
-	auto rc = lut.insert(std::pair<std::string, stats_t>(name, st));
-	assert(rc.second);
+	auto lut_rc = lut.insert(std::pair<std::string, stats_t>(name, st));
+	assert(lut_rc.second);
 
 	if (oid.empty() == false) {
 		std::map<std::string, oid_t> *p_lut = &lut_oid;

@@ -25,8 +25,8 @@ private:
 	uint64_t v { 0 };
 
 public:
-	snmp_integer(uint64_t v, int len);
-	snmp_integer(uint64_t v);
+	explicit snmp_integer(const uint64_t v, const int len);
+	explicit snmp_integer(const uint64_t v);
 	virtual ~snmp_integer();
 
 	std::pair<uint8_t *, uint8_t> get_payload() const override;
@@ -69,7 +69,7 @@ private:
 	uint8_t *v { nullptr };
 
 public:
-	snmp_octet_string(const uint8_t *const v, const int len);
+	explicit snmp_octet_string(const uint8_t *const v, const int len);
 	virtual ~snmp_octet_string();
 
 	std::pair<uint8_t *, uint8_t> get_payload() const override;
@@ -83,7 +83,7 @@ private:
 	uint8_t *v { nullptr };
 
 public:
-	snmp_oid(const std::string & oid);
+	explicit snmp_oid(const std::string & oid);
 	virtual ~snmp_oid();
 
 	std::pair<uint8_t *, uint8_t> get_payload() const override;
@@ -97,7 +97,7 @@ private:
 	uint8_t type { 0x00 };
 
 public:
-	snmp_pdu(const uint8_t type);
+	explicit snmp_pdu(const uint8_t type);
 	virtual ~snmp_pdu();
 
 	std::pair<uint8_t *, uint8_t> get_payload() const override;
