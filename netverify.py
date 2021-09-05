@@ -1,5 +1,8 @@
 #! /usr/bin/python3
 
+# (C) 2021 by Folkert van Heusden <mail@vanheusden.com>
+# Licensed under the Apache License v2.0
+
 import copy
 import socket
 import struct
@@ -13,7 +16,7 @@ def checksum(data):
         chksum += word
 
     chksum = (chksum >> 16) + (chksum & 0xffff)
-    chksum += (chksum >>16)
+    chksum += (chksum >> 16)
     chksum = (~chksum) & 0xffff
                     
     return chksum
