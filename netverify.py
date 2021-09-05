@@ -5,7 +5,6 @@
 
 import copy
 import socket
-import struct
 
 def checksum(data):
     chksum = 0
@@ -18,7 +17,7 @@ def checksum(data):
     chksum = (chksum >> 16) + (chksum & 0xffff)
     chksum += (chksum >> 16)
     chksum = (~chksum) & 0xffff
-                    
+
     return chksum
 
 def mac_to_str(mac):
@@ -51,7 +50,7 @@ with socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003)) as s
         if packet_type == 0x0800:  # IPv4
             version = payload[0] >> 4
             if version != 4:
-                print(f'Mismatch between Ethertype and IP-header version field for IPv4 packet')
+                print('Mismatch between Ethertype and IP-header version field for IPv4 packet')
 
             ihl = payload[0] & 0x0f
 
@@ -84,7 +83,7 @@ with socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003)) as s
 
                 # create IPv4 pseudo header
                 udp_header_copy = copy.deepcopy(udp_data[0:8])
-                udp_header_copy[6] = udp_header_copy[7] = 0x00 
+                udp_header_copy[6] = udp_header_copy[7] = 0x00
 
                 pseudo_header = ip_header[12:16] + ip_header[16:20] + bytearray([ 0x00, protocol ]) + bytearray([ udp_length >> 8, udp_length & 255]) + udp_header_copy + udp_data[8:]
 
