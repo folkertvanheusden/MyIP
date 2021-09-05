@@ -107,6 +107,7 @@ std::pair<uint8_t *, uint8_t> snmp_sequence::get_payload() const
 
 snmp_null::snmp_null()
 {
+	len = 0;
 }
 
 snmp_null::~snmp_null()

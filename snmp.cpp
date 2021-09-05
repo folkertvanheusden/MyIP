@@ -280,9 +280,9 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 			varbind->add(new snmp_integer(*vp));
 		}
 		else {  // FIXME snmp_null?
-			dolog(debug, "SNMP: requested %s not found, returning 0\n", e.c_str());
+			dolog(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
 
-			varbind->add(new snmp_integer(0));
+			varbind->add(new snmp_null());
 		}
 	}
 
