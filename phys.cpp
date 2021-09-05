@@ -155,8 +155,9 @@ void phys::operator()()
 		uint8_t buffer[1600];
 		int size = read(fd, (char *)buffer, sizeof buffer);
 
-		struct timeval tv { 0, 0 };
-		gettimeofday(&tv, nullptr);
+	        struct timespec ts { 0, 0 };
+		if (clock_getres(CLOCK_REALTIME, &ts) == -1)
+			dolog(warning, "clock_getres failed: %s", strerror(errno));
 
 		stats_inc_counter(phys_recv_frame);
 
@@ -180,7 +181,7 @@ void phys::operator()()
 
 		dolog(debug, "phys: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
-		packet *p = new packet(tv, src_mac, any_addr(&buffer[6], 6), any_addr(&buffer[0], 6), &buffer[14], size - 14, &buffer[0], 14);
+		packet *p = new packet(ts, src_mac, any_addr(&buffer[6], 6), any_addr(&buffer[0], 6), &buffer[14], size - 14, &buffer[0], 14);
 
 		it->second->queue_packet(p);
 	}

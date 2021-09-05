@@ -62,10 +62,12 @@ std::string myformat(const char *const fmt, ...)
 
 uint64_t get_us()
 {
-	struct timeval tv { 0, 0 };
-	gettimeofday(&tv, nullptr);
+	struct timespec ts { 0, 0 };
 
-	return tv.tv_sec * 1000l * 1000l + tv.tv_usec;
+	if (clock_getres(CLOCK_REALTIME, &ts) == -1)
+		dolog(warning, "clock_getres failed: %s", strerror(errno));
+
+	return ts.tv_sec * 1000l * 1000l + ts.tv_nsec / 1000;
 }
 
 void get_random(uint8_t *tgt, size_t n)

@@ -85,19 +85,20 @@ void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		msgout.originate_timestamp_secs = sntp->transmit_timestamp_secs;
 		msgout.originate_timestamp_fraq = sntp->transmit_timestamp_fraq;
 
-		struct timeval recv_now = p->get_recv_ts();
+		struct timespec recv_now = p->get_recv_ts();
 
                 msgout.receive_timestamp_seqs = htonl(recv_now.tv_sec + NTP_EPOCH);
-                msgout.receive_timestamp_fraq = htonl(recv_now.tv_usec * 4295);
+                msgout.receive_timestamp_fraq = htonl(recv_now.tv_nsec / 1000 * 4295);
 
-		struct timeval now;
-		gettimeofday(&now, nullptr);
+		struct timespec now { 0, 0 };
+		if (clock_getres(CLOCK_REALTIME, &now) == -1)
+			dolog(warning, "clock_getres failed: %s", strerror(errno));
 
                 msgout.reference_timestamp_secs = htonl(now.tv_sec + NTP_EPOCH);
-                msgout.reference_timestamp_fraq = htonl(now.tv_usec * 4295);
+                msgout.reference_timestamp_fraq = htonl(now.tv_nsec / 1000 * 4295);
 
                 msgout.transmit_timestamp_secs = htonl(now.tv_sec + NTP_EPOCH);
-                msgout.transmit_timestamp_fraq = htonl(now.tv_usec * 4295);
+                msgout.transmit_timestamp_fraq = htonl(now.tv_nsec / 1000 * 4295);
 
 		u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)&msgout, sizeof msgout);
 

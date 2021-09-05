@@ -10,7 +10,7 @@
 class packet
 {
 private:
-	const struct timeval tv { 0, 0 };
+	const struct timespec ts { 0, 0 };
 
 	const any_addr src_mac_addr;
 	const any_addr src_addr, dst_addr;
@@ -24,7 +24,7 @@ private:
 
 public:
 	packet(const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
-	packet(const struct timeval & tv, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
+	packet(const struct timespec & ts, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
 	virtual ~packet();
 
 	uint8_t *get_data() const { return data; }
@@ -40,7 +40,7 @@ public:
 
 	std::pair<const uint8_t *, int> get_header() const { return { header, header_size }; }
 
-	struct timeval get_recv_ts() const { return tv; }
+	struct timespec get_recv_ts() const { return ts; }
 
 	packet *duplicate() const;
 };
