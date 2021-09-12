@@ -30,6 +30,7 @@ add_executable(myip
 	phys.cpp
 	protocol.cpp
 	sip.cpp
+	sip_register.cpp
 	snmp.cpp
 	snmp-elem.cpp
 	stats.cpp

@@ -28,6 +28,7 @@
 #include "tcp_udp_fw.h"
 #include "http.h"
 #include "vnc.h"
+#include "sip_register.h"
 #include "utils.h"
 
 void run(const std::string & what)
@@ -162,6 +163,14 @@ int main(int argc, char *argv[])
 	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"));
 	u->add_handler(5060, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
+	// register with a sip server
+	sip_register *sr = nullptr;
+	// address must be dotted, not a hostname
+	std::string upstream_sip_server = iniparser_getstring(ini, "cfg:upstream-sip-server", "");
+	if (!upstream_sip_server.empty()) {
+		sr = new sip_register(u, upstream_sip_server, iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip, 5060);
+	}
+
 	// something that silently drops packet for a port
 	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
 	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
@@ -234,6 +243,7 @@ int main(int argc, char *argv[])
 
 	dev->stop();
 
+	delete sr;
 	delete ntp_;
 	delete u;
 	delete firewall;
