@@ -16,13 +16,15 @@ typedef struct {
 class arp : public protocol, public address_cache
 {
 private:
+	const any_addr gw_mac;
+
 	uint64_t *arp_requests { nullptr }, *arp_for_me { nullptr };
 
 	std::thread *arp_th { nullptr };
 	std::atomic_bool arp_stop_flag { false };
 
 public:
-	arp(stats *const s, const any_addr & mymac, const any_addr & ip);
+	arp(stats *const s, const any_addr & mymac, const any_addr & ip, const any_addr & gw_mac);
 	virtual ~arp();
 
 	void transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;

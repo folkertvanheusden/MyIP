@@ -7,7 +7,7 @@
 #include "phys.h"
 #include "utils.h"
 
-arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip) : address_cache(s, mymac, myip)
+arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac) : address_cache(s, mymac, myip), gw_mac(gw_mac)
 {
 	arp_requests     = s->register_stat("arp_requests");
 	arp_for_me       = s->register_stat("arp_for_me");
@@ -90,7 +90,11 @@ any_addr * arp::query_cache(const any_addr & ip)
 		return new any_addr(multicast_mac, 6);
 	}
 
-	return address_cache::query_cache(ip);
+	any_addr *rc = address_cache::query_cache(ip);
+	if (rc)
+		return rc;
+
+	return new any_addr(gw_mac);
 }
 
 void arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
