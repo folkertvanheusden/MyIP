@@ -338,7 +338,8 @@ codec_t chose_schema(const std::vector<std::string> *const body, const int max_r
 		speex_encoder_destroy(enc_state);
 	}
 	else {
-		best.frame_size = 500;
+		// usually 20ms
+		best.frame_size = best.rate * 20 / 1000;
 	}
 
 	dolog(info, "SIP: CODEC chosen: %s/%d (id: %u), frame size: %d\n", best.name.c_str(), best.rate, best.id, best.frame_size);
