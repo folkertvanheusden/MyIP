@@ -168,7 +168,7 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		delete body_lines;
 	}
 	else if (parts->size() == 3 && parts->at(0) == "BYE" && parts->at(2) == "SIP/2.0") {
-		// OK
+		send_ACK(src_ip, src_port, dst_ip, dst_port, header_lines, pd);
 	}
 	else if (parts->size() >= 2 && parts->at(0) == "SIP/2.0" && parts->at(1) == "401") {
 		if (now - ddos_protection > 1000000) {
@@ -243,7 +243,9 @@ void create_response_headers(const std::string & request, std::vector<std::strin
 
 	target->push_back("User-Agent: MyIP - https://github.com/folkertvanheusden/myip");
 
-	target->push_back("Content-Type: application/sdp");
+	if (c_size > 0)
+		target->push_back("Content-Type: application/sdp");
+
 	target->push_back(myformat("Content-Length: %zu", c_size));
 }
 
@@ -408,6 +410,16 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 
 		delete m_parts;
 	}
+}
+
+void sip::send_ACK(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, void *const pd)
+{
+	std::vector<std::string> hout;
+	create_response_headers("SIP/2.0 200 OK", &hout, false, headers, 0, src_ip);
+
+	std::string out = merge(hout, "\r\n");
+
+	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 }
 
 void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, void *const pd)
