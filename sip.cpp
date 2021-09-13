@@ -430,6 +430,8 @@ void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, con
 		return;
 	}
 
+	auto call_id = find_header(headers, "Call-ID");
+
 	std::string work = replace(str_wa.value(), ",", " ");
 
 	std::vector<std::string> *parameters = split(work, " ");
@@ -456,7 +458,9 @@ void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, con
 
 	std::string authorize = "Authorization: Digest username=\"" + username + "\",realm=\"" + realm + "\",nonce=\"" + nonce + "\",uri=\"sip:" + src_ip.to_str() + "\",algorithm=MD5,response=\"" + digest + "\"";
 
-	send_REGISTER(authorize);
+	std::string call_id_str = call_id.has_value() ? call_id.value() : "";
+
+	send_REGISTER(call_id_str, authorize);
 
 	delete parameters;
 }
@@ -696,7 +700,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 
 	sf_close(ss->sf);
 
-	send_REGISTER("");  // required?
+	send_REGISTER("", "");  // required?
 
 	ss->finished = true;
 }
@@ -829,7 +833,7 @@ void sip::operator()()
 	}
 }
 
-bool sip::send_REGISTER(const std::string & authorize)
+bool sip::send_REGISTER(const std::string & call_id, const std::string & authorize)
 {
 	std::string work = upstream_server;
 
@@ -846,16 +850,21 @@ bool sip::send_REGISTER(const std::string & authorize)
 
 	std::string out;
 	out += "REGISTER sip:" + tgt_addr.to_str() + " SIP/2.0\r\n";
-	if (authorize.empty())
+	if (authorize.empty()) {
 		out += "CSeq: 1 REGISTER\r\n";
+
+		uint64_t r;
+		get_random((uint8_t *)&r, sizeof r);
+		out += "Call-ID: " + myformat("%08lx", r) + "@" + myip.to_str() + "\r\n";
+	}
        	else {
 		out += authorize + "\r\n";
 		out += "CSeq: 2 REGISTER\r\n";
+		out += "Call-ID: " + call_id + "\r\n";
 	}
 	out += "Via: SIP/2.0/UDP " + myip.to_str() + ":" + myformat("%d", myport) + "\r\n";
 	out += "User-Agent: MyIP\r\n";
 	out += "From: <sip:" + username + "@" + tgt_addr.to_str() + ">;tag=277FD9F0-2607D15D\r\n"; // TODO
-	out += "Call-ID: e4ec6031-99e1\r\n"; // TODO
 	out += "To: <sip:" + username + "@" + tgt_addr.to_str() + ">\r\n";
 	out += "Contact: <sip:" + username + "@" + myip.to_str() + ">;q=1\r\n";
 	out += "Allow: INVITE,ACK,OPTIONS,BYE,CANCEL,SUBSCRIBE,NOTIFY,REFER,MESSAGE,INFO,PING\r\n";
@@ -871,7 +880,7 @@ void sip::register_thread()
 	while(!stop_flag) {
 		int cur_interval = interval;
 
-		if (!send_REGISTER(""))
+		if (!send_REGISTER("", ""))
 			cur_interval = 30;
 
 		for(int i=0; i<cur_interval * 2 && !stop_flag; i++)
