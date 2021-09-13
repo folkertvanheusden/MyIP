@@ -156,8 +156,8 @@ void phys::operator()()
 		int size = read(fd, (char *)buffer, sizeof buffer);
 
 	        struct timespec ts { 0, 0 };
-		if (clock_getres(CLOCK_REALTIME, &ts) == -1)
-			dolog(warning, "clock_getres failed: %s", strerror(errno));
+		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+			dolog(warning, "clock_gettime failed: %s", strerror(errno));
 
 		stats_inc_counter(phys_recv_frame);
 

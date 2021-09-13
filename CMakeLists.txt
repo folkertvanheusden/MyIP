@@ -82,4 +82,11 @@ target_link_libraries(myip ${SPEEX_LIBRARIES})
 target_include_directories(myip PUBLIC ${SPEEX_INCLUDE_DIRS})
 target_compile_options(myip PUBLIC ${SPEEX_CFLAGS_OTHER})
 
+find_package(OpenSSL REQUIRED)
+target_include_directories(myip PUBLIC ${OPENSSL_INCLUDE_DIR})
+target_link_libraries(myip OpenSSL::SSL OpenSSL::Crypto)
+target_include_directories(myiptop PUBLIC ${OPENSSL_INCLUDE_DIR})
+target_link_libraries(myiptop OpenSSL::SSL OpenSSL::Crypto)
+
+
 target_link_libraries(myiptop -lrt)

@@ -116,7 +116,7 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 
 	sf_close(fh);
 
-	th2 = new std::thread(&sip::send_REGISTER, this);
+	th2 = new std::thread(&sip::register_thread, this);
 }
 
 sip::~sip()
@@ -167,6 +167,9 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	}
 	else if (parts->size() == 3 && parts->at(0) == "BYE" && parts->at(2) == "SIP/2.0") {
 		// OK
+	}
+	else if (parts->size() == 3 && parts->at(0) == "SIP/2.0" && parts->at(1) == "401") {
+		reply_to_UNAUTHORIZED(src_ip, src_port, dst_ip, dst_port, header_lines, pd);
 	}
 	else {
 		dolog(info, "SIP: request \"%s\" not understood\n", header_lines->at(0).c_str());
@@ -393,6 +396,45 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 
 		delete m_parts;
 	}
+}
+
+void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, void *const pd)
+{
+	auto str_wa = find_header(headers, "WWW-Authenticate");
+	if (!str_wa.has_value()) {
+		dolog(info, "SIP: \"WWW-Authenticate\" missing");
+		return;
+	}
+
+	std::string work = replace(str_wa.value(), ",", " ");
+
+	std::vector<std::string> *parameters = split(work, " ");
+
+	std::string digest_alg = "MD5";
+	auto str_da = find_header(parameters, "algorithm", "=");
+	if (str_da.has_value())
+		digest_alg = str_da.value();
+
+	std::string realm = "";
+	auto str_realm = find_header(parameters, "realm", "=");
+	if (str_realm.has_value())
+		realm = replace(str_realm.value(), "\"", "");
+
+	std::string nonce = "";
+	auto str_nonce = find_header(parameters, "nonce", "=");
+	if (str_nonce.has_value())
+		nonce = replace(str_nonce.value(), "\"", "");
+
+	std::string a1 = md5hex(username + ":" + realm + ":" + password);
+	std::string a2 = md5hex("REGISTER:sip:" + src_ip.to_str());
+
+	std::string digest = md5hex(a1 + ":" + nonce + ":" + a2);
+
+	std::string authorize = "Authorization: Digest username=\"" + username + "\" realm=\"" + realm + "\" nonce=\"" + nonce + "\" uri=\"sip:" + src_ip.to_str() + "\" algorithm=MD5 response=\"" + digest + "\"";
+
+	send_REGISTER(authorize);
+
+	delete parameters;
 }
 
 std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const codec_t & schema, const short *const samples, const int n_samples)
@@ -761,7 +803,7 @@ void sip::operator()()
 	}
 }
 
-void sip::send_REGISTER()
+void sip::send_REGISTER(const std::string & authorize)
 {
 	std::string work = upstream_server;
 
@@ -786,12 +828,19 @@ void sip::send_REGISTER()
 	out += "To: <sip:" + username + "@" + tgt_addr.to_str() + ">\r\n";
 	out += "Contact: <sip:" + username + "@" + myip.to_str() + ">;q=1\r\n";
 	out += "Allow: INVITE,ACK,OPTIONS,BYE,CANCEL,SUBSCRIBE,NOTIFY,REFER,MESSAGE,INFO,PING\r\n";
+	if (!authorize.empty())
+		out += authorize + "\r\n";
 	out += "Expires: 60\r\n";
 	out += "Content-Length: 0\r\n";
 	out += "Max-Forwards: 70\r\n\r\n";
 
+	u->transmit_packet(tgt_addr, tgt_port, myip, myport, (const uint8_t *)out.c_str(), out.size());
+}
+
+void sip::register_thread()
+{
 	while(!stop_flag) {
-		u->transmit_packet(tgt_addr, tgt_port, myip, myport, (const uint8_t *)out.c_str(), out.size());
+		send_REGISTER("");
 
 		for(int i=0; i<interval * 2 && !stop_flag; i++)
 			myusleep(500 * 1000);

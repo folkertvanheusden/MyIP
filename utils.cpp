@@ -11,6 +11,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <vector>
+#include <openssl/md5.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -64,10 +65,10 @@ uint64_t get_us()
 {
 	struct timespec ts { 0, 0 };
 
-	if (clock_getres(CLOCK_REALTIME, &ts) == -1)
-		dolog(warning, "clock_getres failed: %s", strerror(errno));
+	if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+		fprintf(stderr, "clock_gettime failed: %s\n", strerror(errno));
 
-	return ts.tv_sec * 1000l * 1000l + ts.tv_nsec / 1000;
+	return uint64_t(ts.tv_sec) * uint64_t(1000000l) + uint64_t(ts.tv_nsec / 1000);
 }
 
 void get_random(uint8_t *tgt, size_t n)
@@ -169,7 +170,7 @@ void dolog(const log_level_t ll, const char *fmt, ...)
 		}
 
 		if (fcntl(fileno(lfh), F_SETFD, FD_CLOEXEC) == -1) {
-			fprintf(stderr, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+			fprintf(stderr, "fcntl(FD_CLOEXEC): %s\n", strerror(errno));
 			exit(1);
 		}
 	}
@@ -178,7 +179,8 @@ void dolog(const log_level_t ll, const char *fmt, ...)
 	time_t t_now = now / 1000000;
 
 	struct tm tm { 0 };
-	localtime_r(&t_now, &tm);
+	if (!localtime_r(&t_now, &tm))
+		fprintf(stderr, "localtime_r: %s\n", strerror(errno));
 
 	char *ts_str = nullptr;
 
@@ -321,4 +323,36 @@ std::string merge(const std::vector<std::string> & in, const std::string & seper
 		out += l + seperator;
 
 	return out;
+}
+
+std::string md5hex(const std::string & in)
+{
+	unsigned char result[MD5_DIGEST_LENGTH];
+
+	MD5((unsigned char *)in.c_str(), in.size(), result);
+
+	std::string rc;
+	for(int i=0; i<MD5_DIGEST_LENGTH; i++)
+		rc += myformat("%02x", result[i]);
+
+	return rc;
+}
+
+std::string replace(std::string target, const std::string & what, const std::string & by_what)
+{
+	for(;;) {
+		std::size_t found = target.find(what);
+
+		if (found == std::string::npos)
+			break;
+
+		std::string before = target.substr(0, found);
+
+		std::size_t after_offset = found + what.size();
+		std::string after = target.substr(after_offset);
+
+		target = before + by_what + after;
+	}
+
+	return target;
 }

@@ -198,10 +198,12 @@ int main(int argc, char *argv[])
 	udp *u6 = new udp(&s, icmp6_);
 	ipv6_instance->register_protocol(0x11, u6);
 
+#if 0
 	sip *sip6_ = new sip(&s, u6, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"),
 			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip6, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
 			);
 	u6->add_handler(5060, std::bind(&sip::input, sip6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+#endif
 
 	snmp *snmp6_ = new snmp(&s, u6);
 	u6->add_handler(161, std::bind(&snmp::input, snmp6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
