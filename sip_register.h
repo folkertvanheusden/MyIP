@@ -12,13 +12,13 @@ private:
 	udp *const u;
 	const std::string upstream_server, username, password;
 	const any_addr myip;
-	const int myport;
+	const int myport, interval;
 
 	std::thread *th { nullptr };
 	std::atomic_bool stop_flag { false };
 
 public:
-	sip_register(udp *const u, const std::string & upstream_sip_server, const std::string & upstream_sip_user, const std::string & upstream_sip_password, const any_addr & myip, const int myport);
+	sip_register(udp *const u, const std::string & upstream_sip_server, const std::string & upstream_sip_user, const std::string & upstream_sip_password, const any_addr & myip, const int myport, const int interval);
 	virtual ~sip_register();
 
 	void operator()();

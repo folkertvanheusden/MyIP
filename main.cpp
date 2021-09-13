@@ -122,7 +122,10 @@ int main(int argc, char *argv[])
 
 	printf("Will listen on IPv4 address: %s\n", myip.to_str().c_str());
 
-	arp *a = new arp(&s, mymac, myip);
+	const char *gw_mac_str = iniparser_getstring(ini, "cfg:gateway-mac-address", "42:20:16:2b:6f:9b");
+	any_addr gw_mac = parse_address(gw_mac_str, 6, ":", 16);
+
+	arp *a = new arp(&s, mymac, myip, gw_mac);
 	dev->register_protocol(0x0806, a);
 
 	ipv4 *ipv4_instance = new ipv4(&s, a, myip);
@@ -168,7 +171,7 @@ int main(int argc, char *argv[])
 	// address must be dotted, not a hostname
 	std::string upstream_sip_server = iniparser_getstring(ini, "cfg:upstream-sip-server", "");
 	if (!upstream_sip_server.empty()) {
-		sr = new sip_register(u, upstream_sip_server, iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip, 5060);
+		sr = new sip_register(u, upstream_sip_server, iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450));
 	}
 
 	// something that silently drops packet for a port
