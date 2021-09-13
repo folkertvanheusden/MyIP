@@ -44,7 +44,7 @@ class sip
 private:
 	udp *const u;
 
-	std::string mailbox_path { "/tmp" };
+	const std::string mailbox_path, mb_recv_exec;
 
 	const std::string upstream_server, username, password;
 	const any_addr myip;
@@ -81,7 +81,7 @@ private:
 	void send_ACK(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, void *const pd);
 
 public:
-	sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path, const std::string & upstream_sip_server, const std::string & upstream_sip_user, const std::string & upstream_sip_password, const any_addr & myip, const int myport, const int interval);
+	sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path, const std::string & mb_recv_exec, const std::string & upstream_sip_server, const std::string & upstream_sip_user, const std::string & upstream_sip_password, const any_addr & myip, const int myport, const int interval);
 	sip(const sip &) = delete;
 	virtual ~sip();
 

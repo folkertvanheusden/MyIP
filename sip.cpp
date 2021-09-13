@@ -72,9 +72,9 @@ int8_t encode_alaw(int16_t number)
 	return (sign | ((position - 4) << 4) | lsb) ^ 0x55;
 }
 
-sip::sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path, const std::string & upstream_sip_server, const std::string & upstream_sip_user, const std::string & upstream_sip_password, const any_addr & myip, const int myport, const int interval) :
+sip::sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path, const std::string & mb_recv_exec, const std::string & upstream_sip_server, const std::string & upstream_sip_user, const std::string & upstream_sip_password, const any_addr & myip, const int myport, const int interval) :
 	u(u),
-	mailbox_path(mailbox_path),
+	mailbox_path(mailbox_path), mb_recv_exec(mb_recv_exec),
 	upstream_server(upstream_sip_server), username(upstream_sip_user), password(upstream_sip_password),
 	myip(myip), myport(myport),
 	interval(interval)
@@ -701,6 +701,12 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 	sf_close(ss->sf);
 
 	send_REGISTER("", "");  // required?
+
+	if (!mb_recv_exec.empty()) {
+		std::string full_command = mb_recv_exec + " \"" + full_fname + "\"";
+
+		run(full_command);
+	}
 
 	ss->finished = true;
 }

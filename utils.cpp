@@ -356,3 +356,14 @@ std::string replace(std::string target, const std::string & what, const std::str
 
 	return target;
 }
+
+void run(const std::string & what)
+{
+	pid_t pid = fork();
+
+	if (pid == 0)
+		exit(system(what.c_str()));
+
+	else if (pid == -1)
+		dolog(error, "Failed invoking \"%s\"", what.c_str());
+}

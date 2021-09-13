@@ -30,17 +30,6 @@
 #include "vnc.h"
 #include "utils.h"
 
-void run(const std::string & what)
-{
-	pid_t pid = fork();
-
-	if (pid == 0)
-		exit(system(what.c_str()));
-
-	else if (pid == -1)
-		dolog(error, "Failed invoking \"%s\"", what.c_str());
-}
-
 void free_handler(const tcp_port_handler_t & tph)
 {
 	delete tph.pd;
@@ -162,7 +151,7 @@ int main(int argc, char *argv[])
 	snmp *snmp_ = new snmp(&s, u);
 	u->add_handler(161, std::bind(&snmp::input, snmp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
-	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"),
+	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"), iniparser_getstring(ini, "cfg:mb-recv", "/home/folkert/Projects/myip/mb-recv.sh"),
 			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
 			);
 	u->add_handler(5060, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);

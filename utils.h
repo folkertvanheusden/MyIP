@@ -27,3 +27,4 @@ std::optional<std::string> find_header(const std::vector<std::string> *const lin
 std::string merge(const std::vector<std::string> & in, const std::string & seperator);
 std::string str_tolower(std::string s);
 std::string md5hex(const std::string & in);
+void run(const std::string & what);
