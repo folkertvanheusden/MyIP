@@ -17,7 +17,7 @@ class udp;
 
 typedef struct {
 	uint8_t id;
-	std::string name;
+	std::string name, org_name;
 	int rate;
 	int frame_size;
 } codec_t;
@@ -29,7 +29,7 @@ typedef struct _sip_session_ {
 	any_addr sip_addr_peer, sip_addr_me;
 	int sip_port_peer { 0 }, sip_port_me { 0 };
 	std::thread *recorder { nullptr };
-	codec_t schema { 255, "", -1 };
+	codec_t schema { 255, "", "", -1 };
 	SNDFILE *sf { nullptr };
 	bool stats_done { false };
 	std::atomic_uint64_t latest_pkt { 0 };
@@ -56,6 +56,8 @@ private:
 
 	std::map<std::thread *, sip_session_t *> sessions;
 	std::mutex slock;
+
+	uint64_t ddos_protection { 0 };
 
 	int samplerate { 0 }, n_samples { 0 };
 	short *samples { nullptr };
