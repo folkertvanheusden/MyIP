@@ -28,7 +28,6 @@
 #include "tcp_udp_fw.h"
 #include "http.h"
 #include "vnc.h"
-#include "sip_register.h"
 #include "utils.h"
 
 void run(const std::string & what)
@@ -163,16 +162,10 @@ int main(int argc, char *argv[])
 	snmp *snmp_ = new snmp(&s, u);
 	u->add_handler(161, std::bind(&snmp::input, snmp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
-	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"));
+	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"),
+			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
+			);
 	u->add_handler(5060, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-
-	// register with a sip server
-	sip_register *sr = nullptr;
-	// address must be dotted, not a hostname
-	std::string upstream_sip_server = iniparser_getstring(ini, "cfg:upstream-sip-server", "");
-	if (!upstream_sip_server.empty()) {
-		sr = new sip_register(u, upstream_sip_server, iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450));
-	}
 
 	// something that silently drops packet for a port
 	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
@@ -205,7 +198,9 @@ int main(int argc, char *argv[])
 	udp *u6 = new udp(&s, icmp6_);
 	ipv6_instance->register_protocol(0x11, u6);
 
-	sip *sip6_ = new sip(&s, u6, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"));
+	sip *sip6_ = new sip(&s, u6, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"),
+			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip6, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
+			);
 	u6->add_handler(5060, std::bind(&sip::input, sip6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 	snmp *snmp6_ = new snmp(&s, u6);
@@ -246,7 +241,6 @@ int main(int argc, char *argv[])
 
 	dev->stop();
 
-	delete sr;
 	delete ntp_;
 	delete u;
 	delete firewall;

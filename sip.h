@@ -44,7 +44,14 @@ class sip
 private:
 	udp *const u;
 
+	std::string mailbox_path { "/tmp" };
+
+	const std::string upstream_server, username, password;
+	const any_addr myip;
+	const int myport, interval;
+
 	std::thread *th { nullptr };
+	std::thread *th2 { nullptr };  // register thread
 	std::atomic_bool stop_flag { false };
 
 	std::map<std::thread *, sip_session_t *> sessions;
@@ -52,8 +59,6 @@ private:
 
 	int samplerate { 0 }, n_samples { 0 };
 	short *samples { nullptr };
-
-	std::string mailbox_path { "/tmp" };
 
 	uint64_t *sip_requests { nullptr };
 	uint64_t *sip_requests_unk { nullptr };
@@ -68,9 +73,10 @@ private:
 	void voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss, void *const pd);
 	void send_BYE(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, const std::vector<std::string> & headers);
 	void transmit_audio(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss, const short *const samples, const int n_samples, uint16_t *const seq_nr, uint32_t *const t, const uint32_t ssrc);
+	void send_REGISTER();
 
 public:
-	sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path);
+	sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path, const std::string & upstream_sip_server, const std::string & upstream_sip_user, const std::string & upstream_sip_password, const any_addr & myip, const int myport, const int interval);
 	sip(const sip &) = delete;
 	virtual ~sip();
 
