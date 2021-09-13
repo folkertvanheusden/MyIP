@@ -683,6 +683,8 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 
 	sf_close(ss->sf);
 
+	send_REGISTER("");  // required?
+
 	ss->finished = true;
 }
 
@@ -854,12 +856,12 @@ bool sip::send_REGISTER(const std::string & authorize)
 void sip::register_thread()
 {
 	while(!stop_flag) {
-		if (send_REGISTER("")) {
-			for(int i=0; i<interval * 2 && !stop_flag; i++)
-				myusleep(500 * 1000);
-		}
-		else {
-			myusleep(30 * 1000 * 1000);
-		}
+		int cur_interval = interval;
+
+		if (!send_REGISTER(""))
+			cur_interval = 30;
+
+		for(int i=0; i<cur_interval * 2 && !stop_flag; i++)
+			myusleep(500 * 1000);
 	}
 }
