@@ -803,7 +803,7 @@ void sip::operator()()
 	}
 }
 
-void sip::send_REGISTER(const std::string & authorize)
+bool sip::send_REGISTER(const std::string & authorize)
 {
 	std::string work = upstream_server;
 
@@ -834,15 +834,18 @@ void sip::send_REGISTER(const std::string & authorize)
 	out += "Content-Length: 0\r\n";
 	out += "Max-Forwards: 70\r\n\r\n";
 
-	u->transmit_packet(tgt_addr, tgt_port, myip, myport, (const uint8_t *)out.c_str(), out.size());
+	return u->transmit_packet(tgt_addr, tgt_port, myip, myport, (const uint8_t *)out.c_str(), out.size());
 }
 
 void sip::register_thread()
 {
 	while(!stop_flag) {
-		send_REGISTER("");
-
-		for(int i=0; i<interval * 2 && !stop_flag; i++)
-			myusleep(500 * 1000);
+		if (send_REGISTER("")) {
+			for(int i=0; i<interval * 2 && !stop_flag; i++)
+				myusleep(500 * 1000);
+		}
+		else {
+			myusleep(30 * 1000 * 1000);
+		}
 	}
 }

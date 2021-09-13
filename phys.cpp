@@ -99,7 +99,7 @@ void phys::register_protocol(const uint16_t ether_type, protocol *const p)
 	p->register_phys(this);
 }
 
-void phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
+bool phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
 	dolog(debug, "phys: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
@@ -119,6 +119,8 @@ void phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, c
 
 	// crc32 is not included in a tap device
 
+	bool ok = true;
+
 	int rc = write(fd, out, out_size);
 
 	if (size_t(rc) != out_size) {
@@ -126,9 +128,13 @@ void phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, c
 
 		if (rc == -1)
 			dolog(error, "phys: %s\n", strerror(errno));
+
+		ok = false;
 	}
 
 	delete [] out;
+
+	return ok;
 }
 
 void phys::operator()()

@@ -99,7 +99,7 @@ void udp::remove_handler(const int port)
 	cb_lock.unlock();
 }
 
-void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
+bool udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
 {
 	dolog(debug, "UDP: transmit packet %d -> %d\n", src_port, dst_port);
 
@@ -121,10 +121,13 @@ void udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 
 	out_size += out_size & 1;
 
+	bool rc = false;
 	if (idev)
-		idev->transmit_packet(dst_ip, src_ip, 0x11, out, out_size, nullptr);
+		rc = idev->transmit_packet(dst_ip, src_ip, 0x11, out, out_size, nullptr);
 
 	delete [] out;
+
+	return rc;
 }
 
 int udp::allocate_port()

@@ -64,9 +64,8 @@ void arp::operator()()
 
 			swap_ipv4(&reply[14], &reply[24]);
 
-			if (pdev) {
+			if (pdev)
 				pdev->transmit_packet(pkt->get_src_addr(), mymac, 0x0806, reply, size);
-			}
 
 			delete [] reply;
 		}
@@ -97,14 +96,18 @@ any_addr * arp::query_cache(const any_addr & ip)
 	return new any_addr(gw_mac);
 }
 
-void arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	// for requests
 	assert(0);
+
+	return false;
 }
 
-void arp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool arp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	// for requests
 	assert(0);
+
+	return false;
 }
