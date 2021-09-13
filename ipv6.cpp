@@ -37,7 +37,7 @@ ipv6::~ipv6()
 	delete ipv6_th;
 }
 
-void ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv6_n_tx);
 	stats_inc_counter(ip_n_out_req);
@@ -45,7 +45,7 @@ void ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	if (!pdev) {
 		stats_inc_counter(ipv6_tx_err);
 		stats_inc_counter(ip_n_out_disc);
-		return;
+		return false;
 	}
 
 	size_t out_size = 40 + pl_size;
@@ -79,22 +79,25 @@ void ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
                 delete [] out;
                 stats_inc_counter(ipv6_tx_err);
 		stats_inc_counter(ip_n_out_disc);
-                return;
+                return false;
         }
 
-	pdev->transmit_packet(dst_mac, *src_mac, 0x86dd, out, out_size);
+	bool rc = pdev->transmit_packet(dst_mac, *src_mac, 0x86dd, out, out_size);
 
 	delete src_mac;
 
 	delete [] out;
+
+	return rc;
 }
 
-void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
+	bool rc = false;
         const any_addr *dst_mac = indp->query_cache(dst_ip);
 
         if (dst_mac) {
-		transmit_packet(*dst_mac, dst_ip, src_ip, protocol, payload, pl_size, header_template);
+		rc = transmit_packet(*dst_mac, dst_ip, src_ip, protocol, payload, pl_size, header_template);
 		delete dst_mac;
 	}
 	else {
@@ -102,6 +105,8 @@ void ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 		stats_inc_counter(ip_n_out_disc);
                 stats_inc_counter(ipv6_tx_err);
         }
+
+	return rc;
 }
 
 void ipv6::operator()()

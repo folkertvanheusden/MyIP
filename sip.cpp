@@ -72,7 +72,12 @@ int8_t encode_alaw(int16_t number)
 	return (sign | ((position - 4) << 4) | lsb) ^ 0x55;
 }
 
-sip::sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path) : u(u), mailbox_path(mailbox_path)
+sip::sip(stats *const s, udp *const u, const std::string & sample, const std::string & mailbox_path, const std::string & upstream_sip_server, const std::string & upstream_sip_user, const std::string & upstream_sip_password, const any_addr & myip, const int myport, const int interval) :
+	u(u),
+	mailbox_path(mailbox_path),
+	upstream_server(upstream_sip_server), username(upstream_sip_user), password(upstream_sip_password),
+	myip(myip), myport(myport),
+	interval(interval)
 {
 	sip_requests	= s->register_stat("sip_requests");
 	sip_requests_unk= s->register_stat("sip_requests_unk");
@@ -110,11 +115,16 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 	}
 
 	sf_close(fh);
+
+	th2 = new std::thread(&sip::register_thread, this);
 }
 
 sip::~sip()
 {
 	stop_flag = true;
+
+	th2->join();
+	delete th2;
 
 	th->join();
 	delete th;
@@ -145,6 +155,8 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 	stats_inc_counter(sip_requests);
 
+	uint64_t now = get_us();
+
 	if (parts->size() == 3 && parts->at(0) == "OPTIONS" && parts->at(2) == "SIP/2.0") {
 		reply_to_OPTIONS(src_ip, src_port, dst_ip, dst_port, header_lines);
 	}
@@ -157,6 +169,15 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	}
 	else if (parts->size() == 3 && parts->at(0) == "BYE" && parts->at(2) == "SIP/2.0") {
 		// OK
+	}
+	else if (parts->size() >= 2 && parts->at(0) == "SIP/2.0" && parts->at(1) == "401") {
+		if (now - ddos_protection > 1000000) {
+			reply_to_UNAUTHORIZED(src_ip, src_port, dst_ip, dst_port, header_lines, pd);
+			ddos_protection = now;
+		}
+		else {
+			dolog(info, "SIP: drop 401 packet\n");
+		}
 	}
 	else {
 		dolog(info, "SIP: request \"%s\" not understood\n", header_lines->at(0).c_str());
@@ -257,7 +278,7 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 
 codec_t chose_schema(const std::vector<std::string> *const body, const int max_rate)
 {
-	codec_t best { 255, "", -1 };
+	codec_t best { 255, "", "", -1 };
 
 	for(std::string line : *body) {
 		if (line.substr(0, 9) != "a=rtpmap:")
@@ -282,7 +303,7 @@ codec_t chose_schema(const std::vector<std::string> *const body, const int max_r
 
 		bool pick = false;
 
-		if (rate >= max_rate && (name == "l16" || name.substr(0, 5) == "speex" || name == "alaw")) {
+		if (rate >= max_rate && (name == "l16" || name.substr(0, 5) == "speex" || name == "alaw" || name == "pcma")) {
 			if (abs(rate - max_rate) < abs(rate - best.rate) || best.rate == -1)
 				pick = true;
 		}
@@ -299,12 +320,15 @@ codec_t chose_schema(const std::vector<std::string> *const body, const int max_r
 			best.rate = rate;
 			best.id = id;
 			best.name = name;
+			best.org_name = type_rate.substr(0, slash);
 		}
 	}
 
 	if (best.id == 255) {
+		dolog(info, "SIP: no suitable codec found? picking sane default");
 		best.id = 8;
-		best.name = "alaw";  // safe choice
+		best.name = "pcma";  // safe choice
+		best.org_name = "PCMA";  // safe choice
 		best.rate = 8000;
 	}
 
@@ -314,7 +338,8 @@ codec_t chose_schema(const std::vector<std::string> *const body, const int max_r
 		speex_encoder_destroy(enc_state);
 	}
 	else {
-		best.frame_size = 500;
+		// usually 20ms
+		best.frame_size = best.rate * 20 / 1000;
 	}
 
 	dolog(info, "SIP: CODEC chosen: %s/%d (id: %u), frame size: %d\n", best.name.c_str(), best.rate, best.id, best.frame_size);
@@ -341,7 +366,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 
 		if (schema.id != 255) {
 			content.push_back("a=sendrecv");
-			content.push_back(myformat("a=rtpmap:%u %s/%u", schema.id, schema.name.c_str(), schema.rate));
+			content.push_back(myformat("a=rtpmap:%u %s/%u", schema.id, schema.org_name.c_str(), schema.rate));
 
 			if (schema.name.substr(0, 5) == "speex")
 				content.push_back(myformat("a=fmtp:%u mode=\"1,any\";vbr=on", schema.id));
@@ -385,11 +410,50 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	}
 }
 
+void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, void *const pd)
+{
+	auto str_wa = find_header(headers, "WWW-Authenticate");
+	if (!str_wa.has_value()) {
+		dolog(info, "SIP: \"WWW-Authenticate\" missing");
+		return;
+	}
+
+	std::string work = replace(str_wa.value(), ",", " ");
+
+	std::vector<std::string> *parameters = split(work, " ");
+
+	std::string digest_alg = "MD5";
+	auto str_da = find_header(parameters, "algorithm", "=");
+	if (str_da.has_value())
+		digest_alg = str_da.value();
+
+	std::string realm = "";
+	auto str_realm = find_header(parameters, "realm", "=");
+	if (str_realm.has_value())
+		realm = replace(str_realm.value(), "\"", "");
+
+	std::string nonce = "";
+	auto str_nonce = find_header(parameters, "nonce", "=");
+	if (str_nonce.has_value())
+		nonce = replace(str_nonce.value(), "\"", "");
+
+	std::string a1 = md5hex(username + ":" + realm + ":" + password);
+	std::string a2 = md5hex("REGISTER:sip:" + src_ip.to_str());
+
+	std::string digest = md5hex(a1 + ":" + nonce + ":" + a2);
+
+	std::string authorize = "Authorization: Digest username=\"" + username + "\",realm=\"" + realm + "\",nonce=\"" + nonce + "\",uri=\"sip:" + src_ip.to_str() + "\",algorithm=MD5,response=\"" + digest + "\"";
+
+	send_REGISTER(authorize);
+
+	delete parameters;
+}
+
 std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const codec_t & schema, const short *const samples, const int n_samples)
 {
 	int sample_size = 0;
 
-	if (schema.name == "alaw")// a-law
+	if (schema.name == "alaw" || schema.name == "pcma")// a-law
 		sample_size = sizeof(uint8_t);
 	else if (schema.name == "l16")	// l16 mono
 		sample_size = sizeof(uint16_t);
@@ -416,7 +480,7 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 	rtp_packet[10] = ssrc >>  8;
 	rtp_packet[11] = ssrc;
 
-	if (schema.name == "alaw") {	// a-law
+	if (schema.name == "alaw" || schema.name == "pcma") {	// a-law
 		for(int i=0; i<n_samples; i++)
 			rtp_packet[12 + i] = encode_alaw(samples[i]);
 	}
@@ -620,6 +684,8 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 
 	sf_close(ss->sf);
 
+	send_REGISTER("");  // required?
+
 	ss->finished = true;
 }
 
@@ -664,7 +730,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 
 		stats_inc_counter(sip_rtp_sessions);
 
-		if (ss->schema.name == "alaw")
+		if (ss->schema.name == "alaw" || ss->schema.name == "pcma")
 			stats_inc_counter(sip_rtp_codec_8);
 		else if (ss->schema.name == "l16")
 			stats_inc_counter(sip_rtp_codec_11);
@@ -674,7 +740,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 
 	auto pl = p->get_payload();
 
-	if (ss->schema.name == "alaw") {  // a-law
+	if (ss->schema.name == "alaw" || ss->schema.name == "pcma") {  // a-law
 		int n_samples = pl.second - 12;
 
 		if (n_samples > 0) {
@@ -748,5 +814,55 @@ void sip::operator()()
 			}
 		}
 		slock.unlock();
+	}
+}
+
+bool sip::send_REGISTER(const std::string & authorize)
+{
+	std::string work = upstream_server;
+
+	any_addr tgt_addr;
+	int tgt_port = 5060;
+
+	std::string::size_type colon = work.find(':');
+	if (colon != std::string::npos) {
+		tgt_port = atoi(work.substr(colon + 1).c_str());
+		work = work.substr(0, colon);
+	}
+
+	tgt_addr = parse_address(work.c_str(), 4, ".", 10);
+
+	std::string out;
+	out += "REGISTER sip:" + tgt_addr.to_str() + " SIP/2.0\r\n";
+	if (authorize.empty())
+		out += "CSeq: 1 REGISTER\r\n";
+       	else {
+		out += authorize + "\r\n";
+		out += "CSeq: 2 REGISTER\r\n";
+	}
+	out += "Via: SIP/2.0/UDP " + myip.to_str() + ":" + myformat("%d", myport) + "\r\n";
+	out += "User-Agent: MyIP\r\n";
+	out += "From: <sip:" + username + "@" + tgt_addr.to_str() + ">;tag=277FD9F0-2607D15D\r\n"; // TODO
+	out += "Call-ID: e4ec6031-99e1\r\n"; // TODO
+	out += "To: <sip:" + username + "@" + tgt_addr.to_str() + ">\r\n";
+	out += "Contact: <sip:" + username + "@" + myip.to_str() + ">;q=1\r\n";
+	out += "Allow: INVITE,ACK,OPTIONS,BYE,CANCEL,SUBSCRIBE,NOTIFY,REFER,MESSAGE,INFO,PING\r\n";
+	out += "Expires: 60\r\n";
+	out += "Content-Length: 0\r\n";
+	out += "Max-Forwards: 70\r\n\r\n";
+
+	return u->transmit_packet(tgt_addr, tgt_port, myip, myport, (const uint8_t *)out.c_str(), out.size());
+}
+
+void sip::register_thread()
+{
+	while(!stop_flag) {
+		int cur_interval = interval;
+
+		if (!send_REGISTER(""))
+			cur_interval = 30;
+
+		for(int i=0; i<cur_interval * 2 && !stop_flag; i++)
+			myusleep(500 * 1000);
 	}
 }

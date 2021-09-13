@@ -91,8 +91,8 @@ void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
                 msgout.receive_timestamp_fraq = htonl(recv_now.tv_nsec / 1000 * 4295);
 
 		struct timespec now { 0, 0 };
-		if (clock_getres(CLOCK_REALTIME, &now) == -1)
-			dolog(warning, "clock_getres failed: %s", strerror(errno));
+		if (clock_gettime(CLOCK_REALTIME, &now) == -1)
+			dolog(warning, "clock_gettime failed: %s", strerror(errno));
 
                 msgout.reference_timestamp_secs = htonl(now.tv_sec + NTP_EPOCH);
                 msgout.reference_timestamp_fraq = htonl(now.tv_nsec / 1000 * 4295);
