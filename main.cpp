@@ -28,6 +28,7 @@
 #include "tcp_udp_fw.h"
 #include "http.h"
 #include "vnc.h"
+#include "mqtt.h"
 #include "utils.h"
 
 void free_handler(const tcp_port_handler_t & tph)
@@ -142,6 +143,9 @@ int main(int argc, char *argv[])
 	tcp_port_handler_t vnc_handler = vnc_get_handler(&s);
 	t->add_handler(5900, vnc_handler);
 
+	tcp_port_handler_t mqtt_handler = mqtt_get_handler(&s);
+	t->add_handler(1883, mqtt_handler);
+
 	ntp *ntp_ = new ntp(&s, u, myip, upstream_ntp_server, true);
 	u->add_handler(123, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
@@ -183,6 +187,9 @@ int main(int argc, char *argv[])
 
 	tcp_port_handler_t vnc_handler6 = vnc_get_handler(&s);
 	t6->add_handler(5900, vnc_handler6);
+
+	tcp_port_handler_t mqtt_handler6 = mqtt_get_handler(&s);
+	t6->add_handler(1883, mqtt_handler6);
 
 	udp *u6 = new udp(&s, icmp6_);
 	ipv6_instance->register_protocol(0x11, u6);

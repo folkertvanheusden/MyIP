@@ -35,6 +35,10 @@ public:
 	uint64_t *vnc_duration { nullptr };
 };
 
+class mqtt_private_data : public private_data
+{
+};
+
 class session_data
 {
 public:
@@ -97,4 +101,17 @@ public:
         mutable std::mutex w_lock;
 
 	vnc_private_data *vpd;
+};
+
+class mqtt_session_data : public session_data
+{
+public:
+	std::thread *th { nullptr };
+
+	uint8_t *data { nullptr };
+	size_t data_len { 0 };
+        std::condition_variable w_cond;
+        mutable std::mutex w_lock;
+
+	std::atomic_bool terminate { false };
 };
