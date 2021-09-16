@@ -20,12 +20,52 @@
 
 void mqtt_recv_thread(void *ts_in);
 
+typedef struct {
+	tcp_session_t *ts;  // handle
+	std::mutex tx_lock;
+} mqtt_tx_t;
+
+static std::atomic_bool distr_terminate { false };
+static std::thread *distr_th { nullptr };
+static std::mutex sessions_lck;
+static std::map<std::string, mqtt_tx_t> sessions;
+
+static void register_session(const std::string & id, const mqtt_tx_t & tx)
+{
+	sessions_lck.lock();
+	sessions.insert(std::pair<std::string, mqtt_tx_t>(id, tx));
+	sessions_lck.unlock();
+}
+
+static void unregister_session(const std::string & id);
+{
+	sessions_lck.lock();
+	sessions.erase(id);
+	sessions_lck.unlock();
+}
+
+void mqtt_distributor()
+{
+	for(;!distr_terminate;) {
+		std::unique_lock<std::mutex> lck(ms->w_lock);
+
+		// anything? distribute naar sessions met een andere id
+
+		ms->w_cond.wait(lck); // deze vervangen door iets wat x tijd wacht ivm terminate check
+	}
+}
+
 void mqtt_init()
 {
+	distr_th = new std::thread(mqtt_distributor);
 }
 
 void mqtt_deinit()
 {
+	distr_terminate = true;
+
+	distr_th->join();
+	delete distr_th;
 }
 
 bool mqtt_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
@@ -102,6 +142,14 @@ void mqtt_recv_thread(void *ts_in)
 	tcp_session_t *ts = (tcp_session_t *)ts_in;
 	mqtt_session_data *ms = dynamic_cast<mqtt_session_data *>(ts->p);
 
+	mqtt_tx_t tx;
+	tx.ts = ts;
+
+	const std::string unique_identifier = ts->org_src_addr.to_str() + myformat("-%02d", ts->org_src_port);
+	std::string identifier;
+
+	register_session(unique_identifier, &tx);
+
 	for(;ms->terminate == false;) {
 		uint8_t control = mqtt_get_byte(ms);
 		uint32_t len = 0;
@@ -116,14 +164,19 @@ void mqtt_recv_thread(void *ts_in)
 				break;
 		}
 		
-		uint8_t *mqtt_msg = new uint8_t[len];
+		uint8_t *mqtt_msg = new uint8_t[len + 1];
 		mqtt_get_bytes(ms, mqtt_msg, len);
+		mqtt_msg[len] = 0x00;  // e.g. CONNECT msg ends with strings
 
 		uint8_t cmsg = control >> 4;
 		//uint8_t cflags = control & 0x0f;
 
 		if (cmsg == 1) {  // CONNECT
-			dolog(debug, "MQTT: Connect\n");
+			if (len > 12) {  // should be true (variable header + at least 0x00 for identifier)
+				identifier = (char *)&mqtt_msg[12];
+			}
+
+			dolog(debug, "MQTT: Connect by %s\n", identifier.c_str());
 
 			// send CONNACK
 			uint8_t reply[] = { 0x20, 0x02, 0x00 /* reserved */, 0x00 /* accepted */};
@@ -138,6 +191,8 @@ void mqtt_recv_thread(void *ts_in)
 
 		delete [] mqtt_msg;
 	}
+
+	unregister_session(unique_identifier);
 
 	dolog(info, "MQTT: Thread terminating for %s\n", ms->client_addr.c_str());
 }
