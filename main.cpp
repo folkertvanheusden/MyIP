@@ -66,6 +66,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	signal(SIGCHLD, SIG_IGN);
+
 	dictionary *ini = iniparser_load(argv[1]);
 
 	std::string llf = iniparser_getstring(ini, "cfg:log_level_file", "debug");
