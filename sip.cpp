@@ -278,7 +278,7 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 }
 
-codec_t chose_schema(const std::vector<std::string> *const body, const int max_rate)
+codec_t select_schema(const std::vector<std::string> *const body, const int max_rate)
 {
 	codec_t best { 255, "", "", -1 };
 
@@ -364,7 +364,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	if (m.has_value()) {
 		std::vector<std::string> *m_parts = split(m.value(), " ");
 
-		codec_t schema = chose_schema(body, samplerate);
+		codec_t schema = select_schema(body, samplerate);
 
 		if (schema.id != 255) {
 			content.push_back("a=sendrecv");
