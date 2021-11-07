@@ -148,32 +148,30 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 	std::string pl_str = std::string((const char *)pl.first, pl.second);
 
-	std::vector<std::string> *header_body = split(pl_str, "\r\n\r\n");
+	std::vector<std::string> header_body = split(pl_str, "\r\n\r\n");
 
-	std::vector<std::string> *header_lines = split(header_body->at(0), "\r\n");
+	std::vector<std::string> header_lines = split(header_body.at(0), "\r\n");
 
-	std::vector<std::string> *parts = split(header_lines->at(0), " ");
+	std::vector<std::string> parts = split(header_lines.at(0), " ");
 
 	stats_inc_counter(sip_requests);
 
 	uint64_t now = get_us();
 
-	if (parts->size() == 3 && parts->at(0) == "OPTIONS" && parts->at(2) == "SIP/2.0") {
-		reply_to_OPTIONS(src_ip, src_port, dst_ip, dst_port, header_lines);
+	if (parts.size() == 3 && parts.at(0) == "OPTIONS" && parts.at(2) == "SIP/2.0") {
+		reply_to_OPTIONS(src_ip, src_port, dst_ip, dst_port, &header_lines);
 	}
-	else if (parts->size() == 3 && parts->at(0) == "INVITE" && parts->at(2) == "SIP/2.0" && header_body->size() == 2) {
-		std::vector<std::string> *body_lines = split(header_body->at(1), "\r\n");
+	else if (parts.size() == 3 && parts.at(0) == "INVITE" && parts.at(2) == "SIP/2.0" && header_body.size() == 2) {
+		std::vector<std::string> body_lines = split(header_body.at(1), "\r\n");
 
-		reply_to_INVITE(src_ip, src_port, dst_ip, dst_port, header_lines, body_lines, pd);
-
-		delete body_lines;
+		reply_to_INVITE(src_ip, src_port, dst_ip, dst_port, &header_lines, &body_lines, pd);
 	}
-	else if (parts->size() == 3 && parts->at(0) == "BYE" && parts->at(2) == "SIP/2.0") {
-		send_ACK(src_ip, src_port, dst_ip, dst_port, header_lines, pd);
+	else if (parts.size() == 3 && parts.at(0) == "BYE" && parts.at(2) == "SIP/2.0") {
+		send_ACK(src_ip, src_port, dst_ip, dst_port, &header_lines, pd);
 	}
-	else if (parts->size() >= 2 && parts->at(0) == "SIP/2.0" && parts->at(1) == "401") {
+	else if (parts.size() >= 2 && parts.at(0) == "SIP/2.0" && parts.at(1) == "401") {
 		if (now - ddos_protection > 1000000) {
-			reply_to_UNAUTHORIZED(src_ip, src_port, dst_ip, dst_port, header_lines, pd);
+			reply_to_UNAUTHORIZED(src_ip, src_port, dst_ip, dst_port, &header_lines, pd);
 			ddos_protection = now;
 		}
 		else {
@@ -181,15 +179,9 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		}
 	}
 	else {
-		dolog(info, "SIP: request \"%s\" not understood\n", header_lines->at(0).c_str());
+		dolog(info, "SIP: request \"%s\" not understood\n", header_lines.at(0).c_str());
 		stats_inc_counter(sip_requests_unk);
 	}
-
-	delete parts;
-
-	delete header_lines;
-
-	delete header_body;
 }
 
 void create_response_headers(const std::string & request, std::vector<std::string> *const target, const bool upd_cseq, const std::vector<std::string> *const source, const size_t c_size, const any_addr & my_ip)
@@ -363,7 +355,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	auto m = find_header(body, "m", "=");
 
 	if (m.has_value()) {
-		std::vector<std::string> *m_parts = split(m.value(), " ");
+		std::vector<std::string> m_parts = split(m.value(), " ");
 
 		codec_t schema = chose_schema(body, samplerate);
 
@@ -391,7 +383,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 			u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 
 			// find port to transmit rtp data to and start send-thread
-			int tgt_rtp_port = m_parts->size() >= 2 ? atoi(m_parts->at(1).c_str()) : 8000;
+			int tgt_rtp_port = m_parts.size() >= 2 ? atoi(m_parts.at(1).c_str()) : 8000;
 
 			sip_session_t *ss = new sip_session_t();
 			ss->start_ts = get_us();
@@ -408,8 +400,6 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 			sessions.insert({ th, ss });
 			slock.unlock();
 		}
-
-		delete m_parts;
 	}
 }
 
@@ -435,20 +425,20 @@ void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, con
 
 	std::string work = replace(str_wa.value(), ",", " ");
 
-	std::vector<std::string> *parameters = split(work, " ");
+	std::vector<std::string> parameters = split(work, " ");
 
 	std::string digest_alg = "MD5";
-	auto str_da = find_header(parameters, "algorithm", "=");
+	auto str_da = find_header(&parameters, "algorithm", "=");
 	if (str_da.has_value())
 		digest_alg = str_da.value();
 
 	std::string realm = "";
-	auto str_realm = find_header(parameters, "realm", "=");
+	auto str_realm = find_header(&parameters, "realm", "=");
 	if (str_realm.has_value())
 		realm = replace(str_realm.value(), "\"", "");
 
 	std::string nonce = "";
-	auto str_nonce = find_header(parameters, "nonce", "=");
+	auto str_nonce = find_header(&parameters, "nonce", "=");
 	if (str_nonce.has_value())
 		nonce = replace(str_nonce.value(), "\"", "");
 
@@ -462,8 +452,6 @@ void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, con
 	std::string call_id_str = call_id.has_value() ? call_id.value() : "";
 
 	send_REGISTER(call_id_str, authorize);
-
-	delete parameters;
 }
 
 std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t seq_nr, const uint32_t t, const codec_t & schema, const short *const samples, const int n_samples)

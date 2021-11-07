@@ -190,9 +190,9 @@ any_addr & any_addr::operator =(const any_addr & other)
 
 any_addr parse_address(const char *str, const size_t exp_size, const std::string & seperator, const int base)
 {
-	std::vector<std::string> *parts = split(str, seperator);
+	std::vector<std::string> parts = split(str, seperator);
 
-	if (parts->size() != exp_size && !(exp_size == 16 && parts->size() == 8 /* ipv6 */)) {
+	if (parts.size() != exp_size && !(exp_size == 16 && parts.size() == 8 /* ipv6 */)) {
 		fprintf(stderr, "An address consists of %zu numbers\n", exp_size);
 		exit(1);
 	}
@@ -201,7 +201,7 @@ any_addr parse_address(const char *str, const size_t exp_size, const std::string
 
 	if (exp_size == 16) { // IPv6
 		for(size_t i=0; i<exp_size; i += 2) {
-			uint16_t val = strtol(parts->at(i / 2).c_str(), nullptr, base);
+			uint16_t val = strtol(parts.at(i / 2).c_str(), nullptr, base);
 
 			temp[i + 0] = val >> 8;
 			temp[i + 1] = val;
@@ -209,14 +209,12 @@ any_addr parse_address(const char *str, const size_t exp_size, const std::string
 	}
 	else {
 		for(size_t i=0; i<exp_size; i++)
-			temp[i] = strtol(parts->at(i).c_str(), nullptr, base);
+			temp[i] = strtol(parts.at(i).c_str(), nullptr, base);
 	}
 
 	any_addr rc = any_addr(temp, exp_size);
 
 	delete [] temp;
-
-	delete parts;
 
 	return rc;
 }
