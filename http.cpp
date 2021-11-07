@@ -241,11 +241,13 @@ tcp_port_handler_t http_get_handler(stats *const s, const std::string & web_root
 	hpd->web_root = web_root;
 	hpd->s = s;
 
-	hpd->http_requests = s->register_stat("http_requests");
-	hpd->http_r_200 = s->register_stat("http_r_200");
-	hpd->http_r_404 = s->register_stat("http_r_404");
-	hpd->http_r_500 = s->register_stat("http_r_500");
-	hpd->http_r_err = s->register_stat("http_r_err");
+	// 1.3.6.1.2.1.4.57850: vanheusden.com
+	// 1.3.6.1.2.1.4.57850.1: myip
+	hpd->http_requests = s->register_stat("http_requests", "1.3.6.1.2.1.4.57850.1.1");
+	hpd->http_r_200 = s->register_stat("http_r_200", "1.3.6.1.2.1.4.57850.1.2");
+	hpd->http_r_404 = s->register_stat("http_r_404", "1.3.6.1.2.1.4.57850.1.3");
+	hpd->http_r_500 = s->register_stat("http_r_500", "1.3.6.1.2.1.4.57850.1.4");
+	hpd->http_r_err = s->register_stat("http_r_err", "1.3.6.1.2.1.4.57850.1.5");
 
 	tcp_http.pd = hpd;
 
