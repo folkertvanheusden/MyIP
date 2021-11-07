@@ -9,8 +9,9 @@
 
 arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac) : address_cache(s, mymac, myip), gw_mac(gw_mac)
 {
-	arp_requests     = s->register_stat("arp_requests");
-	arp_for_me       = s->register_stat("arp_for_me");
+	// 1.3.6.1.2.1.4.57850.1.11: arp
+	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
+	arp_for_me       = s->register_stat("arp_for_me", "1.3.6.1.2.1.4.57850.1.11.2");
 
 	arp_th = new std::thread(std::ref(*this));
 }

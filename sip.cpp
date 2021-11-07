@@ -79,13 +79,14 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 	myip(myip), myport(myport),
 	interval(interval)
 {
-	sip_requests	= s->register_stat("sip_requests");
-	sip_requests_unk= s->register_stat("sip_requests_unk");
-	sip_rtp_sessions= s->register_stat("sip_rtp_sessions");
-	sip_rtp_codec_8	= s->register_stat("sip_rtp_codec_8");
-	sip_rtp_codec_11= s->register_stat("sip_rtp_codec_11");
-	sip_rtp_codec_97= s->register_stat("sip_rtp_codec_97");
-	sip_rtp_duration= s->register_stat("sip_rtp_duration");
+	// 1.3.6.1.2.1.4.57850.1.3: sip
+	sip_requests	= s->register_stat("sip_requests", "1.3.6.1.2.1.4.57850.1.3.1");
+	sip_requests_unk= s->register_stat("sip_requests_unk", "1.3.6.1.2.1.4.57850.1.3.2");
+	sip_rtp_sessions= s->register_stat("sip_rtp_sessions", "1.3.6.1.2.1.4.57850.1.3.3");
+	sip_rtp_codec_8	= s->register_stat("sip_rtp_codec_8", "1.3.6.1.2.1.4.57850.1.3.4");
+	sip_rtp_codec_11= s->register_stat("sip_rtp_codec_11", "1.3.6.1.2.1.4.57850.1.3.5");
+	sip_rtp_codec_97= s->register_stat("sip_rtp_codec_97", "1.3.6.1.2.1.4.57850.1.3.6");
+	sip_rtp_duration= s->register_stat("sip_rtp_duration", "1.3.6.1.2.1.4.57850.1.3.7");
 
 	th = new std::thread(std::ref(*this));
 

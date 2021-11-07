@@ -9,12 +9,13 @@
 
 address_cache::address_cache(stats *const s, const any_addr & mymac, const any_addr & myip) : mymac(mymac), myip(myip)
 {
-	address_cache_requests = s->register_stat("address_cache_requests");
-	address_cache_for_me   = s->register_stat("address_cache_for_me");
-	address_cache_req      = s->register_stat("address_cache_req");
-	address_cache_hit      = s->register_stat("address_cache_hit");
-	address_cache_store    = s->register_stat("address_cache_store");
-	address_cache_update   = s->register_stat("address_cache_cache_update");
+	// 1.3.6.1.2.1.4.57850.1.7: address cache
+	address_cache_requests = s->register_stat("address_cache_requests", "1.3.6.1.2.1.4.57850.1.7.1");
+	address_cache_for_me   = s->register_stat("address_cache_for_me", "1.3.6.1.2.1.4.57850.1.7.2");
+	address_cache_req      = s->register_stat("address_cache_req", "1.3.6.1.2.1.4.57850.1.7.3");
+	address_cache_hit      = s->register_stat("address_cache_hit", "1.3.6.1.2.1.4.57850.1.7.4");
+	address_cache_store    = s->register_stat("address_cache_store", "1.3.6.1.2.1.4.57850.1.7.5");
+	address_cache_update   = s->register_stat("address_cache_cache_update", "1.3.6.1.2.1.4.57850.1.7.6");
 
 	address_entry_t me { 0, mymac };  // must never be purged
 	cache.insert({ myip, me });

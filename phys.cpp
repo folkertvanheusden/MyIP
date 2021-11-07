@@ -65,10 +65,11 @@ phys::phys(stats *const s, const std::string & dev_name, const int uid, const in
 		exit(1);
 	}
 
-	phys_recv_frame = s->register_stat("phys_recv_frame");
-	phys_invl_frame = s->register_stat("phys_invl_frame");
-	phys_ign_frame = s->register_stat("phys_ign_frame");
-	phys_transmit = s->register_stat("phys_transmit");
+	// 1.3.6.1.2.1.4.57850.1.8: physical device
+	phys_recv_frame = s->register_stat("phys_recv_frame", "1.3.6.1.2.1.4.57850.1.8.1");
+	phys_invl_frame = s->register_stat("phys_invl_frame", "1.3.6.1.2.1.4.57850.1.8.2");
+	phys_ign_frame = s->register_stat("phys_ign_frame", "1.3.6.1.2.1.4.57850.1.8.3");
+	phys_transmit = s->register_stat("phys_transmit", "1.3.6.1.2.1.4.57850.1.8.4");
 
 	// MTU size for Ethernet
 	mtu_size = 1500;

@@ -12,8 +12,9 @@
 
 snmp::snmp(stats *const s, udp *const u) : s(s), u(u)
 {
-	snmp_requests = s->register_stat("snmp_requests");
-	snmp_invalid  = s->register_stat("snmp_invalid");
+	// 1.3.6.1.2.1.4.57850.1.5: snmp
+	snmp_requests = s->register_stat("snmp_requests", "1.3.6.1.2.1.4.57850.1.5.1");
+	snmp_invalid  = s->register_stat("snmp_invalid", "1.3.6.1.2.1.4.57850.1.5.2");
 }
 
 snmp::~snmp()
