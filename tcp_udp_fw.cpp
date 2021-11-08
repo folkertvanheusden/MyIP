@@ -7,7 +7,8 @@
 
 tcp_udp_fw::tcp_udp_fw(stats *const s, udp *const u)
 {
-	fw_n_dropped = s->register_stat("fw_n_dropped");
+	// 1.3.6.1.2.1.4.57850.1.10: firewall
+	fw_n_dropped = s->register_stat("fw_n_dropped", "1.3.6.1.2.1.4.57850.1.10.1");
 }
 
 tcp_udp_fw::~tcp_udp_fw()

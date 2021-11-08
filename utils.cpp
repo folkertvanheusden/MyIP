@@ -97,9 +97,9 @@ void get_random(uint8_t *tgt, size_t n)
 	close(fd);
 }
 
-std::vector<std::string> * split(std::string in, std::string splitter)
+std::vector<std::string> split(std::string in, std::string splitter)
 {
-	std::vector<std::string> *out = new std::vector<std::string>;
+	std::vector<std::string> out;
 	size_t splitter_size = splitter.size();
 
 	for(;;)
@@ -109,12 +109,12 @@ std::vector<std::string> * split(std::string in, std::string splitter)
 			break;
 
 		std::string before = in.substr(0, pos);
-		out -> push_back(before);
+		out.push_back(before);
 
 		size_t bytes_left = in.size() - (pos + splitter_size);
 		if (bytes_left == 0)
 		{
-			out -> push_back("");
+			out.push_back("");
 			return out;
 		}
 
@@ -122,7 +122,7 @@ std::vector<std::string> * split(std::string in, std::string splitter)
 	}
 
 	if (in.size() > 0)
-		out -> push_back(in);
+		out.push_back(in);
 
 	return out;
 }
@@ -302,14 +302,12 @@ std::optional<std::string> find_header(const std::vector<std::string> *const lin
 	for(auto line : *lines) {
 		auto parts = split(line, seperator);
 
-		if (parts->size() >= 2 && str_tolower(parts->at(0)) == lkey) {
+		if (parts.size() >= 2 && str_tolower(parts.at(0)) == lkey) {
 			value = line.substr(key.size() + 1);
 
 			while(value.value().empty() == false && value.value().at(0) == ' ')
 				value = value.value().substr(1);
 		}
-
-		delete parts;
 	}
 
 	return value;

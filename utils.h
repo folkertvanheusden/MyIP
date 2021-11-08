@@ -11,7 +11,7 @@ uint8_t *duplicate(const uint8_t *const in, const size_t size);
 std::string myformat(const char *const fmt, ...);
 uint64_t get_us();
 void get_random(uint8_t *tgt, size_t n);
-std::vector<std::string> * split(std::string in, std::string splitter);
+std::vector<std::string> split(std::string in, std::string splitter);
 std::string replace(std::string target, const std::string & what, const std::string & by_what);
 uint8_t * get_from_buffer(uint8_t **p, size_t *len, size_t get_len);
 typedef enum { debug, info, warning, error } log_level_t;

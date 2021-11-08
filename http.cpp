@@ -38,33 +38,30 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 	if (endm)
 		*endm = 0x00;
 
-	std::vector<std::string> *lines = split(request, "\r\n");
+	std::vector<std::string> lines = split(request, "\r\n");
 
-	if (lines->size() == 0) {
+	if (lines.size() == 0) {
 		dolog(info, "HTTP: empty request?\n");
-		delete lines;
 		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
 		return;
 	}
 
-	auto parts = split(lines->at(0), " ");
+	auto parts = split(lines.at(0), " ");
 
-	if (parts->size() < 3) {
-		dolog(warning, "HTTP: invalid request: %s\n", lines->at(0).c_str());
-		delete parts;
-		delete lines;
+	if (parts.size() < 3) {
+		dolog(warning, "HTTP: invalid request: %s\n", lines.at(0).c_str());
 		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
 		return;
 	}
 
-	std::string url = parts->at(1);
-	bool get = parts->at(0) == "GET";
+	std::string url = parts.at(1);
+	bool get = parts.at(0) == "GET";
 
 	int rc = 200;
 	uint8_t *reply = nullptr;
 	long content_len = 0;
 
-	auto host = find_header(lines, "Host");
+	auto host = find_header(&lines, "Host");
 
 	if (url == "" || url == "/")
 		url = "index.html";
@@ -146,13 +143,13 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 
 		const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-		auto referer = find_header(lines, "Referer");
-		auto user_agent = find_header(lines, "User-Agent");
+		auto referer = find_header(&lines, "Referer");
+		auto user_agent = find_header(&lines, "User-Agent");
 
 		fprintf(fh, "%s - - [%02d/%s/%04d:%02d:%02d:%02d +0000] \"%s\" %d %ld \"%s\" \"%s\"\n",
 				hs->client_addr.c_str(),
 				tm.tm_mday, month[tm.tm_mon], tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec,
-				(parts->at(0) + " " + parts->at(1) + " " + parts->at(2)).c_str(),
+				(parts.at(0) + " " + parts.at(1) + " " + parts.at(2)).c_str(),
 				rc,
 				content_len,
 				(referer.has_value() ? referer.value() : "-").c_str(),
@@ -163,8 +160,6 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 	else {
 		dolog(error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
-
-	delete parts;
 
 	ts->t->send_data(ts, (const uint8_t *)header.c_str(), header.size(), true);
 
@@ -180,8 +175,6 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 	}
 
 	ts->t->end_session(ts, pkt);
-
-	delete lines;
 
 	free(reply);
 }
@@ -241,11 +234,14 @@ tcp_port_handler_t http_get_handler(stats *const s, const std::string & web_root
 	hpd->web_root = web_root;
 	hpd->s = s;
 
-	hpd->http_requests = s->register_stat("http_requests");
-	hpd->http_r_200 = s->register_stat("http_r_200");
-	hpd->http_r_404 = s->register_stat("http_r_404");
-	hpd->http_r_500 = s->register_stat("http_r_500");
-	hpd->http_r_err = s->register_stat("http_r_err");
+	// 1.3.6.1.2.1.4.57850: vanheusden.com
+	// 1.3.6.1.2.1.4.57850.1: myip
+	// 1.3.6.1.2.1.4.57850.1.1: http
+	hpd->http_requests = s->register_stat("http_requests", "1.3.6.1.2.1.4.57850.1.1.1");
+	hpd->http_r_200 = s->register_stat("http_r_200", "1.3.6.1.2.1.4.57850.1.1.2");
+	hpd->http_r_404 = s->register_stat("http_r_404", "1.3.6.1.2.1.4.57850.1.1.3");
+	hpd->http_r_500 = s->register_stat("http_r_500", "1.3.6.1.2.1.4.57850.1.1.4");
+	hpd->http_r_err = s->register_stat("http_r_err", "1.3.6.1.2.1.4.57850.1.1.5");
 
 	tcp_http.pd = hpd;
 

@@ -9,8 +9,9 @@
 
 ndp::ndp(stats *const s, const any_addr & mymac, const any_addr & myip6) : address_cache(s, mymac, myip6)
 {
-        ndp_cache_req = s->register_stat("ndp_cache_req");
-        ndp_cache_hit = s->register_stat("ndp_cache_hit");
+	// 1.3.6.1.2.1.4.57850.1.9: ndp
+        ndp_cache_req = s->register_stat("ndp_cache_req", "1.3.6.1.2.1.4.57850.1.9.1");
+        ndp_cache_hit = s->register_stat("ndp_cache_hit", "1.3.6.1.2.1.4.57850.1.9.2");
 
 	ndp_th = new std::thread(std::ref(*this));
 }

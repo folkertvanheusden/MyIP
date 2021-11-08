@@ -665,9 +665,10 @@ tcp_port_handler_t vnc_get_handler(stats *const s)
 
 	vnc_private_data *vpd = new vnc_private_data();
 
-	vpd->vnc_requests = s->register_stat("vnc_requests");
-	vpd->vnc_err = s->register_stat("vnc_err");
-	vpd->vnc_duration = s->register_stat("vnc_duration");
+	// 1.3.6.1.2.1.4.57850.1.2: vnc
+	vpd->vnc_requests = s->register_stat("vnc_requests", "1.3.6.1.2.1.4.57850.1.2.1");
+	vpd->vnc_err = s->register_stat("vnc_err", "1.3.6.1.2.1.4.57850.1.2.2");
+	vpd->vnc_duration = s->register_stat("vnc_duration", "1.3.6.1.2.1.4.57850.1.2.3");
 
 	tcp_vnc.pd = vpd;
 

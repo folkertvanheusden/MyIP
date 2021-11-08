@@ -137,38 +137,36 @@ uint64_t * stats::register_stat(const std::string & name, const std::string & oi
 	if (oid.empty() == false) {
 		std::map<std::string, oid_t> *p_lut = &lut_oid;
 
-		std::vector<std::string> *parts = split(oid, ".");
+		std::vector<std::string> parts = split(oid, ".");
 
 		std::string cur_oid;
 
-		for(size_t i=0; i<parts->size(); i++) {
-			auto it = p_lut->find(parts->at(i));
+		for(size_t i=0; i<parts.size(); i++) {
+			auto it = p_lut->find(parts.at(i));
 
 			if (cur_oid.empty() == false)
 				cur_oid += ".";
 
-			cur_oid += parts->at(i);
+			cur_oid += parts.at(i);
 
 			if (it == p_lut->end()) {
 				oid_t o;
 				o.s.oid = cur_oid;
-				o.index = atoi(parts->at(i).c_str());
+				o.index = atoi(parts.at(i).c_str());
 
-				auto rc = p_lut->insert(std::pair<std::string, oid_t>(parts->at(i), o));
+				auto rc = p_lut->insert(std::pair<std::string, oid_t>(parts.at(i), o));
 
 				it = rc.first;
 			}
 
-			if (i == parts->size() - 1) {
+			if (i == parts.size() - 1) {
 				it->second.s = st;
-				it->second.index = atoi(parts->at(i).c_str());
+				it->second.index = atoi(parts.at(i).c_str());
 			}
 			else {
 				p_lut = &it->second.children;
 			}
 		}
-
-		delete parts;
 	}
 
 	lock.unlock();
@@ -189,21 +187,19 @@ uint64_t * stats::find_by_oid(const std::string & oid)
 
 	std::map<std::string, oid_t> *p_lut = &lut_oid;
 
-	std::vector<std::string> *parts = split(oid, ".");
+	std::vector<std::string> parts = split(oid, ".");
 
-	for(size_t i=0; i<parts->size(); i++) {
-		auto it = p_lut->find(parts->at(i));
+	for(size_t i=0; i<parts.size(); i++) {
+		auto it = p_lut->find(parts.at(i));
 
 		if (it == p_lut->end())
 			break;
 
-		if (i == parts->size() - 1)
+		if (i == parts.size() - 1)
 			rc = it->second.s.p;
 		else
 			p_lut = &it->second.children;
 	}
-
-	delete parts;
 
 	lock.unlock();
 
@@ -242,16 +238,16 @@ std::string stats::find_next_oid(const std::string & oid)
 
 	std::map<std::string, oid_t> *p_lut = &lut_oid;
 
-	std::vector<std::string> *parts = split(oid, ".");
+	std::vector<std::string> parts = split(oid, ".");
 
-	for(size_t i=0; i<parts->size(); i++) {
-		auto it = p_lut->find(parts->at(i));
+	for(size_t i=0; i<parts.size(); i++) {
+		auto it = p_lut->find(parts.at(i));
 
 		if (it == p_lut->end())
 			break;
 
-		if (i == parts->size() - 1) {
-			out = get_sibling(*p_lut, atoi(parts->at(i).c_str()));
+		if (i == parts.size() - 1) {
+			out = get_sibling(*p_lut, atoi(parts.at(i).c_str()));
 
 			if (out.empty() == true) {
 				p_lut = &it->second.children;
@@ -264,8 +260,6 @@ std::string stats::find_next_oid(const std::string & oid)
 
 		p_lut = &it->second.children;
 	}
-
-	delete parts;
 
 	lock.unlock();
 

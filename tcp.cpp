@@ -49,7 +49,7 @@ char *flags_to_str(uint8_t flags)
 tcp::tcp(stats *const s)
 {
 	tcp_packets = s->register_stat("tcp_packets");
-	tcp_errors = s->register_stat("tcp_errors");
+	tcp_errors = s->register_stat("tcp_errors", "1.3.6.1.2.1.6.7");  // tcpAttemptFails
 	tcp_succ_estab = s->register_stat("tcp_succ_estab");
 	tcp_internal_err = s->register_stat("tcp_internal_err");
 	tcp_syn = s->register_stat("tcp_syn");
