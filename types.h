@@ -112,6 +112,7 @@ public:
 	size_t data_len { 0 };
         std::condition_variable w_cond;
         mutable std::mutex w_lock;
+	std::vector<std::pair<uint8_t *, size_t> > msgs_out;
 
 	std::atomic_bool terminate { false };
 };
