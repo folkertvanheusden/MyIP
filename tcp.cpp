@@ -679,8 +679,7 @@ void tcp::end_session(tcp_session_t *const ts)
 	dolog(debug, "TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, rel_seqnr(ts, true, ts->my_seq_nr));
 
 	if (ts->unacked_size == 0) {
-		send_segment(ts, ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 1, (1 << 4) | (1 << 0) /* ACK, FIN */, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
-		ts->my_seq_nr++;
+		send_segment(ts, ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 1, (1 << 0) /* FIN */, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
 
 		ts->tx_open = false;
 
