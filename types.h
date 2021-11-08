@@ -114,5 +114,7 @@ public:
         mutable std::mutex w_lock;
 	std::vector<std::pair<uint8_t *, size_t> > msgs_out;
 
+	std::string session_name;
+
 	std::atomic_bool terminate { false };
 };
