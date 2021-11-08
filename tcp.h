@@ -53,6 +53,8 @@ typedef struct {
 	size_t unacked_size;
 	bool fin_after_unacked_empty;
 
+	bool rx_open, tx_open;
+
 	session_data *p;
 } tcp_session_t;
 
@@ -93,7 +95,7 @@ private:
 	uint64_t *tcp_sessions_closed_1 { nullptr };
 	uint64_t *tcp_sessions_closed_2 { nullptr };
 
-	void send_segment(const tcp_session_t *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
+	void send_segment(tcp_session_t *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
 
 	void packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag);
 	void cleanup_session_helper(std::map<uint64_t, tcp_session_t *>::iterator *it);
@@ -107,7 +109,7 @@ public:
 	void add_handler(const int port, tcp_port_handler_t & tph);
 
 	void send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len, const bool in_cb);
-	void end_session(tcp_session_t *const ts, const packet *const pkt);
+	void end_session(tcp_session_t *const ts);
 
 	virtual void operator()() override;
 };

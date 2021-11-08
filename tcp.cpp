@@ -79,7 +79,7 @@ int rel_seqnr(const tcp_session_t *const ts, const bool mine, const uint32_t nr)
 	return mine ? nr - ts->initial_my_seq_nr : nr - ts->initial_their_seq_nr;
 }
 
-void tcp::send_segment(const tcp_session_t *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len)
+void tcp::send_segment(tcp_session_t *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len)
 {
 	char *flag_str = flags_to_str(flags);
 	dolog(debug, "TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str, rel_seqnr(ts, false, ack_to), my_seq_nr ? rel_seqnr(ts, true, *my_seq_nr) : -1, data_len);
@@ -142,6 +142,8 @@ void tcp::send_segment(const tcp_session_t *const ts, const uint64_t session_id,
 
 	if (my_seq_nr)
 		(*my_seq_nr) += data_len;
+
+	ts->last_pkt = get_us();
 }
 
 void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag)
@@ -215,6 +217,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		new_session->org_dst_addr = pkt->get_dst_addr();
 		new_session->org_dst_port = dst_port;
 
+		new_session->rx_open = new_session->tx_open = true;
+
 		new_session->p = nullptr;
 		new_session->t = this;
 
@@ -251,6 +255,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			cur_session->their_seq_nr = their_seq_nr + 1;
 
+			cur_session->rx_open = false;
+
 			uint8_t flags = 1 << 4; // ACK
 
 			if (cur_session->state_me != tcp_fin_wait1)
@@ -271,14 +277,16 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			cur_session->my_seq_nr++;
 
-			cb_it->second.session_closed_1(cur_session, cb_it->second.pd);
+			// tell layer 7 that RX is closed
+			if (cb_it->second.new_data(cur_session, nullptr, nullptr, 0, cb_it->second.pd) == false)
+				delete_entry = true;
 		}
 		else {
 			dolog(info, "TCP[%012" PRIx64 "]: FIN for unknown session\n", id);
 			fail = true;
-		}
 
-		delete_entry = true;
+			delete_entry = true;
+		}
 	}
 	else if (flag_syn) {
 		if (!flag_ack)
@@ -368,6 +376,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				cur_session->my_seq_nr++;
 
 				cur_session->state_me = tcp_fin_wait1;
+
+				cur_session->tx_open = false;
 			}
 		}
 		else if (ack_n < 0) {
@@ -401,7 +411,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 			}
-
 		}
 		else {
 			dolog(info, "TCP[%012" PRIx64 "]: data already seen/resend (seq: %u)\n", id, rel_seqnr(cur_session, true, their_seq_nr));
@@ -467,6 +476,7 @@ void tcp::session_cleaner()
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
+		// TODO: langere wachttijd en wakker maken elders als rx_open of tx_open op false gezet wordt
 		std::unique_lock<std::mutex> lck(sessions_lock);
 		if (sessions_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
 			dolog(debug, "tcp-clnr woke-up after ack\n");
@@ -477,8 +487,11 @@ void tcp::session_cleaner()
 		for(auto it = sessions.cbegin(); it != sessions.cend();) {
 			uint64_t age = (now - it->second->last_pkt) / 1000000;
 
-			if (age >= session_timeout) {
-				dolog(debug, "TCP[%012" PRIx64 "]: session timed out\n", it->first);
+			if (age >= session_timeout || (it->second->rx_open == false && it->second->tx_open == false)) {
+				if (it->second->rx_open == false && it->second->tx_open == false)
+					dolog(debug, "TCP[%012" PRIx64 "]: session closed by both sides\n", it->first);
+				else
+					dolog(debug, "TCP[%012" PRIx64 "]: session timed out\n", it->first);
 
 				// call session_closed
 				auto cb_it = listeners.find(it->second->org_dst_port);
@@ -661,13 +674,15 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 }
 
 // this method requires tcp_session_t to be already locked
-void tcp::end_session(tcp_session_t *const ts, const packet *const pkt)
+void tcp::end_session(tcp_session_t *const ts)
 {
 	dolog(debug, "TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, rel_seqnr(ts, true, ts->my_seq_nr));
 
 	if (ts->unacked_size == 0) {
 		send_segment(ts, ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 1, (1 << 4) | (1 << 0) /* ACK, FIN */, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
 		ts->my_seq_nr++;
+
+		ts->tx_open = false;
 
 		ts->state_me = tcp_fin_wait1;
 	}

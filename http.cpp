@@ -174,7 +174,7 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 		}
 	}
 
-	ts->t->end_session(ts, pkt);
+	ts->t->end_session(ts);
 
 	free(reply);
 }
@@ -187,6 +187,11 @@ bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 		dolog(info, "HTTP: Data for a non-existing session\n");
 		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
 		return false;
+	}
+
+	if (!data) {
+		dolog(debug, "HTTP: client closed session\n");
+		return true;
 	}
 
 	hs->req_data = (char *)realloc(hs->req_data, hs->req_len + data_len + 1);

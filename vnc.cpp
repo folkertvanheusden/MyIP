@@ -293,6 +293,12 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 		return false;
 	}
 
+	if (!data) {
+		dolog(debug, "HTTP: client closed session\n");
+		vs->w_cond.notify_one();
+		return true;
+	}
+
 	vnc_thread_work_t *work = new vnc_thread_work_t;
 	work->pkt = pkt->duplicate();
 	work->data = (char *)duplicate((const uint8_t *)data, data_len);
@@ -617,6 +623,8 @@ void vnc_thread(void *ts_in)
 		delete [] work->data;
 		delete work;
 	}
+
+	ts->t->end_session(ts);
 
 	dolog(info, "VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }

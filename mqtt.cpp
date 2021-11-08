@@ -145,6 +145,12 @@ bool mqtt_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 		return false;
 	}
 
+	if (!data) {
+		dolog(debug, "HTTP: client closed session\n");
+		ms->w_cond.notify_one();
+		return true;
+	}
+
 	const std::lock_guard<std::mutex> lck(ms->w_lock);
 
 	ms->data = static_cast<uint8_t *>(realloc(ms->data, ms->data_len + data_len));
@@ -157,23 +163,19 @@ bool mqtt_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 }
 
 // 2nd mqtt event loop
-void mqtt_get_bytes(tcp_session_t *const ts, mqtt_session_data *const msd, uint8_t *const tgt, const size_t n)
+bool mqtt_get_bytes(tcp_session_t *const ts, mqtt_session_data *const msd, uint8_t *const tgt, const size_t n)
 {
 	dolog(debug, "MQTT(%s): %zu bytes requested, %zu available\n", msd->session_name.c_str(), n, msd->data_len);
 
 	std::unique_lock<std::mutex> lck(msd->w_lock);
 
-	dolog(debug, "001 start (%s)\n", msd->session_name.c_str());
 	for(;!msd->terminate;) {
-	dolog(debug, "002 check queue empy (%s)\n", msd->session_name.c_str());
 		// process outgoing messages
 		// they are placed in the queue by publishers
 		if (msd->msgs_out.empty() == false) {
-	dolog(debug, "003 queue not empty (%s)\n", msd->session_name.c_str());
 			dolog(debug, "MQTT(%s): %zu msgs pending\n", msd->session_name.c_str(), msd->msgs_out.size());
 
 			for (auto it : msd->msgs_out) {
-	dolog(debug, "004 go through queue (%s)\n", msd->session_name.c_str());
 				dolog(debug, "MQTT(%s): sending message of %zu bytes length\n", msd->session_name.c_str(), it.second);
 
 				ts->t->send_data(ts, it.first, it.second, false);
@@ -183,10 +185,8 @@ void mqtt_get_bytes(tcp_session_t *const ts, mqtt_session_data *const msd, uint8
 			msd->msgs_out.clear();
 		}
 
-	dolog(debug, "005 after msg queue (%s)\n", msd->session_name.c_str());
 		// any data?
 		if (msd->data_len >= n) {
-	dolog(debug, "006 any data (%s)\n", msd->session_name.c_str());
 			memcpy(tgt, msd->data, n);
 
 			int move_n = msd->data_len - n;
@@ -201,21 +201,21 @@ void mqtt_get_bytes(tcp_session_t *const ts, mqtt_session_data *const msd, uint8
 			break;
 		}
 
-	dolog(debug, "007 wait for next event (%s)\n", msd->session_name.c_str());
+		// no more data?
+		if (ts->rx_open == false)
+			return false;
+
 		msd->w_cond.wait(lck);
 	}
-	dolog(debug, "008 got data (%s)\n", msd->session_name.c_str());
 
 	dolog(debug, "MQTT(%s): %zu bytes returned\n", msd->session_name.c_str(), n);
+
+	return true;
 }
 
-uint8_t mqtt_get_byte(tcp_session_t *const ts, mqtt_session_data *const ms)
+bool mqtt_get_byte(tcp_session_t *const ts, mqtt_session_data *const ms, uint8_t *data)
 {
-	uint8_t tgt = 123;
-
-	mqtt_get_bytes(ts, ms, &tgt, 1);
-
-	return tgt;
+	return mqtt_get_bytes(ts, ms, data, 1);
 }
 
 void mqtt_recv_thread(void *ts_in)
@@ -228,11 +228,19 @@ void mqtt_recv_thread(void *ts_in)
 	std::string identifier;
 
 	for(;ms->terminate == false;) {
-		uint8_t control = mqtt_get_byte(ts, ms);
+		uint8_t control = 0;
+		if (mqtt_get_byte(ts, ms, &control) == false)
+			break;
+
 		uint32_t len = 0;
 
+		bool finished = false;
 		for(;ms->terminate == false;) {
-			uint8_t b = mqtt_get_byte(ts, ms);
+			uint8_t b = 0;
+			if (!mqtt_get_byte(ts, ms, &b)) {
+				finished = true;
+				break;
+			}
 
 			len <<= 7;
 			len |= b & 127;
@@ -241,13 +249,20 @@ void mqtt_recv_thread(void *ts_in)
 				break;
 		}
 
+		if (finished)
+			break;
+
 		uint8_t cmsg = control >> 4;
 		//uint8_t cflags = control & 0x0f;
 
 		dolog(debug, "MQTT(%s): control %02x msg %d, rem. len.: %d\n", ms->session_name.c_str(), control, cmsg, len);
 		
 		uint8_t *mqtt_msg = new uint8_t[len + 1];
-		mqtt_get_bytes(ts, ms, mqtt_msg, len);
+		if (!mqtt_get_bytes(ts, ms, mqtt_msg, len)) {
+			delete [] mqtt_msg;
+			break;
+		}
+
 		mqtt_msg[len] = 0x00;  // e.g. CONNECT msg ends with strings
 
 		std::string hex;
@@ -349,7 +364,9 @@ void mqtt_recv_thread(void *ts_in)
 
 	unregister_all_topics(ms);
 
-	dolog(info, "MQTT(%s): Thread terminating for %s\n", ms->session_name.c_str(), ms->client_addr.c_str());
+	dolog(info, "MQTT(%s): Thread terminating (and closing session) for %s\n", ms->session_name.c_str(), ms->client_addr.c_str());
+
+	ts->t->end_session(ts);
 }
 
 void mqtt_close_session_1(tcp_session_t *ts, private_data *pd)
