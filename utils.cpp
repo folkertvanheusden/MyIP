@@ -197,10 +197,8 @@ void dolog(const log_level_t ll, const char *fmt, ...)
 	(void)vasprintf(&str, fmt, ap);
 	va_end(ap);
 
-	if (ll >= log_level_file) {
+	if (ll >= log_level_file)
 		fprintf(lfh, "%s%s", ts_str, str);
-		fflush(lfh);
-	}
 
 	if (ll >= log_level_screen)
 		printf("%s%s", ts_str, str);
