@@ -382,17 +382,26 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		dolog(debug, "TCP[%012" PRIx64 "]: packet len %d, header size: %d, data size: %d\n", id, size, header_size, data_len);
 
 		if (their_seq_nr >= cur_session->their_seq_nr) {
-			cur_session->their_seq_nr += data_len;  // FIXME handle missing segments
-
-			send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
-
 			const uint8_t *data_start = &p[header_size];
 
 			std::string content = bin_to_text(data_start, data_len);
 			dolog(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
 
-			if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.pd) == false)
+			try {
+				if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.pd) == false)
+					fail = true;
+			}
+			catch(...) {
+				dolog(error, "TCP[%012" PRIx64 "]: EXCEPTION IN new_data()\n", id);
 				fail = true;
+			}
+
+			if (fail == false) {
+				cur_session->their_seq_nr += data_len;  // FIXME handle missing segments
+
+				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+			}
+
 		}
 		else {
 			dolog(info, "TCP[%012" PRIx64 "]: data already seen/resend (seq: %u)\n", id, rel_seqnr(cur_session, true, their_seq_nr));
