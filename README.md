@@ -2,7 +2,7 @@ what this is
 ------------
 This is an implementation of an IP-stack (IPv4/IPv6).
 It will listen on a tap-device for ethernet frames containg e.g. ARP-
-requests, IP packets, ICMP, UDP and even NTP, VNC, SIP, MQTT (no wildcards) and HTTP requests.
+requests, IP packets, ICMP, UDP and even NTP, VNC, SIP, MQTT and HTTP requests.
 
 required
 --------

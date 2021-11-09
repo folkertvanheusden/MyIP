@@ -22,23 +22,47 @@ void mqtt_recv_thread(void *ts_in);
 
 static std::mutex topic_lck;
 static std::map<const std::string, std::set<mqtt_session_data *> > topic_subscriptions;
+static std::vector<std::pair<const std::string, std::set<mqtt_session_data *> > > topic_wc_subscriptions;  // wildcards
 
 static void register_topic(const std::string & topic, mqtt_session_data *const msd)
 {
 	dolog(debug, "MQTT: Register topic %s for %p\n", topic.c_str(), msd);
 	dolog(debug, "MQTT: # topics: %zu\n", topic_subscriptions.size());
 
-	topic_lck.lock();
+	size_t wc = topic.find('#');
+	if (wc == std::string::npos) {
+		topic_lck.lock();
 
-	auto it = topic_subscriptions.find(topic);
-	if (it != topic_subscriptions.end())
-		it->second.insert(msd);
-	else
-		topic_subscriptions.insert({ topic, { msd } });
+		auto it = topic_subscriptions.find(topic);
+		if (it != topic_subscriptions.end())
+			it->second.insert(msd);
+		else
+			topic_subscriptions.insert({ topic, { msd } });
 
-	dolog(debug, "MQTT: topic %s %zu subscribers\n", topic.c_str(), topic_subscriptions.find(topic)->second.size());
+		dolog(debug, "MQTT: topic %s %zu subscribers\n", topic.c_str(), topic_subscriptions.find(topic)->second.size());
 
-	topic_lck.unlock();
+		topic_lck.unlock();
+	}
+	else {
+		topic_lck.lock();
+
+		bool found = false;
+		for(auto it : topic_wc_subscriptions) {
+			if (it.first == topic) {
+				it.second.insert(msd);
+				found = true;
+				dolog(debug, "MQTT: topic %s %zu subscribers\n", topic.c_str(), it.second.size());
+				break;
+			}
+		}
+
+		if (!found) {
+			topic_wc_subscriptions.push_back({ topic, { msd } });
+			dolog(debug, "MQTT: topic %s 1 subscriber\n", topic.c_str());
+		}
+
+		topic_lck.unlock();
+	}
 }
 
 static void unregister_topic(const std::string & topic, mqtt_session_data *const msd)
@@ -50,6 +74,13 @@ static void unregister_topic(const std::string & topic, mqtt_session_data *const
 	if (it != topic_subscriptions.end())
 		it->second.erase(msd);
 
+	for(auto it : topic_wc_subscriptions) {
+		if (it.first == topic) {
+			it.second.erase(msd);
+			break;
+		}
+	}
+
 	topic_lck.unlock();
 }
 
@@ -60,6 +91,9 @@ static void unregister_all_topics(mqtt_session_data *const msd)
 	topic_lck.lock();
 
 	for(auto it : topic_subscriptions)
+		it.second.erase(msd);
+
+	for(auto it : topic_wc_subscriptions)
 		it.second.erase(msd);
 
 	topic_lck.unlock();
@@ -97,6 +131,24 @@ static void publish(mqtt_session_data *const msd, const std::string & topic, con
 
 	for(auto t_it : topic_subscriptions) {
 		if (t_it.first != topic)
+			continue;
+
+		for(auto s_it : t_it.second) {
+			dolog(debug, "MQTT(%s): queuing for %p (new #: %zu)\n", msd->session_name.c_str(), s_it, s_it->msgs_out.size() + 1);
+
+			const std::lock_guard<std::mutex> lck(s_it->w_lock);
+
+			s_it->msgs_out.push_back({ duplicate(msg.data(), msg.size()), msg.size() });
+
+			s_it->w_cond.notify_one();
+		}
+	}
+
+	for(auto t_it : topic_wc_subscriptions) {
+		size_t wc = t_it.first.find('#');
+		assert(wc != std::string::npos);
+
+		if (topic.substr(0, wc) != t_it.first.substr(0, wc))
 			continue;
 
 		for(auto s_it : t_it.second) {
