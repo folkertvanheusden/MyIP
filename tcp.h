@@ -43,6 +43,7 @@ typedef struct {
 	uint32_t initial_my_seq_nr, initial_their_seq_nr;
 
 	uint8_t *unacked;
+	uint32_t unacked_start_seq_nr;
 	size_t unacked_size;
 	bool fin_after_unacked_empty;
 

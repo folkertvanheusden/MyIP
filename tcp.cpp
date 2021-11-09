@@ -206,6 +206,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		new_session->id = id;
 
 		new_session->unacked = nullptr;
+		new_session->unacked_start_seq_nr = 0;
 		new_session->unacked_size = 0;
 		new_session->fin_after_unacked_empty = false;
 
@@ -346,9 +347,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	}
 
 	if (flag_ack) {
-		int ack_n = ack_to - cur_session->my_seq_nr;
+		int ack_n = ack_to - cur_session->unacked_start_seq_nr;
 
-		if (ack_n > 0 && size_t(ack_n) <= cur_session->unacked_size) {
+		if (ack_n > 0 && cur_session->unacked_size > 0) {  // else: ack to syn/fin
 			dolog(debug, "TCP[%012" PRIx64 "]: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", id, rel_seqnr(cur_session, true, ack_to), rel_seqnr(cur_session, true, cur_session->my_seq_nr), ack_n, cur_session->unacked_size);
 
 			// delete acked
@@ -364,6 +365,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			}
 
 			cur_session->unacked_size -= ack_n;
+			cur_session->unacked_start_seq_nr += ack_n;
 
 			dolog(debug, "TCP[%012" PRIx64 "]: unacked left: %zu, fin after empty: %d\n", id, cur_session->unacked_size, cur_session->fin_after_unacked_empty);
 
@@ -379,9 +381,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				cur_session->tx_open = false;
 			}
-		}
-		else if (ack_n < 0) {
-			dolog(warning, "TCP[%012" PRIx64 "]: got ack for %u SIZE %d?!\n", id, rel_seqnr(cur_session, true, ack_to), ack_n);
 		}
 
 		unacked_cv.notify_all();
@@ -652,6 +651,8 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 			window_full = true;
 		}
 
+		if (ts->unacked_size == 0)
+			ts->unacked_start_seq_nr = ts->my_seq_nr;
 		ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + send_n);
 		memcpy(&ts->unacked[ts->unacked_size], p, send_n);
 		ts->unacked_size += send_n;
