@@ -287,6 +287,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				cur_session->state = tcp_syn_rcvd;
 			}
+			else {
+				dolog(debug, "TCP[%012" PRIx64 "]: unexpected SYN\n", id);
+			}
 		}
 
 		if (flag_ack) {
@@ -299,6 +302,45 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				cur_session->state = tcp_listen;  // tcp_closed really
 				delete_entry = true;
 			}
+			// opponent acknowledges the reception of a bit of data
+			else if (cur_session->state == tcp_established) {
+				int ack_n = ack_to - cur_session->unacked_start_seq_nr;
+
+				if (ack_n > 0 && cur_session->unacked_size > 0) {
+					dolog(debug, "TCP[%012" PRIx64 "]: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", id, rel_seqnr(cur_session, true, ack_to), rel_seqnr(cur_session, true, cur_session->my_seq_nr), ack_n, cur_session->unacked_size);
+
+					// delete acked
+					int left_n = cur_session->unacked_size - ack_n;
+					if (left_n > 0)
+						memmove(&cur_session->unacked[0], &cur_session->unacked[ack_n], left_n);
+					else if (left_n < 0) {
+						dolog(warning, "TCP[%012" PRIx64 "]: ack underrun? %d\n", id, left_n);
+						// terminate this invalid session
+						// can happen for data coming in after finished
+						delete_entry = fail = true;
+					}
+
+					cur_session->unacked_size -= ack_n;
+					cur_session->unacked_start_seq_nr += ack_n;
+
+					dolog(debug, "TCP[%012" PRIx64 "]: unacked left: %zu, fin after empty: %d\n", id, cur_session->unacked_size, cur_session->fin_after_unacked_empty);
+
+					cur_session->my_seq_nr += ack_n;
+
+					if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
+						dolog(debug, "TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n", id);
+
+						send_segment(cur_session, cur_session->id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) | (1 << 0) /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+
+						cur_session->state = tcp_fin_wait_1;
+					}
+				}
+
+				unacked_cv.notify_all();
+			}
+			else {
+				dolog(debug, "TCP[%012" PRIx64 "]: unexpected ACK\n", id);
+			}
 		}
 
 		if (flag_rst) {
@@ -307,6 +349,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				cur_session->state = tcp_listen;
 				delete_entry = true;
 			}		
+			else {
+				dolog(debug, "TCP[%012" PRIx64 "]: unexpected RST\n", id);
+			}
 		}
 
 		if (flag_fin) {
@@ -318,6 +363,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 
 				cur_session->state = tcp_last_ack;
+			}
+			else {
+				dolog(debug, "TCP[%012" PRIx64 "]: unexpected FIN\n", id);
 			}
 		}
 	}
