@@ -23,13 +23,6 @@ constexpr int session_timeout = 60; // in seconds
 typedef enum { tcp_listen, tcp_sync_recv, tcp_established, tcp_fin_wait1, tcp_fin_wait2, tcp_wait } tcp_state_t;
 
 typedef struct {
-	const uint8_t *data;
-	size_t len;
-	uint64_t last_sent;
-	uint64_t internal_id;
-} unacked_segment_t;
-
-typedef struct {
 	std::mutex tlock;
 
 	tcp *t;
