@@ -20,7 +20,7 @@ class tcp;
 constexpr int clean_interval = 1; // in seconds
 constexpr int session_timeout = 60; // in seconds
 
-typedef enum { tcp_listen, tcp_sync_recv, tcp_established, tcp_fin_wait1, tcp_fin_wait2, tcp_wait } tcp_state_t;
+typedef enum { tcp_closed, tcp_listen, tcp_syn_rcvd, tcp_syn_sent, tcp_established, tcp_fin_wait_1, tcp_fin_wait_2, tcp_close_wait, tcp_last_ack, tcp_closing, tcp_time_wait, tcp_rst_act } tcp_state_t;
 
 typedef struct {
 	std::mutex tlock;
@@ -37,7 +37,7 @@ typedef struct {
 
 	uint16_t window_size;
 
-	tcp_state_t state_me;
+	tcp_state_t state;
 	uint64_t last_pkt;
 	uint32_t my_seq_nr, their_seq_nr;
 	uint32_t initial_my_seq_nr, initial_their_seq_nr;
