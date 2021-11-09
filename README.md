@@ -2,7 +2,7 @@ what this is
 ------------
 This is an implementation of an IP-stack (IPv4/IPv6).
 It will listen on a tap-device for ethernet frames containg e.g. ARP-
-requests, IP packets, ICMP, UDP and even NTP, VNC, SIP and HTTP requests.
+requests, IP packets, ICMP, UDP and even NTP, VNC, SIP, MQTT (no wildcards) and HTTP requests.
 
 required
 --------
@@ -57,7 +57,7 @@ See http://myip.vanheusden.com/
 
 Use myip6.vanheusden.com for IPv6 access.
 
-It also runs an NTP, SIP, SNMP and VNC server.
+It also runs an NTP, SIP, SNMP, MQTT and VNC server.
 
 copyright
 ---------
