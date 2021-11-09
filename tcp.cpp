@@ -193,43 +193,53 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	auto cur_it = sessions.find(id);
 
 	if (cur_it == sessions.end()) {
-		tcp_session_t *new_session = new tcp_session_t();
-		new_session->state_me = tcp_listen;
-		new_session->last_pkt = get_us();
+		if (p[13] & (1 << 1)) {  // MUST start with SYN
+			tcp_session_t *new_session = new tcp_session_t();
+			new_session->state_me = tcp_listen;
+			new_session->last_pkt = get_us();
 
-		get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
-		new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
+			get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
+			new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
 
-		new_session->initial_their_seq_nr = their_seq_nr;
-		new_session->their_seq_nr = their_seq_nr + 1;
+			new_session->initial_their_seq_nr = their_seq_nr;
+			new_session->their_seq_nr = their_seq_nr + 1;
 
-		new_session->id = id;
+			new_session->id = id;
 
-		new_session->unacked = nullptr;
-		new_session->unacked_start_seq_nr = 0;
-		new_session->unacked_size = 0;
-		new_session->fin_after_unacked_empty = false;
+			new_session->unacked = nullptr;
+			new_session->unacked_start_seq_nr = 0;
+			new_session->unacked_size = 0;
+			new_session->fin_after_unacked_empty = false;
 
-		new_session->window_size = win_size;
+			new_session->window_size = win_size;
 
-		new_session->org_src_addr = pkt->get_src_addr();
-		new_session->org_src_port = src_port;
+			new_session->org_src_addr = pkt->get_src_addr();
+			new_session->org_src_port = src_port;
 
-		new_session->org_dst_addr = pkt->get_dst_addr();
-		new_session->org_dst_port = dst_port;
+			new_session->org_dst_addr = pkt->get_dst_addr();
+			new_session->org_dst_port = dst_port;
 
-		new_session->rx_open = new_session->tx_open = true;
+			new_session->rx_open = new_session->tx_open = true;
 
-		new_session->p = nullptr;
-		new_session->t = this;
+			new_session->p = nullptr;
+			new_session->t = this;
 
-		sessions.insert({ id, new_session });
+			sessions.insert({ id, new_session });
 
-		stats_inc_counter(tcp_new_sessions);
+			stats_inc_counter(tcp_new_sessions);
 
-		dolog(debug, "TCP[%012" PRIx64 "]: ...is a new session (initial my seq nr: %u, their: %u)\n", id, new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
+			dolog(debug, "TCP[%012" PRIx64 "]: ...is a new session (initial my seq nr: %u, their: %u)\n", id, new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
 
-		cur_it = sessions.find(id);
+			cur_it = sessions.find(id);
+		}
+		else {
+			sessions_lock.unlock();
+			dolog(info, "TCP: new session which does not start with SYN\n");
+			delete pkt;
+			stats_inc_counter(tcp_errors);
+			*finished_flag = true;
+			return;
+		}
 	}
 
 	tcp_session_t *const cur_session = cur_it->second;
