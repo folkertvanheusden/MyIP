@@ -193,7 +193,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	auto cur_it = sessions.find(id);
 
 	if (cur_it == sessions.end()) {
-		if (p[13] & (1 << 1)) {  // MUST start with SYN
+		if (flag_syn) {  // MUST start with SYN
 			tcp_session_t *new_session = new tcp_session_t();
 			new_session->state_me = tcp_listen;
 			new_session->last_pkt = get_us();
