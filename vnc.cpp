@@ -294,7 +294,7 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 	}
 
 	if (!data) {
-		dolog(debug, "HTTP: client closed session\n");
+		dolog(debug, "VNC: client closed session\n");
 		vs->w_cond.notify_one();
 		return true;
 	}
