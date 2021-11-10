@@ -254,8 +254,11 @@ bool mqtt_get_bytes(tcp_session_t *const ts, mqtt_session_data *const msd, uint8
 		}
 
 		// no more data?
-		if (ts->rx_open == false)
+		if (ts->state >= tcp_last_ack) {
+			dolog(debug, "MQTT(%s): (mqtt_get_bytes) no more data; session closed/closing\n", msd->session_name.c_str());
+
 			return false;
+		}
 
 		msd->w_cond.wait(lck);
 	}

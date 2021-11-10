@@ -211,7 +211,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		if (flag_syn) {  // MUST start with SYN
 			tcp_session_t *new_session = new tcp_session_t();
 			new_session->state = tcp_listen;
-			new_session->last_pkt = get_us();
 
 			get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
 			new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
@@ -233,8 +232,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			new_session->org_dst_addr = pkt->get_dst_addr();
 			new_session->org_dst_port = dst_port;
-
-			new_session->rx_open = new_session->tx_open = true;
 
 			new_session->p = nullptr;
 			new_session->t = this;
@@ -258,6 +255,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	}
 
 	tcp_session_t *const cur_session = cur_it->second;
+
+	cur_session->last_pkt = get_us();
 
 	dolog(debug, "TCP[%012" PRIx64 "]: start processing TCP segment, state: %s, my seq nr %d, opponent seq nr %d\n", id, states[cur_session->state], rel_seqnr(cur_session, true, cur_session->my_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
 	cur_session->tlock.lock();
@@ -475,7 +474,7 @@ void tcp::session_cleaner()
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
-		// TODO: langere wachttijd en wakker maken elders als rx_open of tx_open op false gezet wordt
+		// TODO: langere wachttijd en wakker maken elders als state != established gezet wordt
 		std::unique_lock<std::mutex> lck(sessions_lock);
 		if (sessions_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
 			dolog(debug, "tcp-clnr woke-up after ack\n");
@@ -486,9 +485,9 @@ void tcp::session_cleaner()
 		for(auto it = sessions.cbegin(); it != sessions.cend();) {
 			uint64_t age = (now - it->second->last_pkt) / 1000000;
 
-			if (age >= session_timeout || (it->second->rx_open == false && it->second->tx_open == false)) {
-				if (it->second->rx_open == false && it->second->tx_open == false)
-					dolog(debug, "TCP[%012" PRIx64 "]: session closed by both sides\n", it->first);
+			if (age >= session_timeout || it->second->state > tcp_established) {
+				if (it->second->state > tcp_established)
+					dolog(debug, "TCP[%012" PRIx64 "]: session closed (state: %s)\n", it->first, states[it->second->state]);
 				else
 					dolog(debug, "TCP[%012" PRIx64 "]: session timed out\n", it->first);
 
@@ -663,8 +662,6 @@ void tcp::end_session(tcp_session_t *const ts)
 		dolog(debug, "TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, rel_seqnr(ts, true, ts->my_seq_nr));
 
 		send_segment(ts, ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
-
-		ts->tx_open = false;
 
 		ts->state = tcp_fin_wait_1;
 	}

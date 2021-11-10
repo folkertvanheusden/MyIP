@@ -47,8 +47,6 @@ typedef struct {
 	size_t unacked_size;
 	bool fin_after_unacked_empty;
 
-	bool rx_open, tx_open;
-
 	session_data *p;
 } tcp_session_t;
 
