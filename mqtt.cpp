@@ -198,7 +198,7 @@ bool mqtt_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 	}
 
 	if (!data) {
-		dolog(debug, "HTTP: client closed session\n");
+		dolog(debug, "MQTT: client closed session\n");
 		ms->w_cond.notify_one();
 		return true;
 	}
