@@ -383,7 +383,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
         if (data_len > 0 && fail == false) {
                 dolog(debug, "TCP[%012" PRIx64 "]: packet len %d, header size: %d, payload size: %d\n", id, size, header_size, data_len);
 
-                if (their_seq_nr >= cur_session->their_seq_nr) {
+                if (their_seq_nr == cur_session->their_seq_nr) {
                         const uint8_t *data_start = &p[header_size];
 
                         std::string content = bin_to_text(data_start, data_len);
@@ -412,7 +412,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
                         }
                 }
                 else {
-                        dolog(info, "TCP[%012" PRIx64 "]: data already seen/resend (seq: %u)\n", id, rel_seqnr(cur_session, true, their_seq_nr));
+                        dolog(info, "TCP[%012" PRIx64 "]: unexpected sequence nr %u, expected: %u\n", id, rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
                 }
 
                 unacked_cv.notify_all();
