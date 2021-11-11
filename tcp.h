@@ -18,7 +18,7 @@ class ipv4;
 class tcp;
 
 constexpr int clean_interval = 1; // in seconds
-constexpr int session_timeout = 60; // in seconds
+constexpr int session_timeout = 300; // in seconds
 
 typedef enum { tcp_closed, tcp_listen, tcp_syn_rcvd, tcp_syn_sent, tcp_established, tcp_fin_wait_1, tcp_fin_wait_2, tcp_close_wait, tcp_last_ack, tcp_closing, tcp_time_wait, tcp_rst_act } tcp_state_t;
 

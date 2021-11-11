@@ -310,7 +310,7 @@ void mqtt_recv_thread(void *ts_in)
 		uint8_t cmsg = control >> 4;
 		//uint8_t cflags = control & 0x0f;
 
-		dolog(debug, "MQTT(%s): control %02x msg %d, rem. len.: %d\n", ms->session_name.c_str(), control, cmsg, len);
+		dolog(debug, "MQTT(%s): control %02x (%d) msg %d, rem. len.: %d\n", ms->session_name.c_str(), control, control, cmsg, len);
 		
 		uint8_t *mqtt_msg = new uint8_t[len + 1];
 		if (!mqtt_get_bytes(ts, ms, mqtt_msg, len)) {
@@ -403,7 +403,7 @@ void mqtt_recv_thread(void *ts_in)
 			ts->t->send_data(ts, reply.data(), reply.size(), false);
 		}
 		else if (cmsg == 12) {  // PINGREQ
-			dolog(debug, "MQTT(%s): ping\n", ms->session_name.c_str());
+			dolog(debug, "MQTT(%s): PINGREQ\n", ms->session_name.c_str());
 			std::vector<uint8_t> reply;
 			reply.push_back(13 << 4);  // PINGRESP
 			reply.push_back(0);  // no extra data
