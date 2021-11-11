@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <turbojpeg.h>
 #include <unistd.h>
 
 #include "tcp.h"
@@ -17,6 +18,16 @@
 #include "font.h"
 #include "types.h"
 #include "stats.h"
+
+void encode_jpeg(const uint8_t *const rgb, const int w, const int h, int quality, uint8_t **const out, unsigned long int *const len)
+{
+	tjhandle jpegCompressor = tjInitCompress();
+
+        if (tjCompress2(jpegCompressor, rgb, w, 0, h, TJPF_RGB, out, len, TJSAMP_444, quality, TJFLAG_FASTDCT) == -1)
+		dolog(warning, "VNC: tjCompress2 failed\n");
+
+	tjDestroy(jpegCompressor);
+}
 
 struct frame_buffer_t
 {
@@ -162,6 +173,17 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	if (fb->w < x + w || fb->h < y + h)
 		return;
 
+	int jpeg_quality = -1;
+	uint32_t ce = 0;
+
+	for(int32_t e : encodings) {
+		if (e <= -23 && e >= -32 && depth == 24) {
+			jpeg_quality = -(e + 23) * 10;
+			ce = e;
+			dolog(debug, "VNC: jpeg quality %d\n", jpeg_quality);
+		}
+	}
+
 	*message = (uint8_t *)malloc(4 + 12 * 1 + w * h * 4); // at most
 
 	(*message)[0] = 0;  // FramebufferUpdate
@@ -177,24 +199,49 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	(*message)[9] = w & 255; 
 	(*message)[10] = h >> 8;  // h
 	(*message)[11] = h & 255; 
-	(*message)[12] = 0;  // encoding type
-	(*message)[13] = 0;  // (0 Raw)
-	(*message)[14] = 0;
-	(*message)[15] = 0;
+	(*message)[12] = ce >> 24;  // encoding type
+	(*message)[13] = ce >> 16;  // (0 == raw)
+	(*message)[14] = ce >>  8;
+	(*message)[15] = ce;
 
 	int o = 16;
 
 	const std::lock_guard<std::mutex> lck(fb->fb_lock);
 
 	if (depth == 32 || depth == 24) {
-		for(int yo=y; yo<y + h; yo++) {
-			for(int xo=x; xo<x + w; xo++) {
-				int offset = yo * w * 3 + xo * 3;
+		if (jpeg_quality != -1 && depth == 24) {
+			uint8_t *temp = new uint8_t[w * h * 3];
+			size_t tempo = 0;
 
-				(*message)[o++] = fb->buffer[offset + 2];  // blue
-				(*message)[o++] = fb->buffer[offset + 1];  // green
-				(*message)[o++] = fb->buffer[offset + 0];  // red
-				(*message)[o++] = 255;  // alpha
+			for(int yo=y; yo<y + h; yo++) {
+				for(int xo=x; xo<x + w; xo++) {
+					int offset = yo * w * 3 + xo * 3;
+
+					temp[tempo++] = fb->buffer[offset + 0];  // red
+					temp[tempo++] = fb->buffer[offset + 1];  // green
+					temp[tempo++] = fb->buffer[offset + 2];  // blue
+				}
+			}
+
+			uint8_t *out = nullptr;
+			unsigned long int len = 0;
+			encode_jpeg(temp, w, h, jpeg_quality, &out, &len);
+			memcpy(&(*message)[o], out, len);
+			o += len;
+			free(out);
+
+			delete [] temp;
+		}
+		else {
+			for(int yo=y; yo<y + h; yo++) {
+				for(int xo=x; xo<x + w; xo++) {
+					int offset = yo * w * 3 + xo * 3;
+
+					(*message)[o++] = fb->buffer[offset + 2];  // blue
+					(*message)[o++] = fb->buffer[offset + 1];  // green
+					(*message)[o++] = fb->buffer[offset + 0];  // red
+					(*message)[o++] = 255;  // alpha
+				}
 			}
 		}
 	}
@@ -597,7 +644,9 @@ void vnc_thread(void *ts_in)
 
 					for(int i=0; i<n_encodings; i++) {
 						int o = i * 4;
-						encodings.push_back((encodings_bin[o + 0] << 24) | (encodings_bin[o + 1] << 16) | (encodings_bin[o + 2] << 8) | encodings_bin[o + 3]);
+						int32_t e = (encodings_bin[o + 0] << 24) | (encodings_bin[o + 1] << 16) | (encodings_bin[o + 2] << 8) | encodings_bin[o + 3];
+						encodings.push_back(e);
+						dolog(debug, "VNC: encoding %d: %d\n", i, e);
 					}
 
 					n_encodings = -1;

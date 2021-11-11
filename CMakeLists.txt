@@ -89,5 +89,9 @@ target_link_libraries(myip OpenSSL::SSL OpenSSL::Crypto)
 target_include_directories(myiptop PUBLIC ${OPENSSL_INCLUDE_DIR})
 target_link_libraries(myiptop OpenSSL::SSL OpenSSL::Crypto)
 
+pkg_check_modules(LIBJPEG REQUIRED libturbojpeg)
+target_link_libraries(myip ${LIBJPEG_LIBRARIES})
+target_include_directories(myip PUBLIC ${LIBJPEG_INCLUDE_DIRS})
+target_compile_options(myip PUBLIC ${LIBJPEG_CFLAGS_OTHER})
 
 target_link_libraries(myiptop -lrt)
