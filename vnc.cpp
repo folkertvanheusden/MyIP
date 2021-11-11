@@ -184,7 +184,7 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 
 	int o = 16;
 
-	fb->fb_lock.lock();
+	const std::lock_guard<std::mutex> lck(fb->fb_lock);
 
 	if (depth == 32 || depth == 24) {
 		for(int yo=y; yo<y + h; yo++) {
@@ -240,8 +240,6 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 
 		stats_inc_counter(vpd->vnc_err);
 	}
-
-	fb->fb_lock.unlock();
 
 	*message_len = o;
 }
