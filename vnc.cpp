@@ -319,7 +319,8 @@ void vnc_thread(void *ts_in)
 	bool rc = true;
 
 	std::vector<int32_t> encodings;
-	int n_encodings = -1;
+	encodings.push_back(0);  // at least raw
+	int n_encodings = 1;
 
 	int running_cmd = -1, ignore_data_n = -1;
 
@@ -442,6 +443,16 @@ void vnc_thread(void *ts_in)
 
 			dolog(debug, "VNC: server init, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message, false);
+
+			// send initial frame
+			uint8_t *fb_message = nullptr;
+			size_t fb_message_len = 0;
+			calculate_fb_update(&frame_buffer, encodings, false, 0, 0, frame_buffer.w, frame_buffer.h, 24, &fb_message, &fb_message_len, vpd);
+
+			dolog(debug, "VNC: intial (full) framebuffer update\n");
+
+			ts->t->send_data(ts, fb_message, fb_message_len, false);
+			free(fb_message);
 
 			vs->state = vs_running_waiting_cmd;
 		}
