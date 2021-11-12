@@ -525,7 +525,7 @@ void vnc_thread(void *ts_in)
 
 					calculate_fb_update(&frame_buffer, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd);
 
-					dolog(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes\n", message_len, w, h, x, y, message_len);
+					dolog(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes%s\n", message_len, w, h, x, y, message_len, incremental?" (incremental)":"");
 
 					ts->t->send_data(ts, message, message_len, false);
 
