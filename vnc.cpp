@@ -27,7 +27,44 @@ struct frame_buffer_t
 
         mutable std::mutex fb_lock;
 	uint8_t *buffer;
-} frame_buffer;
+
+        mutable std::mutex cb_lock;
+	std::set<vnc_session_t *> callbacks;
+
+	void register_callback(vnc_session_t *p) {
+		dolog("register_callback %p\n", p);
+		const std::lock_guard<std::mutex> lck(cb_lock);
+
+		auto rc = callbacks.insert(p);
+		assert(rc.second);
+	}
+
+	void unregister_callback(vnc_session_t *p) {
+		dolog("unregister_callback %p\n", p);
+		const std::lock_guard<std::mutex> lck(cb_lock);
+
+		// may have not been registered if the connection
+		// is dropped before then handshake was fully
+		// performed
+		callbacks.erase(p);
+	}
+
+	void callback() {
+		const std::lock_guard<std::mutex> lck(cb_lock);
+
+		dolog("VNC: %zu callbacks\n", callbacks.size());
+
+		for(auto vs : callbacks) {
+			const std::lock_guard<std::mutex> lck(vs->w_lock);
+
+			dolog("VNC: %zu CALLBACK for %s (%p)\n", get_us(), vs->client_addr.c_str(), vs);
+
+			vs->wq.push(new vnc_thread_work_t());
+
+			vs->w_cond.notify_one();
+		}
+	}
+} fb;
 
 void vnc_thread(void *ts_in);
 
@@ -129,7 +166,7 @@ void frame_buffer_thread(void *fb_in)
 
 		uint64_t now = get_us();
 
-		if (now - latest_update >= 1000000) {  // 1 time per second
+		if (now - latest_update >= 999999) {  // 1 time per second
 			fb_work->fb_lock.lock();
 
 			latest_update = now;
@@ -147,6 +184,10 @@ void frame_buffer_thread(void *fb_in)
 			free(text);
 
 			fb_work->fb_lock.unlock();
+
+			fb->fb_lock.unlock();
+
+			fb->callback();
 		}
 
 		myusleep(1000);  // ignore any errors during usleep
@@ -320,11 +361,13 @@ void vnc_thread(void *ts_in)
 
 	std::vector<int32_t> encodings;
 	encodings.push_back(0);  // at least raw
-	int n_encodings = 1;
+	int n_encodings = -1;
+	bool continuous_updates = false;
 
 	int running_cmd = -1, ignore_data_n = -1;
 
 	for(;vs->state != vs_terminate;) {
+		bool cont_or_initial_upd_frame = false;
 		vnc_thread_work_t *work = nullptr;
 
 		{
@@ -346,10 +389,14 @@ void vnc_thread(void *ts_in)
 			break;
 		}
 
-		vs->buffer = (char *)realloc(vs->buffer, vs->buffer_size + work->data_len);
+		if (work->data_len == 0)  // callback asked for update
+			cont_or_initial_upd_frame = true;
+		else {
+			vs->buffer = (char *)realloc(vs->buffer, vs->buffer_size + work->data_len);
 
-		memcpy(&vs->buffer[vs->buffer_size], work->data, work->data_len);
-		vs->buffer_size += work->data_len;
+			memcpy(&vs->buffer[vs->buffer_size], work->data, work->data_len);
+			vs->buffer_size += work->data_len;
+		}
 
 		dolog(debug, "VNC: state: %d\n", vs->state);
 	
@@ -444,6 +491,14 @@ void vnc_thread(void *ts_in)
 			dolog(debug, "VNC: server init, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message, false);
 
+			cont_or_initial_upd_frame = true;
+
+			fb.register_callback(vs);
+
+			vs->state = vs_running_waiting_cmd;
+		}
+
+		if (cont_or_initial_upd_frame) {
 			// send initial frame
 			uint8_t *fb_message = nullptr;
 			size_t fb_message_len = 0;
@@ -453,8 +508,6 @@ void vnc_thread(void *ts_in)
 
 			ts->t->send_data(ts, fb_message, fb_message_len, false);
 			free(fb_message);
-
-			vs->state = vs_running_waiting_cmd;
 		}
 
 		if (vs->state == vs_running_waiting_cmd) {
@@ -606,9 +659,15 @@ void vnc_thread(void *ts_in)
 				if (encodings_bin) {
 					encodings.clear();
 
+					continuous_updates = false;
+
 					for(int i=0; i<n_encodings; i++) {
 						int o = i * 4;
-						encodings.push_back((encodings_bin[o + 0] << 24) | (encodings_bin[o + 1] << 16) | (encodings_bin[o + 2] << 8) | encodings_bin[o + 3]);
+						int32_t e = (encodings_bin[o + 0] << 24) | (encodings_bin[o + 1] << 16) | (encodings_bin[o + 2] << 8) | encodings_bin[o + 3];
+						encodings.push_back(e);
+
+						if (e == -313)
+							continuous_updates = true;
 					}
 
 					n_encodings = -1;
@@ -635,7 +694,9 @@ void vnc_thread(void *ts_in)
 
 	ts->t->end_session(ts);
 
-	dolog(info, "VNC: Thread terminating for %s\n", vs->client_addr.c_str());
+	fb.unregister_callback(vs);
+
+	dolog("VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
 
 void vnc_close_session_1(tcp_session_t *ts, private_data *pd)
