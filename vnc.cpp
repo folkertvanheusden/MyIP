@@ -29,18 +29,18 @@ struct frame_buffer_t
 	uint8_t *buffer;
 
         mutable std::mutex cb_lock;
-	std::set<vnc_session_t *> callbacks;
+	std::set<vnc_session_data *> callbacks;
 
-	void register_callback(vnc_session_t *p) {
-		dolog("register_callback %p\n", p);
+	void register_callback(vnc_session_data *p) {
+		dolog(info, "register_callback %p\n", p);
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
 		auto rc = callbacks.insert(p);
 		assert(rc.second);
 	}
 
-	void unregister_callback(vnc_session_t *p) {
-		dolog("unregister_callback %p\n", p);
+	void unregister_callback(vnc_session_data *p) {
+		dolog(info, "unregister_callback %p\n", p);
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
 		// may have not been registered if the connection
@@ -52,12 +52,12 @@ struct frame_buffer_t
 	void callback() {
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
-		dolog("VNC: %zu callbacks\n", callbacks.size());
+		dolog(debug, "VNC: %zu callbacks\n", callbacks.size());
 
 		for(auto vs : callbacks) {
 			const std::lock_guard<std::mutex> lck(vs->w_lock);
 
-			dolog("VNC: %zu CALLBACK for %s (%p)\n", get_us(), vs->client_addr.c_str(), vs);
+			dolog(debug, "VNC: %zu CALLBACK for %s (%p)\n", get_us(), vs->client_addr.c_str(), vs);
 
 			vs->wq.push(new vnc_thread_work_t());
 
@@ -72,27 +72,27 @@ void frame_buffer_thread(void *ts_in);
 
 void vnc_init()
 {
-	frame_buffer.w = 256;
-	frame_buffer.h = 48;
+	fb.w = 256;
+	fb.h = 48;
 
-	size_t n_bytes = size_t(frame_buffer.w) * size_t(frame_buffer.h) * 3;
-	frame_buffer.buffer = new uint8_t[n_bytes]();
+	size_t n_bytes = size_t(fb.w) * size_t(fb.h) * 3;
+	fb.buffer = new uint8_t[n_bytes]();
 
-	frame_buffer.terminate = false;
-	frame_buffer.th = new std::thread(frame_buffer_thread, &frame_buffer);
+	fb.terminate = false;
+	fb.th = new std::thread(frame_buffer_thread, &fb);
 }
 
 void vnc_deinit()
 {
-	if (frame_buffer.th) {
-		frame_buffer.terminate = true;
+	if (fb.th) {
+		fb.terminate = true;
 
-		frame_buffer.th->join();
+		fb.th->join();
 
-		delete frame_buffer.th;
-		frame_buffer.th = nullptr;
+		delete fb.th;
+		fb.th = nullptr;
 
-		delete [] frame_buffer.buffer;
+		delete [] fb.buffer;
 	}
 }
 
@@ -185,9 +185,9 @@ void frame_buffer_thread(void *fb_in)
 
 			fb_work->fb_lock.unlock();
 
-			fb->fb_lock.unlock();
+			fb.fb_lock.unlock();
 
-			fb->callback();
+			fb.callback();
 		}
 
 		myusleep(1000);  // ignore any errors during usleep
@@ -389,8 +389,10 @@ void vnc_thread(void *ts_in)
 			break;
 		}
 
-		if (work->data_len == 0)  // callback asked for update
-			cont_or_initial_upd_frame = true;
+		if (work->data_len == 0) {  // callback asked for update
+			if (continuous_updates)
+				cont_or_initial_upd_frame = true;
+		}
 		else {
 			vs->buffer = (char *)realloc(vs->buffer, vs->buffer_size + work->data_len);
 
@@ -469,8 +471,8 @@ void vnc_thread(void *ts_in)
 
 		if (vs->state == vs_server_init) {  // 7.3.2
 			uint8_t message[] = {
-				uint8_t(frame_buffer.w >> 8), uint8_t(frame_buffer.w & 255),
-				uint8_t(frame_buffer.h >> 8), uint8_t(frame_buffer.h & 255),
+				uint8_t(fb.w >> 8), uint8_t(fb.w & 255),
+				uint8_t(fb.h >> 8), uint8_t(fb.h & 255),
 				// PIXEL_FORMAT
 				32,  // bits per pixel
 				24,  // depth
@@ -502,7 +504,7 @@ void vnc_thread(void *ts_in)
 			// send initial frame
 			uint8_t *fb_message = nullptr;
 			size_t fb_message_len = 0;
-			calculate_fb_update(&frame_buffer, encodings, false, 0, 0, frame_buffer.w, frame_buffer.h, 24, &fb_message, &fb_message_len, vpd);
+			calculate_fb_update(&fb, encodings, false, 0, 0, fb.w, fb.h, 24, &fb_message, &fb_message_len, vpd);
 
 			dolog(debug, "VNC: intial (full) framebuffer update\n");
 
@@ -576,7 +578,7 @@ void vnc_thread(void *ts_in)
 					int w = (parameters[5] << 8) | parameters[6];
 					int h = (parameters[7] << 8) | parameters[8];
 
-					calculate_fb_update(&frame_buffer, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd);
+					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd);
 
 					dolog(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes%s\n", message_len, w, h, x, y, message_len, incremental?" (incremental)":"");
 
@@ -696,7 +698,7 @@ void vnc_thread(void *ts_in)
 
 	fb.unregister_callback(vs);
 
-	dolog("VNC: Thread terminating for %s\n", vs->client_addr.c_str());
+	dolog(info, "VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
 
 void vnc_close_session_1(tcp_session_t *ts, private_data *pd)
