@@ -92,7 +92,10 @@ void vnc_deinit()
 		delete fb.th;
 		fb.th = nullptr;
 
+		fb.fb_lock.lock();
 		delete [] fb.buffer;
+		fb.buffer = nullptr;
+		fb.fb_lock.unlock();
 	}
 }
 
@@ -203,6 +206,10 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	if (fb->w < x + w || fb->h < y + h)
 		return;
 
+	const std::lock_guard<std::mutex> lck(fb->fb_lock);
+	if (!fb->buffer)
+		return;
+
 	*message = (uint8_t *)malloc(4 + 12 * 1 + w * h * 4); // at most
 
 	(*message)[0] = 0;  // FramebufferUpdate
@@ -224,8 +231,6 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	(*message)[15] = 0;
 
 	int o = 16;
-
-	const std::lock_guard<std::mutex> lck(fb->fb_lock);
 
 	if (depth == 32 || depth == 24) {
 		for(int yo=y; yo<y + h; yo++) {
