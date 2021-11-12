@@ -18,6 +18,10 @@
 #include "types.h"
 #include "stats.h"
 
+using namespace std::chrono_literals;
+
+static std::atomic_bool stop { false };
+
 struct frame_buffer_t
 {
 	std::thread *th;
@@ -84,6 +88,8 @@ void vnc_init()
 
 void vnc_deinit()
 {
+	stop = true;
+
 	if (fb.th) {
 		fb.terminate = true;
 
@@ -371,21 +377,21 @@ void vnc_thread(void *ts_in)
 
 	int running_cmd = -1, ignore_data_n = -1;
 
-	for(;vs->state != vs_terminate;) {
+	for(;vs->state != vs_terminate && !stop;) {
 		bool cont_or_initial_upd_frame = false;
 		vnc_thread_work_t *work = nullptr;
 
 		{
 			std::unique_lock<std::mutex> lck(vs->w_lock);
 
-			for(;;) {
+			for(;!stop;) {
 				if (vs->wq.empty() == false) {
 					work = vs->wq.front();
 					vs->wq.pop();
 					break;
 				}
 
-				vs->w_cond.wait(lck);
+				vs->w_cond.wait_for(lck, 500ms);
 			}
 		}
 
