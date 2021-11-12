@@ -349,6 +349,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			else {
 				dolog(debug, "TCP[%012" PRIx64 "]: unexpected ACK\n", id);
 			}
+
+			cur_session->data_since_last_ack = 0;
 		}
 
 		if (flag_rst) {
@@ -545,14 +547,19 @@ void tcp::unacked_sender()
 		for(auto it = sessions.cbegin(); it != sessions.cend(); it++) {
 			it->second->tlock.lock();
 
-			if (it->second->unacked_size) {
-				size_t send_n = std::min(size_t(idev->get_max_packet_size() - 20/*TCP header size*/), std::min(size_t(it->second->window_size), it->second->unacked_size));
+			int to_send = std::min(it->second->window_size - it->second->data_since_last_ack, it->second->unacked_size);
+			int packet_size = idev->get_max_packet_size() - 20;
 
-				dolog(debug, "tcp-unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu)\n", send_n, rel_seqnr(it->second, true, it->second->my_seq_nr), it->second->window_size, it->second->unacked_size);
+			uint32_t resend_nr = it->second->my_seq_nr;
 
-				uint32_t resend_nr = it->second->my_seq_nr;
+			for(int i=0; i<to_send; i += packet_size) {
+				size_t send_n = std::min(packet_size, to_send - i);
 
-				send_segment(it->second, it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, FLAG_ACK, it->second->their_seq_nr, &resend_nr, it->second->unacked, send_n);
+				dolog(debug, "tcp-unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %d)\n", send_n, rel_seqnr(it->second, true, it->second->my_seq_nr), it->second->window_size, it->second->unacked_size, it->second->data_since_last_ack);
+
+				send_segment(it->second, it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, FLAG_ACK, it->second->their_seq_nr, &resend_nr, &it->second->unacked[i], send_n);
+
+				it->second->data_since_last_ack += send_n;
 			}
 
 			it->second->tlock.unlock();
