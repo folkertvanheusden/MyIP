@@ -44,6 +44,7 @@ typedef struct {
 
 	uint8_t *unacked;
 	uint32_t unacked_start_seq_nr;
+	size_t data_since_last_ack;
 	size_t unacked_size;
 	bool fin_after_unacked_empty;
 
