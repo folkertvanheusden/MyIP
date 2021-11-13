@@ -674,14 +674,16 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 		dolog(debug, "TCP[%012" PRIx64 "]: unacked-buffer full\n", ts->id);
 	}
 
-	std::unique_lock<std::mutex> lck(ts->tlock);
+	if (ts->state == tcp_established) {
+		std::unique_lock<std::mutex> lck(ts->tlock);
 
-	if (ts->unacked_size == 0)
-		ts->unacked_start_seq_nr = ts->my_seq_nr;
+		if (ts->unacked_size == 0)
+			ts->unacked_start_seq_nr = ts->my_seq_nr;
 
-	ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + len);
-	memcpy(&ts->unacked[ts->unacked_size], data, len);
-	ts->unacked_size += len;
+		ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + len);
+		memcpy(&ts->unacked[ts->unacked_size], data, len);
+		ts->unacked_size += len;
+	}
 
 	unacked_cv.notify_all();
 }
