@@ -227,8 +227,8 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	uint32_t ce = 0;
 
 	for(int32_t e : encodings) {
-		if (e <= -23 && e >= -32 && depth == 24) {
-			jpeg_quality = -(e + 23) * 10;
+		if (e == 21 && depth == 24) {
+			jpeg_quality = 75;
 			ce = e;
 			dolog(debug, "VNC: jpeg quality %d\n", jpeg_quality);
 		}
