@@ -187,16 +187,16 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 		dolog(error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
 
-	ts->t->send_data(ts, (const uint8_t *)header.c_str(), header.size(), false);
+	ts->t->send_data(ts, (const uint8_t *)header.c_str(), header.size());
 
 	if (get) {
 		if (reply) {
-			ts->t->send_data(ts, reply, content_len, false);
+			ts->t->send_data(ts, reply, content_len);
 		}
 		else {
 			const char err[] = "Something went wrong: you should not see this.";
 
-			ts->t->send_data(ts, (const uint8_t *)err, sizeof(err) - 1, false);
+			ts->t->send_data(ts, (const uint8_t *)err, sizeof(err) - 1);
 		}
 	}
 

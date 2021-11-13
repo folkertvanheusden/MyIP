@@ -101,7 +101,7 @@ public:
 
 	void add_handler(const int port, tcp_port_handler_t & tph);
 
-	void send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len, const bool in_cb);
+	void send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len);
 	void end_session(tcp_session_t *const ts);
 
 	virtual void operator()() override;

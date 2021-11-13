@@ -412,7 +412,7 @@ void vnc_thread(void *ts_in)
 			const char initial_message[] = "RFB 003.008\n";
 
 			dolog(debug, "VNC: send handshake of 12 bytes\n");
-			ts->t->send_data(ts, (const uint8_t *)initial_message, 12, false);  // must be 12 bytes
+			ts->t->send_data(ts, (const uint8_t *)initial_message, 12);  // must be 12 bytes
 
 			vs->state = vs_initial_handshake_client_resp;
 		}
@@ -443,7 +443,7 @@ void vnc_thread(void *ts_in)
 			};
 
 			dolog(debug, "VNC: ack security types, %zu bytes\n", sizeof message);
-			ts->t->send_data(ts, message, sizeof message, false);
+			ts->t->send_data(ts, message, sizeof message);
 
 			vs->state = vs_security_handshake_client_resp;
 		}
@@ -455,7 +455,7 @@ void vnc_thread(void *ts_in)
 				if (*chosen_sec == 1) {  // must have chosen security type 'None'
 					uint8_t response[] = { 0, 0, 0, 0 };  // OK
 					dolog(debug, "VNC: Valid security type chosen, %zu bytes\n", sizeof response);
-					ts->t->send_data(ts, response, sizeof response, false);
+					ts->t->send_data(ts, response, sizeof response);
 
 					vs->state = vs_client_init;
 				}
@@ -464,7 +464,7 @@ void vnc_thread(void *ts_in)
 
 					uint8_t response[] = { 0, 0, 0, 1 };  // failed
 					dolog(info, "VNC: Unexpected/invalid security type: %d (%zu bytes)\n", *chosen_sec, sizeof response);
-					ts->t->send_data(ts, response, sizeof response, false);
+					ts->t->send_data(ts, response, sizeof response);
 					stats_inc_counter(vpd->vnc_err);
 				}
 
@@ -506,7 +506,7 @@ void vnc_thread(void *ts_in)
 			};
 
 			dolog(debug, "VNC: server init, %zu bytes\n", sizeof message);
-			ts->t->send_data(ts, message, sizeof message, false);
+			ts->t->send_data(ts, message, sizeof message);
 
 			cont_or_initial_upd_frame = true;
 
@@ -523,7 +523,7 @@ void vnc_thread(void *ts_in)
 
 			dolog(debug, "VNC: intial (full) framebuffer update\n");
 
-			ts->t->send_data(ts, fb_message, fb_message_len, false);
+			ts->t->send_data(ts, fb_message, fb_message_len);
 			free(fb_message);
 		}
 
@@ -597,7 +597,7 @@ void vnc_thread(void *ts_in)
 
 					dolog(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes%s\n", message_len, w, h, x, y, message_len, incremental?" (incremental)":"");
 
-					ts->t->send_data(ts, message, message_len, false);
+					ts->t->send_data(ts, message, message_len);
 
 					free(message);
 

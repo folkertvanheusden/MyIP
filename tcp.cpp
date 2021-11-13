@@ -640,7 +640,7 @@ void tcp::add_handler(const int port, tcp_port_handler_t & tph)
 	listeners.insert({ port, tph });
 }
 
-void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len, const bool in_cb)
+void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len)
 {
 	uint64_t internal_id = get_us();
 
@@ -649,9 +649,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 	dolog(debug, "TCP[%012" PRIx64 "]: %s\n", ts->id, content.c_str());
 
 	// lock for unacked and for my_seq_nr
-	std::unique_lock<std::mutex> *lck = nullptr;
-	if (!in_cb)
-		lck = new std::unique_lock<std::mutex>(ts->tlock);
+	std::unique_lock<std::mutex> lck(ts->tlock);
 
 	if (ts->unacked_size == 0)
 		ts->unacked_start_seq_nr = ts->my_seq_nr;
@@ -659,11 +657,6 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 	ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + len);
 	memcpy(&ts->unacked[ts->unacked_size], data, len);
 	ts->unacked_size += len;
-
-	if (lck) {
-		lck->unlock();
-		delete lck;
-	}
 
 	unacked_cv.notify_all();
 }
