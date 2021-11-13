@@ -11,6 +11,7 @@
 #include <string.h>
 #include <turbojpeg.h>
 #include <unistd.h>
+#include <zlib.h>
 
 #include "tcp.h"
 #include "utils.h"
@@ -18,16 +19,6 @@
 #include "font.h"
 #include "types.h"
 #include "stats.h"
-
-void encode_jpeg(const uint8_t *const rgb, const int w, const int h, int quality, uint8_t **const out, unsigned long int *const len)
-{
-	tjhandle jpegCompressor = tjInitCompress();
-
-        if (tjCompress2(jpegCompressor, rgb, w, 0, h, TJPF_RGB, out, len, TJSAMP_444, quality, TJFLAG_FASTDCT) == -1)
-		dolog(warning, "VNC: tjCompress2 failed\n");
-
-	tjDestroy(jpegCompressor);
-}
 
 using namespace std::chrono_literals;
 
@@ -87,8 +78,8 @@ void frame_buffer_thread(void *ts_in);
 
 void vnc_init()
 {
-	fb.w = 256;
-	fb.h = 48;
+	fb.w = 640;
+	fb.h = 480;
 
 	size_t n_bytes = size_t(fb.w) * size_t(fb.h) * 3;
 	fb.buffer = new uint8_t[n_bytes]();
@@ -118,6 +109,7 @@ void vnc_deinit()
 
 void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
 {
+	const int maxo = fb->w * fb->h * 3;
 	int len = strlen(text);
 
 	for(int i=0; i<len; i++) {
@@ -126,6 +118,8 @@ void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
 		for(int cy=0; cy<8; cy++) {
 			for(int cx=0; cx<8; cx++) {
 				int o = (cy + y) * fb -> w * 3 + (x + i * 8 + cx) * 3;
+				if (o >= maxo)
+					break;
 
 				uint8_t pixel_value = font_8x8[c][cy][cx];
 
@@ -151,11 +145,7 @@ void frame_buffer_thread(void *fb_in)
 	for(;!fb_work->terminate;) {
 		// should be locking for these as well
 
-		// increase green
-		assert(x < fb_work->w);
-		assert(y < fb_work->h);
-		fb_work->buffer[y * fb_work->w * 3 + x * 3 + 1]++;
-
+		// bounce
 		x += dx;
 		y += dy;
 
@@ -179,11 +169,6 @@ void frame_buffer_thread(void *fb_in)
 			dy = (rand() % 3) + 1;
 		}
 
-		// increase red
-		int cx = rand() % fb_work -> w;
-		int cy = rand() % fb_work -> h;
-		fb_work->buffer[cy * fb_work->w * 3 + cx * 3 + 0]++;
-
 		uint64_t now = get_us();
 
 		if (now - latest_update >= 999999) {  // 1 time per second
@@ -196,10 +181,19 @@ void frame_buffer_thread(void *fb_in)
 			struct tm tm { 0 };
 			gmtime_r(&tnow, &tm);
 
+			for(int y=0; y<fb_work->h; y++) {
+				for(int x=0; x<fb_work->w; x++) {
+					int o = y * fb_work->w * 3 + x * 3;
+
+					if (fb_work->buffer[o])
+						fb_work->buffer[o]--;
+				}
+			}
+
 			char *text = nullptr;
 			asprintf(&text, "%02d:%02d:%02d - MyIP", tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-			draw_text(fb_work, fb_work->w / 2 - 15 * 8 / 4, fb_work->h / 2 - 8 / 2, text);
+			draw_text(fb_work, x, y, text);
 
 			free(text);
 
@@ -210,7 +204,7 @@ void frame_buffer_thread(void *fb_in)
 			fb.callback();
 		}
 
-		myusleep(1000);  // ignore any errors during usleep
+		myusleep(101000);  // ignore any errors during usleep
 	}
 
 	delete [] fb_work->buffer;
@@ -218,19 +212,16 @@ void frame_buffer_thread(void *fb_in)
 	fb_work->buffer = nullptr;
 }
 
-void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len, vnc_private_data *vpd)
+void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len, vnc_private_data *vpd, vnc_session_data *const vsd)
 {
 	if (fb->w < x + w || fb->h < y + h)
 		return;
 
-	int jpeg_quality = -1;
-	uint32_t ce = 0;
-
+	uint32_t ce = 0;  // RAW is default
 	for(int32_t e : encodings) {
-		if (e == 21 && depth == 24) {
-			jpeg_quality = 75;
+		if (e == 6) {  // ZLIB
 			ce = e;
-			dolog(debug, "VNC: jpeg quality %d\n", jpeg_quality);
+			dolog(debug, "VNC: zlib encoding\n");
 		}
 	}
 
@@ -258,42 +249,18 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	(*message)[14] = ce >>  8;
 	(*message)[15] = ce;
 
-	int o = 16;
+	uint8_t *temp = (uint8_t *)malloc(w * h * 3 * 2);
+	int otemp = 0;
 
 	if (depth == 32 || depth == 24) {
-		if (jpeg_quality != -1 && depth == 24) {
-			uint8_t *temp = new uint8_t[w * h * 3];
-			size_t tempo = 0;
+		for(int yo=y; yo<y + h; yo++) {
+			for(int xo=x; xo<x + w; xo++) {
+				int offset = yo * w * 3 + xo * 3;
 
-			for(int yo=y; yo<y + h; yo++) {
-				for(int xo=x; xo<x + w; xo++) {
-					int offset = yo * w * 3 + xo * 3;
-
-					temp[tempo++] = fb->buffer[offset + 0];  // red
-					temp[tempo++] = fb->buffer[offset + 1];  // green
-					temp[tempo++] = fb->buffer[offset + 2];  // blue
-				}
-			}
-
-			uint8_t *out = nullptr;
-			unsigned long int len = 0;
-			encode_jpeg(temp, w, h, jpeg_quality, &out, &len);
-			memcpy(&(*message)[o], out, len);
-			o += len;
-			free(out);
-
-			delete [] temp;
-		}
-		else {
-			for(int yo=y; yo<y + h; yo++) {
-				for(int xo=x; xo<x + w; xo++) {
-					int offset = yo * w * 3 + xo * 3;
-
-					(*message)[o++] = fb->buffer[offset + 2];  // blue
-					(*message)[o++] = fb->buffer[offset + 1];  // green
-					(*message)[o++] = fb->buffer[offset + 0];  // red
-					(*message)[o++] = 255;  // alpha
-				}
+				temp[otemp++] = fb->buffer[offset + 2];  // blue
+				temp[otemp++] = fb->buffer[offset + 1];  // green
+				temp[otemp++] = fb->buffer[offset + 0];  // red
+				temp[otemp++] = 255;  // alpha
 			}
 		}
 	}
@@ -302,9 +269,9 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 			for(int xo=x; xo<x + w; xo++) {
 				int offset = yo * w * 3 + xo * 3;
 
-				(*message)[o++] = (fb->buffer[offset + 0] & 0xe0) |  // red
-						  (fb->buffer[offset + 1] >> 3) |  // green
-						  (fb->buffer[offset + 2] >> 6);  // blue
+				temp[otemp++] = (fb->buffer[offset + 0] & 0xe0) |  // red
+						(fb->buffer[offset + 1] >> 3) |  // green
+						(fb->buffer[offset + 2] >> 6);  // blue
 			}
 		}
 	}
@@ -323,7 +290,7 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 				b_n++;
 
 				if (b_n == 8) {
-					(*message)[o++] = b_out;
+					temp[otemp++] = b_out;
 					b_n = 0;
 				}
 			}
@@ -339,6 +306,34 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 
 		stats_inc_counter(vpd->vnc_err);
 	}
+
+	int o = 16;
+
+	if (ce == 0) {  // raw
+		memcpy(&(*message)[o], temp, otemp);
+		o += otemp;
+	}
+	else if (ce == 6) {  // zlib
+		vsd->strm.next_in = temp;
+		vsd->strm.avail_in = otemp;
+		vsd->strm.next_out = &(*message)[o + 4];
+		vsd->strm.avail_out = w * h * 3 * 2;
+
+		if (deflate(&vsd->strm, Z_SYNC_FLUSH) != Z_OK)
+			dolog(warning, "VNC: deflate failed\n");
+
+		uint32_t size = vsd->strm.total_out - vsd->prev_zsize;
+		(*message)[o + 0] = size >> 24;
+		(*message)[o + 1] = size >> 16;
+		(*message)[o + 2] = size >>  8;
+		(*message)[o + 3] = size;
+
+		o += size + 4;
+
+		vsd->prev_zsize = vsd->strm.total_out;
+	}
+
+	free(temp);
 
 	*message_len = o;
 }
@@ -367,6 +362,12 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 	dolog(debug, "VNC: new session with %s\n", vs->client_addr.c_str());
 
 	vs->th = new std::thread(vnc_thread, ts);
+
+	vs->strm.zalloc = 0;
+	vs->strm.zfree = 0;
+	vs->strm.opaque = 0;
+	if (deflateInit(&vs->strm, Z_DEFAULT_COMPRESSION) != Z_OK)
+		dolog(warning, "VNC: zlib init failed\n");
 
 	return true;
 }
@@ -566,7 +567,7 @@ void vnc_thread(void *ts_in)
 			// send initial frame
 			uint8_t *fb_message = nullptr;
 			size_t fb_message_len = 0;
-			calculate_fb_update(&fb, encodings, false, 0, 0, fb.w, fb.h, 24, &fb_message, &fb_message_len, vpd);
+			calculate_fb_update(&fb, encodings, false, 0, 0, fb.w, fb.h, 24, &fb_message, &fb_message_len, vpd, vs);
 
 			dolog(debug, "VNC: intial (full) framebuffer update\n");
 
@@ -640,7 +641,7 @@ void vnc_thread(void *ts_in)
 					int w = (parameters[5] << 8) | parameters[6];
 					int h = (parameters[7] << 8) | parameters[8];
 
-					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd);
+					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd, vs);
 
 					dolog(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes%s\n", message_len, w, h, x, y, message_len, incremental?" (incremental)":"");
 

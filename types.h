@@ -4,6 +4,7 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <zlib.h>
 
 #include "stats.h"
 
@@ -106,7 +107,10 @@ public:
         std::condition_variable w_cond;
         mutable std::mutex w_lock;
 
+	uint32_t prev_zsize = 0;
 	vnc_private_data *vpd;
+
+	z_stream strm { 0 };
 };
 
 class mqtt_session_data : public session_data
