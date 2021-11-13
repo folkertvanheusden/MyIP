@@ -432,6 +432,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
                 stats_inc_counter(tcp_errors);
 
+		cur_session->unacked_sent_cv.notify_all();
+
                 delete_entry = true;
 
                 dolog(info, "TCP[%012" PRIx64 "]: sending fail packet\n", id);
@@ -661,6 +663,11 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 
 		if (ts->unacked_size < 1024 * 1024)  // max 1MB queued
 			break;
+
+		if (ts->state != tcp_established) {
+			dolog(debug, "TCP[%012" PRIx64 "]: send_data interrupted by session end\n", ts->id);
+			break;
+		}
 
 		ts->unacked_sent_cv.wait_for(lck, 100ms);
 
