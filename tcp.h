@@ -47,6 +47,7 @@ typedef struct {
 	size_t data_since_last_ack;
 	size_t unacked_size;
 	bool fin_after_unacked_empty;
+	std::condition_variable unacked_sent_cv;
 
 	session_data *p;
 } tcp_session_t;
@@ -101,7 +102,7 @@ public:
 
 	void add_handler(const int port, tcp_port_handler_t & tph);
 
-	void send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len, const bool in_cb);
+	void send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len);
 	void end_session(tcp_session_t *const ts);
 
 	virtual void operator()() override;

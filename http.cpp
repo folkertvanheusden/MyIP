@@ -11,6 +11,31 @@
 #include "types.h"
 #include "stats-utils.h"
 
+void send_response(tcp_session_t *ts, struct timespec tv, char *request, private_data *pd);
+
+using namespace std::chrono_literals;
+
+void http_thread(tcp_session_t *ts, struct timespec tv, private_data *pd)
+{
+        set_thread_name("myip-http");
+
+        http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
+
+        for(;hs->terminate == false;) {
+		std::unique_lock<std::mutex> lck(hs->r_lock);
+
+		if (hs->req_data) {
+			char *end_marker = strstr(hs->req_data, "\r\n\r\n");
+			if (end_marker) {
+				send_response(ts, tv, hs->req_data, pd);
+				break;
+			}
+		}
+
+		hs->r_cond.wait_for(lck, 500ms);
+	}
+}
+
 bool http_new_session(tcp_session_t *ts, const packet *pkt, private_data *pd)
 {
 	http_session_data *hs = new http_session_data();
@@ -24,10 +49,12 @@ bool http_new_session(tcp_session_t *ts, const packet *pkt, private_data *pd)
 
 	stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_requests);
 
+	hs->th = new std::thread(http_thread, ts, pkt->get_recv_ts(), pd);
+
 	return true;
 }
 
-void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_data *pd)
+void send_response(tcp_session_t *ts, struct timespec tv, char *request, private_data *pd)
 {
 	http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
 	http_private_data *hpd = dynamic_cast<http_private_data *>(pd);
@@ -137,7 +164,6 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 
 	FILE *fh = fopen(logfile.c_str(), "a+");
 	if (fh) {
-		auto tv = pkt->get_recv_ts();
 		struct tm tm { 0 };
 		gmtime_r(&tv.tv_sec, &tm);
 
@@ -161,16 +187,16 @@ void send_response(tcp_session_t *ts, const packet *pkt, char *request, private_
 		dolog(error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
 
-	ts->t->send_data(ts, (const uint8_t *)header.c_str(), header.size(), true);
+	ts->t->send_data(ts, (const uint8_t *)header.c_str(), header.size());
 
 	if (get) {
 		if (reply) {
-			ts->t->send_data(ts, reply, content_len, true);
+			ts->t->send_data(ts, reply, content_len);
 		}
 		else {
 			const char err[] = "Something went wrong: you should not see this.";
 
-			ts->t->send_data(ts, (const uint8_t *)err, sizeof(err) - 1, true);
+			ts->t->send_data(ts, (const uint8_t *)err, sizeof(err) - 1);
 		}
 	}
 
@@ -194,15 +220,15 @@ bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 		return true;
 	}
 
+	const std::lock_guard<std::mutex> lck(hs->r_lock);
+
 	hs->req_data = (char *)realloc(hs->req_data, hs->req_len + data_len + 1);
 
 	memcpy(&hs->req_data[hs->req_len], data, data_len);
 	hs->req_len += data_len;
 	hs->req_data[hs->req_len] = 0x00;
 
-	char *end_marker = strstr(hs->req_data, "\r\n\r\n");
-	if (end_marker)
-		send_response(ts, pkt, hs->req_data, pd);
+	hs->r_cond.notify_one();
 
 	return true;
 }
@@ -211,6 +237,11 @@ void http_close_session_1(tcp_session_t *ts, private_data *pd)
 {
 	if (ts -> p) {
 		http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
+
+		hs->terminate = true;
+		hs->th->join();
+		delete hs->th;
+
 		free(hs->req_data);
 
 		delete hs;

@@ -230,7 +230,7 @@ bool mqtt_get_bytes(tcp_session_t *const ts, mqtt_session_data *const msd, uint8
 			for (auto it : msd->msgs_out) {
 				dolog(debug, "MQTT(%s): sending message of %zu bytes length\n", msd->session_name.c_str(), it.second);
 
-				ts->t->send_data(ts, it.first, it.second, false);
+				ts->t->send_data(ts, it.first, it.second);
 				delete [] it.first;
 			}
 
@@ -338,7 +338,7 @@ void mqtt_recv_thread(void *ts_in)
 			// send CONNACK
 			uint8_t reply[] = { 0x20, 0x02, 0x00 /* reserved */, 0x00 /* accepted */};
 
-			ts->t->send_data(ts, reply, sizeof reply, false);
+			ts->t->send_data(ts, reply, sizeof reply);
 		}
 		else if (cmsg == 3) {  // PUBLISH
 			int o = 0;
@@ -369,7 +369,7 @@ void mqtt_recv_thread(void *ts_in)
 			reply.push_back(msg_id >> 8);
 			reply.push_back(msg_id & 255);
 
-			ts->t->send_data(ts, reply.data(), reply.size(), false);
+			ts->t->send_data(ts, reply.data(), reply.size());
 		}
 		else if (cmsg == 8) {  // SUBSCRIBE
 			std::vector<uint8_t> reply;
@@ -400,7 +400,7 @@ void mqtt_recv_thread(void *ts_in)
 
 			reply.at(1) = reply.size() - 2;
 
-			ts->t->send_data(ts, reply.data(), reply.size(), false);
+			ts->t->send_data(ts, reply.data(), reply.size());
 		}
 		else if (cmsg == 12) {  // PINGREQ
 			dolog(debug, "MQTT(%s): PINGREQ\n", ms->session_name.c_str());
@@ -408,7 +408,7 @@ void mqtt_recv_thread(void *ts_in)
 			reply.push_back(13 << 4);  // PINGRESP
 			reply.push_back(0);  // no extra data
 
-			ts->t->send_data(ts, reply.data(), reply.size(), false);
+			ts->t->send_data(ts, reply.data(), reply.size());
 		}
 		else {
 			dolog(info, "MQTT(%s): Unexpected command %d received\n", ms->session_name.c_str(), cmsg);

@@ -432,6 +432,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
                 stats_inc_counter(tcp_errors);
 
+		cur_session->unacked_sent_cv.notify_all();
+
                 delete_entry = true;
 
                 dolog(info, "TCP[%012" PRIx64 "]: sending fail packet\n", id);
@@ -547,6 +549,8 @@ void tcp::unacked_sender()
 		for(auto it = sessions.cbegin(); it != sessions.cend(); it++) {
 			it->second->tlock.lock();
 
+			bool notify = false;
+
 			int to_send = std::min(it->second->window_size - it->second->data_since_last_ack, it->second->unacked_size);
 			int packet_size = idev->get_max_packet_size() - 20;
 
@@ -560,9 +564,14 @@ void tcp::unacked_sender()
 				send_segment(it->second, it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, FLAG_ACK, it->second->their_seq_nr, &resend_nr, &it->second->unacked[i], send_n);
 
 				it->second->data_since_last_ack += send_n;
+
+				notify = true;
 			}
 
 			it->second->tlock.unlock();
+
+			if (notify)
+				it->second->unacked_sent_cv.notify_one();
 		}
 
 		lck.unlock();
@@ -640,7 +649,7 @@ void tcp::add_handler(const int port, tcp_port_handler_t & tph)
 	listeners.insert({ port, tph });
 }
 
-void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len, const bool in_cb)
+void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len)
 {
 	uint64_t internal_id = get_us();
 
@@ -648,21 +657,32 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 	std::string content = bin_to_text(data, std::min(len, size_t(32)));
 	dolog(debug, "TCP[%012" PRIx64 "]: %s\n", ts->id, content.c_str());
 
-	// lock for unacked and for my_seq_nr
-	std::unique_lock<std::mutex> *lck = nullptr;
-	if (!in_cb)
-		lck = new std::unique_lock<std::mutex>(ts->tlock);
+	for(;;) {
+		// lock for unacked and for my_seq_nr
+		std::unique_lock<std::mutex> lck(ts->tlock);
 
-	if (ts->unacked_size == 0)
-		ts->unacked_start_seq_nr = ts->my_seq_nr;
+		if (ts->unacked_size < 1024 * 1024)  // max 1MB queued
+			break;
 
-	ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + len);
-	memcpy(&ts->unacked[ts->unacked_size], data, len);
-	ts->unacked_size += len;
+		if (ts->state != tcp_established) {
+			dolog(debug, "TCP[%012" PRIx64 "]: send_data interrupted by session end\n", ts->id);
+			break;
+		}
 
-	if (lck) {
-		lck->unlock();
-		delete lck;
+		ts->unacked_sent_cv.wait_for(lck, 100ms);
+
+		dolog(debug, "TCP[%012" PRIx64 "]: unacked-buffer full\n", ts->id);
+	}
+
+	if (ts->state == tcp_established) {
+		std::unique_lock<std::mutex> lck(ts->tlock);
+
+		if (ts->unacked_size == 0)
+			ts->unacked_start_seq_nr = ts->my_seq_nr;
+
+		ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + len);
+		memcpy(&ts->unacked[ts->unacked_size], data, len);
+		ts->unacked_size += len;
 	}
 
 	unacked_cv.notify_all();
