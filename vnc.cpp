@@ -319,16 +319,6 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 
 	dolog(debug, "VNC: new session with %s\n", vs->client_addr.c_str());
 
-	// yes, this if is strictly seen not required
-	if (vs->state == vs_initial_handshake_server_send) {
-		const char initial_message[] = "RFB 003.008\n";
-
-		dolog(debug, "VNC: send handshake of 12 bytes\n");
-		ts->t->send_data(ts, (const uint8_t *)initial_message, 12, true);  // must be 12 bytes
-
-		vs->state = vs_initial_handshake_client_resp;
-	}
-
 	vs->th = new std::thread(vnc_thread, ts);
 
 	return true;
@@ -368,7 +358,7 @@ void vnc_thread(void *ts_in)
 	tcp_session_t *ts = (tcp_session_t *)ts_in;
 	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 	vnc_private_data *vpd = vs->vpd;
-	bool rc = true;
+	bool rc = true, first = true;
 
 	std::vector<int32_t> encodings;
 	encodings.push_back(0);  // at least raw
@@ -381,6 +371,7 @@ void vnc_thread(void *ts_in)
 		bool cont_or_initial_upd_frame = false;
 		vnc_thread_work_t *work = nullptr;
 
+		if (!first)
 		{
 			std::unique_lock<std::mutex> lck(vs->w_lock);
 
@@ -395,23 +386,36 @@ void vnc_thread(void *ts_in)
 			}
 		}
 
-		if (!work) {
-			dolog(info, "VNC: TERMINATE THREAD REQUESTED\n");
-			break;
-		}
-
-		if (work->data_len == 0) {  // callback asked for update
-			if (continuous_updates)
-				cont_or_initial_upd_frame = true;
-		}
+		if (first)
+			first = false;
 		else {
-			vs->buffer = (char *)realloc(vs->buffer, vs->buffer_size + work->data_len);
+			if (!work) {
+				dolog(info, "VNC: TERMINATE THREAD REQUESTED\n");
+				break;
+			}
 
-			memcpy(&vs->buffer[vs->buffer_size], work->data, work->data_len);
-			vs->buffer_size += work->data_len;
+			if (work->data_len == 0) {  // callback asked for update
+				if (continuous_updates)
+					cont_or_initial_upd_frame = true;
+			}
+			else {
+				vs->buffer = (char *)realloc(vs->buffer, vs->buffer_size + work->data_len);
+
+				memcpy(&vs->buffer[vs->buffer_size], work->data, work->data_len);
+				vs->buffer_size += work->data_len;
+			}
 		}
 
 		dolog(debug, "VNC: state: %d\n", vs->state);
+
+		if (vs->state == vs_initial_handshake_server_send) {
+			const char initial_message[] = "RFB 003.008\n";
+
+			dolog(debug, "VNC: send handshake of 12 bytes\n");
+			ts->t->send_data(ts, (const uint8_t *)initial_message, 12, false);  // must be 12 bytes
+
+			vs->state = vs_initial_handshake_client_resp;
+		}
 	
 		if (vs->state == vs_initial_handshake_client_resp) {
 			char *handshake = (char *)get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 12);
@@ -700,9 +704,11 @@ void vnc_thread(void *ts_in)
 		if (!rc)
 			vs->state = vs_terminate;
 
-		delete work->pkt;
-		delete [] work->data;
-		delete work;
+		if (work) {
+			delete work->pkt;
+			delete [] work->data;
+			delete work;
+		}
 	}
 
 	ts->t->end_session(ts);
