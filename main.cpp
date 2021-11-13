@@ -20,10 +20,12 @@
 #include "arp.h"
 #include "ndp.h"
 #include "sip.h"
+#include "udp.h"
 #include "ntp.h"
 #include "syslog.h"
 #include "snmp.h"
 #include "tcp.h"
+#include "tcp_udp_fw.h"
 #include "http.h"
 #include "vnc.h"
 #include "mqtt.h"
@@ -126,6 +128,8 @@ int main(int argc, char *argv[])
 
 	tcp *t = new tcp(&s);
 	ipv4_instance->register_protocol(0x06, t);
+	udp *u = new udp(&s, icmp_);
+	ipv4_instance->register_protocol(0x11, u);
 
 	dev->register_protocol(0x0800, ipv4_instance);
 
@@ -144,6 +148,64 @@ int main(int argc, char *argv[])
 	tcp_port_handler_t mqtt_handler = mqtt_get_handler(&s);
 	t->add_handler(1883, mqtt_handler);
 
+	ntp *ntp_ = new ntp(&s, u, myip, upstream_ntp_server, true);
+	u->add_handler(123, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+	syslog_srv *syslog_ = new syslog_srv(&s);
+	u->add_handler(514, std::bind(&syslog_srv::input, syslog_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+	snmp *snmp_ = new snmp(&s, u);
+	u->add_handler(161, std::bind(&snmp::input, snmp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"), iniparser_getstring(ini, "cfg:mb-recv", "/home/folkert/Projects/myip/mb-recv.sh"),
+			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
+			);
+	u->add_handler(5060, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+	// something that silently drops packet for a port
+	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
+	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+	/* IPv6 */
+	const char *ip6_str = iniparser_getstring(ini, "cfg:ip6-address", "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
+	any_addr myip6 = parse_address(ip6_str, 16, ":", 16);
+
+	printf("Will listen on IPv6 address: %s\n", myip6.to_str().c_str());
+
+	ndp *ndp_ = new ndp(&s, mymac, myip6);
+
+	ipv6 *ipv6_instance = new ipv6(&s, ndp_, myip6);
+	dev->register_protocol(0x86dd, ipv6_instance);
+
+	icmp6 *icmp6_ = new icmp6(&s, mymac, myip6);
+	ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
+	ipv6_instance->register_icmp(icmp6_);
+
+	tcp *t6 = new tcp(&s);
+	ipv6_instance->register_protocol(0x06, t6);  // TCP
+
+	tcp_port_handler_t http_handler6 = http_get_handler(&s, web_root, http_logfile);
+	t6->add_handler(80, http_handler6);
+
+	tcp_port_handler_t vnc_handler6 = vnc_get_handler(&s);
+	t6->add_handler(5900, vnc_handler6);
+
+	tcp_port_handler_t mqtt_handler6 = mqtt_get_handler(&s);
+	t6->add_handler(1883, mqtt_handler6);
+
+	udp *u6 = new udp(&s, icmp6_);
+	ipv6_instance->register_protocol(0x11, u6);
+
+#if 0
+	sip *sip6_ = new sip(&s, u6, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"),
+			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip6, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
+			);
+	u6->add_handler(5060, std::bind(&sip::input, sip6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+#endif
+
+	snmp *snmp6_ = new snmp(&s, u6);
+	u6->add_handler(161, std::bind(&snmp::input, snmp6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+	/* **** */
 
 	std::string run_at_started = iniparser_getstring(ini, "cfg:ifup", "");
 	if (run_at_started.empty() == false)
@@ -162,10 +224,14 @@ int main(int argc, char *argv[])
 	if (run_at_shutdown.empty() == false)
 		run(run_at_shutdown);
 
+	free_handler(http_handler6);
 	free_handler(http_handler);
 
+	free_handler(vnc_handler6);
 	free_handler(vnc_handler);
 
+	if (vnc_handler6.deinit)
+		vnc_handler6.deinit();
 
 	if (vnc_handler.deinit)
 		vnc_handler.deinit();
@@ -175,6 +241,12 @@ int main(int argc, char *argv[])
 
 	dev->stop();
 
+	delete ntp_;
+	delete u;
+	delete firewall;
+	delete icmp6_;
+	delete ipv6_instance;
+	delete ndp_;
 	delete icmp_;
 	delete t;
 	delete ipv4_instance;
