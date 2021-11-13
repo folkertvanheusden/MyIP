@@ -51,8 +51,14 @@ public:
 class http_session_data : public session_data
 {
 public:
-	char *req_data;
-	size_t req_len;
+	std::thread *th { nullptr };
+	std::atomic_bool terminate { false };
+
+        std::condition_variable r_cond;
+        mutable std::mutex r_lock;
+
+	char *req_data { nullptr };
+	size_t req_len { 0 };
 };
 
 typedef struct _vnc_thread_work_t_ {
