@@ -1,9 +1,12 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 #include <map>
 #include <mutex>
 #include <stdint.h>
 #include <string>
+#include <vector>
+
+#include "fifo-stats.h"
 
 void stats_inc_counter(uint64_t *const p);
 void stats_set(uint64_t *const p, const uint64_t value);
@@ -35,13 +38,18 @@ private:
 
 	std::map<std::string, oid_t> lut_oid;
 
-	std::mutex lock;
+	std::map<std::string, fifo_stats *> fs;
+
+	mutable std::mutex lock;
 
 public:
 	stats(const int size);
 	virtual ~stats();
 
 	uint64_t * register_stat(const std::string & name, const std::string & oid = "");
+
+	void register_fifo_stats(const std::string & name, fifo_stats *const fs);
+	std::vector<std::pair<const std::string, const fifo_stats *> > get_fifo_stats() const;
 
 	uint64_t * find_by_oid(const std::string & oid);
 	std::string find_next_oid(const std::string & oid);

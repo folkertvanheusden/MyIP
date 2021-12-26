@@ -1,10 +1,10 @@
+// (C) 2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 #include <pthread.h>
 #include <stdint.h>
 
+#include "fifo-stats.h"
 #include "stats.h"
-
-static constexpr int up_size = 100;
 
 template <typename T>
 class fifo
@@ -23,8 +23,7 @@ private:
 	 */
 	pthread_cond_t cond_push, cond_pull;
 
-	int up_divider { 1 };
-	uint64_t usage_pattern[up_size] { 0 };
+	fifo_stats *fs { nullptr };
 	uint64_t n_in { 0 };
 
 	uint64_t *fifo_n_in_stats { nullptr };
@@ -36,7 +35,8 @@ public:
 
 		fifo_n_in_stats = s->register_stat(name + "_n_in");
 
-		up_divider = (n_elements + 1) / up_size;
+		fs = new fifo_stats(n_elements);
+		s->register_fifo_stats(name, fs);
 
 		pthread_mutex_init(&lock, NULL);
 
@@ -46,6 +46,8 @@ public:
 
 	~fifo()
 	{
+		delete fs;
+
 		delete [] data;
 	}
 
@@ -63,7 +65,8 @@ public:
 
 		n_in++;
 
-		usage_pattern[n_in / up_divider]++;
+		fs->count(n_in);
+
 		stats_set(fifo_n_in_stats, n_in);
 
 		full = write_pointer == read_pointer;
@@ -87,7 +90,8 @@ public:
 
 			n_in++;
 
-			usage_pattern[n_in / up_divider]++;
+			fs->count(n_in);
+
 			stats_set(fifo_n_in_stats, n_in);
 
 			full = write_pointer == read_pointer;

@@ -60,7 +60,9 @@ int main(int argc, char *argv[])
 	}
 
 	if (json) {
-		std::string out = stats_to_json(p, sb.st_size);
+		std::vector<std::pair<const std::string, const fifo_stats *> > dummy;
+
+		std::string out = stats_to_json(p, dummy, sb.st_size);
 
 		printf("%s\n", out.c_str());
 	}

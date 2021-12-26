@@ -180,9 +180,18 @@ uint64_t * stats::register_stat(const std::string & name, const std::string & oi
 	return (uint64_t *)p_out;
 }
 
+void stats::register_fifo_stats(const std::string & name, fifo_stats *const fs)
+{
+	lock.lock();
+
+	this->fs.insert({ name, fs });
+
+	lock.unlock();
+}
+
 std::string stats::to_json() const
 {
-	return stats_to_json(p, size);
+	return stats_to_json(p, get_fifo_stats(), size);
 }
 
 uint64_t * stats::find_by_oid(const std::string & oid)
@@ -266,6 +275,20 @@ std::string stats::find_next_oid(const std::string & oid)
 
 		p_lut = &it->second.children;
 	}
+
+	lock.unlock();
+
+	return out;
+}
+
+std::vector<std::pair<const std::string, const fifo_stats *> > stats::get_fifo_stats() const
+{
+	std::vector<std::pair<const std::string, const fifo_stats *> > out;
+
+	lock.lock();
+
+	for(auto & item : fs)
+		out.push_back({ item.first, item.second });
 
 	lock.unlock();
 
