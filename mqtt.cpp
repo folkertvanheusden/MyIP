@@ -101,7 +101,7 @@ static void unregister_all_topics(mqtt_session_data *const msd)
 
 static void publish(mqtt_session_data *const msd, const std::string & topic, const uint8_t *const data, const size_t data_len)
 {
-	dolog(debug, "MQTT(%s): Publishing %d bytes to topic %s\n", msd->session_name.c_str(), data_len, topic.c_str());
+	dolog(debug, "MQTT(%s): Publishing %ld bytes to topic %s\n", msd->session_name.c_str(), data_len, topic.c_str());
 
 	std::vector<uint8_t> msg;
 	msg.push_back(3 << 4);  // PUBLISH
@@ -247,8 +247,8 @@ bool mqtt_get_bytes(tcp_session_t *const ts, mqtt_session_data *const msd, uint8
 			if (move_n > 0)
 				memmove(&msd->data[0], &msd->data[n], move_n);
 
+			assert(msd->data_len >= n);
 			msd->data_len -= n;
-			assert(msd->data_len >= 0);
 
 			break;
 		}
