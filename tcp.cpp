@@ -567,7 +567,7 @@ void tcp::unacked_sender()
 			for(int i=0; i<to_send; i += packet_size) {
 				size_t send_n = std::min(packet_size, to_send - i);
 
-				dolog(debug, "tcp-unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %d)\n", send_n, rel_seqnr(it->second, true, it->second->my_seq_nr), it->second->window_size, it->second->unacked_size, it->second->data_since_last_ack);
+				dolog(debug, "tcp-unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", send_n, rel_seqnr(it->second, true, it->second->my_seq_nr), it->second->window_size, it->second->unacked_size, it->second->data_since_last_ack);
 
 				send_segment(it->second, it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, FLAG_ACK, it->second->their_seq_nr, &resend_nr, &it->second->unacked[i], send_n);
 
@@ -696,7 +696,7 @@ void tcp::end_session(tcp_session_t *const ts)
 		ts->state = tcp_fin_wait_1;
 	}
 	else {
-		dolog(debug, "TCP[%012" PRIx64 "]: schedule end session, after %d bytes\n", ts->id, ts->unacked_size);
+		dolog(debug, "TCP[%012" PRIx64 "]: schedule end session, after %ld bytes\n", ts->id, ts->unacked_size);
 
 		ts->fin_after_unacked_empty = true;
 	}
