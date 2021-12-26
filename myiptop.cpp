@@ -14,7 +14,7 @@
 #include "stats-utils.h"
 
 constexpr char shm_name[] = "/myip";
-constexpr int size = 4096;
+constexpr int size = 8192;
 
 void help()
 {

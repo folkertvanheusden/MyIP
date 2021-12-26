@@ -7,12 +7,14 @@
 
 constexpr size_t pkts_max_size { 512 };
 
-protocol::protocol()
+protocol::protocol(stats *const s, const std::string & stats_name)
 {
+	pkts = new fifo<const packet *>(s, stats_name, pkts_max_size);
 }
 
 protocol::~protocol()
 {
+	delete pkts;
 }
 
 void protocol::register_protocol(const uint8_t protocol, ip_protocol *const p)
@@ -24,17 +26,7 @@ void protocol::register_protocol(const uint8_t protocol, ip_protocol *const p)
 
 void protocol::queue_packet(const packet *p)
 {
-	std::lock_guard<std::mutex> lck(pkts_lock);
-
-	while (pkts.size() >= pkts_max_size) {
-		delete pkts.at(0);
-
-		pkts.erase(pkts.begin());
-	}
-
-	pkts.push_back(p);
-
-	pkts_cv.notify_one();
+	pkts->try_put(p);
 }
 
 uint16_t ip_checksum(const uint16_t *p, const size_t n)

@@ -12,7 +12,7 @@
 #include "icmp.h"
 #include "utils.h"
 
-ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : iarp(iarp), myip(myip)
+ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : protocol(s, "ipv4"), iarp(iarp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
@@ -122,20 +122,7 @@ void ipv4::operator()()
 	set_thread_name("myip-ipv4");
 
 	while(!ipv4_stop_flag) {
-		std::unique_lock<std::mutex> lck(pkts_lock);
-
-		using namespace std::chrono_literals;
-
-		while(pkts.empty() && !ipv4_stop_flag)
-			pkts_cv.wait_for(lck, 500ms);
-
-		if (pkts.empty() || ipv4_stop_flag)
-			continue;
-
-		const packet *pkt = pkts.at(0);
-		pkts.erase(pkts.begin());
-
-		lck.unlock();
+		const packet *pkt = pkts->get();
 
 		const uint8_t *const p = pkt->get_data();
 		int size = pkt->get_size();

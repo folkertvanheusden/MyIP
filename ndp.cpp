@@ -7,7 +7,7 @@
 #include "phys.h"
 #include "utils.h"
 
-ndp::ndp(stats *const s, const any_addr & mymac, const any_addr & myip6) : address_cache(s, mymac, myip6)
+ndp::ndp(stats *const s, const any_addr & mymac, const any_addr & myip6) : protocol(s, "ndp"), address_cache(s, mymac, myip6)
 {
 	// 1.3.6.1.2.1.4.57850.1.9: ndp
         ndp_cache_req = s->register_stat("ndp_cache_req", "1.3.6.1.2.1.4.57850.1.9.1");
@@ -29,20 +29,7 @@ void ndp::operator()()
 	set_thread_name("myip-ndp");
 
 	while(!ndp_stop_flag) {
-		std::unique_lock<std::mutex> lck(pkts_lock);
-
-		using namespace std::chrono_literals;
-
-		while(pkts.empty() && !ndp_stop_flag)
-			pkts_cv.wait_for(lck, 500ms);
-
-		if (pkts.empty() || ndp_stop_flag)
-			continue;
-
-		const packet *pkt = pkts.at(0);
-		pkts.erase(pkts.begin());
-
-		lck.unlock();
+		const packet *pkt = pkts->get();
 
 		// NDP packets are not processed here
 

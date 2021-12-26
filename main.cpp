@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, ss);
 
-	stats s(4096);
+	stats s(8192);
 
 	const int uid = iniparser_getint(ini, "cfg:run-as", 1000);  // uid
 	const int gid = iniparser_getint(ini, "cfg:run-in", 1000);  // gid

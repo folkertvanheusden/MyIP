@@ -7,7 +7,7 @@
 #include "phys.h"
 #include "utils.h"
 
-arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac) : address_cache(s, mymac, myip), gw_mac(gw_mac)
+arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac) : protocol(s, "arp"), address_cache(s, mymac, myip), gw_mac(gw_mac)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
 	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
@@ -28,20 +28,7 @@ void arp::operator()()
 	set_thread_name("myip-arp");
 
 	while(!arp_stop_flag) {
-		std::unique_lock<std::mutex> lck(pkts_lock);
-
-		using namespace std::chrono_literals;
-
-		while(pkts.empty() && !arp_stop_flag)
-			pkts_cv.wait_for(lck, 500ms);
-
-		if (pkts.empty() || arp_stop_flag)
-			continue;
-
-		const packet *pkt = pkts.at(0);
-		pkts.erase(pkts.begin());
-
-		lck.unlock();
+		const packet *pkt = pkts->get();
 
 		stats_inc_counter(arp_requests);
 

@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "fifo.h"
 #include "packet.h"
 
 class ip_protocol;
@@ -17,16 +18,14 @@ class phys;
 class protocol
 {
 protected:
-        std::mutex pkts_lock;
-        std::condition_variable pkts_cv;
-	std::vector<const packet *> pkts;
+	fifo<const packet *> *pkts { nullptr };
 
 	phys *pdev { nullptr };
 
 	std::map<uint8_t, ip_protocol *> prot_map;
 
 public:
-	protocol();
+	protocol(stats *const s, const std::string & stats_name);
 	virtual ~protocol();
 
 	void register_phys(phys *const p) { pdev = p; }

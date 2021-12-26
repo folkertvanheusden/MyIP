@@ -11,7 +11,7 @@
 #include "icmp.h"
 #include "utils.h"
 
-ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : indp(indp), myip(myip)
+ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : protocol(s, "ipv6"), indp(indp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
@@ -114,20 +114,7 @@ void ipv6::operator()()
 	set_thread_name("myip-ipv6");
 
 	while(!ipv6_stop_flag) {
-		std::unique_lock<std::mutex> lck(pkts_lock);
-
-		using namespace std::chrono_literals;
-
-		while(pkts.empty() && !ipv6_stop_flag)
-			pkts_cv.wait_for(lck, 500ms);
-
-		if (pkts.empty() || ipv6_stop_flag)
-			continue;
-
-		const packet *pkt = pkts.at(0);
-		pkts.erase(pkts.begin());
-
-		lck.unlock();
+		const packet *pkt = pkts->get();
 
 		stats_inc_counter(ip_n_pkt);
 
