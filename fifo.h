@@ -1,6 +1,8 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include "stats.h"
+
 static constexpr int up_size = 100;
 
 template <typename T>
@@ -22,11 +24,16 @@ private:
 
 	int up_divider { 1 };
 	uint64_t usage_pattern[up_size] { 0 };
+	uint64_t n_in { 0 };
+
+	uint64_t *fifo_n_in_stats { nullptr };
 
 public:
-	fifo(const int n_elements) : n_elements(n_elements)
+	fifo(stats *const s, const std::string & name,const int n_elements) : n_elements(n_elements)
 	{
 		data = new T[n_elements];
+
+		fifo_n_in_stats = s->register_stat(name + "_n_in");
 
 		up_divider = (n_elements + 1) / up_size;
 
@@ -50,10 +57,13 @@ public:
 
 		data[write_pointer] = *element;
 
-		usage_pattern[write_pointer / up_divider]++;
-
 		write_pointer++;
 		write_pointer %= n_elements;
+
+		n_in++;
+
+		usage_pattern[n_in / up_divider]++;
+		stats_set(fifo_n_in_stats, n_in);
 
 		full = write_pointer == read_pointer;
 
@@ -71,10 +81,13 @@ public:
 		if (!full) {
 			data[write_pointer] = element;
 
-			usage_pattern[write_pointer / up_divider]++;
-
 			write_pointer++;
 			write_pointer %= n_elements;
+
+			n_in++;
+
+			usage_pattern[n_in / up_divider]++;
+			stats_set(fifo_n_in_stats, n_in);
 
 			full = write_pointer == read_pointer;
 

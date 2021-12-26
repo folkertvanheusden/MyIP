@@ -6,9 +6,9 @@
 
 constexpr size_t pkts_max_size { 512 };
 
-ip_protocol::ip_protocol()
+ip_protocol::ip_protocol(stats *const s, const std::string & stats_name)
 {
-	pkts = new fifo<const packet *>(pkts_max_size);
+	pkts = new fifo<const packet *>(s, stats_name, pkts_max_size);
 }
 
 ip_protocol::~ip_protocol()

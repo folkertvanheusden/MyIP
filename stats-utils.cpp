@@ -26,7 +26,7 @@ std::string stats_to_json(const uint8_t *const p, const int size)
 		else
 			out += myformat("%lu", *cnt_p);
 
-		cur_p += 40;
+		cur_p += 48;
 	}
 
 	out += " }";

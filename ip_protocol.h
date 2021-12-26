@@ -25,7 +25,7 @@ protected:
 	protocol *idev { nullptr };
 
 public:
-	ip_protocol();
+	ip_protocol(stats *const s, const std::string & stats_name);
 	virtual ~ip_protocol();
 
 	void register_ip(protocol *const p) { idev = p; }

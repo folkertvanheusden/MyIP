@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 				if (nr & 1)
 					wattroff(w, A_BOLD);
 
-				cur_p += 40;
+				cur_p += 48;
 				nr++;
 			}
 
@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
 				else
 					printf("%s\t%lu\n", &cur_p[16], *cnt_p);
 
-				cur_p += 40;
+				cur_p += 48;
 			}
 
 			if (nr < count || count == -1)

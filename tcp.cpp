@@ -57,7 +57,7 @@ char *flags_to_str(uint8_t flags)
 	return out;
 }
 
-tcp::tcp(stats *const s)
+tcp::tcp(stats *const s) : ip_protocol(s, "tcp")
 {
 	tcp_packets = s->register_stat("tcp_packets");
 	tcp_errors = s->register_stat("tcp_errors", "1.3.6.1.2.1.6.7");  // tcpAttemptFails

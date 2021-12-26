@@ -6,7 +6,7 @@
 #include "icmp.h"
 #include "utils.h"
 
-udp::udp(stats *const s, icmp *const icmp_) : icmp_(icmp_)
+udp::udp(stats *const s, icmp *const icmp_) : ip_protocol(s, "udp"), icmp_(icmp_)
 {
 	udp_requests = s->register_stat("udp_requests");
 	udp_refused = s->register_stat("udp_refused");

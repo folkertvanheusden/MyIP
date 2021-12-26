@@ -24,6 +24,12 @@ void stats_inc_counter(uint64_t *const p)
 #endif
 }
 
+void stats_set(uint64_t *const p, const uint64_t value)
+{
+	// TODO atomic
+	*p = value;
+}
+
 void stats_add_average(uint64_t *const p, const int val)
 {
 #if defined(GCC_VERSION) && GCC_VERSION >= 40700
@@ -99,7 +105,7 @@ void dump_tree(const std::map<std::string, oid_t> & tree)
 
 uint64_t * stats::register_stat(const std::string & name, const std::string & oid)
 {
-	if (len + 40 > size) {
+	if (len + 48 > size) {
 		dolog(error, "stats: shm is full\n");
 		return nullptr;
 	}
@@ -121,11 +127,11 @@ uint64_t * stats::register_stat(const std::string & name, const std::string & oi
 	*(uint64_t *)p_out = 0;
 	*(uint64_t *)(p_out + 8) = 0;
 
-	int copy_n = std::min(name.size(), size_t(23));
+	int copy_n = std::min(name.size(), size_t(31));
 	memcpy(&p_out[16], name.c_str(), copy_n);
 	p_out[16 + copy_n] = 0x00;
 
-	len += 40;
+	len += 48;
 
 	stats_t st;
 	st.p = reinterpret_cast<uint64_t *>(p_out);
