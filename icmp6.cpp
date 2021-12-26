@@ -33,20 +33,7 @@ void icmp6::operator()()
 	set_thread_name("myip-icmp6");
 
 	while(!stop_flag) {
-		std::unique_lock<std::mutex> lck(pkts_lock);
-
-		using namespace std::chrono_literals;
-
-		while(pkts.empty() && !stop_flag)
-			pkts_cv.wait_for(lck, 500ms);
-
-		if (pkts.empty() || stop_flag)
-			continue;
-
-		const packet *pkt = pkts.at(0);
-		pkts.erase(pkts.begin());
-
-		lck.unlock();
+		const packet *pkt = pkts->get();
 
 		const uint8_t *const p = pkt->get_data();
 

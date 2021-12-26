@@ -2,32 +2,24 @@
 #include <chrono>
 
 #include "ip_protocol.h"
+#include "utils.h"
 
 constexpr size_t pkts_max_size { 512 };
 
 ip_protocol::ip_protocol()
 {
+	pkts = new fifo<const packet *>(pkts_max_size);
 }
 
 ip_protocol::~ip_protocol()
 {
-	for(auto p : pkts)
-		delete p;
+	delete pkts;
 }
 
 void ip_protocol::queue_packet(const packet *p)
 {
-	std::lock_guard<std::mutex> lck(pkts_lock);
-
-	while (pkts.size() >= pkts_max_size) {
-		delete pkts.at(0);
-
-		pkts.erase(pkts.begin());
-	}
-
-	pkts.push_back(p);
-
-	pkts_cv.notify_one();
+	if (!pkts->try_put(p))
+		dolog(debug, "IP-Protocol: packet dropped\n");
 }
 
 uint16_t tcp_udp_checksum(const any_addr & src_addr, const any_addr & dst_addr, const bool tcp, const uint8_t *const tcp_payload, const int len)

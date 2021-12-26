@@ -76,9 +76,6 @@ tcp::tcp(stats *const s)
 
 tcp::~tcp()
 {
-	for(auto p : pkts)
-		delete p;
-
 	stop_flag = true;
 
 	th->join();
@@ -601,18 +598,7 @@ void tcp::operator()()
 	std::vector<tcp_packet_handle_thread_t *> threads;
 
 	while(!stop_flag) {
-		std::unique_lock<std::mutex> lck(pkts_lock);
-
-		while(pkts.empty() && !stop_flag)
-			pkts_cv.wait_for(lck, 500ms);
-
-		if (pkts.empty() || stop_flag)
-			continue;
-
-		const packet *pkt = pkts.at(0);
-		pkts.erase(pkts.begin());
-
-		lck.unlock();
+		const packet *pkt = pkts->get();
 
 		stats_inc_counter(tcp_packets);
 

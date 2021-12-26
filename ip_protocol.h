@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 
+#include "fifo.h"
 #include "packet.h"
 #include "protocol.h"
 
@@ -19,9 +20,7 @@ protected:
 	std::thread *th { nullptr };
 	std::atomic_bool stop_flag { false };
 
-        std::mutex pkts_lock;
-        std::condition_variable pkts_cv;
-	std::vector<const packet *> pkts;
+	fifo<const packet *> *pkts { nullptr };
 
 	protocol *idev { nullptr };
 

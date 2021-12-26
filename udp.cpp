@@ -16,9 +16,6 @@ udp::udp(stats *const s, icmp *const icmp_) : icmp_(icmp_)
 
 udp::~udp()
 {
-	for(auto p : pkts)
-		delete p;
-
 	stop_flag = true;
 	th->join();
 	delete th;
@@ -29,20 +26,7 @@ void udp::operator()()
 	set_thread_name("myip-udp");
 
 	while(!stop_flag) {
-		std::unique_lock<std::mutex> lck(pkts_lock);
-
-		using namespace std::chrono_literals;
-
-		while(pkts.empty() && !stop_flag)
-			pkts_cv.wait_for(lck, 500ms);
-
-		if (pkts.empty() || stop_flag)
-			continue;
-
-		const packet *pkt = pkts.at(0);
-		pkts.erase(pkts.begin());
-
-		lck.unlock();
+		const packet *pkt = pkts->get();
 
 		const uint8_t *const p = pkt->get_data();
 		const int size = pkt->get_size();
