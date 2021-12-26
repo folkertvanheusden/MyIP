@@ -113,6 +113,8 @@ public:
 		read_pointer++;
 		read_pointer %= n_elements;
 
+		n_in--;
+
 		full = 0;
 
 		pthread_cond_signal(&cond_pull);
