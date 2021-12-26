@@ -20,6 +20,8 @@ any_addr::any_addr(const any_addr & other)
 {
 	other.get(addr, &addr_size);
 	set_ = true;
+
+	assert(addr_size == 4 || addr_size == 6 || addr_size == 16);
 }
 
 any_addr::~any_addr()
@@ -118,6 +120,8 @@ void any_addr::set(const uint8_t src[], const int src_size)
 	memcpy(addr, src, src_size);
 	addr_size = src_size;
 
+	assert(addr_size == 4 || addr_size == 6 || addr_size == 16);
+
 	set_ = true;
 }
 
@@ -174,6 +178,8 @@ any_addr & any_addr::operator =(const any_addr && other)
 {
 	other.get(addr, &addr_size);
 
+	assert(addr_size == 4 || addr_size == 6 || addr_size == 16);
+
 	set_ = true;
 
 	return *this;
@@ -182,6 +188,8 @@ any_addr & any_addr::operator =(const any_addr && other)
 any_addr & any_addr::operator =(const any_addr & other)
 {
 	other.get(addr, &addr_size);
+
+	assert(addr_size == 4 || addr_size == 6 || addr_size == 16);
 
 	set_ = true;
 

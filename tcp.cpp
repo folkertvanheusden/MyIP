@@ -138,7 +138,7 @@ void tcp::send_segment(tcp_session_t *const ts, const uint64_t session_id, const
 
 	if (data_len)
 		memcpy(&temp[20], data, data_len);
-	
+
 	uint16_t checksum = tcp_udp_checksum(peer_addr, my_addr, true, temp, temp_len);
 
 	temp[16] = checksum >> 8;
@@ -306,12 +306,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				dolog(debug, "TCP[%012" PRIx64 "]: received ACK: session is established\n", id);
 				cur_session->state = tcp_established;
 
-                                stats_inc_counter(tcp_succ_estab);
+				stats_inc_counter(tcp_succ_estab);
 
-                                if (cb_it->second.new_session(cur_session, pkt, cb_it->second.pd) == false) {
-                                        dolog(debug, "TCP[%012" PRIx64 "]: session terminated by layer 7\n", id);
-                                        fail = true;
-                                }
+				if (cb_it->second.new_session(cur_session, pkt, cb_it->second.pd) == false) {
+					dolog(debug, "TCP[%012" PRIx64 "]: session terminated by layer 7\n", id);
+					fail = true;
+				}
 			}
 			else if (cur_session->state == tcp_last_ack) {
 				dolog(debug, "TCP[%012" PRIx64 "]: received ACK: session is finished\n", id);
@@ -389,29 +389,29 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	}
 
 	// process payload
-        int data_len = size - header_size;
-        if (data_len > 0 && fail == false) {
-                dolog(debug, "TCP[%012" PRIx64 "]: packet len %d, header size: %d, payload size: %d\n", id, size, header_size, data_len);
+	int data_len = size - header_size;
+	if (data_len > 0 && fail == false) {
+		dolog(debug, "TCP[%012" PRIx64 "]: packet len %d, header size: %d, payload size: %d\n", id, size, header_size, data_len);
 
-                if (their_seq_nr == cur_session->their_seq_nr) {
-                        const uint8_t *data_start = &p[header_size];
+		if (their_seq_nr == cur_session->their_seq_nr) {
+			const uint8_t *data_start = &p[header_size];
 
-                        std::string content = bin_to_text(data_start, data_len);
-                        dolog(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
+			std::string content = bin_to_text(data_start, data_len);
+			dolog(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
 
-                        try {
-                                if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.pd) == false) {
+			try {
+				if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.pd) == false) {
 					dolog(error, "TCP[%012" PRIx64 "]: layer 7 indicated an error\n", id);
-                                        fail = true;
+					fail = true;
 				}
-                        }
-                        catch(...) {
-                                dolog(error, "TCP[%012" PRIx64 "]: EXCEPTION IN new_data()\n", id);
-                                fail = true;
-                        }
+			}
+			catch(...) {
+				dolog(error, "TCP[%012" PRIx64 "]: EXCEPTION IN new_data()\n", id);
+				fail = true;
+			}
 
 			if (fail == false) {
-                                cur_session->their_seq_nr += data_len;  // TODO handle missing segments
+				cur_session->their_seq_nr += data_len;  // TODO handle missing segments
 
 				// well be acked in the 'unacked_sender'-thread
 				if (cur_session->unacked_size == 0) {
@@ -419,34 +419,34 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 					send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 				}
-                        }
-                }
-                else {
-                        dolog(info, "TCP[%012" PRIx64 "]: unexpected sequence nr %u, expected: %u\n", id, rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
+			}
+		}
+		else {
+			dolog(info, "TCP[%012" PRIx64 "]: unexpected sequence nr %u, expected: %u\n", id, rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
 
 			if (cur_session->unacked_size == 0) {
 				dolog(debug, "TCP[%012" PRIx64 "]: re-acknowledging received content to trigger resend\n", id);
 
 				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 			}
-                }
+		}
 
-                unacked_cv.notify_all();
-        }
+		unacked_cv.notify_all();
+	}
 
-        if (fail) {
-                if (cb_it != listeners.end())
-                        cb_it->second.session_closed_1(cur_session, cb_it->second.pd);
+	if (fail) {
+		if (cb_it != listeners.end())
+			cb_it->second.session_closed_1(cur_session, cb_it->second.pd);
 
-                stats_inc_counter(tcp_errors);
+		stats_inc_counter(tcp_errors);
 
 		cur_session->unacked_sent_cv.notify_all();
 
-                delete_entry = true;
+		delete_entry = true;
 
-                dolog(info, "TCP[%012" PRIx64 "]: sending fail packet\n", id);
-                send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 2) | (1 << 4) /* RST, ACK */, their_seq_nr + 1, nullptr, nullptr, 0);
-        }
+		dolog(info, "TCP[%012" PRIx64 "]: sending fail packet\n", id);
+		send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 2) | (1 << 4) /* RST, ACK */, their_seq_nr + 1, nullptr, nullptr, 0);
+	}
 
 	cur_session->tlock.unlock();
 
