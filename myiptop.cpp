@@ -1,6 +1,8 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <fcntl.h>
+#include <map>
 #include <ncurses.h>
+#include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +17,107 @@
 
 constexpr char shm_name[] = "/myip";
 constexpr int size = 8192;
+
+void ncurses_ui(const uint8_t *const p, const uint8_t *const p_end)
+{
+	initscr();
+        cbreak();
+        intrflush(stdscr, FALSE);
+        noecho();
+        nonl();
+        refresh();
+        meta(stdscr, TRUE);
+        idlok(stdscr, TRUE);
+        idcok(stdscr, TRUE);
+        leaveok(stdscr, FALSE);
+        keypad(stdscr, TRUE);
+
+	int maxx = 0, maxy = 0;
+	getmaxyx(stdscr, maxy, maxx);
+
+	WINDOW *win_names = newwin(maxy, 16, 0, 0);
+	WINDOW *win_values = newwin(maxy, maxx - 18, 0, 18);
+
+	std::map<std::string, std::map<std::string, uint64_t *> > values;
+
+	const uint8_t *cur_p = p;
+	while(cur_p < p_end && cur_p[16]) {
+		std::string name = (char *)&cur_p[16];
+		std::size_t underscore = name.find('_');
+		std::string prefix = name.substr(0, underscore);
+
+		auto it = values.find(prefix);
+		if (it == values.end()) {
+			std::map<std::string, uint64_t *> new_pair;
+		       	new_pair.insert({ name, (uint64_t *)&cur_p[0] });
+
+			values.insert({ prefix, new_pair });
+		}
+		else {
+			it->second.insert({ name, (uint64_t *)&cur_p[0] });
+		}
+
+		cur_p += 48;
+	}
+
+	int cursor = 0;
+
+	struct pollfd fds[] { { 0, POLLIN, 0 } };
+
+	for(;;) {
+		int nr = 0;
+
+		werase(win_names);
+		werase(win_values);
+
+		time_t t = time(nullptr);
+		struct tm tm { 0 };
+		localtime_r(&t, &tm);
+		mvwprintw(win_names, 0, 0, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+		for(auto & it : values) {
+			mvwprintw(win_names, nr + 1, 1, "%c%s", nr == cursor ? '>' : ' ', it.first.c_str());
+
+			if (nr == cursor) {
+				int nr2 = 0;
+
+				for(auto & it_entries : it.second) {
+					mvwprintw(win_values, nr2 % maxy, (nr2 / maxy) * 38, "%s", it_entries.first.c_str());
+
+					uint64_t *cnt_p = it_entries.second;
+					uint64_t *cnt_p2 = &cnt_p[1];
+
+					if (*cnt_p2)
+						mvwprintw(win_values, nr2 % maxy, (nr2 / maxy) * 38 + 29, "%.2f", *cnt_p / double(*cnt_p2));
+					else
+						mvwprintw(win_values, nr2 % maxy, (nr2 / maxy) * 38 + 29, "%lu", *cnt_p);
+
+					nr2++;
+				}
+			}
+
+			nr++;
+		}
+
+		wrefresh(win_names);
+		wrefresh(win_values);
+		wmove(win_names, cursor + 1, 0);
+		doupdate();
+
+		if (poll(fds, 1, 500)) {
+			int c = getch();
+
+			if (c == KEY_UP && cursor > 0)
+				cursor--;
+			else if (c == KEY_DOWN && cursor < values.size() - 1)
+				cursor++;
+			else if (c == 'q')
+				break;
+		}
+	}
+
+	endwin();
+}
 
 void help()
 {
@@ -66,59 +169,8 @@ int main(int argc, char *argv[])
 
 		printf("%s\n", out.c_str());
 	}
-	else if (nc) {
-		WINDOW *w = initscr();
-
-		int maxx = 0, maxy = 0;
-		getmaxyx(w, maxy, maxx);
-
-		int cnt = 0;
-
-		for(;count == -1 || cnt++ < count;) {
-			werase(w);
-
-			uint8_t *const p_end = &p[sb.st_size];
-			uint8_t *cur_p = p;
-
-			int nr = 1;
-
-			time_t t = time(nullptr);
-			struct tm tm;
-			localtime_r(&t, &tm);
-
-			mvwprintw(w, 0, 0, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
-
-			while(cur_p < p_end && cur_p[16]) {
-				uint64_t *cnt_p = (uint64_t *)cur_p;
-				uint64_t *cnt_p2 = (uint64_t *)(cur_p + 8);
-
-				if (nr & 1)
-					wattron(w, A_BOLD);
-
-				mvwprintw(w, nr % maxy, (nr / maxy) * 38, "%s\n", &cur_p[16]);
-
-				if (*cnt_p2)
-					mvwprintw(w, nr % maxy, (nr / maxy) * 38 + 29, "%.2f\n", *cnt_p / double(*cnt_p2));
-				else
-					mvwprintw(w, nr % maxy, (nr / maxy) * 38 + 29, "%lu\n", *cnt_p);
-
-				if (nr & 1)
-					wattroff(w, A_BOLD);
-
-				cur_p += 48;
-				nr++;
-			}
-
-			wmove(w, 0, 37);
-
-			wrefresh(w);
-			doupdate();
-
-			sleep(1);
-		}
-
-		endwin();
-	}
+	else if (nc)
+		ncurses_ui(p, &p[sb.st_size]);
 	else {
 		int nr = 0;
 
