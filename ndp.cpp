@@ -29,7 +29,11 @@ void ndp::operator()()
 	set_thread_name("myip-ndp");
 
 	while(!ndp_stop_flag) {
-		const packet *pkt = pkts->get();
+		auto po = pkts->get(500);
+		if (!po.has_value())
+			continue;
+
+		const packet *pkt = po.value();
 
 		// NDP packets are not processed here
 

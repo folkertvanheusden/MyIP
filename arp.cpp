@@ -28,7 +28,11 @@ void arp::operator()()
 	set_thread_name("myip-arp");
 
 	while(!arp_stop_flag) {
-		const packet *pkt = pkts->get();
+		auto po = pkts->get(500);
+		if (!po.has_value())
+			continue;
+
+		const packet *pkt = po.value();
 
 		stats_inc_counter(arp_requests);
 
