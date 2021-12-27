@@ -3,7 +3,6 @@
 #include <atomic>
 #include <climits>
 #include <errno.h>
-#include <queue>
 #include <set>
 #include <stdint.h>
 #include <stdio.h>
