@@ -53,6 +53,15 @@ public:
 class http_session_data : public session_data
 {
 public:
+	~http_session_data() {
+		if (th) {
+			terminate = true;
+
+			th->join();
+			delete th;
+		}
+	}
+
 	std::thread *th { nullptr };
 	std::atomic_bool terminate { false };
 

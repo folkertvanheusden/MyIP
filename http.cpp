@@ -239,8 +239,10 @@ void http_close_session_1(tcp_session_t *ts, private_data *pd)
 		http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
 
 		hs->terminate = true;
+
 		hs->th->join();
 		delete hs->th;
+		hs->th = nullptr;
 
 		free(hs->req_data);
 
