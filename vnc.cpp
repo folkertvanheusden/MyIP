@@ -197,9 +197,7 @@ void frame_buffer_thread(void *fb_in)
 
 			fb_work->fb_lock.unlock();
 
-			fb.fb_lock.unlock();
-
-			fb.callback();
+			fb_work->callback();
 		}
 
 		myusleep(101000);  // ignore any errors during usleep

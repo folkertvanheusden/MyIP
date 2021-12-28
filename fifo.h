@@ -1,5 +1,6 @@
 // (C) 2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
+#include <optional>
 #include <pthread.h>
 #include <stdint.h>
 
@@ -104,6 +105,52 @@ public:
 		pthread_mutex_unlock(&lock);
 
 		return have_put;
+	}
+
+	std::optional<T> get(const int ms)
+	{
+		struct timespec ts { 0, 0 };
+		clock_gettime(CLOCK_REALTIME, &ts);
+
+		ts.tv_nsec += (ms % 1000) * 1000000ll;
+		ts.tv_sec += ms / 1000;
+
+		if (ts.tv_nsec >= 1000000000ll) {
+			ts.tv_nsec -= 1000000000ll;
+			ts.tv_sec++;
+		}
+
+		pthread_mutex_lock(&lock);
+
+		bool ok = true;
+
+		while(read_pointer == write_pointer && !full) {
+			if (pthread_cond_timedwait(&cond_push, &lock, &ts)) {
+				ok = false;
+				break;
+			}
+		}
+
+		if (ok) {
+			T copy = data[read_pointer];
+
+			read_pointer++;
+			read_pointer %= n_elements;
+
+			n_in--;
+
+			full = 0;
+
+			pthread_cond_signal(&cond_pull);
+
+			pthread_mutex_unlock(&lock);
+
+			return copy;
+		}
+
+		pthread_mutex_unlock(&lock);
+
+		return { };
 	}
 
 	T get()

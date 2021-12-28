@@ -26,7 +26,11 @@ void udp::operator()()
 	set_thread_name("myip-udp");
 
 	while(!stop_flag) {
-		const packet *pkt = pkts->get();
+		auto po = pkts->get(500);
+		if (!po.has_value())
+			continue;
+
+		const packet *pkt = po.value();
 
 		const uint8_t *const p = pkt->get_data();
 		const int size = pkt->get_size();
