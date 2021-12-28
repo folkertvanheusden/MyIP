@@ -11,7 +11,7 @@
 
 #include "any_addr.h"
 #include "stats.h"
-#include "phys.h"
+#include "phys_ethernet.h"
 #include "arp.h"
 #include "ipv4.h"
 #include "ipv6.h"
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 
 	setloguid(uid, gid);
 
-	phys *dev = new phys(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
+	phys *dev = new phys_ethernet(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
 
 	if (setgid(gid) == -1) {
 		dolog(error, "setgid: %s", strerror(errno));
