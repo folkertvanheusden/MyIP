@@ -1,0 +1,175 @@
+// (C) 2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+#include <algorithm>
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <stdio.h>
+#include <string.h>
+#include <termios.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include "phys_slip.h"
+#include "packet.h"
+#include "utils.h"
+
+phys_slip::phys_slip(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac) : phys(s), my_mac(my_mac)
+{
+	if ((fd = open(dev_name.c_str(), O_RDWR)) == -1) {
+		dolog(error, "open %s: %s", dev_name.c_str(), strerror(errno));
+		exit(1);
+	}
+
+	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
+		dolog(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+		exit(1);
+	}
+
+        struct termios tty;
+        if (tcgetattr(fd, &tty) != 0) {
+		dolog(error, "tcgetattr: %s", strerror(errno));
+		exit(1);
+        }
+
+        cfsetospeed(&tty, bps);
+        cfsetispeed(&tty, bps);
+
+        tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
+        tty.c_iflag &= ~IGNBRK;         // disable break processing
+        tty.c_lflag = 0;                // no signaling chars, no echo,
+                                        // no canonical processing
+        tty.c_oflag = 0;                // no remapping, no delays
+        tty.c_cc[VMIN]  = 0;            // read doesn't block
+        tty.c_cc[VTIME] = 127;            // 12.7 seconds read timeout
+
+        tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+
+        tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls,
+                                        // enable reading
+        tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
+        tty.c_cflag &= ~CSTOPB;
+        tty.c_cflag &= ~CRTSCTS;
+
+        if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+		dolog(error, "tcsetattr: %s", strerror(errno));
+		exit(1);
+        }
+
+	th = new std::thread(std::ref(*this));
+}
+
+phys_slip::~phys_slip()
+{
+	close(fd);
+}
+
+bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
+{
+	dolog(debug, "phys_slip: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+
+	stats_inc_counter(phys_transmit);
+
+	size_t out_size = pl_size * 2 + 2;
+	uint8_t *out = new uint8_t[out_size];
+
+	size_t out_o = 0;
+	out[out_o++] = 0xc0;  // END
+	for(size_t i=0; i<pl_size; i++) {
+		if (payload[i] == 0xc0) {
+			out[out_o++] = 0xdb;
+			out[out_o++] = 0xdc;
+		}
+		else if (payload[i] == 0xdb) {
+			out[out_o++] = 0xdb;
+			out[out_o++] = 0xdd;
+		}
+		else {
+			out[out_o++] = payload[i];
+		}
+	}
+	out[out_o++] = 0xc0;  // END
+
+	bool ok = true;
+
+	int rc = write(fd, out, out_o);
+
+	if (size_t(rc) != out_o) {
+		dolog(error, "phys_slip: problem sending packet (%d for %zu bytes)\n", rc, out_o);
+
+		if (rc == -1)
+			dolog(error, "phys_slip: %s\n", strerror(errno));
+
+		ok = false;
+	}
+
+	delete [] out;
+
+	return ok;
+}
+
+void phys_slip::operator()()
+{
+	dolog(debug, "phys_slip: thread started\n");
+
+	set_thread_name("myip-phys_slip");
+
+	std::vector<uint8_t> packet_buffer;
+
+	struct pollfd fds[] = { { fd, POLLIN, 0 } };
+
+	while(!stop_flag) {
+		int rc = poll(fds, 1, 150);
+		if (rc == -1) {
+			if (errno == EINTR)
+				continue;
+
+			dolog(error, "poll: %s", strerror(errno));
+			exit(1);
+		}
+
+		if (rc == 0)
+			continue;
+
+		uint8_t buffer = 0x00;
+		int size = read(fd, (char *)&buffer, 1);
+		if (size == -1)
+			continue;
+
+		if (buffer == 0xdb) {
+			uint8_t buffer2 = 0x00;
+			read(fd, (char *)&buffer2, 1);
+
+			if (buffer2 == 0xdc)  // escape for 'END'
+				packet_buffer.push_back(0xc0);
+			else if (buffer2 == 0xdd)  // escape for 'ESCAPE'
+				packet_buffer.push_back(0xdb);
+		}
+		else if (buffer == 0xc0) {  // END of packet
+			stats_inc_counter(phys_recv_frame);
+
+			if (size < 20) {
+				if (size)
+					stats_inc_counter(phys_invl_frame);
+				continue;
+			}
+
+			any_addr src_mac((const uint8_t *)"\0\0\0\0\0\1", 6);
+
+			dolog(debug, "phys_slip: queing packet, size %d\n", packet_buffer.size());
+
+			packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
+
+			auto it = prot_map.find(0x800);  // assuming IPv4
+			it->second->queue_packet(p);
+
+			packet_buffer.clear();
+		}
+		else {
+			packet_buffer.push_back(buffer);
+		}
+	}
+
+	dolog(info, "phys_slip: thread stopped\n");
+}
