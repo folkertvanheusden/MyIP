@@ -149,9 +149,14 @@ void phys_slip::operator()()
 		else if (buffer == 0xc0) {  // END of packet
 			stats_inc_counter(phys_recv_frame);
 
-			if (size < 20) {
+			if (packet_buffer.size() < 20) {
+				dolog(debug, "phys_slip: invalid packet, size %d\n", packet_buffer.size());
+
 				if (size)
 					stats_inc_counter(phys_invl_frame);
+
+				packet_buffer.clear();
+
 				continue;
 			}
 
