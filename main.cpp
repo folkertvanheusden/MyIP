@@ -12,6 +12,7 @@
 #include "any_addr.h"
 #include "stats.h"
 #include "phys_ethernet.h"
+#include "phys_slip.h"
 #include "arp.h"
 #include "ipv4.h"
 #include "ipv6.h"
@@ -91,7 +92,13 @@ int main(int argc, char *argv[])
 
 	setloguid(uid, gid);
 
-	phys *dev = new phys_ethernet(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
+	const char *mac_str = iniparser_getstring(ini, "cfg:mac-address", "52:34:84:16:44:22");
+	any_addr mymac = parse_address(mac_str, 6, ":", 16);
+
+	printf("Will listen on MAC address: %s\n", mymac.to_str().c_str());
+
+//	phys *dev = new phys_ethernet(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
+	phys *dev = new phys_slip(&s, "/dev/ttyACM0", B115200, mymac);
 
 	if (setgid(gid) == -1) {
 		dolog(error, "setgid: %s", strerror(errno));
@@ -102,11 +109,6 @@ int main(int argc, char *argv[])
 		dolog(error, "setuid: %s", strerror(errno));
 		return 1;
 	}
-
-	const char *mac_str = iniparser_getstring(ini, "cfg:mac-address", "52:34:84:16:44:22");
-	any_addr mymac = parse_address(mac_str, 6, ":", 16);
-
-	printf("Will listen on MAC address: %s\n", mymac.to_str().c_str());
 
 	const char *ip_str = iniparser_getstring(ini, "cfg:ip-address", "192.168.3.2");
 	any_addr myip = parse_address(ip_str, 4, ".", 10);

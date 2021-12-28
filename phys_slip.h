@@ -3,6 +3,7 @@
 #include <atomic>
 #include <map>
 #include <string>
+#include <termios.h>
 #include <thread>
 
 #include "any_addr.h"
