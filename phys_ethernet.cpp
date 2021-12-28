@@ -163,7 +163,7 @@ void phys_ethernet::operator()()
 
 		packet *p = new packet(ts, src_mac, any_addr(&buffer[6], 6), any_addr(&buffer[0], 6), &buffer[14], size - 14, &buffer[0], 14);
 
-		it->second->queue_packet(p);
+		it->second->queue_packet(this, p);
 	}
 
 	dolog(info, "phys_ethernet: thread stopped\n");

@@ -47,7 +47,7 @@ public:
 
 	void register_icmp(icmp *const icmp_) { this->icmp_ = icmp_; }
 
-	virtual int get_max_packet_size() const override { return pdev->get_max_packet_size() - 20 /* 20 = size of IPv4 header (without options, as MyIP does) */; }
+	virtual int get_max_packet_size() const override { return default_pdev->get_max_packet_size() - 20 /* 20 = size of IPv4 header (without options, as MyIP does) */; }
 
 	void operator()() override;
 };

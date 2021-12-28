@@ -100,6 +100,8 @@ int main(int argc, char *argv[])
 //	phys *dev = new phys_ethernet(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
 	phys *dev = new phys_slip(&s, "/dev/pts/7", B115200, mymac);
 
+	phys *const default_dev = dev;
+
 	if (setgid(gid) == -1) {
 		dolog(error, "setgid: %s", strerror(errno));
 		return 1;
@@ -119,6 +121,7 @@ int main(int argc, char *argv[])
 	any_addr gw_mac = parse_address(gw_mac_str, 6, ":", 16);
 
 	arp *a = new arp(&s, mymac, myip, gw_mac);
+	a->add_static_entry(default_dev, mymac, myip);
 	dev->register_protocol(0x0806, a);
 
 	ipv4 *ipv4_instance = new ipv4(&s, a, myip);

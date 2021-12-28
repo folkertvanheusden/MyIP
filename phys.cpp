@@ -43,7 +43,7 @@ void phys::register_protocol(const uint16_t ether_type, protocol *const p)
 {
 	prot_map.insert({ ether_type, p });
 
-	p->register_phys(this);
+	p->register_default_phys(this);
 }
 
 bool phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)

@@ -46,7 +46,7 @@ public:
 
 	void register_icmp(icmp6 *const icmp6_) { this->icmp6_ = icmp6_; }
 
-	virtual int get_max_packet_size() const override { return pdev->get_max_packet_size() - 40 /* 40 = size of IPv6 header */; }
+	virtual int get_max_packet_size() const override { return default_pdev->get_max_packet_size() - 40 /* 40 = size of IPv6 header */; }
 
 	void operator()() override;
 };

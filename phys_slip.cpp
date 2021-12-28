@@ -170,7 +170,7 @@ void phys_slip::operator()()
 			packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
 
 			auto it = prot_map.find(0x800);  // assuming IPv4
-			it->second->queue_packet(p);
+			it->second->queue_packet(this, p);
 
 			packet_buffer.clear();
 		}

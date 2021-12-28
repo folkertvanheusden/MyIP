@@ -9,7 +9,7 @@ constexpr size_t pkts_max_size { 512 };
 
 protocol::protocol(stats *const s, const std::string & stats_name)
 {
-	pkts = new fifo<const packet *>(s, stats_name, pkts_max_size);
+	pkts = new fifo<fifo_element_t>(s, stats_name, pkts_max_size);
 }
 
 protocol::~protocol()
@@ -24,9 +24,9 @@ void protocol::register_protocol(const uint8_t protocol, ip_protocol *const p)
 	p->register_ip(this);
 }
 
-void protocol::queue_packet(const packet *p)
+void protocol::queue_packet(phys *const interface, const packet *p)
 {
-	pkts->try_put(p);
+	pkts->try_put({ interface, p });
 }
 
 uint16_t ip_checksum(const uint16_t *p, const size_t n)
