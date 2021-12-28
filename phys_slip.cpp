@@ -1,5 +1,6 @@
 // (C) 2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <algorithm>
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -17,6 +18,8 @@
 
 phys_slip::phys_slip(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac) : phys(s), my_mac(my_mac)
 {
+	assert(my_mac.get_len() == 6);
+
 	if ((fd = open(dev_name.c_str(), O_RDWR)) == -1) {
 		dolog(error, "open %s: %s", dev_name.c_str(), strerror(errno));
 		exit(1);

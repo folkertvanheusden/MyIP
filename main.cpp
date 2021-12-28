@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 	printf("Will listen on MAC address: %s\n", mymac.to_str().c_str());
 
 //	phys *dev = new phys_ethernet(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
-	phys *dev = new phys_slip(&s, "/dev/ttyACM0", B115200, mymac);
+	phys *dev = new phys_slip(&s, "/dev/pts/7", B115200, mymac);
 
 	if (setgid(gid) == -1) {
 		dolog(error, "setgid: %s", strerror(errno));
