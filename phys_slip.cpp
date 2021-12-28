@@ -41,7 +41,7 @@ phys_slip::phys_slip(stats *const s, const std::string & dev_name, const int bps
         tty.c_lflag = 0;                // no signaling chars, no echo,
                                         // no canonical processing
         tty.c_oflag = 0;                // no remapping, no delays
-        tty.c_cc[VMIN]  = 0;            // read doesn't block
+        tty.c_cc[VMIN]  = 1;            // read blocks
         tty.c_cc[VTIME] = 127;            // 12.7 seconds read timeout
 
         tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
