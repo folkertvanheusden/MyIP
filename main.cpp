@@ -97,10 +97,10 @@ int main(int argc, char *argv[])
 
 	printf("Will listen on MAC address: %s\n", mymac.to_str().c_str());
 
-//	phys *dev = new phys_ethernet(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
-	phys *dev = new phys_slip(&s, "/dev/pts/7", B115200, mymac);
+	phys *dev1 = new phys_ethernet(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
+	phys *dev2 = new phys_slip(&s, "/dev/pts/7", B115200, mymac);
 
-	phys *const default_dev = dev;
+	phys *const default_dev = dev1;
 
 	if (setgid(gid) == -1) {
 		dolog(error, "setgid: %s", strerror(errno));
@@ -122,21 +122,30 @@ int main(int argc, char *argv[])
 
 	arp *a = new arp(&s, mymac, myip, gw_mac);
 	a->add_static_entry(default_dev, mymac, myip);
-	dev->register_protocol(0x0806, a);
+	dev1->register_protocol(0x0806, a);
+	dev2->register_protocol(0x0806, a);
 
-	ipv4 *ipv4_instance = new ipv4(&s, a, myip);
+	ipv4 *ipv4_instance1 = new ipv4(&s, a, myip);
 
-	icmp *icmp_ = new icmp(&s);
-	ipv4_instance->register_protocol(0x01, icmp_);
+	ipv4 *ipv4_instance2 = new ipv4(&s, a, parse_address("192.168.4.2", 4, ".", 10));
+
+	icmp *icmp_1 = new icmp(&s);
+	ipv4_instance1->register_protocol(0x01, icmp_1);
 	// rather ugly but that's how IP works
-	ipv4_instance->register_icmp(icmp_);
+	ipv4_instance1->register_icmp(icmp_1);
 
 	tcp *t = new tcp(&s);
-	ipv4_instance->register_protocol(0x06, t);
-	udp *u = new udp(&s, icmp_);
-	ipv4_instance->register_protocol(0x11, u);
+	ipv4_instance1->register_protocol(0x06, t);
+	udp *u = new udp(&s, icmp_1);
+	ipv4_instance1->register_protocol(0x11, u);
 
-	dev->register_protocol(0x0800, ipv4_instance);
+	dev1->register_protocol(0x0800, ipv4_instance1);
+
+	icmp *icmp_2 = new icmp(&s);
+	ipv4_instance2->register_protocol(0x01, icmp_2);
+	ipv4_instance2->register_icmp(icmp_2);
+
+	dev2->register_protocol(0x0800, ipv4_instance2);
 
 	const char *ntp_ip_str = iniparser_getstring(ini, "cfg:ntp-ip-address", "192.168.64.1");
 	any_addr upstream_ntp_server = parse_address(ntp_ip_str, 4, ".", 10);
@@ -180,7 +189,7 @@ int main(int argc, char *argv[])
 	ndp *ndp_ = new ndp(&s, mymac, myip6);
 
 	ipv6 *ipv6_instance = new ipv6(&s, ndp_, myip6);
-	dev->register_protocol(0x86dd, ipv6_instance);
+	dev1->register_protocol(0x86dd, ipv6_instance);
 
 	icmp6 *icmp6_ = new icmp6(&s, mymac, myip6);
 	ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
@@ -244,7 +253,8 @@ int main(int argc, char *argv[])
 	if (http_handler.deinit)
 		http_handler.deinit();
 
-	dev->stop();
+	dev2->stop();
+	dev1->stop();
 
 	delete ntp_;
 	delete u;
@@ -252,11 +262,14 @@ int main(int argc, char *argv[])
 	delete icmp6_;
 	delete ipv6_instance;
 	delete ndp_;
-	delete icmp_;
+	delete icmp_2;
+	delete icmp_1;
 	delete t;
-	delete ipv4_instance;
+	delete ipv4_instance2;
+	delete ipv4_instance1;
 	delete a;
-	delete dev;
+	delete dev2;
+	delete dev1;
 
 	dolog(info, "THIS IS THE END\n");
 

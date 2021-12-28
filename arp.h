@@ -16,7 +16,7 @@ typedef struct {
 class arp : public protocol, public address_cache
 {
 private:
-	const any_addr gw_mac, my_mac, my_ip;
+	const any_addr gw_mac;
 
 	uint64_t *arp_requests { nullptr }, *arp_for_me { nullptr };
 
