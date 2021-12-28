@@ -131,6 +131,7 @@ static const char *logfile = strdup("/tmp/myip.log");
 static log_level_t log_level_file = warning;
 static log_level_t log_level_screen = warning;
 static FILE *lfh = nullptr;
+static int lf_uid = 0, lf_gid = 0;
 
 void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen)
 {
@@ -147,8 +148,8 @@ void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_scre
 
 void setloguid(const int uid, const int gid)
 {
-	if (fchown(fileno(lfh), uid, gid) == -1)
-		fprintf(stderr, "Cannot change logfile (%s) ownership: %s\n", logfile, strerror(errno));
+	lf_uid = uid;
+	lf_gid = gid;
 }
 
 void closelog()
@@ -168,6 +169,9 @@ void dolog(const log_level_t ll, const char *fmt, ...)
 			fprintf(stderr, "Cannot access log-file %s: %s\n", logfile, strerror(errno));
 			exit(1);
 		}
+
+		if (fchown(fileno(lfh), lf_uid, lf_gid) == -1)
+			fprintf(stderr, "Cannot change logfile (%s) ownership: %s\n", logfile, strerror(errno));
 
 		if (fcntl(fileno(lfh), F_SETFD, FD_CLOEXEC) == -1) {
 			fprintf(stderr, "fcntl(FD_CLOEXEC): %s\n", strerror(errno));
