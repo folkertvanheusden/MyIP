@@ -31,17 +31,13 @@ void protocol::queue_packet(const packet *p)
 
 uint16_t ip_checksum(const uint16_t *p, const size_t n)
 {
-        uint32_t sum = 0;
+        uint32_t cksum = 0;
 
-        for(size_t i=0; i<n; i++) {
-                sum += htons(p[i]);
+        for(size_t i=0; i<n; i++) 
+                cksum += htons(p[i]);
 
-                if (sum & 0x80000000)   /* if high order bit set, fold */
-                        sum = (sum & 0xFFFF) + (sum >> 16);
-        }
+	cksum = (cksum >> 16) + (cksum & 0xffff);
+	cksum += (cksum >>16);
 
-        while(sum >> 16)
-                sum = (sum & 0xFFFF) + (sum >> 16);
-
-        return ~sum;
+        return ~cksum;
 }
