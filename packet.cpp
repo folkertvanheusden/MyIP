@@ -8,7 +8,7 @@ packet::packet(const struct timespec & ts_in, const any_addr & src_mac_addr, con
 	data = ::duplicate(in, size);
 
 	this->header_size = header_size;
-	this->header = ::duplicate(header, header_size);
+	this->header = header_size ? ::duplicate(header, header_size) : nullptr;
 }
 
 packet::packet(const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size) : src_addr(src_addr), dst_addr(dst_addr)
@@ -17,7 +17,7 @@ packet::packet(const any_addr & src_addr, const any_addr & dst_addr, const uint8
 	data = ::duplicate(in, size);
 
 	this->header_size = header_size;
-	this->header = ::duplicate(header, header_size);
+	this->header = header_size ? ::duplicate(header, header_size) : nullptr;
 }
 
 packet::~packet()
