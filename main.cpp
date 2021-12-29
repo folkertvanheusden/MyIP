@@ -475,13 +475,13 @@ int main(int argc, char *argv[])
 			if (!i4)
 				continue;
 
-			udp *const u = (udp *)i4->get_ip_protocol(0x11);
-			if (!u)
+			udp *const u4 = (udp *)i4->get_ip_protocol(0x11);
+			if (!u4)
 				continue;
 
-			sip *sip_ = new sip(&s, u, sample, mb_path, mb_recv_script, upstream_sip_server, upstream_sip_user, upstream_sip_password, i4->get_addr(), port, sip_register_interval);
+			sip *sip_ = new sip(&s, u4, sample, mb_path, mb_recv_script, upstream_sip_server, upstream_sip_user, upstream_sip_password, i4->get_addr(), port, sip_register_interval);
 
-			u->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+			u4->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			// TODO: ipv6 sip
 		}
