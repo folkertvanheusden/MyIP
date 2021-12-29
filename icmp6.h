@@ -11,8 +11,8 @@
 class icmp6 : public icmp
 {
 private:
-	const any_addr & my_mac;
-	const any_addr & my_ip;
+	const any_addr my_mac;
+	const any_addr my_ip;
 
 	std::thread *th2 { nullptr };
 
