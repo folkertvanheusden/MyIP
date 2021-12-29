@@ -413,12 +413,12 @@ int main(int argc, char *argv[])
 
 	// HTTP
 	try {
-		const libconfig::Setting & s_ntp = root.lookup("http");
+		const libconfig::Setting & s_http = root.lookup("http");
 
-		std::string web_root = cfg_str(s_ntp, "web-root", "HTTP server files root", false, "");
-		std::string web_logfile = cfg_str(s_ntp, "web-logfile", "HTTP server logfile", false, "");
+		std::string web_root = cfg_str(s_http, "web-root", "HTTP server files root", false, "");
+		std::string web_logfile = cfg_str(s_http, "web-logfile", "HTTP server logfile", false, "");
 
-		int port = cfg_int(s_ntp, "port", "tcp port to listen on", true, 80);
+		int port = cfg_int(s_http, "port", "tcp port to listen on", true, 80);
 
 		tcp_port_handler_t http_handler = http_get_handler(&s, web_root, web_logfile);
 
@@ -430,9 +430,9 @@ int main(int argc, char *argv[])
 
 	// VNC
 	try {
-		const libconfig::Setting & s_ntp = root.lookup("vnc");
+		const libconfig::Setting & s_vnc = root.lookup("vnc");
 
-		int port = cfg_int(s_ntp, "port", "tcp port to listen on", true, 5900);
+		int port = cfg_int(s_vnc, "port", "tcp port to listen on", true, 5900);
 
 		tcp_port_handler_t vnc_handler = vnc_get_handler(&s);
 
@@ -444,9 +444,9 @@ int main(int argc, char *argv[])
 
 	// MQTT
 	try {
-		const libconfig::Setting & s_ntp = root.lookup("mqtt");
+		const libconfig::Setting & s_mqtt = root.lookup("mqtt");
 
-		int port = cfg_int(s_ntp, "port", "tcp port to listen on", true, 1883);
+		int port = cfg_int(s_mqtt, "port", "tcp port to listen on", true, 1883);
 
 		tcp_port_handler_t mqtt_handler = mqtt_get_handler(&s);
 
