@@ -12,7 +12,7 @@ Linux and BSD, see https://en.wikipedia.org/wiki/TUN/TAP ).
 
 how to build
 ------------
-Make sure you have "libssl-dev", "libncurses-dev", "libiniparser-dev", "libspeex-dev", "libsamplerate0-dev" and "libsndfile1-dev" installed. Then:
+Make sure you have "libssl-dev", "libncurses-dev", "libconfig++-dev", "libspeex-dev", "libsamplerate0-dev" and "libsndfile1-dev" installed. Then:
 
 * mkdir build
 * cd build
@@ -23,9 +23,9 @@ how to run
 ----------
 As root:
 
-	./myip configuration-file.ini
+	./myip configuration-file.cfg
 
-Look at 'example.ini' on how to configure the stack.
+Look at 'example.cfg' on how to configure the stack.
 
 After you have started `myip', a 'myip' network device has appeared.
 Of course, your "local IP address" must be configured (remote is the MyIP instance, local is the Linux system; so for the example.ini: 192.168.3.2 is the MyIP address and you could e.g. add 192.168.3.1 to the 'myip' network interface).

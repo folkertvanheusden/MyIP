@@ -7,7 +7,7 @@
 #include "phys.h"
 #include "utils.h"
 
-ndp::ndp(stats *const s, const any_addr & mymac, const any_addr & myip6) : protocol(s, "ndp"), address_cache(s, mymac, myip6)
+ndp::ndp(stats *const s) : protocol(s, "ndp"), address_cache(s)
 {
 	// 1.3.6.1.2.1.4.57850.1.9: ndp
         ndp_cache_req = s->register_stat("ndp_cache_req", "1.3.6.1.2.1.4.57850.1.9.1");
@@ -22,6 +22,11 @@ ndp::~ndp()
 
 	ndp_th->join();
 	delete ndp_th;
+}
+
+void ndp::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
+{
+	update_cache(mac, ip, interface, true);
 }
 
 void ndp::operator()()

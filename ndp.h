@@ -22,8 +22,10 @@ private:
 	std::atomic_bool ndp_stop_flag { false };
 
 public:
-	ndp(stats *const s, const any_addr & mymac, const any_addr & ip6);
+	ndp(stats *const s);
 	virtual ~ndp();
+
+	void add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip);
 
 	bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;

@@ -35,6 +35,7 @@ public:
 	void register_default_phys(phys *const p) { default_pdev = p; }
 
 	void register_protocol(const uint8_t protocol, ip_protocol *const p);
+	ip_protocol *get_ip_protocol(const uint8_t p);
 
 	void queue_packet(phys *const interface, const packet *p);
 
