@@ -18,10 +18,10 @@ any_addr::any_addr(const uint8_t src[], const int src_size)
 
 any_addr::any_addr(const any_addr & other)
 {
+	assert(other.get_len() == 4 || other.get_len() == 6 || other.get_len() == 16);
+
 	other.get(addr, &addr_size);
 	set_ = true;
-
-	assert(addr_size == 4 || addr_size == 6 || addr_size == 16);
 }
 
 any_addr::~any_addr()

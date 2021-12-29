@@ -11,6 +11,7 @@
 typedef struct {
 	uint64_t ts;
 	any_addr addr;
+	phys *interface;
 } address_entry_t;
 
 class address_cache
@@ -19,8 +20,7 @@ protected:
 	std::shared_mutex cache_lock;
 	std::map<any_addr, address_entry_t> cache;
 
-	const any_addr mymac;
-	const any_addr myip;
+	const any_addr my_mac, my_ip;
 
 	std::atomic_bool cleaner_stop_flag { false };
 	std::thread *cleaner_th { nullptr };
@@ -32,9 +32,9 @@ protected:
 	void cache_cleaner();
 
 public:
-	address_cache(stats *const s, const any_addr & mymac, const any_addr & ip);
+	address_cache(stats *const s, const any_addr & my_mac, const any_addr & my_ip);
 	virtual ~address_cache();
 
-	void update_cache(const any_addr & mac, const any_addr & ip);
-	virtual any_addr * query_cache(const any_addr & ip);
+	void update_cache(const any_addr & mac, const any_addr & ip, phys *const interface);
+	virtual std::pair<phys *, any_addr *> query_cache(const any_addr & ip);
 };

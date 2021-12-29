@@ -1,0 +1,3 @@
+race:frame_buffer_thread
+race:calculate_fb_update
+race:stats_inc_counter

@@ -872,6 +872,8 @@ bool sip::send_REGISTER(const std::string & call_id, const std::string & authori
 
 void sip::register_thread()
 {
+	myusleep(2500000);
+
 	while(!stop_flag) {
 		int cur_interval = interval;
 

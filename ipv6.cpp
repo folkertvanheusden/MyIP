@@ -42,12 +42,6 @@ bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	stats_inc_counter(ipv6_n_tx);
 	stats_inc_counter(ip_n_out_req);
 
-	if (!pdev) {
-		stats_inc_counter(ipv6_tx_err);
-		stats_inc_counter(ip_n_out_disc);
-		return false;
-	}
-
 	size_t out_size = 40 + pl_size;
 	uint8_t *out = new uint8_t[out_size];
 
@@ -73,7 +67,8 @@ bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	if (pl_size)
 		memcpy(&out[40], payload, pl_size);
 
-        const any_addr *src_mac = indp->query_cache(src_ip);
+	auto ndp_result = indp->query_cache(src_ip);
+        const any_addr *src_mac = ndp_result.second;
         if (!src_mac) {
                 dolog(warning, "IPv6: cannot find src IP (%s) in MAC lookup table\n", src_ip.to_str().c_str());
                 delete [] out;
@@ -82,7 +77,7 @@ bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
                 return false;
         }
 
-	bool rc = pdev->transmit_packet(dst_mac, *src_mac, 0x86dd, out, out_size);
+	bool rc = ndp_result.first->transmit_packet(dst_mac, *src_mac, 0x86dd, out, out_size);
 
 	delete src_mac;
 
@@ -94,7 +89,9 @@ bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 bool ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	bool rc = false;
-        const any_addr *dst_mac = indp->query_cache(dst_ip);
+
+	auto ndp_result = indp->query_cache(dst_ip);
+        const any_addr *dst_mac = ndp_result.second;
 
         if (dst_mac) {
 		rc = transmit_packet(*dst_mac, dst_ip, src_ip, protocol, payload, pl_size, header_template);
@@ -118,7 +115,7 @@ void ipv6::operator()()
 		if (!po.has_value())
 			continue;
 
-		const packet *pkt = po.value();
+		const packet *pkt = po.value().p;
 
 		stats_inc_counter(ip_n_pkt);
 
@@ -161,7 +158,7 @@ void ipv6::operator()()
 			continue;
 		}
 
-		indp->update_cache(pkt->get_src_addr(), pkt_src);
+		indp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 
 		int ip_size = (payload_header[4] << 8) | payload_header[5];
 

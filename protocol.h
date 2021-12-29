@@ -14,12 +14,17 @@
 class ip_protocol;
 class phys;
 
+typedef struct {
+	phys *interface;
+	const packet *p;
+} fifo_element_t;
+
 class protocol
 {
 protected:
-	fifo<const packet *> *pkts { nullptr };
+	fifo<fifo_element_t> *pkts { nullptr };
 
-	phys *pdev { nullptr };
+	phys *default_pdev { nullptr };
 
 	std::map<uint8_t, ip_protocol *> prot_map;
 
@@ -27,11 +32,11 @@ public:
 	protocol(stats *const s, const std::string & stats_name);
 	virtual ~protocol();
 
-	void register_phys(phys *const p) { pdev = p; }
+	void register_default_phys(phys *const p) { default_pdev = p; }
 
 	void register_protocol(const uint8_t protocol, ip_protocol *const p);
 
-	void queue_packet(const packet *p);
+	void queue_packet(phys *const interface, const packet *p);
 
 	virtual bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
 	virtual bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
