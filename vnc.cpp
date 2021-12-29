@@ -68,7 +68,7 @@ struct frame_buffer_t
 			vs->w_cond.notify_one();
 		}
 	}
-} fb;
+} frame_buffer;
 
 void vnc_thread(void *ts_in);
 
@@ -76,38 +76,38 @@ void frame_buffer_thread(void *ts_in);
 
 void vnc_init()
 {
-	fb.w = 640;
-	fb.h = 480;
+	frame_buffer.w = 640;
+	frame_buffer.h = 480;
 
-	size_t n_bytes = size_t(fb.w) * size_t(fb.h) * 3;
-	fb.buffer = new uint8_t[n_bytes]();
+	size_t n_bytes = size_t(frame_buffer.w) * size_t(frame_buffer.h) * 3;
+	frame_buffer.buffer = new uint8_t[n_bytes]();
 
-	fb.terminate = false;
-	fb.th = new std::thread(frame_buffer_thread, &fb);
+	frame_buffer.terminate = false;
+	frame_buffer.th = new std::thread(frame_buffer_thread, &frame_buffer);
 }
 
 void vnc_deinit()
 {
 	stop = true;
 
-	if (fb.th) {
-		fb.terminate = true;
+	if (frame_buffer.th) {
+		frame_buffer.terminate = true;
 
-		fb.th->join();
+		frame_buffer.th->join();
 
-		delete fb.th;
-		fb.th = nullptr;
+		delete frame_buffer.th;
+		frame_buffer.th = nullptr;
 
-		fb.fb_lock.lock();
-		delete [] fb.buffer;
-		fb.buffer = nullptr;
-		fb.fb_lock.unlock();
+		frame_buffer.fb_lock.lock();
+		delete [] frame_buffer.buffer;
+		frame_buffer.buffer = nullptr;
+		frame_buffer.fb_lock.unlock();
 	}
 }
 
-void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
+void draw_text(frame_buffer_t *fb_in, int x, int y, const char *text)
 {
-	const int maxo = fb->w * fb->h * 3;
+	const int maxo = fb_in->w * fb_in->h * 3;
 	int len = strlen(text);
 
 	for(int i=0; i<len; i++) {
@@ -115,15 +115,15 @@ void draw_text(frame_buffer_t *fb, int x, int y, const char *text)
 
 		for(int cy=0; cy<8; cy++) {
 			for(int cx=0; cx<8; cx++) {
-				int o = (cy + y) * fb -> w * 3 + (x + i * 8 + cx) * 3;
+				int o = (cy + y) * fb_in -> w * 3 + (x + i * 8 + cx) * 3;
 				if (o >= maxo)
 					break;
 
 				uint8_t pixel_value = font_8x8[c][cy][cx];
 
-				fb->buffer[o + 0] = pixel_value;
-				fb->buffer[o + 1] = pixel_value;
-				fb->buffer[o + 2] = pixel_value;
+				fb_in->buffer[o + 0] = pixel_value;
+				fb_in->buffer[o + 1] = pixel_value;
+				fb_in->buffer[o + 2] = pixel_value;
 			}
 		}
 	}
@@ -530,8 +530,8 @@ void vnc_thread(void *ts_in)
 
 		if (vs->state == vs_server_init) {  // 7.3.2
 			uint8_t message[] = {
-				uint8_t(fb.w >> 8), uint8_t(fb.w & 255),
-				uint8_t(fb.h >> 8), uint8_t(fb.h & 255),
+				uint8_t(frame_buffer.w >> 8), uint8_t(frame_buffer.w & 255),
+				uint8_t(frame_buffer.h >> 8), uint8_t(frame_buffer.h & 255),
 				// PIXEL_FORMAT
 				32,  // bits per pixel
 				24,  // depth
@@ -554,7 +554,7 @@ void vnc_thread(void *ts_in)
 
 			cont_or_initial_upd_frame = true;
 
-			fb.register_callback(vs);
+			frame_buffer.register_callback(vs);
 
 			vs->state = vs_running_waiting_cmd;
 		}
@@ -563,7 +563,7 @@ void vnc_thread(void *ts_in)
 			// send initial frame
 			uint8_t *fb_message = nullptr;
 			size_t fb_message_len = 0;
-			calculate_fb_update(&fb, encodings, false, 0, 0, fb.w, fb.h, 24, &fb_message, &fb_message_len, vpd, vs);
+			calculate_fb_update(&frame_buffer, encodings, false, 0, 0, frame_buffer.w, frame_buffer.h, 24, &fb_message, &fb_message_len, vpd, vs);
 
 			dolog(debug, "VNC: intial (full) framebuffer update\n");
 
@@ -637,7 +637,7 @@ void vnc_thread(void *ts_in)
 					int w = (parameters[5] << 8) | parameters[6];
 					int h = (parameters[7] << 8) | parameters[8];
 
-					calculate_fb_update(&fb, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd, vs);
+					calculate_fb_update(&frame_buffer, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd, vs);
 
 					dolog(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes%s\n", message_len, w, h, x, y, message_len, incremental?" (incremental)":"");
 
@@ -759,7 +759,7 @@ void vnc_thread(void *ts_in)
 
 	ts->t->end_session(ts);
 
-	fb.unregister_callback(vs);
+	frame_buffer.unregister_callback(vs);
 
 	dolog(info, "VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
