@@ -456,6 +456,38 @@ int main(int argc, char *argv[])
 		// just fine
 	}
 
+	// SIP
+	try {
+		const libconfig::Setting & s_sip = root.lookup("sip");
+
+		std::string sample = cfg_str(s_sip, "sample", "audio sample to play", false, "");
+		std::string mb_path = cfg_str(s_sip, "mb-path", "where to store audio", false, "");
+		std::string mb_recv_script = cfg_str(s_sip, "mb-recv-script", "script to invoke on received audio", true, "");
+		std::string upstream_sip_server = cfg_str(s_sip, "upstream-sip-server", "upstream SIP server", false, "");
+		std::string upstream_sip_user = cfg_str(s_sip, "upstream-sip-user", "upstream SIP user", false, "");
+		std::string upstream_sip_password = cfg_str(s_sip, "upstream-sip-password", "upstream SIP password", false, "");
+		int sip_register_interval = cfg_int(s_sip, "sip-register-interval", "SIP upstream registesr interval", true, 450);
+
+		int port = cfg_int(s_sip, "port", "udp port to listen on", true, 123);
+
+		for(auto & dev : devs) {
+			ipv4 *i4 = (ipv4 *)dev->get_protocol(0x0800);
+			if (!i4)
+				continue;
+
+			udp *const u = (udp *)i4->get_ip_protocol(0x11);
+			if (!u)
+				continue;
+
+			sip *sip_ = new sip(&s, u, sample, mb_path, mb_recv_script, upstream_sip_server, upstream_sip_user, upstream_sip_password, i4->get_addr(), port, sip_register_interval);
+
+			u->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+
 	dolog(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
@@ -488,10 +520,6 @@ int main(int argc, char *argv[])
 	snmp *snmp_ = new snmp(&s, u);
 	u->add_handler(161, std::bind(&snmp::input, snmp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
-	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"), iniparser_getstring(ini, "cfg:mb-recv", "/home/folkert/Projects/myip/mb-recv.sh"),
-			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
-			);
-	u->add_handler(5060, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 	// something that silently drops packet for a port
 	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
