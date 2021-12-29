@@ -153,7 +153,7 @@ void phys_slip::operator()()
 			stats_inc_counter(phys_recv_frame);
 
 			if (packet_buffer.size() < 20) {
-				dolog(debug, "phys_slip: invalid packet, size %d\n", packet_buffer.size());
+				dolog(debug, "phys_slip: invalid packet, size %zu\n", packet_buffer.size());
 
 				if (size)
 					stats_inc_counter(phys_invl_frame);
@@ -165,7 +165,7 @@ void phys_slip::operator()()
 
 			any_addr src_mac((const uint8_t *)"\0\0\0\0\0\1", 6);
 
-			dolog(debug, "phys_slip: queing packet, size %d\n", packet_buffer.size());
+			dolog(debug, "phys_slip: queing packet, size %zu\n", packet_buffer.size());
 
 			packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
 
