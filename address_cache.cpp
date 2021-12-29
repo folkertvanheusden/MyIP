@@ -28,18 +28,18 @@ address_cache::~address_cache()
 	delete cleaner_th;
 }
 
-void address_cache::update_cache(const any_addr & mac, const any_addr & ip, phys *const interface)
+void address_cache::update_cache(const any_addr & mac, const any_addr & ip, phys *const interface, const bool static_entry)
 {
 	const std::lock_guard<std::shared_mutex> lock(cache_lock);
 
 	auto it = cache.find(ip);
 
 	if (it == cache.end()) {
-		cache.insert({ ip, { get_us(), mac, interface } });
+		cache.insert({ ip, { static_entry ? 0 : get_us(), mac, interface } });
 		stats_inc_counter(address_cache_store);
 	}
 	else {
-		it->second = { get_us(), mac, interface };
+		it->second = { static_entry ? 0 : get_us(), mac, interface };
 		stats_inc_counter(address_cache_update);
 	}
 }

@@ -26,7 +26,7 @@ ndp::~ndp()
 
 void ndp::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
 {
-	update_cache(mac, ip, interface);
+	update_cache(mac, ip, interface, true);
 }
 
 void ndp::operator()()
