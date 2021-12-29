@@ -482,11 +482,82 @@ int main(int argc, char *argv[])
 			sip *sip_ = new sip(&s, u, sample, mb_path, mb_recv_script, upstream_sip_server, upstream_sip_user, upstream_sip_password, i4->get_addr(), port, sip_register_interval);
 
 			u->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			// TODO: ipv6 sip
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine
 	}
+
+	// SNMP
+	try {
+		const libconfig::Setting & s_snmp = root.lookup("snmp");
+
+		int port = cfg_int(s_snmp, "port", "udp port to listen on", true, 123);
+
+		for(auto & dev : devs) {
+			ipv4 *i4 = (ipv4 *)dev->get_protocol(0x0800);
+			if (!i4)
+				continue;
+
+			udp *const u4 = (udp *)i4->get_ip_protocol(0x11);
+			if (!u4)
+				continue;
+
+			snmp *snmp_4 = new snmp(&s, u4);
+			u4->add_handler(port, std::bind(&snmp::input, snmp_4, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			ipv6 *i6 = (ipv6 *)dev->get_protocol(0x86dd);
+			if (!i6)
+				continue;
+
+			udp *const u6 = (udp *)i6->get_ip_protocol(0x11);
+			if (!u6)
+				continue;
+
+			snmp *snmp_6 = new snmp(&s, u6);
+			u6->add_handler(port, std::bind(&snmp::input, snmp_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+
+	// SYSLOG
+	try {
+		const libconfig::Setting & s_syslog = root.lookup("syslog");
+
+		int port = cfg_int(s_syslog, "port", "udp port to listen on", true, 123);
+
+		for(auto & dev : devs) {
+			ipv4 *i4 = (ipv4 *)dev->get_protocol(0x0800);
+			if (!i4)
+				continue;
+
+			udp *const u4 = (udp *)i4->get_ip_protocol(0x11);
+			if (!u4)
+				continue;
+
+			syslog_srv *syslog_4 = new syslog_srv(&s);
+			u4->add_handler(port, std::bind(&syslog_srv::input, syslog_4, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			ipv6 *i6 = (ipv6 *)dev->get_protocol(0x86dd);
+			if (!i6)
+				continue;
+
+			udp *const u6 = (udp *)i6->get_ip_protocol(0x11);
+			if (!u6)
+				continue;
+
+			syslog_srv *syslog_6 = new syslog_srv(&s);
+			u6->add_handler(port, std::bind(&syslog_srv::input, syslog_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+
 
 	dolog(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
@@ -514,37 +585,9 @@ int main(int argc, char *argv[])
 	closelog();
 
 #if 0
-	syslog_srv *syslog_ = new syslog_srv(&s);
-	u->add_handler(514, std::bind(&syslog_srv::input, syslog_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-
-	snmp *snmp_ = new snmp(&s, u);
-	u->add_handler(161, std::bind(&snmp::input, snmp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-
-
 	// something that silently drops packet for a port
 	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
 	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-
-
-	tcp_port_handler_t vnc_handler6 = vnc_get_handler(&s);
-	t6->add_handler(5900, vnc_handler6);
-
-	tcp_port_handler_t mqtt_handler6 = mqtt_get_handler(&s);
-	t6->add_handler(1883, mqtt_handler6);
-
-	udp *u6 = new udp(&s, icmp6_);
-	ipv6_instance->register_protocol(0x11, u6);
-
-#if 0
-	sip *sip6_ = new sip(&s, u6, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"),
-			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip6, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
-			);
-	u6->add_handler(5060, std::bind(&sip::input, sip6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-#endif
-
-	snmp *snmp6_ = new snmp(&s, u6);
-	u6->add_handler(161, std::bind(&snmp::input, snmp6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-	/* **** */
 
 	std::string run_at_started = iniparser_getstring(ini, "cfg:ifup", "");
 	if (run_at_started.empty() == false)
