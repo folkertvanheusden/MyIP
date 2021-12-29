@@ -11,8 +11,7 @@
 
 class phys
 {
-private:
-	int fd { -1 };
+protected:
 	std::thread *th { nullptr };
 	std::atomic_bool stop_flag { false };
 
@@ -26,7 +25,7 @@ private:
 	std::map<uint16_t, protocol *> prot_map;
 
 public:
-	phys(stats *const s, const std::string & dev_name, const int uid, const int gid);
+	phys(stats *const s);
 	phys(const phys &) = delete;
 	virtual ~phys();
 
@@ -34,9 +33,9 @@ public:
 
 	void register_protocol(const uint16_t ether_type, protocol *const p);
 
-	bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size);
+	virtual bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size);
 
 	virtual int get_max_packet_size() const { return mtu_size - 14 /* 14 = size of Ethernet header */; }
 
-	void operator()();
+	virtual void operator()();
 };

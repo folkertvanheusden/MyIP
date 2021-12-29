@@ -23,6 +23,11 @@ arp::~arp()
 	delete arp_th;
 }
 
+void arp::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
+{
+	update_cache(mac, ip, interface);
+}
+
 void arp::operator()()
 {
 	set_thread_name("myip-arp");
@@ -32,7 +37,7 @@ void arp::operator()()
 		if (!po.has_value())
 			continue;
 
-		const packet *pkt = po.value();
+		const packet *pkt = po.value().p;
 
 		stats_inc_counter(arp_requests);
 
@@ -41,7 +46,7 @@ void arp::operator()()
 
 		if (p[6] == 0x00 && p[7] == 0x01 && // request
 		    p[2] == 0x08 && p[3] == 0x00 && // ethertype IPv4
-		    any_addr(&p[24], 4) == myip) // I am the target?
+		    any_addr(&p[24], 4) == my_ip) // I am the target?
 		{
 			stats_inc_counter(arp_for_me);
 
@@ -50,14 +55,13 @@ void arp::operator()()
 			swap_mac(&reply[8], &reply[18]); // arp addresses
 
 			// my MAC address
-			mymac.get(&reply[8], 6);
+			my_mac.get(&reply[8], 6);
 
 			reply[7] = 0x02; // reply
 
 			swap_ipv4(&reply[14], &reply[24]);
 
-			if (pdev)
-				pdev->transmit_packet(pkt->get_src_addr(), mymac, 0x0806, reply, size);
+			po.value().interface->transmit_packet(pkt->get_src_addr(), my_mac, 0x0806, reply, size);
 
 			delete [] reply;
 		}
@@ -69,7 +73,7 @@ void arp::operator()()
 	}
 }
 
-any_addr * arp::query_cache(const any_addr & ip)
+std::pair<phys *, any_addr *> arp::query_cache(const any_addr & ip)
 {
 	assert(ip.get_len() == 4);
 
@@ -78,14 +82,14 @@ any_addr * arp::query_cache(const any_addr & ip)
 		stats_inc_counter(address_cache_hit);
 
 		constexpr uint8_t multicast_mac[] { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-		return new any_addr(multicast_mac, 6);
+		return { default_pdev, new any_addr(multicast_mac, 6) };
 	}
 
-	any_addr *rc = address_cache::query_cache(ip);
-	if (rc)
+	auto rc = address_cache::query_cache(ip);
+	if (rc.second)
 		return rc;
 
-	return new any_addr(gw_mac);
+	return { default_pdev, new any_addr(gw_mac) };
 }
 
 bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)

@@ -24,16 +24,18 @@ private:
 	std::atomic_bool arp_stop_flag { false };
 
 public:
-	arp(stats *const s, const any_addr & mymac, const any_addr & ip, const any_addr & gw_mac);
+	arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac);
 	virtual ~arp();
+
+	void add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip);
 
 	bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 
 	// using this for ARP packets does not make sense
-	virtual int get_max_packet_size() const override { return pdev->get_max_packet_size() - 26 /* 26 = size of ARP */; }
+	virtual int get_max_packet_size() const override { return default_pdev->get_max_packet_size() - 26 /* 26 = size of ARP */; }
 
-	any_addr * query_cache(const any_addr & ip) override;
+	std::pair<phys *, any_addr *> query_cache(const any_addr & ip) override;
 
 	void operator()() override;
 };

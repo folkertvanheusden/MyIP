@@ -43,12 +43,6 @@ bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	stats_inc_counter(ipv4_n_tx);
 	stats_inc_counter(ip_n_out_req);
 
-	if (!pdev) {
-		stats_inc_counter(ipv4_tx_err);
-		stats_inc_counter(ip_n_out_disc);
-		return false;
-	}
-
 	size_t out_size = 20 + pl_size;
 	uint8_t *out = new uint8_t[out_size];
 
@@ -82,16 +76,21 @@ bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	out[11] = checksum;
 
 	any_addr q_addr = override_ip ? myip : src_ip;
-	const any_addr *src_mac = iarp->query_cache(q_addr);
-	if (!src_mac) {
-		dolog(warning, "IPv4: cannot find src IP (%s) in ARP table\n", q_addr.to_str().c_str());
+	auto arp_result = iarp->query_cache(q_addr);
+	const any_addr *src_mac = arp_result.second;
+	if (!src_mac || !arp_result.first) {
+		if (!src_mac)
+			dolog(warning, "IPv4: cannot find src IP (%s) in ARP table\n", q_addr.to_str().c_str());
+		else
+			dolog(warning, "IPv4: no interface set yet\n");
+
 		delete [] out;
 		stats_inc_counter(ipv4_tx_err);
 		stats_inc_counter(ip_n_out_disc);
 		return false;
 	}
 
-	bool rc = pdev->transmit_packet(dst_mac, *src_mac, 0x0800, out, out_size);
+	bool rc = arp_result.first->transmit_packet(dst_mac, *src_mac, 0x0800, out, out_size);
 
 	delete src_mac;
 
@@ -102,7 +101,9 @@ bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 
 bool ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
-	const any_addr *dst_mac = iarp->query_cache(dst_ip);
+	auto arp_result = iarp->query_cache(dst_ip);
+	const any_addr *dst_mac = arp_result.second;
+
 	if (!dst_mac) {
 		dolog(warning, "IPv4: cannot find dst IP (%s) in ARP table\n", dst_ip.to_str().c_str());
 		stats_inc_counter(ipv4_tx_err);
@@ -126,7 +127,7 @@ void ipv4::operator()()
 		if (!po.has_value())
 			continue;
 
-		const packet *pkt = po.value();
+		const packet *pkt = po.value().p;
 
 		const uint8_t *const p = pkt->get_data();
 		int size = pkt->get_size();
@@ -159,8 +160,8 @@ void ipv4::operator()()
 		any_addr pkt_src(&payload_header[12], 4);
 
 		// update arp cache
-		iarp->update_cache(pkt->get_dst_addr(), pkt_dst);
-		iarp->update_cache(pkt->get_src_addr(), pkt_src);
+		iarp->update_cache(pkt->get_dst_addr(), pkt_dst, po.value().interface);
+		iarp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 
 		dolog(debug, "IPv4[%04x]: packet %s => %s\n", id, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 

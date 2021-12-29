@@ -33,7 +33,7 @@ void ndp::operator()()
 		if (!po.has_value())
 			continue;
 
-		const packet *pkt = po.value();
+		const packet *pkt = po.value().p;
 
 		// NDP packets are not processed here
 

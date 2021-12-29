@@ -30,6 +30,8 @@ add_executable(myip
 	ntp.cpp
 	packet.cpp
 	phys.cpp
+	phys_ethernet.cpp
+	phys_slip.cpp
 	protocol.cpp
 	sip.cpp
 	snmp.cpp

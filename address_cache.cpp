@@ -7,7 +7,7 @@
 #include "phys.h"
 #include "utils.h"
 
-address_cache::address_cache(stats *const s, const any_addr & mymac, const any_addr & myip) : mymac(mymac), myip(myip)
+address_cache::address_cache(stats *const s, const any_addr & my_mac, const any_addr & my_ip) : my_mac(my_mac), my_ip(my_ip)
 {
 	// 1.3.6.1.2.1.4.57850.1.7: address cache
 	address_cache_requests = s->register_stat("address_cache_requests", "1.3.6.1.2.1.4.57850.1.7.1");
@@ -16,9 +16,6 @@ address_cache::address_cache(stats *const s, const any_addr & mymac, const any_a
 	address_cache_hit      = s->register_stat("address_cache_hit", "1.3.6.1.2.1.4.57850.1.7.4");
 	address_cache_store    = s->register_stat("address_cache_store", "1.3.6.1.2.1.4.57850.1.7.5");
 	address_cache_update   = s->register_stat("address_cache_cache_update", "1.3.6.1.2.1.4.57850.1.7.6");
-
-	address_entry_t me { 0, mymac };  // must never be purged
-	cache.insert({ myip, me });
 
 	cleaner_th = new std::thread(&address_cache::cache_cleaner, this);
 }
@@ -31,23 +28,23 @@ address_cache::~address_cache()
 	delete cleaner_th;
 }
 
-void address_cache::update_cache(const any_addr & mac, const any_addr & ip)
+void address_cache::update_cache(const any_addr & mac, const any_addr & ip, phys *const interface)
 {
 	const std::lock_guard<std::shared_mutex> lock(cache_lock);
 
 	auto it = cache.find(ip);
 
 	if (it == cache.end()) {
-		cache.insert({ ip, { get_us(), mac } });
+		cache.insert({ ip, { get_us(), mac, interface } });
 		stats_inc_counter(address_cache_store);
 	}
 	else {
-		it->second = { get_us(), mac };
+		it->second = { get_us(), mac, interface };
 		stats_inc_counter(address_cache_update);
 	}
 }
 
-any_addr * address_cache::query_cache(const any_addr & ip)
+std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip)
 {
 	const std::shared_lock<std::shared_mutex> lock(cache_lock);
 
@@ -56,12 +53,12 @@ any_addr * address_cache::query_cache(const any_addr & ip)
 	auto it = cache.find(ip);
 	if (it == cache.end()) {
 		dolog(warning, "address_cache: %s is not in the cache\n", ip.to_str().c_str());
-		return nullptr;
+		return { nullptr, nullptr };
 	}
 
 	stats_inc_counter(address_cache_hit);
 
-	return new any_addr(it->second.addr);
+	return { it->second.interface, new any_addr(it->second.addr) };
 }
 
 void address_cache::cache_cleaner()

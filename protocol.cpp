@@ -9,7 +9,7 @@ constexpr size_t pkts_max_size { 512 };
 
 protocol::protocol(stats *const s, const std::string & stats_name)
 {
-	pkts = new fifo<const packet *>(s, stats_name, pkts_max_size);
+	pkts = new fifo<fifo_element_t>(s, stats_name, pkts_max_size);
 }
 
 protocol::~protocol()
@@ -24,24 +24,20 @@ void protocol::register_protocol(const uint8_t protocol, ip_protocol *const p)
 	p->register_ip(this);
 }
 
-void protocol::queue_packet(const packet *p)
+void protocol::queue_packet(phys *const interface, const packet *p)
 {
-	pkts->try_put(p);
+	pkts->try_put({ interface, p });
 }
 
 uint16_t ip_checksum(const uint16_t *p, const size_t n)
 {
-        uint32_t sum = 0;
+        uint32_t cksum = 0;
 
-        for(size_t i=0; i<n; i++) {
-                sum += htons(p[i]);
+        for(size_t i=0; i<n; i++) 
+                cksum += htons(p[i]);
 
-                if (sum & 0x80000000)   /* if high order bit set, fold */
-                        sum = (sum & 0xFFFF) + (sum >> 16);
-        }
+	cksum = (cksum >> 16) + (cksum & 0xffff);
+	cksum += (cksum >>16);
 
-        while(sum >> 16)
-                sum = (sum & 0xFFFF) + (sum >> 16);
-
-        return ~sum;
+        return ~cksum;
 }
