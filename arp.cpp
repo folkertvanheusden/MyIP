@@ -7,7 +7,7 @@
 #include "phys.h"
 #include "utils.h"
 
-arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac) : protocol(s, "arp"), address_cache(s, mymac, myip), gw_mac(gw_mac)
+arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) : protocol(s, "arp"), address_cache(s), my_mac(my_mac), my_ip(my_ip)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
 	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");

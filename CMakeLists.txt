@@ -63,7 +63,7 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads)
 target_link_libraries(myip Threads::Threads)
 
-target_link_libraries(myip -lrt -liniparser)
+target_link_libraries(myip -lrt)
 
 find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
@@ -96,5 +96,10 @@ target_include_directories(myip PUBLIC ${OPENSSL_INCLUDE_DIR})
 target_link_libraries(myip OpenSSL::SSL OpenSSL::Crypto)
 target_include_directories(myiptop PUBLIC ${OPENSSL_INCLUDE_DIR})
 target_link_libraries(myiptop OpenSSL::SSL OpenSSL::Crypto)
+
+pkg_check_modules(LIBCONFIG REQUIRED libconfig++)
+target_link_libraries(myip ${LIBCONFIG_LIBRARIES})
+target_include_directories(myip PUBLIC ${LIBCONFIG_INCLUDE_DIRS})
+target_compile_options(myip PUBLIC ${LIBCONFIG_CFLAGS_OTHER})
 
 target_link_libraries(myiptop -lrt -lz)

@@ -7,7 +7,7 @@
 #include "phys.h"
 #include "utils.h"
 
-address_cache::address_cache(stats *const s, const any_addr & my_mac, const any_addr & my_ip) : my_mac(my_mac), my_ip(my_ip)
+address_cache::address_cache(stats *const s)
 {
 	// 1.3.6.1.2.1.4.57850.1.7: address cache
 	address_cache_requests = s->register_stat("address_cache_requests", "1.3.6.1.2.1.4.57850.1.7.1");

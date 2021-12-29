@@ -46,6 +46,15 @@ void phys::register_protocol(const uint16_t ether_type, protocol *const p)
 	p->register_default_phys(this);
 }
 
+protocol *phys::get_protocol(const uint16_t p)
+{
+	auto it = prot_map.find(p);
+	if (it == prot_map.end())
+		return nullptr;
+
+	return it->second;
+}
+
 bool phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
 	return false;
