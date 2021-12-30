@@ -59,13 +59,16 @@ phys_slip::phys_slip(stats *const s, const std::string & dev_name, const int bps
 		dolog(error, "tcsetattr: %s", strerror(errno));
 		exit(1);
         }
-
-	th = new std::thread(std::ref(*this));
 }
 
 phys_slip::~phys_slip()
 {
 	close(fd);
+}
+
+void phys_slip::start()
+{
+	th = new std::thread(std::ref(*this));
 }
 
 bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
