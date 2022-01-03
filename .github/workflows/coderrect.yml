@@ -30,6 +30,6 @@ jobs:
         make
     
     - name: Coderrect Scan
-        uses: coderrect-inc/coderrect-github-action@v1.2
+      uses: coderrect-inc/coderrect-github-action@v1.2
       with:
         buildPath: "build"
