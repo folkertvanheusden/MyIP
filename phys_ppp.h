@@ -15,11 +15,14 @@ class phys_ppp : public phys_slip
 {
 private:
 	bool emulate_modem_xp { false };
+	bool protocol_compression { false };
+	bool ac_field_compression { false };
 	std::vector<uint8_t> ACCM_tx, ACCM_rx;
 
 	std::mutex send_lock;
 
 	void handle_lcp(const std::vector<uint8_t> & data);
+	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM);
 
 public:
 	phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp);
