@@ -28,3 +28,4 @@ std::string merge(const std::vector<std::string> & in, const std::string & seper
 std::string str_tolower(std::string s);
 std::string md5hex(const std::string & in);
 void run(const std::string & what);
+uint64_t MurmurHash64A(const void *const key, const int len, const uint64_t seed);

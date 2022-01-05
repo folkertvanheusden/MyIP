@@ -170,7 +170,8 @@ const uint8_t & any_addr::operator[](const int index) const
 uint64_t any_addr::get_hash() const
 {
 	assert(set_);
-	return std::hash<std::string>{}(to_str());
+
+	return MurmurHash64A(addr, addr_size, 123);
 }
 
 // not useful, but to silence coverity
