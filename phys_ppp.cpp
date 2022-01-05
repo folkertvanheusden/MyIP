@@ -16,7 +16,7 @@
 #include "packet.h"
 #include "utils.h"
 
-phys_ppp::phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac) : phys_slip(s, dev_name, bps, my_mac)
+phys_ppp::phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp) : phys_slip(s, dev_name, bps, my_mac), emulate_modem_xp(emulate_modem_xp)
 {
 	ACCM_rx.resize(32);
 	ACCM_rx.at(0) = 0xff;
@@ -286,6 +286,9 @@ void phys_ppp::operator()()
 
 	std::vector<uint8_t> packet_buffer;
 
+	std::string modem;
+	bool modem_7e_flag = false;
+
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
 	while(!stop_flag) {
@@ -305,6 +308,9 @@ void phys_ppp::operator()()
 		int size = read(fd, (char *)&buffer, 1);
 		if (size == -1)
 			continue;
+
+		// fprintf(stderr, "%02x[%c] ", buffer, buffer > 31 ? buffer : '.');
+		// fflush(stderr);
 
 		if (buffer == 0x7e) {
 			if (packet_buffer.empty() == false) {  // START/END of packet
@@ -341,10 +347,39 @@ void phys_ppp::operator()()
 				}
 
 				packet_buffer.clear();
+
+				modem_7e_flag = false;
+				modem.clear();
 			}
 		}
 		else {
 			packet_buffer.push_back(buffer);
+
+			if (buffer == 0x7e)
+				modem_7e_flag = true;
+
+			if (emulate_modem_xp && modem_7e_flag == false) {
+				if ((buffer >= 32 && buffer < 127) || buffer == 10 || buffer == 13) {
+					modem += (char)buffer;
+
+					if (modem.find("ATDT") != std::string::npos) {
+						printf("ATDT -> CONNECT\n");
+						write(fd, "CONNECT\r\n", 9);
+						modem.clear();
+					}
+					else if (modem.find("AT") != std::string::npos) {
+						printf("AT -> OK\n");
+						write(fd, "OK\r\n", 4);
+						modem.clear();
+					}
+					else if (modem.find("CLIENT") != std::string::npos) {
+						// Windows XP direction PPP connection
+						printf("CLIENT -> SERVER\n");
+						write(fd, "SERVER\r\n", 7);
+						modem.clear();
+					}
+				}
+			}
 		}
 	}
 

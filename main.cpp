@@ -268,10 +268,14 @@ int main(int argc, char *argv[])
 
 			if (type == "slip")
 				dev = new phys_slip(&s, dev_name, bps_setting, my_mac);
-			else if (type == "ppp")
-				dev = new phys_ppp(&s, dev_name, bps_setting, my_mac);
-			else
+			else if (type == "ppp") {
+				bool emulate_modem_xp = cfg_bool(interface, "emulate-modem-xp", "emulate AT-set modem / XP direct link", true, false);
+
+				dev = new phys_ppp(&s, dev_name, bps_setting, my_mac, emulate_modem_xp);
+			}
+			else {
 				error_exit(false, "internal error");
+			}
 		}
 		else
 			error_exit(false, "\"%s\" is an unknown network interface type", type.c_str());

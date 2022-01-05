@@ -14,6 +14,7 @@
 class phys_ppp : public phys_slip
 {
 private:
+	bool emulate_modem_xp { false };
 	std::vector<uint8_t> ACCM_tx, ACCM_rx;
 
 	std::mutex send_lock;
@@ -21,7 +22,7 @@ private:
 	void handle_lcp(const std::vector<uint8_t> & data);
 
 public:
-	phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac);
+	phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp);
 	phys_ppp(const phys_ppp &) = delete;
 	virtual ~phys_ppp();
 
