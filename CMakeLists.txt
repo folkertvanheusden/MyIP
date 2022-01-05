@@ -63,11 +63,7 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads)
 target_link_libraries(myip Threads::Threads)
 
-target_link_libraries(myip -lrt -liniparser)
-
-find_package(Curses REQUIRED)
-include_directories(${CURSES_INCLUDE_DIR})
-target_link_libraries(myiptop ${CURSES_LIBRARIES})
+target_link_libraries(myip -lrt)
 
 include(FindPkgConfig)
 
@@ -80,6 +76,11 @@ pkg_check_modules(SAMPLERATE REQUIRED samplerate)
 target_link_libraries(myip ${SAMPLERATE_LIBRARIES})
 target_include_directories(myip PUBLIC ${SAMPLERATE_INCLUDE_DIRS})
 target_compile_options(myip PUBLIC ${SAMPLERATE_CFLAGS_OTHER})
+
+pkg_check_modules(NCURSES REQUIRED ncurses)
+target_link_libraries(myiptop ${NCURSES_LIBRARIES})
+target_include_directories(myiptop PUBLIC ${NCURSES_INCLUDE_DIRS})
+target_compile_options(myiptop PUBLIC ${NCURSES_CFLAGS_OTHER})
 
 pkg_check_modules(SPEEX REQUIRED speex)
 target_link_libraries(myip ${SPEEX_LIBRARIES})
@@ -96,5 +97,10 @@ target_include_directories(myip PUBLIC ${OPENSSL_INCLUDE_DIR})
 target_link_libraries(myip OpenSSL::SSL OpenSSL::Crypto)
 target_include_directories(myiptop PUBLIC ${OPENSSL_INCLUDE_DIR})
 target_link_libraries(myiptop OpenSSL::SSL OpenSSL::Crypto)
+
+pkg_check_modules(LIBCONFIG REQUIRED libconfig++)
+target_link_libraries(myip ${LIBCONFIG_LIBRARIES})
+target_include_directories(myip PUBLIC ${LIBCONFIG_INCLUDE_DIRS})
+target_compile_options(myip PUBLIC ${LIBCONFIG_CFLAGS_OTHER})
 
 target_link_libraries(myiptop -lrt -lz)

@@ -2,7 +2,7 @@ extraction:
   cpp:
     prepare:
       packages:
-        - libiniparser-dev
+        - libconfig++-dev
         - libsndfile1-dev
         - libspeex-dev
         - libsamplerate0-dev

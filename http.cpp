@@ -68,7 +68,7 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 	std::vector<std::string> lines = split(request, "\r\n");
 
 	if (lines.size() == 0) {
-		dolog(info, "HTTP: empty request?\n");
+		DOLOG(info, "HTTP: empty request?\n");
 		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
 		return;
 	}
@@ -76,7 +76,7 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 	auto parts = split(lines.at(0), " ");
 
 	if (parts.size() < 3) {
-		dolog(warning, "HTTP: invalid request: %s\n", lines.at(0).c_str());
+		DOLOG(warning, "HTTP: invalid request: %s\n", lines.at(0).c_str());
 		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
 		return;
 	}
@@ -119,7 +119,7 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 		rc = 404;
 		reply = (uint8_t *)strdup("File does not exist.");
 		content_len = strlen((const char *)reply);
-		dolog(debug, "HTTP: requested file \"%s\" does not exist", path.c_str());
+		DOLOG(debug, "HTTP: requested file \"%s\" does not exist", path.c_str());
 	}
 	else {
 		reply = (uint8_t *)calloc(1, file_size);
@@ -160,7 +160,7 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 			stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_500);
 	}
 
-	dolog(debug, "HTTP: Send response %d for %s: %s\n", rc, hs->client_addr.c_str(), url.c_str());
+	DOLOG(debug, "HTTP: Send response %d for %s: %s\n", rc, hs->client_addr.c_str(), url.c_str());
 
 	FILE *fh = fopen(logfile.c_str(), "a+");
 	if (fh) {
@@ -184,7 +184,7 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 		fclose(fh);
 	}
 	else {
-		dolog(error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
+		DOLOG(error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
 
 	ts->t->send_data(ts, (const uint8_t *)header.c_str(), header.size());
@@ -210,13 +210,13 @@ bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, si
 	http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
 
 	if (!hs) {
-		dolog(info, "HTTP: Data for a non-existing session\n");
+		DOLOG(info, "HTTP: Data for a non-existing session\n");
 		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
 		return false;
 	}
 
 	if (!data) {
-		dolog(debug, "HTTP: client closed session\n");
+		DOLOG(debug, "HTTP: client closed session\n");
 		return true;
 	}
 

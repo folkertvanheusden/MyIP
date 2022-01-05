@@ -24,6 +24,15 @@ void protocol::register_protocol(const uint8_t protocol, ip_protocol *const p)
 	p->register_ip(this);
 }
 
+ip_protocol *protocol::get_ip_protocol(const uint8_t p)
+{
+	auto it = prot_map.find(p);
+	if (it == prot_map.end())
+		return nullptr;
+
+	return it->second;
+}
+
 void protocol::queue_packet(phys *const interface, const packet *p)
 {
 	pkts->try_put({ interface, p });

@@ -39,7 +39,7 @@ void resample(const short *const in, const int in_rate, const int n_samples, sho
 
 	int rc = -1;
 	if ((rc = src_simple(&sd, SRC_SINC_BEST_QUALITY, 1)) != 0)
-		dolog(warning, "SIP: resample failed: %s", src_strerror(rc));
+		DOLOG(warning, "SIP: resample failed: %s", src_strerror(rc));
 
 	*out = new short[*out_n_samples];
 	src_float_to_short_array(out_float, *out, *out_n_samples);
@@ -93,14 +93,14 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 	SF_INFO sfinfo { 0 };
 	SNDFILE *fh = sf_open(sample.c_str(), SFM_READ, &sfinfo);
 	if (!fh) {
-		dolog(error, "SIP: \"%s\" cannot be opened\n", sample.c_str());
+		DOLOG(error, "SIP: \"%s\" cannot be opened\n", sample.c_str());
 		exit(1);
 	}
 
 	samplerate = sfinfo.samplerate;
 
 	if (sfinfo.channels != 1) {
-		dolog(error, "SIP: \"%u\": should be mono sample (%s)\n", sfinfo.channels, sample.c_str());
+		DOLOG(error, "SIP: \"%u\": should be mono sample (%s)\n", sfinfo.channels, sample.c_str());
 		sf_close(fh);
 		exit(1);
 	}
@@ -110,7 +110,7 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 
 	samples = new short[n_samples + (n_samples & 1)]();
 	if (sf_read_short(fh, samples, n_samples) != n_samples) {
-		dolog(error, "SIP: short read on \"%s\"\n", sample.c_str());
+		DOLOG(error, "SIP: short read on \"%s\"\n", sample.c_str());
 		sf_close(fh);
 		exit(1);
 	}
@@ -135,12 +135,12 @@ sip::~sip()
 
 void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
 {
-	dolog(info, "SIP: packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
+	DOLOG(info, "SIP: packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
 
 	auto pl = p->get_payload();
 
 	if (pl.second == 0) {
-		dolog(info, "SIP: empty packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
+		DOLOG(info, "SIP: empty packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
 		return;
 	}
 
@@ -175,11 +175,11 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 			ddos_protection = now;
 		}
 		else {
-			dolog(info, "SIP: drop 401 packet\n");
+			DOLOG(info, "SIP: drop 401 packet\n");
 		}
 	}
 	else {
-		dolog(info, "SIP: request \"%s\" not understood\n", header_lines.at(0).c_str());
+		DOLOG(info, "SIP: request \"%s\" not understood\n", header_lines.at(0).c_str());
 		stats_inc_counter(sip_requests_unk);
 	}
 }
@@ -320,7 +320,7 @@ codec_t select_schema(const std::vector<std::string> *const body, const int max_
 	}
 
 	if (best.id == 255) {
-		dolog(info, "SIP: no suitable codec found? picking sane default");
+		DOLOG(info, "SIP: no suitable codec found? picking sane default");
 		best.id = 8;
 		best.name = "pcma";  // safe choice
 		best.org_name = "PCMA";  // safe choice
@@ -337,7 +337,7 @@ codec_t select_schema(const std::vector<std::string> *const body, const int max_
 		best.frame_size = best.rate * 20 / 1000;
 	}
 
-	dolog(info, "SIP: CODEC chosen: %s/%d (id: %u), frame size: %d\n", best.name.c_str(), best.rate, best.id, best.frame_size);
+	DOLOG(info, "SIP: CODEC chosen: %s/%d (id: %u), frame size: %d\n", best.name.c_str(), best.rate, best.id, best.frame_size);
 
 	return best;
 }
@@ -417,7 +417,7 @@ void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, con
 {
 	auto str_wa = find_header(headers, "WWW-Authenticate");
 	if (!str_wa.has_value()) {
-		dolog(info, "SIP: \"WWW-Authenticate\" missing");
+		DOLOG(info, "SIP: \"WWW-Authenticate\" missing");
 		return;
 	}
 
@@ -465,7 +465,7 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 	else if (schema.name.substr(0, 5) == "speex")	// speex
 		sample_size = sizeof(uint8_t);
 	else {
-		dolog(error, "SIP: Invalid rtp payload schema %s/%d\n", schema.name.c_str(), schema.rate);
+		DOLOG(error, "SIP: Invalid rtp payload schema %s/%d\n", schema.name.c_str(), schema.rate);
 		return { nullptr, 0 };
 	}
 
@@ -520,7 +520,7 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 		speex_bits_destroy(&spx.bits);
 
 		if (new_size > size) {
-			dolog(error, "SIP: speex decoded data too big (%ld > %ld)\n", new_size, size);
+			DOLOG(error, "SIP: speex decoded data too big (%ld > %ld)\n", new_size, size);
 			delete [] rtp_packet;
 			return { nullptr, 0 };
 		}
@@ -637,18 +637,18 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 
 		int rc = sf_set_string(ss->sf, SF_STR_COMMENT, merged.c_str());
 		if (rc)
-			dolog(warning, "SIP: cannot add SF_STR_COMMENT to .wav: %s\n", sf_error_number(rc));
+			DOLOG(warning, "SIP: cannot add SF_STR_COMMENT to .wav: %s\n", sf_error_number(rc));
 
 		auto str_from = find_header(&ss->headers, "From");
 		if (str_from.has_value()) {
 			rc = sf_set_string(ss->sf, SF_STR_ARTIST, str_from.value().c_str());
 
 			if (rc)
-				dolog(warning, "SIP: cannot add SF_STR_ARTIST to .wav: %s\n", sf_error_number(rc));
+				DOLOG(warning, "SIP: cannot add SF_STR_ARTIST to .wav: %s\n", sf_error_number(rc));
 		}
 	}
 	else {
-		dolog(error, "SIP: cannot create %s (%s)\n", full_fname.c_str(), strerror(errno));
+		DOLOG(error, "SIP: cannot create %s (%s)\n", full_fname.c_str(), strerror(errno));
 	}
 
 	u->add_handler(src_port, std::bind(&sip::input_recv, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), ss);
@@ -679,7 +679,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 	send_BYE(ss->sip_addr_peer, ss->sip_port_peer, ss->sip_addr_me, ss->sip_port_me, ss->headers);
 
 	long int took = time(nullptr) - start;
-	dolog(info, "SIP: Recording stopped after %lu seconds\n", took);
+	DOLOG(info, "SIP: Recording stopped after %lu seconds\n", took);
 
 	stats_add_average(sip_rtp_duration, took);
 
@@ -762,7 +762,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 
 			int rc = 0;
 			if ((rc = sf_write_short(ss->sf, temp, n_samples)) != n_samples)
-				dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, n_samples);
+				DOLOG(warning, "SIP: short write on WAV-file: %d/%d\n", rc, n_samples);
 
 			delete [] temp;
 		}
@@ -773,7 +773,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 		if (n_samples > 0) {
 			int rc = 0;
 			if ((rc = sf_write_short(ss->sf, (const short *)&pl.first[12], n_samples)) != n_samples)
-				dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, n_samples);
+				DOLOG(warning, "SIP: short write on WAV-file: %d/%d\n", rc, n_samples);
 		}
 	}
 	else if (ss->schema.name.substr(0, 5) == "speex") { // speex
@@ -791,7 +791,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 
 		int rc = 0;
 		if ((rc = sf_write_short(ss->sf, of, frame_size)) != frame_size)
-			dolog(warning, "SIP: short write on WAV-file: %d/%d\n", rc, frame_size);
+			DOLOG(warning, "SIP: short write on WAV-file: %d/%d\n", rc, frame_size);
 
 		delete [] of;
 
@@ -799,7 +799,7 @@ void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst
 		speex_decoder_destroy(spx.state);
 	}
 	else {
-		dolog(warning, "SIP: unsupported incoming schema %s/%d\n", ss->schema.name.c_str(), ss->schema.rate);
+		DOLOG(warning, "SIP: unsupported incoming schema %s/%d\n", ss->schema.name.c_str(), ss->schema.rate);
 	}
 }
 

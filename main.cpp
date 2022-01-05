@@ -1,6 +1,6 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
-#include <iniparser/iniparser.h>
 #include <errno.h>
+#include <libconfig.h++>
 #include <signal.h>
 #include <stdio.h>
 #include <string>
@@ -32,6 +32,30 @@
 #include "mqtt.h"
 #include "utils.h"
 
+void error_exit(const bool se, const char *format, ...)
+{
+	int e = errno;
+	va_list ap;
+
+	va_start(ap, format);
+	char *temp = NULL;
+	if (vasprintf(&temp, format, ap) == -1)
+		puts(format);  // last resort
+	va_end(ap);
+
+	fprintf(stderr, "%s\n", temp);
+	DOLOG(error, "%s\n", temp);
+
+	if (se && e) {
+		fprintf(stderr, "errno: %d (%s)\n", e, strerror(e));
+		DOLOG(error, "errno: %d (%s)\n", e, strerror(e));
+	}
+
+	free(temp);
+
+	exit(EXIT_FAILURE);
+}
+
 void free_handler(const tcp_port_handler_t & tph)
 {
 	delete tph.pd;
@@ -60,179 +84,529 @@ void ss(int s)
 {
 }
 
+std::string cfg_str(const libconfig::Setting & cfg, const std::string & key, const char *descr, const bool optional, const std::string & def)
+{
+	try {
+		return (const char *)cfg.lookup(key.c_str());
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		if (!optional)
+			error_exit(false, "\"%s\" not found (%s)", key.c_str(), descr);
+	}
+
+	DOLOG(info, "\"%s\" not found (%s), assuming default (%s)\n", key.c_str(), descr, def.c_str());
+
+	return def; // field is optional
+}
+
+int cfg_int(const libconfig::Setting & cfg, const std::string & key, const char *descr, const bool optional, const int def=-1)
+{
+	int v = def;
+
+	try {
+		v = cfg.lookup(key.c_str());
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		if (!optional)
+			error_exit(false, "\"%s\" not found (%s)", key.c_str(), descr);
+
+		DOLOG(info, "\"%s\" not found (%s), assuming default (%d)\n", key.c_str(), descr, def);
+	}
+
+	catch(const libconfig::SettingTypeException & ste) {
+		error_exit(false, "Expected an int value for \"%s\" (%s) at line %d but got something else", key.c_str(), descr, cfg.getSourceLine());
+	}
+
+	return v;
+}
+
+int cfg_bool(const libconfig::Setting & cfg, const char *const key, const char *descr, const bool optional, const bool def=false)
+{
+	bool v = def;
+
+	try {
+		v = cfg.lookup(key);
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		if (!optional)
+			error_exit(false, "\"%s\" not found (%s)", key, descr);
+
+		DOLOG(info, "\"%s\" not found (%s), assuming default (%d)\n", key, descr, def);
+	}
+	catch(const libconfig::SettingTypeException & ste) {
+		error_exit(false, "Expected a boolean value for \"%s\" (%s) but got something else", key, descr);
+	}
+
+	return v;
+}
+
+void register_tcp_service(std::vector<phys *> *const devs, tcp_port_handler_t & tph, const int port)
+{
+	for(auto & dev : *devs) {
+		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+		if (!i4)
+			continue;
+
+		tcp *const t4 = dynamic_cast<tcp *>(i4->get_ip_protocol(0x06));
+		if (!t4)
+			continue;
+
+		t4->add_handler(port, tph);
+
+		ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
+		if (!i6)
+			continue;
+
+		tcp *const t6 = dynamic_cast<tcp *>(i6->get_ip_protocol(0x06));
+		if (!t6)
+			continue;
+
+		t6->add_handler(port, tph);
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc != 2) {
-		fprintf(stderr, "File name of configuration ini file missing\n");
+		fprintf(stderr, "File name of configuration cfg-file missing\n");
 		return 1;
 	}
 
 	signal(SIGCHLD, SIG_IGN);
 
-	dictionary *ini = iniparser_load(argv[1]);
+	libconfig::Config lc_cfg;
 
-	std::string llf = iniparser_getstring(ini, "cfg:log_level_file", "debug");
-	std::string lls = iniparser_getstring(ini, "cfg:log_level_screen", "warning");
-
-	setlog(iniparser_getstring(ini, "cfg:logfile", "/tmp/myip.log"), parse_ll(llf), parse_ll(lls));
-
-	dolog(info, "*** START ***\n");
-
-	if (chdir(iniparser_getstring(ini, "cfg:chdir-path", "/tmp")) == -1) {
-		dolog(error, "chdir: %s", strerror(errno));
+	try {
+		lc_cfg.readFile(argv[1]);
+	}
+	catch(const libconfig::FileIOException &fioex) {
+		fprintf(stderr, "I/O error while reading configuration file %s\n", argv[1]);
 		return 1;
 	}
+	catch(const libconfig::ParseException &pex) {
+		fprintf(stderr, "Configuration file %s parse error at line %d: %s\n", pex.getFile(), pex.getLine(), pex.getError());
+		return 1;
+	}
+
+	const libconfig::Setting & root = lc_cfg.getRoot();
+
+	/// logging
+	{
+		const libconfig::Setting & logging = root.lookup("logging");
+
+		std::string llf = cfg_str(logging, "level_file", "log level file", true, "debug");
+		std::string lls = cfg_str(logging, "level_screen", "log level screen", true, "debug");
+
+		std::string log_file = cfg_str(logging, "file", "log file", true, "/tmp/myip.log");
+
+		setlog(log_file.c_str(), parse_ll(llf), parse_ll(lls));
+	}
+
+	DOLOG(info, "*** START ***\n");
 
 	signal(SIGINT, ss);
 
 	stats s(8192);
 
-	const int uid = iniparser_getint(ini, "cfg:run-as", 1000);  // uid
-	const int gid = iniparser_getint(ini, "cfg:run-in", 1000);  // gid
+	/// environment
+	int uid = 1000, gid = 1000;
+	{
+		const libconfig::Setting & environment = root.lookup("environment");
 
-	setloguid(uid, gid);
+		int uid = cfg_int(environment, "run-as", "user to run as", true, 1000);
+		int gid = cfg_int(environment, "run-in", "group to run in", true, 1000);
+		setloguid(uid, gid);
 
-	const char *mac_str = iniparser_getstring(ini, "cfg:mac-address", "52:34:84:16:44:22");
-	any_addr mymac = parse_address(mac_str, 6, ":", 16);
+		std::string chdir_path = cfg_str(environment, "chdir-path", "directory to chdir to", true, "/tmp");
 
-	printf("Will listen on MAC address: %s\n", mymac.to_str().c_str());
+		if (chdir(chdir_path.c_str()) == -1) {
+			DOLOG(error, "chdir: %s", strerror(errno));
+			return 1;
+		}
+	}
 
-	phys *dev1 = new phys_ethernet(&s, iniparser_getstring(ini, "cfg:dev-name", "myip"), uid, gid);
-	phys *dev2 = new phys_slip(&s, "/dev/pts/7", B115200, mymac);
+	// used for clean-up
+	std::vector<protocol *> protocols;
+	std::vector<ip_protocol *> ip_protocols;
+	std::vector<application *> applications;
 
-	phys *const default_dev = dev1;
+	/// network interfaces
+	const libconfig::Setting &interfaces = root["interfaces"];
+	size_t n_interfaces = interfaces.getLength();
+
+	std::vector<phys *> devs;
+
+	for(size_t i=0; i<n_interfaces; i++) {
+		const libconfig::Setting &interface = interfaces[i];
+
+		std::string type = cfg_str(interface, "type", "network interface type (e.g. \"ethernet\" or \"slip\")", true, "ethernet");
+
+		std::string mac = cfg_str(interface, "mac-address", "MAC address", true, "52:34:84:16:44:22");
+		any_addr my_mac = parse_address(mac.c_str(), 6, ":", 16);
+
+		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
+
+		phys *dev = nullptr;
+
+		if (type == "ethernet") {
+			std::string dev_name = cfg_str(interface, "dev-name", "device name", true, "myip");
+
+			dev = new phys_ethernet(&s, dev_name, uid, gid);
+		}
+		else if (type == "slip") {
+			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
+
+			int baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
+			int bps_setting = 0;
+			if (baudrate == 9600)
+				bps_setting = B9600;
+			else if (baudrate == 115200)
+				bps_setting = B115200;
+			else
+				error_exit(false, "\"%d\" cannot be configured", baudrate);
+
+			dev = new phys_slip(&s, dev_name, bps_setting, my_mac);
+		}
+		else
+			error_exit(false, "\"%s\" is an unknown network interface type", type.c_str());
+
+		devs.push_back(dev);
+
+		// ipv4
+		try {
+			const libconfig::Setting & ipv4_ = interface.lookup("ipv4");
+
+			std::string ma_str = cfg_str(ipv4_, "my-address", "IPv4 address", false, "192.168.3.2");
+			any_addr my_address = parse_address(ma_str.c_str(), 4, ".", 10);
+
+			std::string gw_str = cfg_str(ipv4_, "gateway-mac-address", "default gateway MAC address", false, "42:20:16:2b:6f:9b");
+			any_addr gw_mac = parse_address(gw_str.c_str(), 6, ":", 16);
+
+			printf("%zu] Will listen on IPv4 address: %s\n", i, my_address.to_str().c_str());
+
+			arp *a = new arp(&s, my_mac, my_address, gw_mac);
+			a->add_static_entry(dev, my_mac, my_address);
+			dev->register_protocol(0x0806, a);
+
+			ipv4 *ipv4_instance = new ipv4(&s, a, my_address);
+			protocols.push_back(ipv4_instance);
+
+			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "if to enable icmp", true, true);
+			icmp *icmp_ = nullptr;
+			if (use_icmp) {
+				icmp_ = new icmp(&s);
+
+				ipv4_instance->register_protocol(0x01, icmp_);
+				// rather ugly but that's how IP works
+				ipv4_instance->register_icmp(icmp_);
+
+				ip_protocols.push_back(icmp_);
+			}
+
+			bool use_tcp = cfg_bool(ipv4_, "use-tcp", "wether to enable tcp", true, true);
+			if (use_tcp) {
+				tcp *t = new tcp(&s);
+				ipv4_instance->register_protocol(0x06, t);
+
+				ip_protocols.push_back(t);
+			}
+
+			bool use_udp = cfg_bool(ipv4_, "use-udp", "wether to enable udp", true, true);
+			if (use_udp) {
+				udp *u = new udp(&s, icmp_);
+				ipv4_instance->register_protocol(0x11, u);
+
+				ip_protocols.push_back(u);
+			}
+
+			dev->register_protocol(0x0800, ipv4_instance);
+
+			protocols.push_back(a);
+		}
+		catch(const libconfig::SettingNotFoundException &nfex) {
+			// just fine
+		}
+
+		// ipv6
+		try {
+			const libconfig::Setting & ipv6_ = interface.lookup("ipv6");
+
+			std::string ma_str = cfg_str(ipv6_, "my-address", "IPv6 address", false, "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
+			any_addr my_ip6 = parse_address(ma_str.c_str(), 16, ":", 16);
+
+			printf("%zu] Will listen on IPv6 address: %s\n", i, my_ip6.to_str().c_str());
+
+			ndp *ndp_ = new ndp(&s);
+			ndp_->add_static_entry(dev, my_mac, my_ip6);
+			protocols.push_back(ndp_);
+
+			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6);
+			protocols.push_back(ipv6_instance);
+
+			dev->register_protocol(0x86dd, ipv6_instance);
+
+			bool use_icmp = cfg_bool(ipv6_, "use-icmp", "wether to enable icmp", true, true);
+			icmp6 *icmp6_ = nullptr;
+			if (use_icmp) {
+				icmp6_ = new icmp6(&s, my_mac, my_ip6);
+				ip_protocols.push_back(icmp6_);
+
+				ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
+				ipv6_instance->register_icmp(icmp6_);
+			}
+
+			bool use_tcp = cfg_bool(ipv6_, "use-tcp", "wether to enable tcp", true, true);
+			if (use_tcp) {
+				tcp *t6 = new tcp(&s);
+				ipv6_instance->register_protocol(0x06, t6);  // TCP
+				ip_protocols.push_back(t6);
+			}
+
+			bool use_udp = cfg_bool(ipv6_, "use-udp", "wether to enable udp", true, true);
+			if (use_udp) {
+				udp *u = new udp(&s, icmp6_);
+				ipv6_instance->register_protocol(0x11, u);
+
+				ip_protocols.push_back(u);
+			}
+		}
+		catch(const libconfig::SettingNotFoundException &nfex) {
+			// just fine
+		}
+	}
 
 	if (setgid(gid) == -1) {
-		dolog(error, "setgid: %s", strerror(errno));
+		DOLOG(error, "setgid: %s", strerror(errno));
 		return 1;
 	}
 
 	if (setuid(uid) == -1) {
-		dolog(error, "setuid: %s", strerror(errno));
+		DOLOG(error, "setuid: %s", strerror(errno));
 		return 1;
 	}
 
-	const char *ip_str = iniparser_getstring(ini, "cfg:ip-address", "192.168.3.2");
-	any_addr myip = parse_address(ip_str, 4, ".", 10);
+	// NTP
+	try {
+		const libconfig::Setting & s_ntp = root.lookup("ntp");
 
-	printf("Will listen on IPv4 address: %s\n", myip.to_str().c_str());
+		std::string ntp_u_ip_str = cfg_str(s_ntp, "upstream-ip-address", "upstream NTP server", false, "");
+		any_addr upstream_ntp_server = parse_address(ntp_u_ip_str.c_str(), 4, ".", 10);
 
-	const char *gw_mac_str = iniparser_getstring(ini, "cfg:gateway-mac-address", "42:20:16:2b:6f:9b");
-	any_addr gw_mac = parse_address(gw_mac_str, 6, ":", 16);
+		int port = cfg_int(s_ntp, "port", "udp port to listen on", true, 123);
 
-	arp *a = new arp(&s, mymac, myip, gw_mac);
-	a->add_static_entry(default_dev, mymac, myip);
-	dev1->register_protocol(0x0806, a);
-	dev2->register_protocol(0x0806, a);
+		for(auto & dev : devs) {
+			ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+			if (!i4)
+				continue;
 
-	ipv4 *ipv4_instance1 = new ipv4(&s, a, myip);
+			udp *const u = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+			if (!u)
+				continue;
 
-	ipv4 *ipv4_instance2 = new ipv4(&s, a, parse_address("192.168.4.2", 4, ".", 10));
+			ntp *ntp_ = new ntp(&s, u, i4->get_addr(), upstream_ntp_server, true);
 
-	icmp *icmp_1 = new icmp(&s);
-	ipv4_instance1->register_protocol(0x01, icmp_1);
-	// rather ugly but that's how IP works
-	ipv4_instance1->register_icmp(icmp_1);
+			u->add_handler(port, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
-	tcp *t = new tcp(&s);
-	ipv4_instance1->register_protocol(0x06, t);
-	udp *u = new udp(&s, icmp_1);
-	ipv4_instance1->register_protocol(0x11, u);
+			applications.push_back(ntp_);
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
 
-	dev1->register_protocol(0x0800, ipv4_instance1);
+	// HTTP
+	try {
+		const libconfig::Setting & s_http = root.lookup("http");
 
-	icmp *icmp_2 = new icmp(&s);
-	ipv4_instance2->register_protocol(0x01, icmp_2);
-	ipv4_instance2->register_icmp(icmp_2);
+		std::string web_root = cfg_str(s_http, "web-root", "HTTP server files root", false, "");
+		std::string web_logfile = cfg_str(s_http, "web-logfile", "HTTP server logfile", false, "");
 
-	dev2->register_protocol(0x0800, ipv4_instance2);
+		int port = cfg_int(s_http, "port", "tcp port to listen on", true, 80);
 
-	const char *ntp_ip_str = iniparser_getstring(ini, "cfg:ntp-ip-address", "192.168.64.1");
-	any_addr upstream_ntp_server = parse_address(ntp_ip_str, 4, ".", 10);
+		tcp_port_handler_t http_handler = http_get_handler(&s, web_root, web_logfile);
 
-	const char *web_root = iniparser_getstring(ini, "cfg:web-root", "/home/folkert/www");
-	const char *http_logfile = iniparser_getstring(ini, "cfg:web-logfile", "/home/folkert/http_access.log");
+		register_tcp_service(&devs, http_handler, port);
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
 
-	tcp_port_handler_t http_handler = http_get_handler(&s, web_root, http_logfile);
-	t->add_handler(80, http_handler);
+	// VNC
+	try {
+		const libconfig::Setting & s_vnc = root.lookup("vnc");
 
-	tcp_port_handler_t vnc_handler = vnc_get_handler(&s);
-	t->add_handler(5900, vnc_handler);
+		int port = cfg_int(s_vnc, "port", "tcp port to listen on", true, 5900);
 
-	tcp_port_handler_t mqtt_handler = mqtt_get_handler(&s);
-	t->add_handler(1883, mqtt_handler);
+		tcp_port_handler_t vnc_handler = vnc_get_handler(&s);
 
-	ntp *ntp_ = new ntp(&s, u, myip, upstream_ntp_server, true);
-	u->add_handler(123, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+		register_tcp_service(&devs, vnc_handler, port);
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
 
-	syslog_srv *syslog_ = new syslog_srv(&s);
-	u->add_handler(514, std::bind(&syslog_srv::input, syslog_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+	// MQTT
+	try {
+		const libconfig::Setting & s_mqtt = root.lookup("mqtt");
 
-	snmp *snmp_ = new snmp(&s, u);
-	u->add_handler(161, std::bind(&snmp::input, snmp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+		int port = cfg_int(s_mqtt, "port", "tcp port to listen on", true, 1883);
 
-	sip *sip_ = new sip(&s, u, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"), iniparser_getstring(ini, "cfg:mb-recv", "/home/folkert/Projects/myip/mb-recv.sh"),
-			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
-			);
-	u->add_handler(5060, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+		tcp_port_handler_t mqtt_handler = mqtt_get_handler(&s);
 
-	// something that silently drops packet for a port
-	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
-	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+		register_tcp_service(&devs, mqtt_handler, port);
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
 
-	/* IPv6 */
-	const char *ip6_str = iniparser_getstring(ini, "cfg:ip6-address", "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
-	any_addr myip6 = parse_address(ip6_str, 16, ":", 16);
+	// SIP
+	try {
+		const libconfig::Setting & s_sip = root.lookup("sip");
 
-	printf("Will listen on IPv6 address: %s\n", myip6.to_str().c_str());
+		std::string sample = cfg_str(s_sip, "sample", "audio sample to play", false, "");
+		std::string mb_path = cfg_str(s_sip, "mb-path", "where to store audio", false, "");
+		std::string mb_recv_script = cfg_str(s_sip, "mb-recv-script", "script to invoke on received audio", true, "");
+		std::string upstream_sip_server = cfg_str(s_sip, "upstream-sip-server", "upstream SIP server", false, "");
+		std::string upstream_sip_user = cfg_str(s_sip, "upstream-sip-user", "upstream SIP user", false, "");
+		std::string upstream_sip_password = cfg_str(s_sip, "upstream-sip-password", "upstream SIP password", false, "");
+		int sip_register_interval = cfg_int(s_sip, "sip-register-interval", "SIP upstream registesr interval", true, 450);
 
-	ndp *ndp_ = new ndp(&s, mymac, myip6);
+		int port = cfg_int(s_sip, "port", "udp port to listen on", true, 123);
 
-	ipv6 *ipv6_instance = new ipv6(&s, ndp_, myip6);
-	dev1->register_protocol(0x86dd, ipv6_instance);
+		for(auto & dev : devs) {
+			ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+			if (!i4)
+				continue;
 
-	icmp6 *icmp6_ = new icmp6(&s, mymac, myip6);
-	ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
-	ipv6_instance->register_icmp(icmp6_);
+			udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+			if (!u4)
+				continue;
 
-	tcp *t6 = new tcp(&s);
-	ipv6_instance->register_protocol(0x06, t6);  // TCP
+			sip *sip_ = new sip(&s, u4, sample, mb_path, mb_recv_script, upstream_sip_server, upstream_sip_user, upstream_sip_password, i4->get_addr(), port, sip_register_interval);
 
-	tcp_port_handler_t http_handler6 = http_get_handler(&s, web_root, http_logfile);
-	t6->add_handler(80, http_handler6);
+			u4->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
-	tcp_port_handler_t vnc_handler6 = vnc_get_handler(&s);
-	t6->add_handler(5900, vnc_handler6);
+			// TODO: ipv6 sip
 
-	tcp_port_handler_t mqtt_handler6 = mqtt_get_handler(&s);
-	t6->add_handler(1883, mqtt_handler6);
+			applications.push_back(sip_);
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
 
-	udp *u6 = new udp(&s, icmp6_);
-	ipv6_instance->register_protocol(0x11, u6);
+	// SNMP
+	try {
+		const libconfig::Setting & s_snmp = root.lookup("snmp");
 
-#if 0
-	sip *sip6_ = new sip(&s, u6, iniparser_getstring(ini, "cfg:sample", "test.wav"), iniparser_getstring(ini, "cfg:mb-path", "/home/folkert"),
-			iniparser_getstring(ini, "cfg:upstream-sip-server", ""), iniparser_getstring(ini, "cfg:upstream-sip-user", ""), iniparser_getstring(ini, "cfg:upstream-sip-password", ""), myip6, 5060, iniparser_getint(ini, "cfg:sip-register-interval", 450)
-			);
-	u6->add_handler(5060, std::bind(&sip::input, sip6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-#endif
+		int port = cfg_int(s_snmp, "port", "udp port to listen on", true, 123);
 
-	snmp *snmp6_ = new snmp(&s, u6);
-	u6->add_handler(161, std::bind(&snmp::input, snmp6_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-	/* **** */
+		for(auto & dev : devs) {
+			ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+			if (!i4)
+				continue;
 
-	std::string run_at_started = iniparser_getstring(ini, "cfg:ifup", "");
-	if (run_at_started.empty() == false)
-		run(run_at_started);
+			udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+			if (!u4)
+				continue;
 
-	dolog(debug, "*** STARTED ***\n");
+			snmp *snmp_4 = new snmp(&s, u4);
+			u4->add_handler(port, std::bind(&snmp::input, snmp_4, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
+			if (!i6)
+				continue;
+
+			udp *const u6 = dynamic_cast<udp *>(i6->get_ip_protocol(0x11));
+			if (!u6)
+				continue;
+
+			snmp *snmp_6 = new snmp(&s, u6);
+			u6->add_handler(port, std::bind(&snmp::input, snmp_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			applications.push_back(snmp_4);
+			applications.push_back(snmp_6);
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+
+	// SYSLOG
+	try {
+		const libconfig::Setting & s_syslog = root.lookup("syslog");
+
+		int port = cfg_int(s_syslog, "port", "udp port to listen on", true, 123);
+
+		for(auto & dev : devs) {
+			ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+			if (!i4)
+				continue;
+
+			udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+			if (!u4)
+				continue;
+
+			syslog_srv *syslog_4 = new syslog_srv(&s);
+			u4->add_handler(port, std::bind(&syslog_srv::input, syslog_4, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
+			if (!i6)
+				continue;
+
+			udp *const u6 = dynamic_cast<udp *>(i6->get_ip_protocol(0x11));
+			if (!u6)
+				continue;
+
+			syslog_srv *syslog_6 = new syslog_srv(&s);
+			u6->add_handler(port, std::bind(&syslog_srv::input, syslog_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			applications.push_back(syslog_4);
+			applications.push_back(syslog_6);
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+
+
+	DOLOG(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
 
 	getchar();
 
-	dolog(info, " *** TERMINATING ***\n");
+	DOLOG(info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating\n");
+
+	for(auto & a : applications)
+		delete a;
+
+	for(auto & d : devs)
+		d->stop();
+
+	for(auto & p : ip_protocols)
+		delete p;
+
+	for(auto & p : protocols)
+		delete p;
+
+	for(auto & d : devs)
+		delete d;
+
+	DOLOG(info, "THIS IS THE END\n");
+
+	closelog();
+
+#if 0
+	// something that silently drops packet for a port
+	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
+	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+	std::string run_at_started = iniparser_getstring(ini, "cfg:ifup", "");
+	if (run_at_started.empty() == false)
+		run(run_at_started);
+
 
 	std::string run_at_shutdown = iniparser_getstring(ini, "cfg:ifdown", "");
 	if (run_at_shutdown.empty() == false)
@@ -252,30 +626,7 @@ int main(int argc, char *argv[])
 
 	if (http_handler.deinit)
 		http_handler.deinit();
-
-	dev2->stop();
-	dev1->stop();
-
-	delete ntp_;
-	delete u;
-	delete firewall;
-	delete icmp6_;
-	delete ipv6_instance;
-	delete ndp_;
-	delete icmp_2;
-	delete icmp_1;
-	delete t;
-	delete ipv4_instance2;
-	delete ipv4_instance1;
-	delete a;
-	delete dev2;
-	delete dev1;
-
-	dolog(info, "THIS IS THE END\n");
-
-	closelog();
-
-	iniparser_freedict(ini);
+#endif
 
 	return 0;
 }

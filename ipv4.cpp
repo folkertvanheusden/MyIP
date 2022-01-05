@@ -53,7 +53,7 @@ bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 
 	out[4] = out[5] = 0; // identification
 
-	dolog(debug, "IPv4[%04x]: transmit packet %s -> %s\n", (out[4] << 8) | out[5], src_ip.to_str().c_str(), dst_ip.to_str().c_str());
+	DOLOG(debug, "IPv4[%04x]: transmit packet %s -> %s\n", (out[4] << 8) | out[5], src_ip.to_str().c_str(), dst_ip.to_str().c_str());
 
 	out[6] = 0x40;
 	out[7] = 0; // flags (DF) & fragment offset
@@ -80,9 +80,9 @@ bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	const any_addr *src_mac = arp_result.second;
 	if (!src_mac || !arp_result.first) {
 		if (!src_mac)
-			dolog(warning, "IPv4: cannot find src IP (%s) in ARP table\n", q_addr.to_str().c_str());
+			DOLOG(warning, "IPv4: cannot find src IP (%s) in ARP table\n", q_addr.to_str().c_str());
 		else
-			dolog(warning, "IPv4: no interface set yet\n");
+			DOLOG(warning, "IPv4: no interface set yet\n");
 
 		delete [] out;
 		stats_inc_counter(ipv4_tx_err);
@@ -105,7 +105,7 @@ bool ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	const any_addr *dst_mac = arp_result.second;
 
 	if (!dst_mac) {
-		dolog(warning, "IPv4: cannot find dst IP (%s) in ARP table\n", dst_ip.to_str().c_str());
+		DOLOG(warning, "IPv4: cannot find dst IP (%s) in ARP table\n", dst_ip.to_str().c_str());
 		stats_inc_counter(ipv4_tx_err);
 		stats_inc_counter(ip_n_out_disc);
 		return false;
@@ -133,7 +133,7 @@ void ipv4::operator()()
 		int size = pkt->get_size();
 
 		if (size < 20) {
-			dolog(info, "IPv4: not an IPv4 packet (size: %d)\n", size);
+			DOLOG(info, "IPv4: not an IPv4 packet (size: %d)\n", size);
 			delete pkt;
 			continue;
 		}
@@ -152,7 +152,7 @@ void ipv4::operator()()
 		if (version != 0x04) {
 			delete pkt;
 			stats_inc_counter(ip_n_disc);
-			dolog(info, "IPv4[%04x]: not an IPv4 packet (version: %d)\n", id, version);
+			DOLOG(info, "IPv4[%04x]: not an IPv4 packet (version: %d)\n", id, version);
 			continue;
 		}
 
@@ -163,7 +163,7 @@ void ipv4::operator()()
 		iarp->update_cache(pkt->get_dst_addr(), pkt_dst, po.value().interface);
 		iarp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 
-		dolog(debug, "IPv4[%04x]: packet %s => %s\n", id, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
+		DOLOG(debug, "IPv4[%04x]: packet %s => %s\n", id, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
 		if (pkt_dst != myip) {
 			delete pkt;
@@ -174,11 +174,11 @@ void ipv4::operator()()
 
 		int header_size = (payload_header[0] & 15) * 4;
 		int ip_size = (payload_header[2] << 8) | payload_header[3];
-		dolog(debug, "IPv4[%04x]: total packet size: %d, IP header says: %d, header size: %d\n", id, size, ip_size, header_size);
+		DOLOG(debug, "IPv4[%04x]: total packet size: %d, IP header says: %d, header size: %d\n", id, size, ip_size, header_size);
 
 		if (ip_size > size) {
 			delete pkt;
-			dolog(info, "IPv4[%04x] size (%d) > Ethernet size (%d)\n", id, ip_size, size);
+			DOLOG(info, "IPv4[%04x] size (%d) > Ethernet size (%d)\n", id, ip_size, size);
 			stats_inc_counter(ip_n_disc);
 			continue;
 		}
@@ -188,7 +188,7 @@ void ipv4::operator()()
 
 		if (header_size > size) {
 			delete pkt;
-			dolog(info, "IPv4[%04x] Header size (%d) > size (%d)\n", id, header_size, size);
+			DOLOG(info, "IPv4[%04x] Header size (%d) > size (%d)\n", id, header_size, size);
 			stats_inc_counter(ip_n_disc);
 			continue;
 		}
@@ -200,7 +200,7 @@ void ipv4::operator()()
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
 			delete pkt;
-			dolog(info, "IPv4[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", id, protocol, size);
+			DOLOG(info, "IPv4[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", id, protocol, size);
 			stats_inc_counter(ipv4_unk_prot);
 			stats_inc_counter(ip_n_disc);
 			continue;
@@ -214,13 +214,13 @@ void ipv4::operator()()
 			send_ttl_exceeded(ip_p);
 			delete ip_p;
 			delete pkt;
-			dolog(debug, "IPv4[%04x]: TTL exceeded\n", id);
+			DOLOG(debug, "IPv4[%04x]: TTL exceeded\n", id);
 			stats_inc_counter(ipv4_ttl_ex);
 			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
-		dolog(debug, "IPv4[%04x]: queing packet protocol %02x and size %d\n", id, protocol, payload_size);
+		DOLOG(debug, "IPv4[%04x]: queing packet protocol %02x and size %d\n", id, protocol, payload_size);
 
 		it->second->queue_packet(ip_p);
 

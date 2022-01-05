@@ -7,7 +7,7 @@
 #include "phys.h"
 #include "utils.h"
 
-arp::arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac) : protocol(s, "arp"), address_cache(s, mymac, myip), gw_mac(gw_mac)
+arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) : protocol(s, "arp"), address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
 	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
@@ -25,7 +25,7 @@ arp::~arp()
 
 void arp::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
 {
-	update_cache(mac, ip, interface);
+	update_cache(mac, ip, interface, true);
 }
 
 void arp::operator()()
@@ -66,7 +66,7 @@ void arp::operator()()
 			delete [] reply;
 		}
 		else {
-			dolog(debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(&p[24], 4).to_str().c_str());
+			DOLOG(debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(&p[24], 4).to_str().c_str());
 		}
 
 		delete pkt;

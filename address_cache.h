@@ -20,8 +20,6 @@ protected:
 	std::shared_mutex cache_lock;
 	std::map<any_addr, address_entry_t> cache;
 
-	const any_addr my_mac, my_ip;
-
 	std::atomic_bool cleaner_stop_flag { false };
 	std::thread *cleaner_th { nullptr };
 
@@ -32,9 +30,9 @@ protected:
 	void cache_cleaner();
 
 public:
-	address_cache(stats *const s, const any_addr & my_mac, const any_addr & my_ip);
+	address_cache(stats *const s);
 	virtual ~address_cache();
 
-	void update_cache(const any_addr & mac, const any_addr & ip, phys *const interface);
+	void update_cache(const any_addr & mac, const any_addr & ip, phys *const interface, const bool static_entry = false);
 	virtual std::pair<phys *, any_addr *> query_cache(const any_addr & ip);
 };
