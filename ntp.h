@@ -5,12 +5,13 @@
 #include <thread>
 
 #include "any_addr.h"
+#include "application.h"
 #include "stats.h"
 
 class packet;
 class udp;
 
-class ntp
+class ntp : public application
 {
 private:
 	udp *const u;
@@ -20,7 +21,6 @@ private:
 	const bool broadcast;
 
 	std::thread *th { nullptr };
-	std::atomic_bool stop_flag { false };
 
 	uint64_t *ntp_requests { nullptr }, *ntp_invalid { nullptr }, *ntp_time_req { nullptr };
 	uint64_t *ntp_t_req_v[8] { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };

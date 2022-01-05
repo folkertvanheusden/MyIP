@@ -228,6 +228,7 @@ int main(int argc, char *argv[])
 	// used for clean-up
 	std::vector<protocol *> protocols;
 	std::vector<ip_protocol *> ip_protocols;
+	std::vector<application *> applications;
 
 	/// network interfaces
 	const libconfig::Setting &interfaces = root["interfaces"];
@@ -405,6 +406,8 @@ int main(int argc, char *argv[])
 			ntp *ntp_ = new ntp(&s, u, i4->get_addr(), upstream_ntp_server, true);
 
 			u->add_handler(port, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			applications.push_back(ntp_);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -484,6 +487,8 @@ int main(int argc, char *argv[])
 			u4->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			// TODO: ipv6 sip
+
+			applications.push_back(sip_);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -518,6 +523,9 @@ int main(int argc, char *argv[])
 
 			snmp *snmp_6 = new snmp(&s, u6);
 			u6->add_handler(port, std::bind(&snmp::input, snmp_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			applications.push_back(snmp_4);
+			applications.push_back(snmp_6);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -552,6 +560,9 @@ int main(int argc, char *argv[])
 
 			syslog_srv *syslog_6 = new syslog_srv(&s);
 			u6->add_handler(port, std::bind(&syslog_srv::input, syslog_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			applications.push_back(syslog_4);
+			applications.push_back(syslog_6);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -567,6 +578,9 @@ int main(int argc, char *argv[])
 
 	dolog(info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating\n");
+
+	for(auto & a : applications)
+		delete a;
 
 	for(auto & d : devs)
 		d->stop();

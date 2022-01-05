@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "any_addr.h"
+#include "application.h"
 #include "stats.h"
 
 class packet;
@@ -39,7 +40,7 @@ typedef struct _sip_session_ {
 
 } sip_session_t;
 
-class sip
+class sip : public application
 {
 private:
 	udp *const u;
@@ -52,7 +53,6 @@ private:
 
 	std::thread *th { nullptr };
 	std::thread *th2 { nullptr };  // register thread
-	std::atomic_bool stop_flag { false };
 
 	std::map<std::thread *, sip_session_t *> sessions;
 	std::mutex slock;

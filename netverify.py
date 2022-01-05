@@ -6,6 +6,9 @@
 import copy
 import socket
 
+port_tcp_listening = 13  # 'daytime' service
+port_tcp_not_listening = 29889  # should trigger 'connection refused'
+
 def checksum(data):
     chksum = 0
 
@@ -32,68 +35,74 @@ def get_uint16(data):
 def get_uint32(data):
     return (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]
 
-with socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003)) as sock:
-    sock.bind(('myip', 0))
+def open_netdev(dev_name):
+    fd = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003)) as sock:
 
-    while True:
-        raw_packet = bytearray(sock.recv(9000))
+    fd.bind((dev_name, 0))
 
-        if len(raw_packet) & 1:
-            raw_packet += bytearray([ 0 ])
+    return fd
 
-        packet_type = get_uint16(raw_packet[12:14])
+fd = open_netdev('myip')
 
-        # print(f'from: {mac_to_str(raw_packet[0:6])} to: {mac_to_str(raw_packet[6:12])} type: {packet_type:04x}')
+while True:
+    raw_packet = bytearray(sock.recv(9000))
 
-        payload = raw_packet[14:]
+    if len(raw_packet) & 1:
+        raw_packet += bytearray([ 0 ])
 
-        if packet_type == 0x0800:  # IPv4
-            version = payload[0] >> 4
-            if version != 4:
-                print('Mismatch between Ethertype and IP-header version field for IPv4 packet')
+    packet_type = get_uint16(raw_packet[12:14])
 
-            ihl = payload[0] & 0x0f
+    print(f'from: {mac_to_str(raw_packet[0:6])} to: {mac_to_str(raw_packet[6:12])} type: {packet_type:04x}')
 
-            if ihl < 5:
-                print(f'IPv4 header too short, must be at least 20 (5 fields): {ihl}')
+    payload = raw_packet[14:]
 
-            ip_header = payload[0: ihl * 4]  # TODO: check size
+    if packet_type == 0x0800:  # IPv4
+        version = payload[0] >> 4
+        if version != 4:
+            print('Mismatch between Ethertype and IP-header version field for IPv4 packet')
 
-            # verify header checksum
-            ipv4_checksum = get_uint16(payload[10:12])
+        ihl = payload[0] & 0x0f
 
-            ip_header_copy = copy.deepcopy(ip_header)
-            ip_header_copy[10] = ip_header_copy[11] = 0
+        if ihl < 5:
+            print(f'IPv4 header too short, must be at least 20 (5 fields): {ihl}')
 
-            ip_calc_checksum = checksum(ip_header_copy)
+        ip_header = payload[0: ihl * 4]  # TODO: check size
 
-            if ip_calc_checksum != ipv4_checksum:
-                print(f'IPv4 header checksum {ipv4_checksum:04x} incorrect, should be: {ip_calc_checksum:04x}')
+        # verify header checksum
+        ipv4_checksum = get_uint16(payload[10:12])
 
-            # evaluate protocol (layer 6)
-            protocol = ip_header[9]
+        ip_header_copy = copy.deepcopy(ip_header)
+        ip_header_copy[10] = ip_header_copy[11] = 0
 
-            if protocol == 17:  # UDP
-                udp_data = payload[ihl * 4:]
+        ip_calc_checksum = checksum(ip_header_copy)
 
-                ## verify checksum
-                udp_checksum = get_uint16(udp_data[6:8])
+        if ip_calc_checksum != ipv4_checksum:
+            print(f'IPv4 header checksum {ipv4_checksum:04x} incorrect, should be: {ip_calc_checksum:04x}')
 
-                udp_length = get_uint16(udp_data[4:6])
+        # evaluate protocol (layer 6)
+        protocol = ip_header[9]
 
-                # create IPv4 pseudo header
-                udp_header_copy = copy.deepcopy(udp_data[0:8])
-                udp_header_copy[6] = udp_header_copy[7] = 0x00
+        if protocol == 17:  # UDP
+            udp_data = payload[ihl * 4:]
 
-                pseudo_header = ip_header[12:16] + ip_header[16:20] + bytearray([ 0x00, protocol ]) + bytearray([ udp_length >> 8, udp_length & 255]) + udp_header_copy + udp_data[8:]
+            ## verify checksum
+            udp_checksum = get_uint16(udp_data[6:8])
 
-                if len(pseudo_header) & 1:
-                    print(f'Pseudo header is odd in size {len(pseudo_header)}')
+            udp_length = get_uint16(udp_data[4:6])
 
-                assert len(pseudo_header) == 12 + len(udp_data)
+            # create IPv4 pseudo header
+            udp_header_copy = copy.deepcopy(udp_data[0:8])
+            udp_header_copy[6] = udp_header_copy[7] = 0x00
 
-                udp_calc_checksum = checksum(pseudo_header)
+            pseudo_header = ip_header[12:16] + ip_header[16:20] + bytearray([ 0x00, protocol ]) + bytearray([ udp_length >> 8, udp_length & 255]) + udp_header_copy + udp_data[8:]
 
-                if udp_calc_checksum != udp_checksum:
-                    print(f'{ipv4_addr_to_str(ip_header[12:16])} -> {ipv4_addr_to_str(ip_header[16:20])}')
-                    print(f'UDP header checksum {udp_checksum:04x} incorrect, should be: {udp_calc_checksum:04x}')
+            if len(pseudo_header) & 1:
+                print(f'Pseudo header is odd in size {len(pseudo_header)}')
+
+            assert len(pseudo_header) == 12 + len(udp_data)
+
+            udp_calc_checksum = checksum(pseudo_header)
+
+            if udp_calc_checksum != udp_checksum:
+                print(f'{ipv4_addr_to_str(ip_header[12:16])} -> {ipv4_addr_to_str(ip_header[16:20])}')
+                print(f'UDP header checksum {udp_checksum:04x} incorrect, should be: {udp_calc_checksum:04x}')
