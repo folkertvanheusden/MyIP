@@ -129,14 +129,14 @@ std::string any_addr::to_str() const
 {
 	if (addr_size == 4) {  // assume IPv4
 		char buffer[16];
-		snprintf(buffer, sizeof buffer, "%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3]);
+		sprintf(buffer, "%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3]);
 
 		return buffer;
 	}
 
 	if (addr_size == 6) {  // assume MAC address
 		char buffer[18];
-		snprintf(buffer, sizeof buffer, "%02x:%02x:%02x:%02x:%02x:%02x",
+		sprintf(buffer, "%02x:%02x:%02x:%02x:%02x:%02x",
 				addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 
 		return buffer;
@@ -144,7 +144,7 @@ std::string any_addr::to_str() const
 
 	if (addr_size == 16) {  // assume IPv6
 		char buffer[40];
-		snprintf(buffer, sizeof buffer, "%x:%x:%x:%x:%x:%x:%x:%x",
+		sprintf(buffer, "%x:%x:%x:%x:%x:%x:%x:%x",
 				get_word(0), get_word(2), get_word(4), get_word(6), get_word(8),
 				get_word(10), get_word(12), get_word(14));
 
