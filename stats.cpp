@@ -49,23 +49,23 @@ stats::stats(const int size) : size(size)
 {
 	fd = shm_open(shm_name, O_RDWR | O_CREAT, 0644);
 	if (fd == -1) {
-		dolog(error, "shm_open: %s", strerror(errno));
+		DOLOG(error, "shm_open: %s", strerror(errno));
 		exit(1);
 	}
 
 	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
-		dolog(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+		DOLOG(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
 		exit(1);
 	}
 
 	if (ftruncate(fd, size) == -1) {
-		dolog(error, "truncate: %s", strerror(errno));
+		DOLOG(error, "truncate: %s", strerror(errno));
 		exit(1);
 	}
 
 	p = (uint8_t *)mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED) {
-		dolog(error, "mmap: %s", strerror(errno));
+		DOLOG(error, "mmap: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -76,7 +76,7 @@ stats::stats(const int size) : size(size)
 
 stats::~stats()
 {
-	dolog(debug, "Removing shared memory segment\n");
+	DOLOG(debug, "Removing shared memory segment\n");
 	munmap(p, size);
 
 	shm_unlink(shm_name);
@@ -106,7 +106,7 @@ void dump_tree(const std::map<std::string, oid_t> & tree)
 uint64_t * stats::register_stat(const std::string & name, const std::string & oid)
 {
 	if (len + 48 > size) {
-		dolog(error, "stats: shm is full\n");
+		DOLOG(error, "stats: shm is full\n");
 		return nullptr;
 	}
 

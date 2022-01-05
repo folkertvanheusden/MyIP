@@ -75,7 +75,7 @@ void get_random(uint8_t *tgt, size_t n)
 {
 	int fd = open("/dev/urandom", O_RDONLY);
 	if (fd == -1) {
-		dolog(error, "open(\"/dev/urandom\"): %s", strerror(errno));
+		DOLOG(error, "open(\"/dev/urandom\"): %s", strerror(errno));
 		exit(1);
 	}
 
@@ -86,7 +86,7 @@ void get_random(uint8_t *tgt, size_t n)
 			if (errno == EINTR)
 				continue;
 
-			dolog(error, "read(\"/dev/urandom\"): %s", strerror(errno));
+			DOLOG(error, "read(\"/dev/urandom\"): %s", strerror(errno));
 			exit(1);
 		}
 
@@ -128,8 +128,8 @@ std::vector<std::string> split(std::string in, std::string splitter)
 }
 
 static const char *logfile = strdup("/tmp/myip.log");
-static log_level_t log_level_file = warning;
-static log_level_t log_level_screen = warning;
+log_level_t log_level_file = warning;
+log_level_t log_level_screen = warning;
 static FILE *lfh = nullptr;
 static int lf_uid = 0, lf_gid = 0;
 
@@ -241,7 +241,7 @@ void set_thread_name(std::string name)
 	if (name.length() > 15)
 		name = name.substr(0, 15);
 
-	dolog(debug, "Set name of thread %d to \"%s\"\n", gettid(), name.c_str());
+	DOLOG(debug, "Set name of thread %d to \"%s\"\n", gettid(), name.c_str());
 
 	pthread_setname_np(pthread_self(), name.c_str());
 }
@@ -365,7 +365,7 @@ void run(const std::string & what)
 		exit(system(what.c_str()));
 
 	else if (pid == -1)
-		dolog(error, "Failed invoking \"%s\"", what.c_str());
+		DOLOG(error, "Failed invoking \"%s\"", what.c_str());
 }
 
 uint64_t MurmurHash64A(const void *const key, const int len, const uint64_t seed)

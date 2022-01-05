@@ -44,11 +44,11 @@ void error_exit(const bool se, const char *format, ...)
 	va_end(ap);
 
 	fprintf(stderr, "%s\n", temp);
-	dolog(error, "%s\n", temp);
+	DOLOG(error, "%s\n", temp);
 
 	if (se && e) {
 		fprintf(stderr, "errno: %d (%s)\n", e, strerror(e));
-		dolog(error, "errno: %d (%s)\n", e, strerror(e));
+		DOLOG(error, "errno: %d (%s)\n", e, strerror(e));
 	}
 
 	free(temp);
@@ -94,7 +94,7 @@ std::string cfg_str(const libconfig::Setting & cfg, const std::string & key, con
 			error_exit(false, "\"%s\" not found (%s)", key.c_str(), descr);
 	}
 
-	dolog(info, "\"%s\" not found (%s), assuming default (%s)\n", key.c_str(), descr, def.c_str());
+	DOLOG(info, "\"%s\" not found (%s), assuming default (%s)\n", key.c_str(), descr, def.c_str());
 
 	return def; // field is optional
 }
@@ -110,7 +110,7 @@ int cfg_int(const libconfig::Setting & cfg, const std::string & key, const char 
 		if (!optional)
 			error_exit(false, "\"%s\" not found (%s)", key.c_str(), descr);
 
-		dolog(info, "\"%s\" not found (%s), assuming default (%d)\n", key.c_str(), descr, def);
+		DOLOG(info, "\"%s\" not found (%s), assuming default (%d)\n", key.c_str(), descr, def);
 	}
 
 	catch(const libconfig::SettingTypeException & ste) {
@@ -131,7 +131,7 @@ int cfg_bool(const libconfig::Setting & cfg, const char *const key, const char *
 		if (!optional)
 			error_exit(false, "\"%s\" not found (%s)", key, descr);
 
-		dolog(info, "\"%s\" not found (%s), assuming default (%d)\n", key, descr, def);
+		DOLOG(info, "\"%s\" not found (%s), assuming default (%d)\n", key, descr, def);
 	}
 	catch(const libconfig::SettingTypeException & ste) {
 		error_exit(false, "Expected a boolean value for \"%s\" (%s) but got something else", key, descr);
@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
 		setlog(log_file.c_str(), parse_ll(llf), parse_ll(lls));
 	}
 
-	dolog(info, "*** START ***\n");
+	DOLOG(info, "*** START ***\n");
 
 	signal(SIGINT, ss);
 
@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
 		std::string chdir_path = cfg_str(environment, "chdir-path", "directory to chdir to", true, "/tmp");
 
 		if (chdir(chdir_path.c_str()) == -1) {
-			dolog(error, "chdir: %s", strerror(errno));
+			DOLOG(error, "chdir: %s", strerror(errno));
 			return 1;
 		}
 	}
@@ -376,12 +376,12 @@ int main(int argc, char *argv[])
 	}
 
 	if (setgid(gid) == -1) {
-		dolog(error, "setgid: %s", strerror(errno));
+		DOLOG(error, "setgid: %s", strerror(errno));
 		return 1;
 	}
 
 	if (setuid(uid) == -1) {
-		dolog(error, "setuid: %s", strerror(errno));
+		DOLOG(error, "setuid: %s", strerror(errno));
 		return 1;
 	}
 
@@ -570,13 +570,13 @@ int main(int argc, char *argv[])
 	}
 
 
-	dolog(debug, "*** STARTED ***\n");
+	DOLOG(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
 
 	getchar();
 
-	dolog(info, " *** TERMINATING ***\n");
+	DOLOG(info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating\n");
 
 	for(auto & a : applications)
@@ -594,7 +594,7 @@ int main(int argc, char *argv[])
 	for(auto & d : devs)
 		delete d;
 
-	dolog(info, "THIS IS THE END\n");
+	DOLOG(info, "THIS IS THE END\n");
 
 	closelog();
 

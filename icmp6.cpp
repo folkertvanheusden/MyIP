@@ -55,7 +55,7 @@ void icmp6::operator()()
 			send_packet_neighbor_advertisement(pkt->get_src_mac_addr(), pkt->get_src_addr());
 		}
 		else {
-			dolog(warning, "ICMP6: type: %d / code: %d not known\n", p[0], p[1]);
+			DOLOG(warning, "ICMP6: type: %d / code: %d not known\n", p[0], p[1]);
 		}
 
 		delete pkt;
@@ -129,7 +129,7 @@ void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, 
 
 void icmp6::send_packet_router_soliciation() const
 {
-	dolog(debug, "ICMP6: send router sollicitation (%s)\n", my_ip.to_str().c_str());
+	DOLOG(debug, "ICMP6: send router sollicitation (%s)\n", my_ip.to_str().c_str());
 
 	uint8_t dst_mac[6] = { 0x33, 0x33, all_router_multicast_addr[12], all_router_multicast_addr[13], all_router_multicast_addr[14], all_router_multicast_addr[15] };
 	any_addr adst_mac(dst_mac, 6);
