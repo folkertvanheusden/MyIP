@@ -26,7 +26,7 @@ uint64_t snmp::get_INTEGER(const uint8_t *p, const size_t length)
 	uint64_t v = 0;
 
 	if (length > 8)
-		dolog(info, "SNMP: INTEGER truncated (%zu bytes)", length);
+		DOLOG(info, "SNMP: INTEGER truncated (%zu bytes)", length);
 
 	for(size_t i=0; i<length; i++) {
 		v <<= 8;
@@ -73,7 +73,7 @@ bool snmp::get_OID(const uint8_t *p, const size_t length, std::string *const oid
 	}
 
 	if (v) {
-		dolog(warning, "SNMP: object identifier did not properly terminate\n");
+		DOLOG(warning, "SNMP: object identifier did not properly terminate\n");
 		return false;
 	}
 
@@ -135,7 +135,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 		uint8_t seq_length = *pnt++;
 
 		if (&pnt[seq_length] > &p[len_vb_list]) {
-			dolog(warning, "SNMP: length field out of bounds\n");
+			DOLOG(warning, "SNMP: length field out of bounds\n");
 			return false;
 		}
 
@@ -144,7 +144,7 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 			pnt += seq_length;
 		}
 		else {
-			dolog(warning, "SNMP: unexpected/invalid type %02x\n", seq_type);
+			DOLOG(warning, "SNMP: unexpected/invalid type %02x\n", seq_type);
 			return false;
 		}
 	}
@@ -163,7 +163,7 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 		uint8_t length = *pnt++;
 
 		if (&pnt[length] > &p[len]) {
-			dolog(warning, "SNMP: length field out of bounds\n");
+			DOLOG(warning, "SNMP: length field out of bounds\n");
 			return false;
 		}
 
@@ -234,7 +234,7 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 			pnt += length;
 		}
 		else {
-			dolog(warning, "SNMP: invalid type %02x\n", type);
+			DOLOG(warning, "SNMP: invalid type %02x\n", type);
 			return false;
 		}
 	}
@@ -276,12 +276,12 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 		uint64_t *vp = s->find_by_oid(e);
 
 		if (vp) {
-			dolog(debug, "SNMP: requested %s gives %lu\n", e.c_str(), *vp);
+			DOLOG(debug, "SNMP: requested %s gives %lu\n", e.c_str(), *vp);
 
 			varbind->add(new snmp_integer(*vp));
 		}
 		else {  // FIXME snmp_null?
-			dolog(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
+			DOLOG(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
 
 			varbind->add(new snmp_null());
 		}
@@ -298,20 +298,20 @@ void snmp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip,
 {
 	stats_inc_counter(snmp_requests);
 
-	dolog(debug, "SNMP: request from [%s]:%d\n", src_ip.to_str().c_str(), src_port);
+	DOLOG(debug, "SNMP: request from [%s]:%d\n", src_ip.to_str().c_str(), src_port);
 
         auto pl = p->get_payload();
 
         if (pl.second == 0) {
 		stats_inc_counter(snmp_invalid);
-                dolog(info, "SNMP: empty packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
+                DOLOG(info, "SNMP: empty packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
                 return;
         }
 
 	oid_req_t or_;
 
 	if (!process_BER(pl.first, pl.second, &or_, false, 2)) {
-                dolog(info, "SNMP: failed processing request\n");
+                DOLOG(info, "SNMP: failed processing request\n");
 		stats_inc_counter(snmp_invalid);
                 return;
 	}
@@ -322,7 +322,7 @@ void snmp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip,
 	gen_reply(or_, &packet_out, &output_size);
 
 	if (output_size) {
-		dolog(debug, "SNMP: sending reply of %zu bytes to [%s]:%d\n", output_size, src_ip.to_str().c_str(), src_port);
+		DOLOG(debug, "SNMP: sending reply of %zu bytes to [%s]:%d\n", output_size, src_ip.to_str().c_str(), src_port);
 		u->transmit_packet(src_ip, src_port, dst_ip, dst_port, packet_out, output_size);
 
 		free(packet_out);

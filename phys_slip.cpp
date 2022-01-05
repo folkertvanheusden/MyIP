@@ -21,18 +21,18 @@ phys_slip::phys_slip(stats *const s, const std::string & dev_name, const int bps
 	assert(my_mac.get_len() == 6);
 
 	if ((fd = open(dev_name.c_str(), O_RDWR)) == -1) {
-		dolog(error, "open %s: %s", dev_name.c_str(), strerror(errno));
+		DOLOG(error, "open %s: %s", dev_name.c_str(), strerror(errno));
 		exit(1);
 	}
 
 	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
-		dolog(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+		DOLOG(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
 		exit(1);
 	}
 
         struct termios tty;
         if (tcgetattr(fd, &tty) != 0) {
-		dolog(error, "tcgetattr: %s", strerror(errno));
+		DOLOG(error, "tcgetattr: %s", strerror(errno));
 		exit(1);
         }
 
@@ -56,7 +56,7 @@ phys_slip::phys_slip(stats *const s, const std::string & dev_name, const int bps
         tty.c_cflag &= ~CRTSCTS;
 
         if (tcsetattr(fd, TCSANOW, &tty) != 0) {
-		dolog(error, "tcsetattr: %s", strerror(errno));
+		DOLOG(error, "tcsetattr: %s", strerror(errno));
 		exit(1);
         }
 }
@@ -73,7 +73,7 @@ void phys_slip::start()
 
 bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	dolog(debug, "phys_slip: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	DOLOG(debug, "phys_slip: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	stats_inc_counter(phys_transmit);
 
@@ -102,10 +102,10 @@ bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	int rc = write(fd, out, out_o);
 
 	if (size_t(rc) != out_o) {
-		dolog(error, "phys_slip: problem sending packet (%d for %zu bytes)\n", rc, out_o);
+		DOLOG(error, "phys_slip: problem sending packet (%d for %zu bytes)\n", rc, out_o);
 
 		if (rc == -1)
-			dolog(error, "phys_slip: %s\n", strerror(errno));
+			DOLOG(error, "phys_slip: %s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -117,7 +117,7 @@ bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 
 void phys_slip::operator()()
 {
-	dolog(debug, "phys_slip: thread started\n");
+	DOLOG(debug, "phys_slip: thread started\n");
 
 	set_thread_name("myip-phys_slip");
 
@@ -131,7 +131,7 @@ void phys_slip::operator()()
 			if (errno == EINTR)
 				continue;
 
-			dolog(error, "poll: %s", strerror(errno));
+			DOLOG(error, "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -156,7 +156,7 @@ void phys_slip::operator()()
 			stats_inc_counter(phys_recv_frame);
 
 			if (packet_buffer.size() < 20) {
-				dolog(debug, "phys_slip: invalid packet, size %zu\n", packet_buffer.size());
+				DOLOG(debug, "phys_slip: invalid packet, size %zu\n", packet_buffer.size());
 
 				if (size)
 					stats_inc_counter(phys_invl_frame);
@@ -168,13 +168,13 @@ void phys_slip::operator()()
 
 			any_addr src_mac((const uint8_t *)"\0\0\0\0\0\1", 6);
 
-			dolog(debug, "phys_slip: queing packet, size %zu\n", packet_buffer.size());
+			DOLOG(debug, "phys_slip: queing packet, size %zu\n", packet_buffer.size());
 
 			packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
 
 			auto it = prot_map.find(0x800);  // assuming IPv4
 			if (it == prot_map.end())
-				dolog(warning, "phys_slip: no IPv4 stack attached to SLIP device (yet)\n");
+				DOLOG(warning, "phys_slip: no IPv4 stack attached to SLIP device (yet)\n");
 			else
 				it->second->queue_packet(this, p);
 
@@ -185,5 +185,5 @@ void phys_slip::operator()()
 		}
 	}
 
-	dolog(info, "phys_slip: thread stopped\n");
+	DOLOG(info, "phys_slip: thread stopped\n");
 }

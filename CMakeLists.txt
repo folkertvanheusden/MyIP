@@ -66,10 +66,6 @@ target_link_libraries(myip Threads::Threads)
 
 target_link_libraries(myip -lrt)
 
-find_package(Curses REQUIRED)
-include_directories(${CURSES_INCLUDE_DIR})
-target_link_libraries(myiptop ${CURSES_LIBRARIES})
-
 include(FindPkgConfig)
 
 pkg_check_modules(SNDFILE REQUIRED sndfile)
@@ -81,6 +77,11 @@ pkg_check_modules(SAMPLERATE REQUIRED samplerate)
 target_link_libraries(myip ${SAMPLERATE_LIBRARIES})
 target_include_directories(myip PUBLIC ${SAMPLERATE_INCLUDE_DIRS})
 target_compile_options(myip PUBLIC ${SAMPLERATE_CFLAGS_OTHER})
+
+pkg_check_modules(NCURSES REQUIRED ncurses)
+target_link_libraries(myiptop ${NCURSES_LIBRARIES})
+target_include_directories(myiptop PUBLIC ${NCURSES_INCLUDE_DIRS})
+target_compile_options(myiptop PUBLIC ${NCURSES_CFLAGS_OTHER})
 
 pkg_check_modules(SPEEX REQUIRED speex)
 target_link_libraries(myip ${SPEEX_LIBRARIES})

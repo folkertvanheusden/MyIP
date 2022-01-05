@@ -23,7 +23,7 @@ phys::phys(stats *const s)
 
 	// MTU size for Ethernet
 	mtu_size = 1500;
-	dolog(debug, "phys: MTU size: %d\n", mtu_size);
+	DOLOG(debug, "phys: MTU size: %d\n", mtu_size);
 }
 
 phys::~phys()
@@ -66,5 +66,5 @@ bool phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, c
 
 void phys::operator()()
 {
-	dolog(info, "phys: thread stopped\n");
+	DOLOG(info, "phys: thread stopped\n");
 }

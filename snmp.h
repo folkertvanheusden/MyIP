@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "any_addr.h"
+#include "application.h"
 #include "stats.h"
 
 class packet;
@@ -24,7 +25,7 @@ typedef struct _oid_req_t_ {
 	}
 } oid_req_t;
 
-class snmp
+class snmp : public application
 {
 private:
 	stats *const s;

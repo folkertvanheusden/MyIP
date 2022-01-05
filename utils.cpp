@@ -75,7 +75,7 @@ void get_random(uint8_t *tgt, size_t n)
 {
 	int fd = open("/dev/urandom", O_RDONLY);
 	if (fd == -1) {
-		dolog(error, "open(\"/dev/urandom\"): %s", strerror(errno));
+		DOLOG(error, "open(\"/dev/urandom\"): %s", strerror(errno));
 		exit(1);
 	}
 
@@ -86,7 +86,7 @@ void get_random(uint8_t *tgt, size_t n)
 			if (errno == EINTR)
 				continue;
 
-			dolog(error, "read(\"/dev/urandom\"): %s", strerror(errno));
+			DOLOG(error, "read(\"/dev/urandom\"): %s", strerror(errno));
 			exit(1);
 		}
 
@@ -128,8 +128,8 @@ std::vector<std::string> split(std::string in, std::string splitter)
 }
 
 static const char *logfile = strdup("/tmp/myip.log");
-static log_level_t log_level_file = warning;
-static log_level_t log_level_screen = warning;
+log_level_t log_level_file = warning;
+log_level_t log_level_screen = warning;
 static FILE *lfh = nullptr;
 static int lf_uid = 0, lf_gid = 0;
 
@@ -241,7 +241,7 @@ void set_thread_name(std::string name)
 	if (name.length() > 15)
 		name = name.substr(0, 15);
 
-	dolog(debug, "Set name of thread %d to \"%s\"\n", gettid(), name.c_str());
+	DOLOG(debug, "Set name of thread %d to \"%s\"\n", gettid(), name.c_str());
 
 	pthread_setname_np(pthread_self(), name.c_str());
 }
@@ -365,5 +365,47 @@ void run(const std::string & what)
 		exit(system(what.c_str()));
 
 	else if (pid == -1)
-		dolog(error, "Failed invoking \"%s\"", what.c_str());
+		DOLOG(error, "Failed invoking \"%s\"", what.c_str());
 }
+
+uint64_t MurmurHash64A(const void *const key, const int len, const uint64_t seed)
+{
+	const uint64_t m = 0xc6a4a7935bd1e995LLU;
+	const int r = 47;
+
+	uint64_t h = seed ^ (len * m);
+
+	const uint64_t *data = (const uint64_t *)key;
+	const uint64_t *end = (len >> 3) + data;
+
+	while(data != end) {
+		uint64_t k = *data++;
+
+		k *= m;
+		k ^= k >> r;
+		k *= m;
+
+		h ^= k;
+		h *= m;
+	}
+
+	const uint8_t *data2 = (const uint8_t *)data;
+
+	switch(len & 7) {
+		case 7: h ^= (uint64_t)(data2[6]) << 48;
+		case 6: h ^= (uint64_t)(data2[5]) << 40;
+		case 5: h ^= (uint64_t)(data2[4]) << 32;
+		case 4: h ^= (uint64_t)(data2[3]) << 24;
+		case 3: h ^= (uint64_t)(data2[2]) << 16;
+		case 2: h ^= (uint64_t)(data2[1]) << 8;
+		case 1: h ^= (uint64_t)(data2[0]);
+			h *= m;
+	};
+
+	h ^= h >> r;
+	h *= m;
+	h ^= h >> r;
+
+	return h;
+}
+

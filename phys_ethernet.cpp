@@ -28,12 +28,12 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 phys_ethernet::phys_ethernet(stats *const s, const std::string & dev_name, const int uid, const int gid) : phys(s)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
-		dolog(error, "open /dev/net/tun: %s", strerror(errno));
+		DOLOG(error, "open /dev/net/tun: %s", strerror(errno));
 		exit(1);
 	}
 
 	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
-		dolog(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+		DOLOG(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
 		exit(1);
 	}
 
@@ -45,23 +45,23 @@ phys_ethernet::phys_ethernet(stats *const s, const std::string & dev_name, const
 	set_ifr_name(&ifr_tap, dev_name);
 
 	if (ioctl(fd, TUNSETIFF, &ifr_tap) == -1) {
-		dolog(error, "ioctl TUNSETIFF: %s", strerror(errno));
+		DOLOG(error, "ioctl TUNSETIFF: %s", strerror(errno));
 		exit(1);
 	}
 
 	// myip calcs checksums by itself
 	if (ioctl(fd, TUNSETNOCSUM, 1) == -1) {
-		dolog(error, "ioctl TUNSETNOCSUM: %s", strerror(errno));
+		DOLOG(error, "ioctl TUNSETNOCSUM: %s", strerror(errno));
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETGROUP, gid) == -1) {
-		dolog(error, "ioctl TUNSETGROUP: %s", strerror(errno));
+		DOLOG(error, "ioctl TUNSETGROUP: %s", strerror(errno));
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETOWNER, uid) == -1) {
-		dolog(error, "ioctl TUNSETOWNER: %s", strerror(errno));
+		DOLOG(error, "ioctl TUNSETOWNER: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -75,7 +75,7 @@ phys_ethernet::~phys_ethernet()
 
 bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	dolog(debug, "phys_ethernet: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	DOLOG(debug, "phys_ethernet: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	stats_inc_counter(phys_transmit);
 
@@ -98,10 +98,10 @@ bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & s
 	int rc = write(fd, out, out_size);
 
 	if (size_t(rc) != out_size) {
-		dolog(error, "phys_ethernet: problem sending packet (%d for %zu bytes)\n", rc, out_size);
+		DOLOG(error, "phys_ethernet: problem sending packet (%d for %zu bytes)\n", rc, out_size);
 
 		if (rc == -1)
-			dolog(error, "phys_ethernet: %s\n", strerror(errno));
+			DOLOG(error, "phys_ethernet: %s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -113,7 +113,7 @@ bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & s
 
 void phys_ethernet::operator()()
 {
-	dolog(debug, "phys_ethernet: thread started\n");
+	DOLOG(debug, "phys_ethernet: thread started\n");
 
 	set_thread_name("myip-phys_ethernet");
 
@@ -125,7 +125,7 @@ void phys_ethernet::operator()()
 			if (errno == EINTR)
 				continue;
 
-			dolog(error, "poll: %s", strerror(errno));
+			DOLOG(error, "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -137,7 +137,7 @@ void phys_ethernet::operator()()
 
 	        struct timespec ts { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-			dolog(warning, "clock_gettime failed: %s", strerror(errno));
+			DOLOG(warning, "clock_gettime failed: %s", strerror(errno));
 
 		stats_inc_counter(phys_recv_frame);
 
@@ -150,7 +150,7 @@ void phys_ethernet::operator()()
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
-			dolog(info, "phys_ethernet: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
+			DOLOG(info, "phys_ethernet: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
 			stats_inc_counter(phys_ign_frame);
 			continue;
 		}
@@ -159,12 +159,12 @@ void phys_ethernet::operator()()
 
 		any_addr src_mac(&buffer[6], 6);
 
-		dolog(debug, "phys_ethernet: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
+		DOLOG(debug, "phys_ethernet: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
-		packet *p = new packet(ts, src_mac, any_addr(&buffer[6], 6), any_addr(&buffer[0], 6), &buffer[14], size - 14, &buffer[0], 14);
+		packet *p = new packet(ts, src_mac, src_mac, dst_mac, &buffer[14], size - 14, &buffer[0], 14);
 
 		it->second->queue_packet(this, p);
 	}
 
-	dolog(info, "phys_ethernet: thread stopped\n");
+	DOLOG(info, "phys_ethernet: thread stopped\n");
 }

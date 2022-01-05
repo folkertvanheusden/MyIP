@@ -36,7 +36,7 @@ struct frame_buffer_t
 	std::set<vnc_session_data *> callbacks;
 
 	void register_callback(vnc_session_data *p) {
-		dolog(info, "register_callback %p\n", p);
+		DOLOG(info, "register_callback %p\n", p);
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
 		auto rc = callbacks.insert(p);
@@ -44,7 +44,7 @@ struct frame_buffer_t
 	}
 
 	void unregister_callback(vnc_session_data *p) {
-		dolog(info, "unregister_callback %p\n", p);
+		DOLOG(info, "unregister_callback %p\n", p);
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
 		// may have not been registered if the connection
@@ -56,12 +56,12 @@ struct frame_buffer_t
 	void callback() {
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
-		dolog(debug, "VNC: %zu callbacks\n", callbacks.size());
+		DOLOG(debug, "VNC: %zu callbacks\n", callbacks.size());
 
 		for(auto vs : callbacks) {
 			const std::lock_guard<std::mutex> lck(vs->w_lock);
 
-			dolog(debug, "VNC: %zu CALLBACK for %s (%p)\n", get_us(), vs->client_addr.c_str(), vs);
+			DOLOG(debug, "VNC: %zu CALLBACK for %s (%p)\n", get_us(), vs->client_addr.c_str(), vs);
 
 			vs->wq.push(new vnc_thread_work_t());
 
@@ -217,7 +217,7 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	for(int32_t e : encodings) {
 		if (e == 6) {  // ZLIB
 			ce = e;
-			dolog(debug, "VNC: zlib encoding\n");
+			DOLOG(debug, "VNC: zlib encoding\n");
 		}
 	}
 
@@ -293,12 +293,12 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 		}
 
 		if (b_n) {
-			dolog(error, "VNC: BITS LEFT: %d\n", b_n);
+			DOLOG(error, "VNC: BITS LEFT: %d\n", b_n);
 			stats_inc_counter(vpd->vnc_err);
 		}
 	}
 	else {
-		dolog(info, "VNC: depth=%d not supported\n", depth);
+		DOLOG(info, "VNC: depth=%d not supported\n", depth);
 
 		stats_inc_counter(vpd->vnc_err);
 	}
@@ -316,7 +316,7 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 		vsd->strm.avail_out = w * h * 3 * 2;
 
 		if (deflate(&vsd->strm, Z_SYNC_FLUSH) != Z_OK)
-			dolog(warning, "VNC: deflate failed\n");
+			DOLOG(warning, "VNC: deflate failed\n");
 
 		uint32_t size = vsd->strm.total_out - vsd->prev_zsize;
 		(*message)[o + 0] = size >> 24;
@@ -355,7 +355,7 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 
 	ts->p = vs;
 
-	dolog(debug, "VNC: new session with %s\n", vs->client_addr.c_str());
+	DOLOG(debug, "VNC: new session with %s\n", vs->client_addr.c_str());
 
 	vs->th = new std::thread(vnc_thread, ts);
 
@@ -363,7 +363,7 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 	vs->strm.zfree = 0;
 	vs->strm.opaque = 0;
 	if (deflateInit(&vs->strm, Z_DEFAULT_COMPRESSION) != Z_OK)
-		dolog(warning, "VNC: zlib init failed\n");
+		DOLOG(warning, "VNC: zlib init failed\n");
 
 	return true;
 }
@@ -373,12 +373,12 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 
 	if (!vs) {
-		dolog(info, "VNC: Data for a non-existing session\n");
+		DOLOG(info, "VNC: Data for a non-existing session\n");
 		return false;
 	}
 
 	if (!data) {
-		dolog(debug, "VNC: client closed session\n");
+		DOLOG(debug, "VNC: client closed session\n");
 		vs->w_cond.notify_one();
 		return true;
 	}
@@ -434,7 +434,7 @@ void vnc_thread(void *ts_in)
 			first = false;
 		else {
 			if (!work) {
-				dolog(info, "VNC: TERMINATE THREAD REQUESTED\n");
+				DOLOG(info, "VNC: TERMINATE THREAD REQUESTED\n");
 				break;
 			}
 
@@ -450,12 +450,12 @@ void vnc_thread(void *ts_in)
 			}
 		}
 
-		dolog(debug, "VNC: state: %d\n", vs->state);
+		DOLOG(debug, "VNC: state: %d\n", vs->state);
 
 		if (vs->state == vs_initial_handshake_server_send) {
 			const char initial_message[] = "RFB 003.008\n";
 
-			dolog(debug, "VNC: send handshake of 12 bytes\n");
+			DOLOG(debug, "VNC: send handshake of 12 bytes\n");
 			ts->t->send_data(ts, (const uint8_t *)initial_message, 12);  // must be 12 bytes
 
 			vs->state = vs_initial_handshake_client_resp;
@@ -468,12 +468,12 @@ void vnc_thread(void *ts_in)
 				std::string handshake_str = std::string(handshake, 12);
 
 				if (memcmp(handshake, "RFB", 3) == 0) {  // let's not be too picky
-					dolog(debug, "VNC: Client responded with protocol version: %s\n", handshake_str.c_str());
+					DOLOG(debug, "VNC: Client responded with protocol version: %s\n", handshake_str.c_str());
 					vs->state = vs_security_handshake_server;
 				}
 				else {
 					rc = false;
-					dolog(info, "VNC: Unexpected/invalid protocol version: %s\n", handshake_str.c_str());
+					DOLOG(info, "VNC: Unexpected/invalid protocol version: %s\n", handshake_str.c_str());
 					stats_inc_counter(vpd->vnc_err);
 				}
 
@@ -486,7 +486,7 @@ void vnc_thread(void *ts_in)
 				1,  // 'None'
 			};
 
-			dolog(debug, "VNC: ack security types, %zu bytes\n", sizeof message);
+			DOLOG(debug, "VNC: ack security types, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message);
 
 			vs->state = vs_security_handshake_client_resp;
@@ -498,7 +498,7 @@ void vnc_thread(void *ts_in)
 			if (chosen_sec) {
 				if (*chosen_sec == 1) {  // must have chosen security type 'None'
 					uint8_t response[] = { 0, 0, 0, 0 };  // OK
-					dolog(debug, "VNC: Valid security type chosen, %zu bytes\n", sizeof response);
+					DOLOG(debug, "VNC: Valid security type chosen, %zu bytes\n", sizeof response);
 					ts->t->send_data(ts, response, sizeof response);
 
 					vs->state = vs_client_init;
@@ -507,7 +507,7 @@ void vnc_thread(void *ts_in)
 					rc = false;
 
 					uint8_t response[] = { 0, 0, 0, 1 };  // failed
-					dolog(info, "VNC: Unexpected/invalid security type: %d (%zu bytes)\n", *chosen_sec, sizeof response);
+					DOLOG(info, "VNC: Unexpected/invalid security type: %d (%zu bytes)\n", *chosen_sec, sizeof response);
 					ts->t->send_data(ts, response, sizeof response);
 					stats_inc_counter(vpd->vnc_err);
 				}
@@ -520,7 +520,7 @@ void vnc_thread(void *ts_in)
 			uint8_t *client_init = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 1);
 
 			if (client_init) {
-				dolog(debug, "VNC: client asks for %sdesktop sharing\n", *client_init ? "" : "NO ");
+				DOLOG(debug, "VNC: client asks for %sdesktop sharing\n", *client_init ? "" : "NO ");
 
 				vs->state = vs_server_init;
 
@@ -549,7 +549,7 @@ void vnc_thread(void *ts_in)
 				'M', 'y', 'I', 'P'  // no "..."! that would include a 0x00!
 			};
 
-			dolog(debug, "VNC: server init, %zu bytes\n", sizeof message);
+			DOLOG(debug, "VNC: server init, %zu bytes\n", sizeof message);
 			ts->t->send_data(ts, message, sizeof message);
 
 			cont_or_initial_upd_frame = true;
@@ -565,7 +565,7 @@ void vnc_thread(void *ts_in)
 			size_t fb_message_len = 0;
 			calculate_fb_update(&frame_buffer, encodings, false, 0, 0, frame_buffer.w, frame_buffer.h, 24, &fb_message, &fb_message_len, vpd, vs);
 
-			dolog(debug, "VNC: intial (full) framebuffer update\n");
+			DOLOG(debug, "VNC: intial (full) framebuffer update\n");
 
 			ts->t->send_data(ts, fb_message, fb_message_len);
 			free(fb_message);
@@ -577,7 +577,7 @@ void vnc_thread(void *ts_in)
 			if (cmd) {
 				running_cmd = *cmd;
 
-				dolog(debug, "VNC: Received command %d\n", running_cmd);
+				DOLOG(debug, "VNC: Received command %d\n", running_cmd);
 
 				vs->state = vs_running_waiting_data;
 
@@ -589,10 +589,10 @@ void vnc_thread(void *ts_in)
 			bool proceed = false;
 			int ignore_n = 0;
 
-			dolog(debug, "VNC: waiting for data for command %d\n", running_cmd);
+			DOLOG(debug, "VNC: waiting for data for command %d\n", running_cmd);
 
 			if (running_cmd == 0) {  // SetPixelFormat, 7.5.1
-				dolog(debug, "VNC: Retrieving pixelformat\n");
+				DOLOG(debug, "VNC: Retrieving pixelformat\n");
 
 				uint8_t *pf = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 19);
 
@@ -605,7 +605,7 @@ void vnc_thread(void *ts_in)
 					uint16_t gmax = (data[6] << 8) | data[7];
 					uint16_t bmax = (data[8] << 8) | data[9];
 
-					dolog(debug, "VNC: Changed 'depth'(BPP) to %d (bpp: %d, red/green/blue max: %d/%d/%d)\n", vs->depth, data[0], rmax, gmax, bmax);
+					DOLOG(debug, "VNC: Changed 'depth'(BPP) to %d (bpp: %d, red/green/blue max: %d/%d/%d)\n", vs->depth, data[0], rmax, gmax, bmax);
 
 					vs->state = vs_running_waiting_cmd;
 
@@ -617,7 +617,7 @@ void vnc_thread(void *ts_in)
 
 				if (parameters) {
 					n_encodings = (parameters[1] << 8) | parameters[2];
-					dolog(debug, "VNC: Retrieving number of encodings (%d)\n", n_encodings);
+					DOLOG(debug, "VNC: Retrieving number of encodings (%d)\n", n_encodings);
 
 					vs->state = vs_running_waiting_data_extra;
 
@@ -639,7 +639,7 @@ void vnc_thread(void *ts_in)
 
 					calculate_fb_update(&frame_buffer, encodings, incremental, x, y, w, h, vs->depth, &message, &message_len, vpd, vs);
 
-					dolog(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes%s\n", message_len, w, h, x, y, message_len, incremental?" (incremental)":"");
+					DOLOG(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes%s\n", message_len, w, h, x, y, message_len, incremental?" (incremental)":"");
 
 					ts->t->send_data(ts, message, message_len);
 
@@ -652,18 +652,18 @@ void vnc_thread(void *ts_in)
 			}
 			else if (running_cmd == 4) {  // KeyEvent
 				ignore_n = 7;
-				dolog(debug, "VNC: CLIENT KeyEvent (ignore %d)\n", ignore_n);
+				DOLOG(debug, "VNC: CLIENT KeyEvent (ignore %d)\n", ignore_n);
 			}
 			else if (running_cmd == 5) {  // PointerEvent
 				ignore_n = 5;
-				dolog(debug, "VNC: CLIENT PointerEvent (ignore %d)\n", ignore_n);
+				DOLOG(debug, "VNC: CLIENT PointerEvent (ignore %d)\n", ignore_n);
 			}
 			else if (running_cmd == 6) {  // ClientCutText
 				uint8_t *parameters = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, 7);
 
 				if (parameters) {
 					ignore_data_n = (parameters[3] << 24) | (parameters[4] << 16) | (parameters[5] << 8) | parameters[6];
-					dolog(debug, "VNC: ClientCutText (ignore %d)\n", ignore_data_n);
+					DOLOG(debug, "VNC: ClientCutText (ignore %d)\n", ignore_data_n);
 
 					vs->state = vs_running_waiting_data_ignore;
 
@@ -671,14 +671,14 @@ void vnc_thread(void *ts_in)
 				}
 			}
 			else {
-				dolog(warning, "VNC: Command %d not known (data state)\n", running_cmd);
+				DOLOG(warning, "VNC: Command %d not known (data state)\n", running_cmd);
 				stats_inc_counter(vpd->vnc_err);
 				rc = false;
 			}
 
 			// part of the command
 			if (ignore_n) {
-				dolog(debug, "VNC: Ignore %d bytes from command\n", ignore_n);
+				DOLOG(debug, "VNC: Ignore %d bytes from command\n", ignore_n);
 
 				uint8_t *ignore = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, ignore_n);
 
@@ -697,7 +697,7 @@ void vnc_thread(void *ts_in)
 
 		// parameters of a command to ignore
 		if (vs->state == vs_running_waiting_data_ignore) {
-			dolog(debug, "VNC: Ignore %d command parameters\n", ignore_data_n);
+			DOLOG(debug, "VNC: Ignore %d command parameters\n", ignore_data_n);
 
 			assert(ignore_data_n > 0);
 			uint8_t *ignore = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, ignore_data_n);
@@ -713,7 +713,7 @@ void vnc_thread(void *ts_in)
 
 		if (vs->state == vs_running_waiting_data_extra) {
 			if (running_cmd == 2) {  // SetEncodings
-				dolog(debug, "VNC: Retrieving %d encodings\n", n_encodings);
+				DOLOG(debug, "VNC: Retrieving %d encodings\n", n_encodings);
 
 				uint8_t *encodings_bin = get_from_buffer((uint8_t **)&vs->buffer, &vs->buffer_size, n_encodings * 4);
 
@@ -727,7 +727,7 @@ void vnc_thread(void *ts_in)
 						int32_t e = (encodings_bin[o + 0] << 24) | (encodings_bin[o + 1] << 16) | (encodings_bin[o + 2] << 8) | encodings_bin[o + 3];
 						encodings.push_back(e);
 
-						dolog(debug, "VNC: encoding %d: %d\n", i, e);
+						DOLOG(debug, "VNC: encoding %d: %d\n", i, e);
 
 						if (e == -313)
 							continuous_updates = true;
@@ -741,7 +741,7 @@ void vnc_thread(void *ts_in)
 				}
 			}
 			else {
-				dolog(warning, "VNC: Command %d not known (data-extra state)\n", running_cmd);
+				DOLOG(warning, "VNC: Command %d not known (data-extra state)\n", running_cmd);
 				stats_inc_counter(vpd->vnc_err);
 				rc = false;
 			}
@@ -761,7 +761,7 @@ void vnc_thread(void *ts_in)
 
 	frame_buffer.unregister_callback(vs);
 
-	dolog(info, "VNC: Thread terminating for %s\n", vs->client_addr.c_str());
+	DOLOG(info, "VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
 
 void vnc_close_session_1(tcp_session_t *ts, private_data *pd)

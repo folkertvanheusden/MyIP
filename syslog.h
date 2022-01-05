@@ -5,16 +5,15 @@
 #include <thread>
 
 #include "any_addr.h"
+#include "application.h"
 #include "stats.h"
 
 class packet;
 class udp;
 
-class syslog_srv
+class syslog_srv : public application
 {
 private:
-	std::atomic_bool stop_flag { false };
-
 	uint64_t *syslog_srv_requests { nullptr };
 
 public:

@@ -40,7 +40,7 @@ void udp::operator()()
 
 		stats_inc_counter(udp_requests);
 
-		dolog(debug, "UDP: packet for port %d from port %d\n", dst_port, src_port);
+		DOLOG(debug, "UDP: packet for port %d from port %d\n", dst_port, src_port);
 
 		cb_lock.lock_shared();
 		auto it = callbacks.find(dst_port);
@@ -89,7 +89,7 @@ void udp::remove_handler(const int port)
 
 bool udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
 {
-	dolog(debug, "UDP: transmit packet %d -> %d\n", src_port, dst_port);
+	DOLOG(debug, "UDP: transmit packet %d -> %d\n", src_port, dst_port);
 
 	int out_size = 8 + pl_size;
 

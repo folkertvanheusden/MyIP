@@ -94,7 +94,7 @@ void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 		struct timespec now { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &now) == -1)
-			dolog(warning, "clock_gettime failed: %s", strerror(errno));
+			DOLOG(warning, "clock_gettime failed: %s", strerror(errno));
 
                 msgout.reference_timestamp_secs = htonl(now.tv_sec + NTP_EPOCH);
                 msgout.reference_timestamp_fraq = htonl(now.tv_nsec / 1000 * 4295);
@@ -104,7 +104,7 @@ void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 		u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)&msgout, sizeof msgout);
 
-		dolog(debug, "NTP: packet transmitted\n");
+		DOLOG(debug, "NTP: packet transmitted\n");
 	}
 }
 
@@ -130,7 +130,7 @@ void ntp::operator()()
 
 		prev = now;
 
-		dolog(debug, "NTP: Sending broadcast\n");
+		DOLOG(debug, "NTP: Sending broadcast\n");
 
 		stats_inc_counter(ntp_broadcast);
 

@@ -166,7 +166,7 @@ snmp_oid::snmp_oid(const std::string & oid)
 		work = work.substr(4);
 	}
 
-	uint8_t temp[(8 * 9) / 7];
+	uint8_t temp[(8 * 9) / 7] { 0 };
 	int temp_o = 0;
 
 	while(work.empty() == false) {

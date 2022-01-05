@@ -45,11 +45,11 @@ void error_exit(const bool se, const char *format, ...)
 	va_end(ap);
 
 	fprintf(stderr, "%s\n", temp);
-	dolog(error, "%s\n", temp);
+	DOLOG(error, "%s\n", temp);
 
 	if (se && e) {
 		fprintf(stderr, "errno: %d (%s)\n", e, strerror(e));
-		dolog(error, "errno: %d (%s)\n", e, strerror(e));
+		DOLOG(error, "errno: %d (%s)\n", e, strerror(e));
 	}
 
 	free(temp);
@@ -95,7 +95,7 @@ std::string cfg_str(const libconfig::Setting & cfg, const std::string & key, con
 			error_exit(false, "\"%s\" not found (%s)", key.c_str(), descr);
 	}
 
-	dolog(info, "\"%s\" not found (%s), assuming default (%s)\n", key.c_str(), descr, def.c_str());
+	DOLOG(info, "\"%s\" not found (%s), assuming default (%s)\n", key.c_str(), descr, def.c_str());
 
 	return def; // field is optional
 }
@@ -111,7 +111,7 @@ int cfg_int(const libconfig::Setting & cfg, const std::string & key, const char 
 		if (!optional)
 			error_exit(false, "\"%s\" not found (%s)", key.c_str(), descr);
 
-		dolog(info, "\"%s\" not found (%s), assuming default (%d)\n", key.c_str(), descr, def);
+		DOLOG(info, "\"%s\" not found (%s), assuming default (%d)\n", key.c_str(), descr, def);
 	}
 
 	catch(const libconfig::SettingTypeException & ste) {
@@ -132,7 +132,7 @@ int cfg_bool(const libconfig::Setting & cfg, const char *const key, const char *
 		if (!optional)
 			error_exit(false, "\"%s\" not found (%s)", key, descr);
 
-		dolog(info, "\"%s\" not found (%s), assuming default (%d)\n", key, descr, def);
+		DOLOG(info, "\"%s\" not found (%s), assuming default (%d)\n", key, descr, def);
 	}
 	catch(const libconfig::SettingTypeException & ste) {
 		error_exit(false, "Expected a boolean value for \"%s\" (%s) but got something else", key, descr);
@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
 		setlog(log_file.c_str(), parse_ll(llf), parse_ll(lls));
 	}
 
-	dolog(info, "*** START ***\n");
+	DOLOG(info, "*** START ***\n");
 
 	signal(SIGINT, ss);
 
@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
 		std::string chdir_path = cfg_str(environment, "chdir-path", "directory to chdir to", true, "/tmp");
 
 		if (chdir(chdir_path.c_str()) == -1) {
-			dolog(error, "chdir: %s", strerror(errno));
+			DOLOG(error, "chdir: %s", strerror(errno));
 			return 1;
 		}
 	}
@@ -229,6 +229,7 @@ int main(int argc, char *argv[])
 	// used for clean-up
 	std::vector<protocol *> protocols;
 	std::vector<ip_protocol *> ip_protocols;
+	std::vector<application *> applications;
 
 	/// network interfaces
 	const libconfig::Setting &interfaces = root["interfaces"];
@@ -383,12 +384,12 @@ int main(int argc, char *argv[])
 	}
 
 	if (setgid(gid) == -1) {
-		dolog(error, "setgid: %s", strerror(errno));
+		DOLOG(error, "setgid: %s", strerror(errno));
 		return 1;
 	}
 
 	if (setuid(uid) == -1) {
-		dolog(error, "setuid: %s", strerror(errno));
+		DOLOG(error, "setuid: %s", strerror(errno));
 		return 1;
 	}
 
@@ -413,6 +414,8 @@ int main(int argc, char *argv[])
 			ntp *ntp_ = new ntp(&s, u, i4->get_addr(), upstream_ntp_server, true);
 
 			u->add_handler(port, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			applications.push_back(ntp_);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -492,6 +495,8 @@ int main(int argc, char *argv[])
 			u4->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			// TODO: ipv6 sip
+
+			applications.push_back(sip_);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -526,6 +531,9 @@ int main(int argc, char *argv[])
 
 			snmp *snmp_6 = new snmp(&s, u6);
 			u6->add_handler(port, std::bind(&snmp::input, snmp_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			applications.push_back(snmp_4);
+			applications.push_back(snmp_6);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -560,6 +568,9 @@ int main(int argc, char *argv[])
 
 			syslog_srv *syslog_6 = new syslog_srv(&s);
 			u6->add_handler(port, std::bind(&syslog_srv::input, syslog_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			applications.push_back(syslog_4);
+			applications.push_back(syslog_6);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -567,14 +578,17 @@ int main(int argc, char *argv[])
 	}
 
 
-	dolog(debug, "*** STARTED ***\n");
+	DOLOG(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
 
 	getchar();
 
-	dolog(info, " *** TERMINATING ***\n");
+	DOLOG(info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating\n");
+
+	for(auto & a : applications)
+		delete a;
 
 	for(auto & d : devs)
 		d->stop();
@@ -588,7 +602,7 @@ int main(int argc, char *argv[])
 	for(auto & d : devs)
 		delete d;
 
-	dolog(info, "THIS IS THE END\n");
+	DOLOG(info, "THIS IS THE END\n");
 
 	closelog();
 
