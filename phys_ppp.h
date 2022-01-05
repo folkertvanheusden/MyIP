@@ -17,6 +17,7 @@ private:
 	bool emulate_modem_xp { false };
 	bool protocol_compression { false };
 	bool ac_field_compression { false };
+	uint32_t magic { 0x1234abcd };
 	std::vector<uint8_t> ACCM_tx, ACCM_rx;
 
 	std::mutex send_lock;

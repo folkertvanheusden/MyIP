@@ -145,15 +145,14 @@ bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 {
 	size_t lcp_offset = 4;
-	uint8_t code = data.at(lcp_offset + 0);
+	const uint8_t code = data.at(lcp_offset + 0);
+	const uint8_t identifier = data.at(lcp_offset + 1);
 
 	dolog(debug, "LCP:\n");
 	dolog(debug, "\tcode: %02x\n", code);
-	dolog(debug, "\tidentifier: %02x\n", data.at(lcp_offset + 1));
+	dolog(debug, "\tidentifier: %02x\n", identifier);
 	uint16_t length = (data.at(lcp_offset + 2) << 8) | data.at(lcp_offset + 3);
 	dolog(debug, "\tlength: %d\n", length);
-
-	uint32_t magic = 0;
 
 	if (data.size() < 4 + length) {
 		dolog(debug, "\tINVALID SIZE %zu < %d\n", data.size(), 4 + 8 + length);
@@ -164,8 +163,8 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 		dolog(debug, "\tOPTIONS:\n");
 		size_t options_offset = lcp_offset + 4;
 
-		protocol_compression = false;
-		ac_field_compression = false;
+		bool ack_protocol_compression = true;
+		bool ack_ac_field_compression = true;
 
 		std::vector<uint8_t> ack, nak;
 
@@ -188,22 +187,26 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			}
 			else if (type == 2) {  // ACCM
 				for(size_t i=0; i<len; i++) {
+					// let's do it the same for both directions
 					ACCM_rx.at(i) = ACCM_tx.at(i) = data.at(options_offset + i);
 				}
 
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
 			else if (type == 5) {  // magic
-				magic = (data.at(options_offset + 0) << 24) | (data.at(options_offset + 1) << 16) | (data.at(options_offset + 2) << 8) | data.at(options_offset + 3);
+				// magic = (data.at(options_offset + 0) << 24) | (data.at(options_offset + 1) << 16) | (data.at(options_offset + 2) << 8) | data.at(options_offset + 3);
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
 			else if (type == 7) {  // protocol field
-				protocol_compression = true;
+				ack_protocol_compression = true;
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
 			else if (type == 8) {  // remove address and control field
-				ac_field_compression = true;
+				ack_ac_field_compression = true;
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
+			}
+			else if (type == 13) {  // callback
+				dolog(debug, "\t\tcallback: %02x\n", data.at(options_offset));
 			}
 			else {
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(nak));	
@@ -220,7 +223,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			dolog(debug, "ppp send ack\n");
 			std::vector<uint8_t> out;
 			out.push_back(0x02);  // code for 'ack'
-			out.push_back(data.at(lcp_offset + 1));  // identifier
+			out.push_back(identifier);  // identifier
 			size_t len_offset = out.size();
 			out.push_back(0);  // length
 			out.push_back(0);  // length
@@ -230,7 +233,12 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			out.at(len_offset) = out.size() >> 8;
 			out.at(len_offset + 1) = out.size() & 255;
 
-			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xC021, ACCM_tx);
+	std::string d;
+	for(size_t i=0; i<out.size(); i++)
+		d += myformat("%02x ", out.at(i));
+	dolog(debug, "ppp pkt send: %s\n", d.c_str());
+
+			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xc021, ACCM_tx);
 
 			send_lock.lock();
 			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())  // TODO error checking, locking
@@ -265,16 +273,34 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 		{
 			std::vector<uint8_t> out;
 			out.push_back(0x01);  // code for 'request'
-			out.push_back(rand() & 255);  // identifier
+			out.push_back(1);  // identifier
 			size_t len_offset = out.size();
 			out.push_back(0);  // length
 			out.push_back(0);  // length
 
-			// max mtu size
-			out.push_back(1);
-			out.push_back(4);
-			out.push_back(1500 >> 8);
-			out.push_back(1500 & 255);
+			// ACCM
+			out.push_back(2);
+			out.push_back(6);
+			out.push_back(ACCM_rx.at(0));
+			out.push_back(ACCM_rx.at(1));
+			out.push_back(ACCM_rx.at(2));
+			out.push_back(ACCM_rx.at(3));
+
+			// magic 
+			out.push_back(5);
+			out.push_back(6);
+			out.push_back(magic >> 24);
+			out.push_back(magic >> 16);
+			out.push_back(magic >>  8);
+			out.push_back(magic);
+
+			// protocol compression
+			out.push_back(7);
+			out.push_back(2);
+
+			// address- & control field compression
+			out.push_back(8);
+			out.push_back(2);
 
 			out.at(len_offset) = out.size() >> 8;
 			out.at(len_offset + 1) = out.size() & 255;
@@ -286,6 +312,9 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 				printf("write error\n");
 			send_lock.unlock();
 		}
+
+		protocol_compression = ack_protocol_compression;
+		ac_field_compression = ack_ac_field_compression;
 	}
 	else if (code == 0x12) {  // identifier
 		dolog(debug, "\tmessage: %s\n", std::string((const char *)(data.data() + lcp_offset + 8), length).c_str());
@@ -297,10 +326,10 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 		out.push_back(data.at(lcp_offset + 1));  // identifier
 		out.push_back(0x00);  // length
 		out.push_back(12);  // length
-		out.push_back(data.at(lcp_offset + 4));  // magic number
-		out.push_back(data.at(lcp_offset + 5));
-		out.push_back(data.at(lcp_offset + 6));
-		out.push_back(data.at(lcp_offset + 7));
+		out.push_back(magic >> 24);
+		out.push_back(magic >> 16);
+		out.push_back(magic >>  8);
+		out.push_back(magic);
 		out.push_back('M');
 		out.push_back('y');
 		out.push_back('I');
