@@ -396,8 +396,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		if (their_seq_nr == cur_session->their_seq_nr) {
 			const uint8_t *data_start = &p[header_size];
 
-			std::string content = bin_to_text(data_start, data_len);
-			dolog(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
+//			std::string content = bin_to_text(data_start, data_len);
+//			dolog(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
 
 			try {
 				if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.pd) == false) {
@@ -655,8 +655,8 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 	uint64_t internal_id = get_us();
 
 	dolog(debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %lu packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
-	std::string content = bin_to_text(data, std::min(len, size_t(32)));
-	dolog(debug, "TCP[%012" PRIx64 "]: %s\n", ts->id, content.c_str());
+//	std::string content = bin_to_text(data, std::min(len, size_t(32)));
+//	dolog(debug, "TCP[%012" PRIx64 "]: %s\n", ts->id, content.c_str());
 
 	for(;;) {
 		// lock for unacked and for my_seq_nr
