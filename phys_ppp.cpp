@@ -181,7 +181,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 		dolog(debug, "send 0x01 LCP reply\n");
 
 		// ACK
-		{
+		if (ack.empty() == false) {
 			std::vector<uint8_t> out;
 			out.push_back(0x02);  // code for 'ack'
 			out.push_back(data.at(lcp_offset + 1));  // identifier
