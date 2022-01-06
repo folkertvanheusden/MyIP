@@ -271,7 +271,10 @@ int main(int argc, char *argv[])
 			else if (type == "ppp") {
 				bool emulate_modem_xp = cfg_bool(interface, "emulate-modem-xp", "emulate AT-set modem / XP direct link", true, false);
 
-				dev = new phys_ppp(&s, dev_name, bps_setting, my_mac, emulate_modem_xp);
+				std::string oa_str = cfg_str(interface, "opponent-address", "opponent IPv4 address", false, "192.168.3.2");
+				any_addr opponent_address = parse_address(oa_str.c_str(), 4, ".", 10);
+
+				dev = new phys_ppp(&s, dev_name, bps_setting, my_mac, emulate_modem_xp, opponent_address);
 			}
 			else {
 				error_exit(false, "internal error");

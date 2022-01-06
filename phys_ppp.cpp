@@ -16,7 +16,7 @@
 #include "packet.h"
 #include "utils.h"
 
-phys_ppp::phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp) : phys_slip(s, dev_name, bps, my_mac), emulate_modem_xp(emulate_modem_xp)
+phys_ppp::phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp, const any_addr & opponent_address) : phys_slip(s, dev_name, bps, my_mac), emulate_modem_xp(emulate_modem_xp), opponent_address(opponent_address)
 {
 	ACCM_rx.resize(32);
 	ACCM_rx.at(0) = 0xff;
@@ -162,7 +162,7 @@ void phys_ppp::send_rej(const uint16_t protocol, const uint8_t identifier, const
 
 bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	return true;
+	return true;  // TODO FIXME
 	std::vector temp(payload, &payload[pl_size]);
 	std::vector<uint8_t> ppp_frame = wrap_in_ppp_frame(temp, 0x0021 /* IP */, ACCM_tx, true);
 
@@ -254,6 +254,8 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 	if (code == 0x01) {  // options
 		std::vector<uint8_t> ack, rej;
 
+		bool send_nak_with_new_address = false;
+
 		DOLOG(debug, "\tOPTIONS:\n");
 
 		size_t options_offset = ipcp_offset + 4;
@@ -270,7 +272,19 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 				break;
 			}
 
-			if (type == 0xff) {
+			if (type == 0x03) {  // IP address
+				any_addr theirs(data.data() + options_offset, 4);
+
+				if (theirs == opponent_address) {
+					dolog(debug, "phys_ppp: acking IP address %s\n", theirs.to_str().c_str());
+
+					std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
+				}
+				else {
+					send_nak_with_new_address = true;
+				}
+			}
+			else if (type == 0xff) {
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
 			else {
@@ -280,9 +294,63 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 		}
 
 		// REJ
-		if (rej.empty() == false)
-			send_rej(0x8021, data.at(ipcp_offset + 1), rej);
+		if (send_nak_with_new_address) {
+			assert(opponent_address.get_len() == 4);
 
+			DOLOG(debug, "push IPCP IP addr (addr: %s)\n", opponent_address.to_str().c_str());
+
+			std::vector<uint8_t> out;
+			out.push_back(3);  // code for nak
+			out.push_back(1);  // identifier
+			size_t len_offset = out.size();
+			out.push_back(0);  // length
+			out.push_back(0);  // length
+
+			// IP-address
+			out.push_back(3);
+			out.push_back(6);
+			out.push_back(opponent_address[0]);
+			out.push_back(opponent_address[1]);
+			out.push_back(opponent_address[2]);
+			out.push_back(opponent_address[3]);
+
+			out.at(len_offset) = out.size() >> 8;
+			out.at(len_offset + 1) = out.size() & 255;
+
+			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0x8021, ACCM_tx, false);
+
+			send_lock.lock();
+			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
+				printf("write error\n");
+			send_lock.unlock();
+		}
+		else if (rej.empty() == false) {
+			send_rej(0x8021, data.at(ipcp_offset + 1), rej);
+		}
+		else if (ack.empty() == false) {
+			DOLOG(debug, "ppp send ack\n");
+			std::vector<uint8_t> out;
+			out.push_back(0x02);  // code for 'ack'
+			out.push_back(identifier);  // identifier
+			size_t len_offset = out.size();
+			out.push_back(0);  // length
+			out.push_back(0);  // length
+
+			std::copy(ack.begin(), ack.end(), std::back_inserter(ack));
+
+			out.at(len_offset) = out.size() >> 8;
+			out.at(len_offset + 1) = out.size() & 255;
+
+			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0x8021, ACCM_tx, false);
+
+			send_lock.lock();
+			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())  // TODO error checking, locking
+				printf("write error\n");
+			send_lock.unlock();
+		}
+
+
+#if 0
 		if (!ipcp_options_acked) {
 			auto it = prot_map.find(0x800);  // assuming IPv4
 			if (it == prot_map.end())
@@ -292,7 +360,9 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 				assert(a.get_len() == 4);
 
 				DOLOG(debug, "sending IPCP options (addr: %s)\n", a.to_str().c_str());
-
+// ff 03 80 21
+// code 04 0f
+// 00 0a 03 06 00 00 00 00 4f
 				std::vector<uint8_t> out;
 				out.push_back(0x01);  // code for 'request'
 				out.push_back(1);  // identifier
@@ -319,6 +389,7 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 				send_lock.unlock();
 			}
 		}
+#endif
 	}
 	else if (code == 0x02) {  // options ack
 		ipcp_options_acked = true;
@@ -480,7 +551,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 		lcp_options_acked = true;
 	}
 	else if (code == 0x0c) {  // identifier (12)
-		DOLOG(debug, "\tmessage: %s\n", std::string((const char *)(data.data() + lcp_offset + 8), length - 2).c_str());
+		DOLOG(debug, "\tmessage: %s\n", std::string((const char *)(data.data() + lcp_offset + 8), length - 8).c_str());
 
 		DOLOG(debug, "send 0x0c LCP reply\n");
 

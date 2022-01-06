@@ -21,6 +21,7 @@ private:
 	bool ipcp_options_acked { false };
 	uint32_t magic { 0x1234abcd };
 	std::vector<uint8_t> ACCM_tx, ACCM_rx;
+	const any_addr opponent_address;
 
 	uint16_t fcstab[256] { 0 };
 
@@ -33,7 +34,7 @@ private:
 	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool apply_compression);
 
 public:
-	phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp);
+	phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp, const any_addr & opponent_address);
 	phys_ppp(const phys_ppp &) = delete;
 	virtual ~phys_ppp();
 
