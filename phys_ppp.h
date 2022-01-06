@@ -20,10 +20,12 @@ private:
 	uint32_t magic { 0x1234abcd };
 	std::vector<uint8_t> ACCM_tx, ACCM_rx;
 
+	uint16_t fcstab[256] { 0 };
+
 	std::mutex send_lock;
 
 	void handle_lcp(const std::vector<uint8_t> & data);
-	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM);
+	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool apply_compression);
 
 public:
 	phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp);

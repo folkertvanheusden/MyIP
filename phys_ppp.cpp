@@ -27,6 +27,26 @@ phys_ppp::phys_ppp(stats *const s, const std::string & dev_name, const int bps, 
 	ACCM_rx.at(0x7d >> 3) = 0x7e & 7;  // escape character
 
 	ACCM_tx = ACCM_rx;  // initially only
+
+	// from
+	// https://stackoverflow.com/questions/45198049/calculating-the-ppp-frame-check-sequence
+	constexpr uint16_t polynomial = 0x8408;
+
+	for(int i = 0; i < 256; i++) {
+            uint16_t value = 0;
+            uint8_t temp = i;
+
+            for(int j = 0; j < 8; j++) {
+                if ((value ^ temp) & 0x0001)
+                    value = uint16_t((value >> 1) ^ polynomial);
+                else
+                    value >>= 1;
+
+                temp >>= 1;
+            }
+
+            fcstab[i] = value;
+        }
 }
 
 phys_ppp::~phys_ppp()
@@ -38,16 +58,16 @@ void phys_ppp::start()
 	th = new std::thread(std::ref(*this));
 }
 
-std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM)
+std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool apply_compression)
 {
 	std::vector<uint8_t> temp;
 
-	if (!ac_field_compression) {
+	if (!ac_field_compression || !apply_compression) {
 		temp.push_back(0xff);  // standard broadcast address
 		temp.push_back(0x03);  // unnumbered data
 	}
 
-	if (protocol_compression && protocol < 0x0100)
+	if (protocol_compression && protocol < 0x0100 && apply_compression)
 		temp.push_back(protocol);  // protocol
 	else {
 		temp.push_back(protocol >> 8);  // protocol
@@ -57,23 +77,20 @@ std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & pa
 	std::copy(payload.begin(), payload.end(), std::back_inserter(temp));	
 	// TODO? padding?
 
-	// from https://stackoverflow.com/questions/4308606/how-do-i-create-an-fcs-for-ppp-packets
-	uint16_t crc = 0xffff;
-
-	for(size_t loop=0; loop<temp.size(); loop++) {
-		uint8_t x = temp.at(loop);
-
-		for(int i=0; i<8; i++) {
-			crc=((crc&1)^(x&1))?(crc>>1)^0x8408:crc>>1;
-			x>>=1;
-		}
-	}
-
-	temp.push_back(crc >> 8);
-	temp.push_back(crc);
-
 	std::vector<uint8_t> out;
 	out.push_back(0x7e);  // flag
+
+	uint16_t fcs = 0xFFFF;
+
+	for(int i = 0; i < temp.size(); i++) {
+		int index = uint8_t((fcs ^ temp.at(i)) & 0xff);
+		fcs = uint16_t((fcs >> 8) ^ fcstab[index]);
+	}
+
+	fcs ^= 0xFFFF;
+
+	temp.push_back(fcs);
+	temp.push_back(fcs >> 8);
 
 	for(size_t i=0; i<temp.size(); i++) {
 		uint8_t b = temp.at(i);
@@ -122,7 +139,7 @@ bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 {
 	return true;
 	std::vector temp(payload, &payload[pl_size]);
-	std::vector<uint8_t> ppp_frame = wrap_in_ppp_frame(temp, 0x0021 /* IP */, ACCM_tx);
+	std::vector<uint8_t> ppp_frame = wrap_in_ppp_frame(temp, 0x0021 /* IP */, ACCM_tx, true);
 
 	bool ok = true;
 
@@ -163,8 +180,8 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 		dolog(debug, "\tOPTIONS:\n");
 		size_t options_offset = lcp_offset + 4;
 
-		bool ack_protocol_compression = true;
-		bool ack_ac_field_compression = true;
+		protocol_compression = true;
+		ac_field_compression = true;
 
 		std::vector<uint8_t> ack, nak;
 
@@ -198,11 +215,11 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
 			else if (type == 7) {  // protocol field
-				ack_protocol_compression = true;
+				protocol_compression = true;
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
 			else if (type == 8) {  // remove address and control field
-				ack_ac_field_compression = true;
+				ac_field_compression = true;
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
 			else if (type == 13) {  // callback
@@ -238,7 +255,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 		d += myformat("%02x ", out.at(i));
 	dolog(debug, "ppp pkt send: %s\n", d.c_str());
 
-			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xc021, ACCM_tx);
+			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xc021, ACCM_tx, false);
 
 			send_lock.lock();
 			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())  // TODO error checking, locking
@@ -261,7 +278,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			out.at(len_offset) = out.size() >> 8;
 			out.at(len_offset + 1) = out.size() & 255;
 
-			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xC021, ACCM_tx);
+			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xC021, ACCM_tx, false);
 
 			send_lock.lock();
 			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
@@ -305,16 +322,13 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			out.at(len_offset) = out.size() >> 8;
 			out.at(len_offset + 1) = out.size() & 255;
 
-			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xC021, ACCM_tx);
+			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xC021, ACCM_tx, false);
 
 			send_lock.lock();
 			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
 				printf("write error\n");
 			send_lock.unlock();
 		}
-
-		protocol_compression = ack_protocol_compression;
-		ac_field_compression = ack_ac_field_compression;
 	}
 	else if (code == 0x12) {  // identifier
 		dolog(debug, "\tmessage: %s\n", std::string((const char *)(data.data() + lcp_offset + 8), length).c_str());
@@ -335,7 +349,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 		out.push_back('I');
 		out.push_back('P');
 
-		std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xC021, ACCM_tx);
+		std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xC021, ACCM_tx, false);
 
 		send_lock.lock();
 		if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
@@ -429,12 +443,12 @@ void phys_ppp::operator()()
 					modem += (char)buffer;
 
 					if (modem.find("ATDT") != std::string::npos) {
-						printf("ATDT -> CONNECT\n");
+						printf("ATDT -> CONNECT (%s)\n", modem.c_str());
 						write(fd, "CONNECT\r\n", 9);
 						modem.clear();
 					}
 					else if (modem.find("AT") != std::string::npos) {
-						printf("AT -> OK\n");
+						printf("AT -> OK (%s)\n", modem.c_str());
 						write(fd, "OK\r\n", 4);
 						modem.clear();
 					}
