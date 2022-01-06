@@ -17,6 +17,8 @@ private:
 	bool emulate_modem_xp { false };
 	bool protocol_compression { false };
 	bool ac_field_compression { false };
+	bool lcp_options_acked { false };
+	bool ipcp_options_acked { false };
 	uint32_t magic { 0x1234abcd };
 	std::vector<uint8_t> ACCM_tx, ACCM_rx;
 
@@ -25,6 +27,9 @@ private:
 	std::mutex send_lock;
 
 	void handle_lcp(const std::vector<uint8_t> & data);
+	void handle_ccp(const std::vector<uint8_t> & data);
+	void handle_ipcp(const std::vector<uint8_t> & data);
+	void send_rej(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);
 	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool apply_compression);
 
 public:

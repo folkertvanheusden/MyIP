@@ -116,7 +116,7 @@ std::vector<uint8_t> unwrap_ppp_frame(const std::vector<uint8_t> & payload, cons
 	std::string d;
 	for(size_t i=0; i<payload.size(); i++)
 		d += myformat("%02x ", payload.at(i));
-	dolog(debug, "ppp pkt before: %s\n", d.c_str());
+	DOLOG(debug, "ppp pkt before: %s\n", d.c_str());
 
 	for(size_t i=0; i<payload.size();) {
 		uint8_t c = payload.at(i++);
@@ -130,9 +130,34 @@ std::vector<uint8_t> unwrap_ppp_frame(const std::vector<uint8_t> & payload, cons
 	d.clear();
 	for(size_t i=0; i<out.size(); i++)
 		d += myformat("%02x ", out.at(i));
-	dolog(debug, "ppp pkt after: %s\n", d.c_str());
+	DOLOG(debug, "ppp pkt after: %s\n", d.c_str());
 
 	return out;
+}
+
+void phys_ppp::send_rej(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options)
+{
+	DOLOG(debug, "ppp send rej for protocol %04x, identifier %02x\n", protocol, identifier);
+
+	std::vector<uint8_t> out;
+	out.push_back(0x04);  // code for 'rej'
+	out.push_back(identifier);  // identifier
+
+	size_t len_offset = out.size();
+	out.push_back(0);  // length
+	out.push_back(0);  // length
+
+	std::copy(options.begin(), options.end(), std::back_inserter(out));
+
+	out.at(len_offset) = out.size() >> 8;
+	out.at(len_offset + 1) = out.size() & 255;
+
+	std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, protocol, ACCM_tx, false);
+
+	send_lock.lock();
+	if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
+		printf("write error\n");
+	send_lock.unlock();
 }
 
 bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
@@ -148,15 +173,156 @@ bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 	send_lock.unlock();
 
 	if (size_t(rc) != ppp_frame.size()) {
-		dolog(error, "phys_ppp: problem sending packet (%d for %zu bytes)\n", rc, ppp_frame.size());
+		DOLOG(error, "phys_ppp: problem sending packet (%d for %zu bytes)\n", rc, ppp_frame.size());
 
 		if (rc == -1)
-			dolog(error, "phys_ppp: %s\n", strerror(errno));
+			DOLOG(error, "phys_ppp: %s\n", strerror(errno));
 
 		ok = false;
 	}
 
 	return ok;
+}
+
+void phys_ppp::handle_ccp(const std::vector<uint8_t> & data)
+{
+	size_t ccp_offset = 4;
+
+	const uint8_t code = data.at(ccp_offset + 0);
+	const uint8_t identifier = data.at(ccp_offset + 1);
+
+	DOLOG(debug, "CCP:\n");
+	DOLOG(debug, "\tcode: %02x\n", code);
+	DOLOG(debug, "\tidentifier: %02x\n", identifier);
+
+	uint16_t length = (data.at(ccp_offset + 2) << 8) | data.at(ccp_offset + 3);
+	DOLOG(debug, "\tlength: %d\n", length);
+
+	if (data.size() < 4 + length) {
+		DOLOG(debug, "\tINVALID SIZE %zu < %d\n", data.size(), 4 + 8 + length);
+		return;
+	}
+
+	if (code == 0x01) {  // options
+		std::vector<uint8_t> ack, rej;
+
+		DOLOG(debug, "\tOPTIONS:\n");
+
+		size_t options_offset = ccp_offset + 4;
+
+		while(options_offset < data.size() - 2) {
+			size_t next_offset = options_offset;
+			uint8_t type = data.at(options_offset++);
+			uint8_t len = data.at(options_offset++);
+
+			DOLOG(debug, "\t\toption: %02x of %d bytes\n", type, len);
+
+			if (data.size() - next_offset < len) {
+				DOLOG(debug, "len: %d, got: %zu\n", len, data.size() - options_offset);
+				break;
+			}
+
+			std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
+			DOLOG(debug, "\t\tunknown option %02x\n", type);
+		}
+
+		// REJ
+		if (rej.empty() == false)
+			send_rej(0x80fd, data.at(ccp_offset + 1), rej);
+	}
+}
+
+void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
+{
+	size_t ipcp_offset = 4;
+
+	const uint8_t code = data.at(ipcp_offset + 0);
+	const uint8_t identifier = data.at(ipcp_offset + 1);
+
+	DOLOG(debug, "IPCP:\n");
+	DOLOG(debug, "\tcode: %02x\n", code);
+	DOLOG(debug, "\tidentifier: %02x\n", identifier);
+
+	uint16_t length = (data.at(ipcp_offset + 2) << 8) | data.at(ipcp_offset + 3);
+	DOLOG(debug, "\tlength: %d\n", length);
+
+	if (data.size() < 4 + length) {
+		DOLOG(debug, "\tINVALID SIZE %zu < %d\n", data.size(), 4 + 8 + length);
+		return;
+	}
+
+	if (code == 0x01) {  // options
+		std::vector<uint8_t> ack, rej;
+
+		DOLOG(debug, "\tOPTIONS:\n");
+
+		size_t options_offset = ipcp_offset + 4;
+
+		while(options_offset < data.size() - 2) {
+			size_t next_offset = options_offset;
+			uint8_t type = data.at(options_offset++);
+			uint8_t len = data.at(options_offset++);
+
+			DOLOG(debug, "\t\toption: %02x of %d bytes\n", type, len);
+
+			if (data.size() - next_offset < len) {
+				DOLOG(debug, "len: %d, got: %zu\n", len, data.size() - options_offset);
+				break;
+			}
+
+			if (type == 0xff) {
+				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
+			}
+			else {
+				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
+				DOLOG(debug, "\t\tunknown option %02x: %s\n", type, bin_to_text(data.data() + next_offset, len).c_str());
+			}
+		}
+
+		// REJ
+		if (rej.empty() == false)
+			send_rej(0x8021, data.at(ipcp_offset + 1), rej);
+
+		if (!ipcp_options_acked) {
+			auto it = prot_map.find(0x800);  // assuming IPv4
+			if (it == prot_map.end())
+				DOLOG(warning, "phys_ppp: no IPv4 stack attached to PPP device\n");
+			else {
+				any_addr a = it->second->get_addr();
+				assert(a.get_len() == 4);
+
+				DOLOG(debug, "sending IPCP options (addr: %s)\n", a.to_str().c_str());
+
+				std::vector<uint8_t> out;
+				out.push_back(0x01);  // code for 'request'
+				out.push_back(1);  // identifier
+				size_t len_offset = out.size();
+				out.push_back(0);  // length
+				out.push_back(0);  // length
+
+				// IP-address
+				out.push_back(2);
+				out.push_back(6);
+				out.push_back(a[0]);
+				out.push_back(a[1]);
+				out.push_back(a[2]);
+				out.push_back(a[3]);
+
+				out.at(len_offset) = out.size() >> 8;
+				out.at(len_offset + 1) = out.size() & 255;
+
+				std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0x8021, ACCM_tx, false);
+
+				send_lock.lock();
+				if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
+					printf("write error\n");
+				send_lock.unlock();
+			}
+		}
+	}
+	else if (code == 0x02) {  // options ack
+		ipcp_options_acked = true;
+	}
 }
 
 void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
@@ -165,25 +331,26 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 	const uint8_t code = data.at(lcp_offset + 0);
 	const uint8_t identifier = data.at(lcp_offset + 1);
 
-	dolog(debug, "LCP:\n");
-	dolog(debug, "\tcode: %02x\n", code);
-	dolog(debug, "\tidentifier: %02x\n", identifier);
+	DOLOG(debug, "LCP:\n");
+	DOLOG(debug, "\tcode: %02x\n", code);
+	DOLOG(debug, "\tidentifier: %02x\n", identifier);
 	uint16_t length = (data.at(lcp_offset + 2) << 8) | data.at(lcp_offset + 3);
-	dolog(debug, "\tlength: %d\n", length);
+	DOLOG(debug, "\tlength: %d\n", length);
 
 	if (data.size() < 4 + length) {
-		dolog(debug, "\tINVALID SIZE %zu < %d\n", data.size(), 4 + 8 + length);
+		DOLOG(debug, "\tINVALID SIZE %zu < %d\n", data.size(), 4 + 8 + length);
 		return;
 	}
 
-	if (code == 0x01) {  // options
-		dolog(debug, "\tOPTIONS:\n");
+	if (code == 0x01) {  // options req
+		DOLOG(debug, "\tOPTIONS:\n");
+
+		std::vector<uint8_t> ack, rej;
+
 		size_t options_offset = lcp_offset + 4;
 
 		protocol_compression = true;
 		ac_field_compression = true;
-
-		std::vector<uint8_t> ack, nak;
 
 		// -2: last two are the crc
 		while(options_offset < data.size() - 2) {
@@ -191,15 +358,15 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			uint8_t type = data.at(options_offset++);
 			uint8_t len = data.at(options_offset++);
 
-			dolog(debug, "option: %02x of %d bytes\n", type, len);
+			DOLOG(debug, "option: %02x of %d bytes\n", type, len);
 
 			if (data.size() - next_offset < len) {
-				dolog(debug, "len: %d, got: %zu\n", len, data.size() - options_offset);
+				DOLOG(debug, "len: %d, got: %zu\n", len, data.size() - options_offset);
 				break;
 			}
 
 			if (type == 1) {  // max receive unit
-				dolog(debug, "\t\tMTU: %d\n", (data.at(options_offset + 0) << 8) | data.at(options_offset + 1));
+				DOLOG(debug, "\t\tMTU: %d\n", (data.at(options_offset + 0) << 8) | data.at(options_offset + 1));
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
 			else if (type == 2) {  // ACCM
@@ -222,22 +389,28 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 				ac_field_compression = true;
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
-			else if (type == 13) {  // callback
-				dolog(debug, "\t\tcallback: %02x\n", data.at(options_offset));
+			else if (type == 13) {  // callback 0x0d
+				DOLOG(debug, "\t\tcallback: %02x\n", data.at(options_offset));
+				// not supported
+				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
 			}
 			else {
-				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(nak));	
-				dolog(debug, "\t\tunknown option %02x\n", type);
+				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
+				DOLOG(debug, "\t\tunknown option %02x\n", type);
 			}
 
 			options_offset = next_offset + len;
 		}
 
-		dolog(debug, "send 0x01 LCP reply\n");
+		DOLOG(debug, "send 0x01 LCP reply\n");
 
+		// REJ
+		if (rej.empty() == false) {
+			send_rej(0xc021, data.at(lcp_offset + 1), rej);
+		}
 		// ACK
-		if (ack.empty() == false) {
-			dolog(debug, "ppp send ack\n");
+		else if (ack.empty() == false) {
+			DOLOG(debug, "ppp send ack\n");
 			std::vector<uint8_t> out;
 			out.push_back(0x02);  // code for 'ack'
 			out.push_back(identifier);  // identifier
@@ -250,11 +423,6 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			out.at(len_offset) = out.size() >> 8;
 			out.at(len_offset + 1) = out.size() & 255;
 
-	std::string d;
-	for(size_t i=0; i<out.size(); i++)
-		d += myformat("%02x ", out.at(i));
-	dolog(debug, "ppp pkt send: %s\n", d.c_str());
-
 			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xc021, ACCM_tx, false);
 
 			send_lock.lock();
@@ -263,30 +431,8 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			send_lock.unlock();
 		}
 
-		// NAK
-		if (nak.empty() == false) {
-			dolog(debug, "ppp send nak\n");
-			std::vector<uint8_t> out;
-			out.push_back(0x03);  // code for 'not ack'
-			out.push_back(data.at(lcp_offset + 1));  // identifier
-			size_t len_offset = out.size();
-			out.push_back(0);  // length
-			out.push_back(0);  // length
-
-			std::copy(nak.begin(), nak.end(), std::back_inserter(out));	
-
-			out.at(len_offset) = out.size() >> 8;
-			out.at(len_offset + 1) = out.size() & 255;
-
-			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xC021, ACCM_tx, false);
-
-			send_lock.lock();
-			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
-				printf("write error\n");
-			send_lock.unlock();
-		}
-
 		// send request
+		if (!lcp_options_acked)
 		{
 			std::vector<uint8_t> out;
 			out.push_back(0x01);  // code for 'request'
@@ -330,13 +476,16 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			send_lock.unlock();
 		}
 	}
-	else if (code == 0x12) {  // identifier
-		dolog(debug, "\tmessage: %s\n", std::string((const char *)(data.data() + lcp_offset + 8), length).c_str());
+	else if (code == 0x02) {  // options ack
+		lcp_options_acked = true;
+	}
+	else if (code == 0x0c) {  // identifier (12)
+		DOLOG(debug, "\tmessage: %s\n", std::string((const char *)(data.data() + lcp_offset + 8), length - 2).c_str());
 
-		dolog(debug, "send 0x12 LCP reply\n");
+		DOLOG(debug, "send 0x0c LCP reply\n");
 
 		std::vector<uint8_t> out;
-		out.push_back(0x12);  // code
+		out.push_back(0x0c);  // code
 		out.push_back(data.at(lcp_offset + 1));  // identifier
 		out.push_back(0x00);  // length
 		out.push_back(12);  // length
@@ -360,7 +509,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 
 void phys_ppp::operator()()
 {
-	dolog(debug, "phys_ppp: thread started\n");
+	DOLOG(debug, "phys_ppp: thread started\n");
 
 	set_thread_name("myip-phys_ppp");
 
@@ -377,7 +526,7 @@ void phys_ppp::operator()()
 			if (errno == EINTR)
 				continue;
 
-			dolog(error, "poll: %s", strerror(errno));
+			DOLOG(error, "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -406,11 +555,11 @@ void phys_ppp::operator()()
 
 				uint16_t protocol = (packet_buffer.at(2) << 8) | packet_buffer.at(3);
 
-				dolog(debug, "address: %02x\n", packet_buffer.at(0));
-				dolog(debug, "control: %02x\n", packet_buffer.at(1));
-				dolog(debug, "protocol: %04x\n", protocol);
+				DOLOG(debug, "address: %02x\n", packet_buffer.at(0));
+				DOLOG(debug, "control: %02x\n", packet_buffer.at(1));
+				DOLOG(debug, "protocol: %04x\n", protocol);
 
-				dolog(debug, "size: %zu\n", packet_buffer.size());
+				DOLOG(debug, "size: %zu\n", packet_buffer.size());
 
 				for(size_t i=4; i<packet_buffer.size() - 2; i++)
 					printf("%02x ", packet_buffer.at(i));
@@ -421,19 +570,28 @@ void phys_ppp::operator()()
 
 					any_addr src_mac((const uint8_t *)"\0\0\0\0\0\1", 6);
 
-					dolog(debug, "phys_ppp: queing packet, size %zu\n", packet_buffer.size());
+					DOLOG(debug, "phys_ppp: queing packet, size %zu\n", packet_buffer.size());
 
 					// 4 ppp header, 2 fcs (=crc)
 					packet *p = new packet(src_mac, my_mac, packet_buffer.data() + 4, packet_buffer.size() - (4 + 2), NULL, 0);
 
 					auto it = prot_map.find(0x800);  // assuming IPv4
 					if (it == prot_map.end())
-						dolog(warning, "phys_ppp: no IPv4 stack attached to PPP device (yet)\n");
+						DOLOG(warning, "phys_ppp: no IPv4 stack attached to PPP device (yet)\n");
 					else
 						it->second->queue_packet(this, p);
 				}
 				else if (protocol == 0xc021) {  // LCP
 					handle_lcp(packet_buffer);
+				}
+				else if (protocol == 0x8021) {  // IPCP
+					handle_ipcp(packet_buffer);
+				}
+				else if (protocol == 0x80fd) {  // CCP
+					handle_ccp(packet_buffer);
+				}
+				else {
+					DOLOG(info, "phys_ppp: protocol %04x not supported\n", protocol);
 				}
 
 				packet_buffer.clear();
@@ -473,5 +631,5 @@ void phys_ppp::operator()()
 		}
 	}
 
-	dolog(info, "phys_ppp: thread stopped\n");
+	DOLOG(info, "phys_ppp: thread stopped\n");
 }
