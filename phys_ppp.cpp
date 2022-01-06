@@ -396,10 +396,20 @@ void phys_ppp::operator()()
 			if (packet_buffer.empty() == false) {  // START/END of packet
 				packet_buffer = unwrap_ppp_frame(packet_buffer, ACCM_rx);
 
+				if (packet_buffer.at(0) != 0xff && ac_field_compression) {
+					packet_buffer.insert(packet_buffer.begin()+0, 0xff);
+					packet_buffer.insert(packet_buffer.begin()+1, 0x03);
+				}
+
+				if ((packet_buffer.at(2) & 1) == 1 && protocol_compression)
+					packet_buffer.insert(packet_buffer.begin()+1, 0x00);
+
+				uint16_t protocol = (packet_buffer.at(2) << 8) | packet_buffer.at(3);
+
 				dolog(debug, "address: %02x\n", packet_buffer.at(0));
 				dolog(debug, "control: %02x\n", packet_buffer.at(1));
-				uint16_t protocol = (packet_buffer.at(2) << 8) | packet_buffer.at(3);
 				dolog(debug, "protocol: %04x\n", protocol);
+
 				dolog(debug, "size: %zu\n", packet_buffer.size());
 
 				for(size_t i=4; i<packet_buffer.size() - 2; i++)
