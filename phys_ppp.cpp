@@ -409,8 +409,10 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 
 		size_t options_offset = lcp_offset + 4;
 
-		protocol_compression = true;
-		ac_field_compression = true;
+		protocol_compression = false;
+		ac_field_compression = false;
+
+		lcp_options_acked = false;
 
 		// -2: last two are the crc
 		while(options_offset < data.size() - 2) {
