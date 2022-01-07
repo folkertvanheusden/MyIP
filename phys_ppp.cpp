@@ -23,8 +23,6 @@ phys_ppp::phys_ppp(stats *const s, const std::string & dev_name, const int bps, 
 	ACCM_rx.at(1) = 0xff;
 	ACCM_rx.at(2) = 0xff;
 	ACCM_rx.at(3) = 0xff;
-	ACCM_rx.at(0x7e >> 3) = 0x7e & 7;  // flag
-	ACCM_rx.at(0x7d >> 3) = 0x7e & 7;  // escape character
 
 	ACCM_tx = ACCM_rx;  // initially only
 
@@ -68,10 +66,10 @@ std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & pa
 	}
 
 	if (protocol_compression && protocol < 0x0100 && apply_compression)
-		temp.push_back(protocol);  // protocol
+		temp.push_back(protocol);
 	else {
-		temp.push_back(protocol >> 8);  // protocol
-		temp.push_back(protocol);  // protocol
+		temp.push_back(protocol >> 8);
+		temp.push_back(protocol);
 	}
 
 	std::copy(payload.begin(), payload.end(), std::back_inserter(temp));	
@@ -95,7 +93,7 @@ std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & pa
 	for(size_t i=0; i<temp.size(); i++) {
 		uint8_t b = temp.at(i);
 
-		if (ACCM.at(b >> 3) & (1 << (b & 7))) {
+		if (b == 0x7d || b == 0x7e || (ACCM.at(b >> 3) & (1 << (b & 7)))) {
 			out.push_back(0x7d);
 			out.push_back(b ^ 0x20);
 		}
