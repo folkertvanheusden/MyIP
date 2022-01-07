@@ -135,19 +135,20 @@ std::vector<uint8_t> unwrap_ppp_frame(const std::vector<uint8_t> & payload, cons
 	return out;
 }
 
-void phys_ppp::send_rej(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options)
+void phys_ppp::send_Xcp(const uint8_t code, const uint8_t identifier, const uint16_t protocol, const std::vector<uint8_t> & data)
 {
-	DOLOG(debug, "ppp send rej for protocol %04x, identifier %02x\n", protocol, identifier);
+	DOLOG(debug, "ppp send code %d\n", code);
 
 	std::vector<uint8_t> out;
-	out.push_back(0x04);  // code for 'rej'
-	out.push_back(identifier);  // identifier
+
+	out.push_back(code);
+	out.push_back(identifier);
 
 	size_t len_offset = out.size();
-	out.push_back(0);  // length
-	out.push_back(0);  // length
+	out.push_back(0);  // placeholder for length (MSB)
+	out.push_back(0);  // placeholder for length (LSB)
 
-	std::copy(options.begin(), options.end(), std::back_inserter(out));
+	std::copy(data.begin(), data.end(), std::back_inserter(out));
 
 	out.at(len_offset) = out.size() >> 8;
 	out.at(len_offset + 1) = out.size() & 255;
@@ -156,8 +157,29 @@ void phys_ppp::send_rej(const uint16_t protocol, const uint8_t identifier, const
 
 	send_lock.lock();
 	if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
-		printf("write error\n");
+		dolog(error, "write error\n");
 	send_lock.unlock();
+}
+
+void phys_ppp::send_rej(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options)
+{
+	DOLOG(debug, "ppp send rej for protocol %04x, identifier %02x\n", protocol, identifier);
+
+	send_Xcp(4, identifier, protocol, options);
+}
+
+void phys_ppp::send_ack(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options)
+{
+	DOLOG(debug, "ppp send ack for protocol %04x, identifier %02x\n", protocol, identifier);
+
+	send_Xcp(2, identifier, protocol, options);
+}
+
+void phys_ppp::send_nak(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options)
+{
+	DOLOG(debug, "ppp send nak for protocol %04x, identifier %02x\n", protocol, identifier);
+
+	send_Xcp(3, identifier, protocol, options);
 }
 
 bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
@@ -299,56 +321,23 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 
 			DOLOG(debug, "push IPCP IP addr (addr: %s)\n", opponent_address.to_str().c_str());
 
-			std::vector<uint8_t> out;
-			out.push_back(3);  // code for nak
-			out.push_back(1);  // identifier
-			size_t len_offset = out.size();
-			out.push_back(0);  // length
-			out.push_back(0);  // length
-
 			// IP-address
-			out.push_back(3);
-			out.push_back(6);
-			out.push_back(opponent_address[0]);
-			out.push_back(opponent_address[1]);
-			out.push_back(opponent_address[2]);
-			out.push_back(opponent_address[3]);
+			std::vector<uint8_t> nak;
+			nak.push_back(3);
+			nak.push_back(6);
+			nak.push_back(opponent_address[0]);
+			nak.push_back(opponent_address[1]);
+			nak.push_back(opponent_address[2]);
+			nak.push_back(opponent_address[3]);
 
-			out.at(len_offset) = out.size() >> 8;
-			out.at(len_offset + 1) = out.size() & 255;
-
-			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0x8021, ACCM_tx, false);
-
-			send_lock.lock();
-			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
-				printf("write error\n");
-			send_lock.unlock();
+			send_nak(0x8021, data.at(ipcp_offset + 1), nak);
 		}
 		else if (rej.empty() == false) {
 			send_rej(0x8021, data.at(ipcp_offset + 1), rej);
 		}
 		else if (ack.empty() == false) {
-			DOLOG(debug, "ppp send ack\n");
-			std::vector<uint8_t> out;
-			out.push_back(0x02);  // code for 'ack'
-			out.push_back(identifier);  // identifier
-			size_t len_offset = out.size();
-			out.push_back(0);  // length
-			out.push_back(0);  // length
-
-			std::copy(ack.begin(), ack.end(), std::back_inserter(ack));
-
-			out.at(len_offset) = out.size() >> 8;
-			out.at(len_offset + 1) = out.size() & 255;
-
-			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0x8021, ACCM_tx, false);
-
-			send_lock.lock();
-			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())  // TODO error checking, locking
-				printf("write error\n");
-			send_lock.unlock();
+			send_ack(0x8021, data.at(ipcp_offset + 1), ack);
 		}
-
 
 #if 0
 		if (!ipcp_options_acked) {
@@ -481,25 +470,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 		}
 		// ACK
 		else if (ack.empty() == false) {
-			DOLOG(debug, "ppp send ack\n");
-			std::vector<uint8_t> out;
-			out.push_back(0x02);  // code for 'ack'
-			out.push_back(identifier);  // identifier
-			size_t len_offset = out.size();
-			out.push_back(0);  // length
-			out.push_back(0);  // length
-
-			std::copy(ack.begin(), ack.end(), std::back_inserter(out));	
-
-			out.at(len_offset) = out.size() >> 8;
-			out.at(len_offset + 1) = out.size() & 255;
-
-			std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xc021, ACCM_tx, false);
-
-			send_lock.lock();
-			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())  // TODO error checking, locking
-				printf("write error\n");
-			send_lock.unlock();
+			send_ack(0xc021, identifier, ack);
 		}
 
 		// send request

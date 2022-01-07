@@ -30,7 +30,12 @@ private:
 	void handle_lcp(const std::vector<uint8_t> & data);
 	void handle_ccp(const std::vector<uint8_t> & data);
 	void handle_ipcp(const std::vector<uint8_t> & data);
+
+	void send_Xcp(const uint8_t code, const uint8_t identifier, const uint16_t protocol, const std::vector<uint8_t> & data);
 	void send_rej(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);
+	void send_ack(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);
+	void send_nak(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);
+
 	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool apply_compression);
 
 public:
