@@ -16,6 +16,18 @@ public:
 	virtual ~private_data() = default;
 };
 
+class socks_private_data : public private_data
+{
+private:
+	const int fd { -1 };
+
+public:
+	socks_private_data(const int fd) : fd(fd) { }
+	virtual ~socks_private_data() = default;
+
+	int get_fd() const { return fd; }
+};
+
 class http_private_data : public private_data
 {
 public:

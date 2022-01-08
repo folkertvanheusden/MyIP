@@ -25,7 +25,7 @@ std::optional<std::string> find_header(const std::vector<std::string> *const lin
 
 uint8_t * get_from_buffer(uint8_t **p, size_t *len, size_t get_len);
 
-typedef enum { debug, info, warning, error } log_level_t;
+typedef enum { debug, info, warning, ll_error } log_level_t;  // TODO ll_ prefix
 void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen);
 void setloguid(const int uid, const int gid);
 void closelog();
@@ -43,3 +43,5 @@ void run(const std::string & what);
 
 uint64_t MurmurHash64A(const void *const key, const int len, const uint64_t seed);
 std::string md5hex(const std::string & in);
+
+void error_exit(const bool se, const char *format, ...);

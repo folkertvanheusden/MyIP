@@ -93,14 +93,14 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 	SF_INFO sfinfo { 0 };
 	SNDFILE *fh = sf_open(sample.c_str(), SFM_READ, &sfinfo);
 	if (!fh) {
-		DOLOG(error, "SIP: \"%s\" cannot be opened\n", sample.c_str());
+		DOLOG(ll_error, "SIP: \"%s\" cannot be opened\n", sample.c_str());
 		exit(1);
 	}
 
 	samplerate = sfinfo.samplerate;
 
 	if (sfinfo.channels != 1) {
-		DOLOG(error, "SIP: \"%u\": should be mono sample (%s)\n", sfinfo.channels, sample.c_str());
+		DOLOG(ll_error, "SIP: \"%u\": should be mono sample (%s)\n", sfinfo.channels, sample.c_str());
 		sf_close(fh);
 		exit(1);
 	}
@@ -110,7 +110,7 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 
 	samples = new short[n_samples + (n_samples & 1)]();
 	if (sf_read_short(fh, samples, n_samples) != n_samples) {
-		DOLOG(error, "SIP: short read on \"%s\"\n", sample.c_str());
+		DOLOG(ll_error, "SIP: short read on \"%s\"\n", sample.c_str());
 		sf_close(fh);
 		exit(1);
 	}
@@ -465,7 +465,7 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 	else if (schema.name.substr(0, 5) == "speex")	// speex
 		sample_size = sizeof(uint8_t);
 	else {
-		DOLOG(error, "SIP: Invalid rtp payload schema %s/%d\n", schema.name.c_str(), schema.rate);
+		DOLOG(ll_error, "SIP: Invalid rtp payload schema %s/%d\n", schema.name.c_str(), schema.rate);
 		return { nullptr, 0 };
 	}
 
@@ -520,7 +520,7 @@ std::pair<uint8_t *, int> create_rtp_packet(const uint32_t ssrc, const uint16_t 
 		speex_bits_destroy(&spx.bits);
 
 		if (new_size > size) {
-			DOLOG(error, "SIP: speex decoded data too big (%ld > %ld)\n", new_size, size);
+			DOLOG(ll_error, "SIP: speex decoded data too big (%ld > %ld)\n", new_size, size);
 			delete [] rtp_packet;
 			return { nullptr, 0 };
 		}
@@ -648,7 +648,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 		}
 	}
 	else {
-		DOLOG(error, "SIP: cannot create %s (%s)\n", full_fname.c_str(), strerror(errno));
+		DOLOG(ll_error, "SIP: cannot create %s (%s)\n", full_fname.c_str(), strerror(errno));
 	}
 
 	u->add_handler(src_port, std::bind(&sip::input_recv, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), ss);

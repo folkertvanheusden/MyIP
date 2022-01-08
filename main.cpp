@@ -32,30 +32,7 @@
 #include "vnc.h"
 #include "mqtt.h"
 #include "utils.h"
-
-void error_exit(const bool se, const char *format, ...)
-{
-	int e = errno;
-	va_list ap;
-
-	va_start(ap, format);
-	char *temp = NULL;
-	if (vasprintf(&temp, format, ap) == -1)
-		puts(format);  // last resort
-	va_end(ap);
-
-	fprintf(stderr, "%s\n", temp);
-	DOLOG(error, "%s\n", temp);
-
-	if (se && e) {
-		fprintf(stderr, "errno: %d (%s)\n", e, strerror(e));
-		DOLOG(error, "errno: %d (%s)\n", e, strerror(e));
-	}
-
-	free(temp);
-
-	exit(EXIT_FAILURE);
-}
+#include "socks_proxy.h"
 
 void free_handler(const tcp_port_handler_t & tph)
 {
@@ -74,7 +51,7 @@ log_level_t parse_ll(const std::string & ll)
 		return warning;
 
 	if (ll == "error")
-		return error;
+		return ll_error;
 
 	fprintf(stderr, "Log-level \"%s\" not understood\n", ll.c_str());
 
@@ -221,7 +198,7 @@ int main(int argc, char *argv[])
 		std::string chdir_path = cfg_str(environment, "chdir-path", "directory to chdir to", true, "/tmp");
 
 		if (chdir(chdir_path.c_str()) == -1) {
-			DOLOG(error, "chdir: %s", strerror(errno));
+			DOLOG(ll_error, "chdir: %s", strerror(errno));
 			return 1;
 		}
 	}
@@ -234,6 +211,8 @@ int main(int argc, char *argv[])
 	/// network interfaces
 	const libconfig::Setting &interfaces = root["interfaces"];
 	size_t n_interfaces = interfaces.getLength();
+
+	socks_proxy *so { nullptr };
 
 	std::vector<phys *> devs;
 
@@ -280,10 +259,13 @@ int main(int argc, char *argv[])
 				error_exit(false, "internal error");
 			}
 		}
-		else
+		else {
 			error_exit(false, "\"%s\" is an unknown network interface type", type.c_str());
+		}
 
 		devs.push_back(dev);
+
+		tcp *ipv4_tcp { nullptr };
 
 		// ipv4
 		try {
@@ -320,6 +302,8 @@ int main(int argc, char *argv[])
 			if (use_tcp) {
 				tcp *t = new tcp(&s);
 				ipv4_instance->register_protocol(0x06, t);
+
+				ipv4_tcp = t;
 
 				ip_protocols.push_back(t);
 			}
@@ -387,16 +371,34 @@ int main(int argc, char *argv[])
 			// just fine
 		}
 
+		// socks proxy
+		try {
+			const libconfig::Setting & socks = interface.lookup("socks");
+
+			if (!ipv4_tcp)
+				error_exit(false, "socks requires a TCP layer");
+
+			std::string interface = cfg_str(socks, "interface", "address of interface to listen on", true, "0.0.0.0");
+			int port = cfg_int(socks, "port", "port to listen on", true, 1080);
+
+			printf("Starting socks listener on %s:%d\n", interface.c_str(), port);
+
+			so = new socks_proxy(interface, port, ipv4_tcp);
+		}
+		catch(const libconfig::SettingNotFoundException &nfex) {
+			// just fine
+		}
+
 		dev->start();
 	}
 
 	if (setgid(gid) == -1) {
-		DOLOG(error, "setgid: %s", strerror(errno));
+		DOLOG(ll_error, "setgid: %s", strerror(errno));
 		return 1;
 	}
 
 	if (setuid(uid) == -1) {
-		DOLOG(error, "setuid: %s", strerror(errno));
+		DOLOG(ll_error, "setuid: %s", strerror(errno));
 		return 1;
 	}
 
@@ -593,6 +595,8 @@ int main(int argc, char *argv[])
 
 	DOLOG(info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating\n");
+
+	delete so;
 
 	for(auto & a : applications)
 		delete a;

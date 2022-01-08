@@ -28,12 +28,12 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 phys_ethernet::phys_ethernet(stats *const s, const std::string & dev_name, const int uid, const int gid) : phys(s)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
-		DOLOG(error, "open /dev/net/tun: %s", strerror(errno));
+		DOLOG(ll_error, "open /dev/net/tun: %s", strerror(errno));
 		exit(1);
 	}
 
 	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
-		DOLOG(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+		DOLOG(ll_error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
 		exit(1);
 	}
 
@@ -45,23 +45,23 @@ phys_ethernet::phys_ethernet(stats *const s, const std::string & dev_name, const
 	set_ifr_name(&ifr_tap, dev_name);
 
 	if (ioctl(fd, TUNSETIFF, &ifr_tap) == -1) {
-		DOLOG(error, "ioctl TUNSETIFF: %s", strerror(errno));
+		DOLOG(ll_error, "ioctl TUNSETIFF: %s", strerror(errno));
 		exit(1);
 	}
 
 	// myip calcs checksums by itself
 	if (ioctl(fd, TUNSETNOCSUM, 1) == -1) {
-		DOLOG(error, "ioctl TUNSETNOCSUM: %s", strerror(errno));
+		DOLOG(ll_error, "ioctl TUNSETNOCSUM: %s", strerror(errno));
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETGROUP, gid) == -1) {
-		DOLOG(error, "ioctl TUNSETGROUP: %s", strerror(errno));
+		DOLOG(ll_error, "ioctl TUNSETGROUP: %s", strerror(errno));
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETOWNER, uid) == -1) {
-		DOLOG(error, "ioctl TUNSETOWNER: %s", strerror(errno));
+		DOLOG(ll_error, "ioctl TUNSETOWNER: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -98,10 +98,10 @@ bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & s
 	int rc = write(fd, out, out_size);
 
 	if (size_t(rc) != out_size) {
-		DOLOG(error, "phys_ethernet: problem sending packet (%d for %zu bytes)\n", rc, out_size);
+		DOLOG(ll_error, "phys_ethernet: problem sending packet (%d for %zu bytes)\n", rc, out_size);
 
 		if (rc == -1)
-			DOLOG(error, "phys_ethernet: %s\n", strerror(errno));
+			DOLOG(ll_error, "phys_ethernet: %s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -125,7 +125,7 @@ void phys_ethernet::operator()()
 			if (errno == EINTR)
 				continue;
 
-			DOLOG(error, "poll: %s", strerror(errno));
+			DOLOG(ll_error, "poll: %s", strerror(errno));
 			exit(1);
 		}
 

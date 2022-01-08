@@ -293,7 +293,7 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 		}
 
 		if (b_n) {
-			DOLOG(error, "VNC: BITS LEFT: %d\n", b_n);
+			DOLOG(ll_error, "VNC: BITS LEFT: %d\n", b_n);
 			stats_inc_counter(vpd->vnc_err);
 		}
 	}

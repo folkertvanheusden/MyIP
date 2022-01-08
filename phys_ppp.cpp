@@ -153,7 +153,7 @@ void phys_ppp::send_Xcp(const uint8_t code, const uint8_t identifier, const uint
 
 	send_lock.lock();
 	if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
-		DOLOG(error, "write error\n");
+		DOLOG(ll_error, "write error\n");
 	send_lock.unlock();
 }
 
@@ -190,10 +190,10 @@ bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 	send_lock.unlock();
 
 	if (size_t(rc) != ppp_frame.size()) {
-		DOLOG(error, "phys_ppp: problem sending packet (%d for %zu bytes)\n", rc, ppp_frame.size());
+		DOLOG(ll_error, "phys_ppp: problem sending packet (%d for %zu bytes)\n", rc, ppp_frame.size());
 
 		if (rc == -1)
-			DOLOG(error, "phys_ppp: %s\n", strerror(errno));
+			DOLOG(ll_error, "phys_ppp: %s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -650,7 +650,7 @@ void phys_ppp::operator()()
 			if (errno == EINTR)
 				continue;
 
-			DOLOG(error, "poll: %s", strerror(errno));
+			DOLOG(ll_error, "poll: %s", strerror(errno));
 			exit(1);
 		}
 

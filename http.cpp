@@ -184,7 +184,7 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 		fclose(fh);
 	}
 	else {
-		DOLOG(error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
+		DOLOG(ll_error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
 
 	ts->t->send_data(ts, (const uint8_t *)header.c_str(), header.size());

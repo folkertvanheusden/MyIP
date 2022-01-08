@@ -49,23 +49,23 @@ stats::stats(const int size) : size(size)
 {
 	fd = shm_open(shm_name, O_RDWR | O_CREAT, 0644);
 	if (fd == -1) {
-		DOLOG(error, "shm_open: %s", strerror(errno));
+		DOLOG(ll_error, "shm_open: %s", strerror(errno));
 		exit(1);
 	}
 
 	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
-		DOLOG(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+		DOLOG(ll_error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
 		exit(1);
 	}
 
 	if (ftruncate(fd, size) == -1) {
-		DOLOG(error, "truncate: %s", strerror(errno));
+		DOLOG(ll_error, "truncate: %s", strerror(errno));
 		exit(1);
 	}
 
 	p = (uint8_t *)mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED) {
-		DOLOG(error, "mmap: %s", strerror(errno));
+		DOLOG(ll_error, "mmap: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -106,7 +106,7 @@ void dump_tree(const std::map<std::string, oid_t> & tree)
 uint64_t * stats::register_stat(const std::string & name, const std::string & oid)
 {
 	if (len + 48 > size) {
-		DOLOG(error, "stats: shm is full\n");
+		DOLOG(ll_error, "stats: shm is full\n");
 		return nullptr;
 	}
 

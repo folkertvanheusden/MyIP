@@ -1,4 +1,4 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <atomic>
 #include <chrono>
@@ -158,6 +158,26 @@ void tcp::send_segment(tcp_session_t *const ts, const uint64_t session_id, const
 	ts->last_pkt = get_us();
 }
 
+std::optional<tcp_port_handler_t> tcp::get_lock_listener(const int dst_port, const uint64_t id)
+{
+	listeners_lock.lock();
+
+	auto cb_it = listeners.find(dst_port);
+
+	if (cb_it == listeners.end()) {
+		DOLOG(info, "TCP[%012" PRIx64 "]: no listener for that port\n", id);
+
+		return { };
+	}
+
+	return cb_it->second;
+}
+
+void tcp::release_listener_lock()
+{
+	listeners_lock.unlock();
+}
+
 void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag)
 {
 	set_thread_name("myip-pkt-handler");
@@ -190,8 +210,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	int header_size = (p[12] >> 4) * 4;
 
 	int win_size = (p[14] << 8) | p[15];
-
-	auto cb_it = listeners.find(dst_port);
 
 	auto src = pkt->get_src_addr();
 	uint64_t id = src.get_hash() ^ (uint64_t(src_port) << 31);
@@ -279,11 +297,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		fail = true;
 	}
 
-	if (cb_it == listeners.end()) {
-		DOLOG(info, "TCP[%012" PRIx64 "]: no listener for that port\n", id);
-		fail = true;
-	}
-
 	if (!fail) {
 		if (flag_syn) {
 			stats_inc_counter(tcp_syn);
@@ -308,10 +321,19 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				stats_inc_counter(tcp_succ_estab);
 
-				if (cb_it->second.new_session(cur_session, pkt, cb_it->second.pd) == false) {
-					DOLOG(debug, "TCP[%012" PRIx64 "]: session terminated by layer 7\n", id);
+				auto cb = get_lock_listener(dst_port, id);
+
+				if (cb.has_value()) {
+					if (cb.value().new_session(cur_session, pkt, cb.value().pd) == false) {
+						DOLOG(debug, "TCP[%012" PRIx64 "]: session terminated by layer 7\n", id);
+						fail = true;
+					}
+				}
+				else {
 					fail = true;
 				}
+
+				release_listener_lock();
 			}
 			else if (cur_session->state == tcp_last_ack) {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: received ACK: session is finished\n", id);
@@ -399,16 +421,25 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 //			std::string content = bin_to_text(data_start, data_len);
 //			DOLOG(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
 
-			try {
-				if (cb_it->second.new_data(cur_session, pkt, data_start, data_len, cb_it->second.pd) == false) {
-					DOLOG(error, "TCP[%012" PRIx64 "]: layer 7 indicated an error\n", id);
+			auto cb = get_lock_listener(dst_port, id);
+
+			if (cb.has_value()) {
+				try {
+					if (cb.value().new_data(cur_session, pkt, data_start, data_len, cb.value().pd) == false) {
+						DOLOG(ll_error, "TCP[%012" PRIx64 "]: layer 7 indicated an error\n", id);
+						fail = true;
+					}
+				}
+				catch(...) {
+					DOLOG(ll_error, "TCP[%012" PRIx64 "]: EXCEPTION IN new_data()\n", id);
 					fail = true;
 				}
 			}
-			catch(...) {
-				DOLOG(error, "TCP[%012" PRIx64 "]: EXCEPTION IN new_data()\n", id);
+			else {
 				fail = true;
 			}
+
+			release_listener_lock();
 
 			if (fail == false) {
 				cur_session->their_seq_nr += data_len;  // TODO handle missing segments
@@ -435,8 +466,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	}
 
 	if (fail) {
-		if (cb_it != listeners.end())
-			cb_it->second.session_closed_1(cur_session, cb_it->second.pd);
+		auto cb = get_lock_listener(dst_port, id);
+
+		if (cb.has_value())
+			cb.value().session_closed_1(cur_session, cb.value().pd);
+
+		release_listener_lock();
 
 		stats_inc_counter(tcp_errors);
 
@@ -465,10 +500,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			sessions_lock.unlock();
 
 			// call session_closed_2
-			auto cb_org_it = listeners.find(pointer->org_dst_port);
+			auto cb_org = get_lock_listener(pointer->org_dst_port, id);
 
-			if (cb_org_it != listeners.end())  // session not initiated here?
-				cb_org_it->second.session_closed_2(pointer, cb_org_it->second.pd);
+			if (cb_org.has_value())  // session not initiated here?
+				cb_org.value().session_closed_2(pointer, cb_org.value().pd);
+
+			release_listener_lock();
 
 			// clean-up
 			free_tcp_session(pointer);
@@ -510,12 +547,14 @@ void tcp::session_cleaner()
 					DOLOG(debug, "TCP[%012" PRIx64 "]: session timed out\n", it->first);
 
 				// call session_closed
-				auto cb_it = listeners.find(it->second->org_dst_port);
+				auto cb = get_lock_listener(it->second->org_dst_port, it->first);
 
-				if (cb_it != listeners.end()) {  // session not initiated here?
-					cb_it->second.session_closed_1(it->second, cb_it->second.pd);
-					cb_it->second.session_closed_2(it->second, cb_it->second.pd);
+				if (cb.has_value()) {  // session not initiated here?
+					cb.value().session_closed_1(it->second, cb.value().pd);
+					cb.value().session_closed_2(it->second, cb.value().pd);
 				}
+
+				release_listener_lock();
 
 				// clean-up
 				free_tcp_session(it->second);
@@ -647,7 +686,11 @@ void tcp::add_handler(const int port, tcp_port_handler_t & tph)
 	if (tph.init)
 		tph.init();
 
+	listeners_lock.lock();
+
 	listeners.insert({ port, tph });
+
+	listeners_lock.unlock();
 }
 
 void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len)
@@ -704,4 +747,110 @@ void tcp::end_session(tcp_session_t *const ts)
 
 		ts->fin_after_unacked_empty = true;
 	}
+}
+
+int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const any_addr & dst_addr, const int dst_port, private_data *const pd)
+{
+	tcp_port_handler_t handler { 0 };
+	handler.new_data = new_data;
+	handler.pd = pd;
+
+	// generate id/port mapping
+	uint64_t id = 0;
+	get_random((uint8_t *)&id, sizeof id);
+
+	uint16_t port = 0;
+
+	// lock all sesions
+	std::unique_lock<std::mutex> lck(sessions_lock);
+
+	// allocate free port
+	for(;;) {
+		get_random((uint8_t *)&port, sizeof port);
+
+		if (port > 0 && port < 65535 && tcp_clients.find(port) == tcp_clients.end())
+			break;
+	}
+
+	tcp_clients.insert({ id, port });
+
+	// generate tcp session
+	tcp_session_t *new_session = new tcp_session_t();
+	new_session->state = tcp_syn_sent;
+
+	get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
+	new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
+
+	new_session->initial_their_seq_nr = 0;
+	new_session->their_seq_nr = 0;
+
+	new_session->id = id;
+
+	new_session->unacked = nullptr;
+	new_session->unacked_start_seq_nr = 0;
+	new_session->unacked_size = 0;
+	new_session->fin_after_unacked_empty = false;
+
+	new_session->window_size = idev->get_max_packet_size();
+
+	new_session->org_src_addr = idev->get_addr();
+	new_session->org_src_port = port;
+
+	new_session->org_dst_addr = dst_addr;
+	new_session->org_dst_port = dst_port;
+
+	new_session->p = nullptr;
+	new_session->t = this;
+
+	stats_inc_counter(tcp_new_sessions);
+
+	// connect id to session data
+	sessions.insert({ id, new_session });
+
+	DOLOG(debug, "TCP[%012" PRIx64 "]: new_session, my seq nr: %u\n", id, new_session->initial_my_seq_nr);
+
+	// TODO: syn, syn ack, ack
+
+	return port;
+}
+
+void tcp::close_client_session(const int port)
+{
+	// lock all sessions
+	std::unique_lock<std::mutex> lck(sessions_lock);
+
+	// find id of the session
+	auto it_id = tcp_clients.find(port);
+	if (it_id == tcp_clients.end())
+		return;
+
+	// find session data
+	auto sd_it = sessions.find(it_id->second);
+	if (sd_it == sessions.end())
+		return;
+
+	// send FIN
+	sd_it->second->tlock.lock();
+	end_session(sd_it->second);
+	sd_it->second->tlock.unlock();
+
+	// forget client session
+	tcp_clients.erase(port);
+}
+
+void tcp::client_session_send_data(const int local_port, const uint8_t *const data, const size_t len)
+{
+	// lock all sessions
+	std::unique_lock<std::mutex> lck(sessions_lock);
+
+	// find id of the session
+	auto it_id = tcp_clients.find(local_port);
+	if (it_id == tcp_clients.end())
+		return;
+
+	auto sd_it = sessions.find(it_id->second);
+	if (sd_it == sessions.end())
+		return;
+
+	send_data(sd_it->second, data, len);
 }

@@ -67,6 +67,11 @@ typedef struct {
 	std::atomic_bool finished_flag;
 } tcp_packet_handle_thread_t;
 
+typedef struct {
+	uint64_t id;
+	int port;
+} tcp_client_t;
+
 class tcp : public ip_protocol
 {
 private:
@@ -75,7 +80,12 @@ private:
 	// the key is an 'internal id'
 	std::map<uint64_t, tcp_session_t *> sessions;
 
+	// listen port -> handler
+	std::mutex listeners_lock;
 	std::map<int, tcp_port_handler_t> listeners;
+
+	// client port -> session
+	std::map<int, uint64_t> tcp_clients;
 
 	uint64_t *tcp_packets { nullptr };
 	uint64_t *tcp_errors { nullptr };
@@ -96,6 +106,9 @@ private:
 	void session_cleaner();
 	void unacked_sender();
 
+	std::optional<tcp_port_handler_t> get_lock_listener(const int dst_port, const uint64_t id);
+	void release_listener_lock();
+
 public:
 	tcp(stats *const s);
 	virtual ~tcp();
@@ -104,6 +117,11 @@ public:
 
 	void send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len);
 	void end_session(tcp_session_t *const ts);
+
+	// returns a port number
+	int allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const any_addr & dst_addr, const int dst_port, private_data *const pd);
+	void client_session_send_data(const int local_port, const uint8_t *const data, const size_t len);
+	void close_client_session(const int port);
 
 	virtual void operator()() override;
 };

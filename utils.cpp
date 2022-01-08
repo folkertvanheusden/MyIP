@@ -75,7 +75,7 @@ void get_random(uint8_t *tgt, size_t n)
 {
 	int fd = open("/dev/urandom", O_RDONLY);
 	if (fd == -1) {
-		DOLOG(error, "open(\"/dev/urandom\"): %s", strerror(errno));
+		DOLOG(ll_error, "open(\"/dev/urandom\"): %s", strerror(errno));
 		exit(1);
 	}
 
@@ -86,7 +86,7 @@ void get_random(uint8_t *tgt, size_t n)
 			if (errno == EINTR)
 				continue;
 
-			DOLOG(error, "read(\"/dev/urandom\"): %s", strerror(errno));
+			DOLOG(ll_error, "read(\"/dev/urandom\"): %s", strerror(errno));
 			exit(1);
 		}
 
@@ -366,7 +366,7 @@ void run(const std::string & what)
 		exit(system(what.c_str()));
 
 	else if (pid == -1)
-		DOLOG(error, "Failed invoking \"%s\"", what.c_str());
+		DOLOG(ll_error, "Failed invoking \"%s\"", what.c_str());
 }
 
 uint64_t MurmurHash64A(const void *const key, const int len, const uint64_t seed)
@@ -410,3 +410,26 @@ uint64_t MurmurHash64A(const void *const key, const int len, const uint64_t seed
 	return h;
 }
 
+void error_exit(const bool se, const char *format, ...)
+{
+	int e = errno;
+	va_list ap;
+
+	va_start(ap, format);
+	char *temp = NULL;
+	if (vasprintf(&temp, format, ap) == -1)
+		puts(format);  // last resort
+	va_end(ap);
+
+	fprintf(stderr, "%s\n", temp);
+	DOLOG(ll_error, "%s\n", temp);
+
+	if (se && e) {
+		fprintf(stderr, "errno: %d (%s)\n", e, strerror(e));
+		DOLOG(ll_error, "errno: %d (%s)\n", e, strerror(e));
+	}
+
+	free(temp);
+
+	exit(EXIT_FAILURE);
+}

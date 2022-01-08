@@ -21,18 +21,18 @@ phys_slip::phys_slip(stats *const s, const std::string & dev_name, const int bps
 	assert(my_mac.get_len() == 6);
 
 	if ((fd = open(dev_name.c_str(), O_RDWR)) == -1) {
-		DOLOG(error, "open %s: %s", dev_name.c_str(), strerror(errno));
+		DOLOG(ll_error, "open %s: %s", dev_name.c_str(), strerror(errno));
 		exit(1);
 	}
 
 	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
-		DOLOG(error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
+		DOLOG(ll_error, "fcntl(FD_CLOEXEC): %s", strerror(errno));
 		exit(1);
 	}
 
         struct termios tty;
         if (tcgetattr(fd, &tty) != 0) {
-		DOLOG(error, "tcgetattr: %s", strerror(errno));
+		DOLOG(ll_error, "tcgetattr: %s", strerror(errno));
 		exit(1);
         }
 
@@ -56,7 +56,7 @@ phys_slip::phys_slip(stats *const s, const std::string & dev_name, const int bps
         tty.c_cflag &= ~CRTSCTS;
 
         if (tcsetattr(fd, TCSANOW, &tty) != 0) {
-		DOLOG(error, "tcsetattr: %s", strerror(errno));
+		DOLOG(ll_error, "tcsetattr: %s", strerror(errno));
 		exit(1);
         }
 }
@@ -102,10 +102,10 @@ bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	int rc = write(fd, out, out_o);
 
 	if (size_t(rc) != out_o) {
-		DOLOG(error, "phys_slip: problem sending packet (%d for %zu bytes)\n", rc, out_o);
+		DOLOG(ll_error, "phys_slip: problem sending packet (%d for %zu bytes)\n", rc, out_o);
 
 		if (rc == -1)
-			DOLOG(error, "phys_slip: %s\n", strerror(errno));
+			DOLOG(ll_error, "phys_slip: %s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -131,7 +131,7 @@ void phys_slip::operator()()
 			if (errno == EINTR)
 				continue;
 
-			DOLOG(error, "poll: %s", strerror(errno));
+			DOLOG(ll_error, "poll: %s", strerror(errno));
 			exit(1);
 		}
 
