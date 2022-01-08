@@ -19,6 +19,7 @@ private:
 	bool ac_field_compression { false };
 	bool lcp_options_acked { false };
 	bool ipcp_options_acked { false };
+	bool ipv6cp_options_acked { false };
 	uint32_t magic { 0x1234abcd };
 	std::vector<uint8_t> ACCM_tx, ACCM_rx;
 	const any_addr opponent_address;
@@ -30,6 +31,7 @@ private:
 	void handle_lcp(const std::vector<uint8_t> & data);
 	void handle_ccp(const std::vector<uint8_t> & data);
 	void handle_ipcp(const std::vector<uint8_t> & data);
+	void handle_ipv6cp(const std::vector<uint8_t> & data);
 
 	void send_Xcp(const uint8_t code, const uint8_t identifier, const uint16_t protocol, const std::vector<uint8_t> & data);
 	void send_rej(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);

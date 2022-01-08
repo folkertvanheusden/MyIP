@@ -385,6 +385,67 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 	}
 }
 
+void phys_ppp::handle_ipv6cp(const std::vector<uint8_t> & data)
+{
+	size_t ipv6cp_offset = 4;
+
+	const uint8_t code = data.at(ipv6cp_offset + 0);
+	const uint8_t identifier = data.at(ipv6cp_offset + 1);
+
+	DOLOG(debug, "IPV6CP:\n");
+	DOLOG(debug, "\tcode: %02x\n", code);
+	DOLOG(debug, "\tidentifier: %02x\n", identifier);
+
+	uint16_t length = (data.at(ipv6cp_offset + 2) << 8) | data.at(ipv6cp_offset + 3);
+	DOLOG(debug, "\tlength: %d\n", length);
+
+	if (data.size() < 4 + length) {
+		DOLOG(debug, "\tINVALID SIZE %zu < %d\n", data.size(), 4 + 8 + length);
+		return;
+	}
+
+	if (code == 0x01) {  // options
+		std::vector<uint8_t> ack, rej;
+
+		bool send_nak_with_new_address = false;
+
+		DOLOG(debug, "\tOPTIONS:\n");
+
+		size_t options_offset = ipv6cp_offset + 4;
+
+		while(options_offset < data.size() - 2) {
+			size_t next_offset = options_offset;
+			uint8_t type = data.at(options_offset++);
+			uint8_t len = data.at(options_offset++);
+
+			DOLOG(debug, "\t\toption: %02x of %d bytes\n", type, len);
+
+			if (data.size() - next_offset < len) {
+				DOLOG(debug, "len: %d, got: %zu\n", len, data.size() - options_offset);
+				break;
+			}
+
+			if (type == 0xff) {  // IP address
+			}
+			else {
+				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
+				DOLOG(debug, "\t\tunknown option %02x: %s\n", type, bin_to_text(data.data() + next_offset, len).c_str());
+			}
+		}
+
+		// REJ
+		if (rej.empty() == false) {
+			send_rej(0x8057, data.at(ipv6cp_offset + 1), rej);
+		}
+		else if (ack.empty() == false) {
+			send_ack(0x8057, data.at(ipv6cp_offset + 1), ack);
+		}
+	}
+	else if (code == 0x02) {  // options ack
+		ipv6cp_options_acked = true;
+	}
+}
+
 void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 {
 	size_t lcp_offset = 4;
@@ -653,6 +714,9 @@ void phys_ppp::operator()()
 				}
 				else if (protocol == 0x8021) {  // IPCP
 					handle_ipcp(packet_buffer);
+				}
+				else if (protocol == 0x8057) {  // IPV6CP
+					handle_ipv6cp(packet_buffer);
 				}
 				else if (protocol == 0x80fd) {  // CCP
 					handle_ccp(packet_buffer);
