@@ -350,7 +350,7 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 				out.push_back(0);  // length
 
 				// IP-address
-				out.push_back(2);
+				out.push_back(3);
 				out.push_back(6);
 				out.push_back(a[0]);
 				out.push_back(a[1]);
