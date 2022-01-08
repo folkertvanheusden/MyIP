@@ -184,7 +184,6 @@ void phys_ppp::send_nak(const uint16_t protocol, const uint8_t identifier, const
 
 bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	return true;  // TODO FIXME
 	std::vector temp(payload, &payload[pl_size]);
 	std::vector<uint8_t> ppp_frame = wrap_in_ppp_frame(temp, 0x0021 /* IP */, ACCM_tx, true);
 
@@ -246,6 +245,8 @@ void phys_ppp::handle_ccp(const std::vector<uint8_t> & data)
 
 			std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
 			DOLOG(debug, "\t\tunknown option %02x\n", type);
+
+			options_offset = next_offset + len;
 		}
 
 		// REJ
@@ -313,6 +314,8 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
 				DOLOG(debug, "\t\tunknown option %02x: %s\n", type, bin_to_text(data.data() + next_offset, len).c_str());
 			}
+
+			options_offset = next_offset + len;
 		}
 
 		// REJ
@@ -339,7 +342,6 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 			send_ack(0x8021, data.at(ipcp_offset + 1), ack);
 		}
 
-#if 0
 		if (!ipcp_options_acked) {
 			auto it = prot_map.find(0x800);  // assuming IPv4
 			if (it == prot_map.end())
@@ -349,9 +351,7 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 				assert(a.get_len() == 4);
 
 				DOLOG(debug, "sending IPCP options (addr: %s)\n", a.to_str().c_str());
-// ff 03 80 21
-// code 04 0f
-// 00 0a 03 06 00 00 00 00 4f
+
 				std::vector<uint8_t> out;
 				out.push_back(0x01);  // code for 'request'
 				out.push_back(1);  // identifier
@@ -378,7 +378,6 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 				send_lock.unlock();
 			}
 		}
-#endif
 	}
 	else if (code == 0x02) {  // options ack
 		ipcp_options_acked = true;
@@ -431,6 +430,8 @@ void phys_ppp::handle_ipv6cp(const std::vector<uint8_t> & data)
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
 				DOLOG(debug, "\t\tunknown option %02x: %s\n", type, bin_to_text(data.data() + next_offset, len).c_str());
 			}
+
+			options_offset = next_offset + len;
 		}
 
 		// REJ
