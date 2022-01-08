@@ -1,5 +1,6 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
+#include <assert.h>
 #include <map>
 #include <shared_mutex>
 
@@ -24,6 +25,8 @@ private:
 public:
 	ndp(stats *const s);
 	virtual ~ndp();
+
+	any_addr get_addr() const override { assert(false); return any_addr(); }
 
 	void add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip);
 
