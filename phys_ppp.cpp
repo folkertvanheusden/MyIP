@@ -251,6 +251,8 @@ void phys_ppp::handle_ccp(const std::vector<uint8_t> & data)
 		// REJ
 		if (rej.empty() == false)
 			send_rej(0x80fd, data.at(ccp_offset + 1), rej);
+		else
+			send_ack(0x80fd, data.at(ccp_offset + 1), ack);
 	}
 }
 
@@ -300,14 +302,12 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 				if (theirs == opponent_address) {
 					dolog(debug, "phys_ppp: acking IP address %s\n", theirs.to_str().c_str());
 
-					std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
+					std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));
 				}
 				else {
+					dolog(debug, "phys_ppp: send NAK with address %s\n", opponent_address.to_str().c_str());
 					send_nak_with_new_address = true;
 				}
-			}
-			else if (type == 0xff) {
-				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
 			else {
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
