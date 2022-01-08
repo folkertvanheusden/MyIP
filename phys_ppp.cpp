@@ -78,16 +78,12 @@ std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & pa
 	std::vector<uint8_t> out;
 	out.push_back(0x7e);  // flag
 
-	printf("%s\n", bin_to_text(temp.data(), temp.size()).c_str());
-
 	uint16_t fcs = 0xFFFF;
 
 	for(int i = 0; i < temp.size(); i++)
 		fcs = (fcs >> 8) ^ fcstab[(fcs ^ temp.at(i)) & 0xff];
 
 	fcs ^= 0xFFFF;
-
-	printf("%04x\n", fcs);
 
 	temp.push_back(fcs);
 	temp.push_back(fcs >> 8);
@@ -364,7 +360,7 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 
 				send_lock.lock();
 				if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
-					printf("write error\n");
+					DOLOG(info, "write error\n");
 				send_lock.unlock();
 			}
 		}
@@ -579,7 +575,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 
 			send_lock.lock();
 			if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
-				printf("write error\n");
+				DOLOG(info, "write error\n");
 			send_lock.unlock();
 		}
 	}
@@ -605,7 +601,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 
 		send_lock.lock();
 		if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
-			printf("write error\n");
+			DOLOG(info, "write error\n");
 		send_lock.unlock();
 		
 	}
@@ -632,7 +628,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 
 		send_lock.lock();
 		if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
-			printf("write error\n");
+			DOLOG(info, "write error\n");
 		send_lock.unlock();
 	}
 }
@@ -668,9 +664,6 @@ void phys_ppp::operator()()
 		if (size == -1)
 			continue;
 
-		// fprintf(stderr, "%02x[%c] ", buffer, buffer > 31 ? buffer : '.');
-		// fflush(stderr);
-
 		if (buffer == 0x7e) {
 			if (packet_buffer.empty() == false) {  // START/END of packet
 				packet_buffer = unwrap_ppp_frame(packet_buffer, ACCM_rx);
@@ -681,7 +674,7 @@ void phys_ppp::operator()()
 				}
 
 				if ((packet_buffer.at(2) & 1) == 1 && protocol_compression)
-					packet_buffer.insert(packet_buffer.begin()+1, 0x00);
+					packet_buffer.insert(packet_buffer.begin()+2, 0x00);
 
 				uint16_t protocol = (packet_buffer.at(2) << 8) | packet_buffer.at(3);
 
@@ -690,10 +683,6 @@ void phys_ppp::operator()()
 				DOLOG(debug, "protocol: %04x\n", protocol);
 
 				DOLOG(debug, "size: %zu\n", packet_buffer.size());
-
-				for(size_t i=4; i<packet_buffer.size() - 2; i++)
-					printf("%02x ", packet_buffer.at(i));
-				printf("\n");
 
 				if (protocol == 0x0021) {  // IP
 					stats_inc_counter(phys_recv_frame);
@@ -744,18 +733,18 @@ void phys_ppp::operator()()
 					modem += (char)buffer;
 
 					if (modem.find("ATDT") != std::string::npos) {
-						printf("ATDT -> CONNECT (%s)\n", modem.c_str());
+						DOLOG(debug, "ATDT -> CONNECT (%s)\n", modem.c_str());
 						write(fd, "CONNECT\r\n", 9);
 						modem.clear();
 					}
 					else if (modem.find("AT") != std::string::npos) {
-						printf("AT -> OK (%s)\n", modem.c_str());
+						DOLOG(debug, "AT -> OK (%s)\n", modem.c_str());
 						write(fd, "OK\r\n", 4);
 						modem.clear();
 					}
 					else if (modem.find("CLIENT") != std::string::npos) {
 						// Windows XP direction PPP connection
-						printf("CLIENT -> SERVER\n");
+						DOLOG(debug, "CLIENT -> SERVER\n");
 						write(fd, "SERVER\r\n", 7);
 						modem.clear();
 					}
