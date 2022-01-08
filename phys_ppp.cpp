@@ -56,7 +56,7 @@ void phys_ppp::start()
 	th = new std::thread(std::ref(*this));
 }
 
-std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool not_ppp_meta)
+std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> & ACCM, const bool not_ppp_meta)
 {
 	std::vector<uint8_t> temp;
 
@@ -105,7 +105,7 @@ std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & pa
 	return out;
 }
 
-std::vector<uint8_t> unwrap_ppp_frame(const std::vector<uint8_t> & payload, const std::vector<uint8_t> ACCM)
+std::vector<uint8_t> unwrap_ppp_frame(const std::vector<uint8_t> & payload, const std::vector<uint8_t> & ACCM)
 {
 	std::vector<uint8_t> out;
 
@@ -408,8 +408,6 @@ void phys_ppp::handle_ipv6cp(const std::vector<uint8_t> & data)
 
 	if (code == 0x01) {  // options
 		std::vector<uint8_t> ack, rej;
-
-		bool send_nak_with_new_address = false;
 
 		size_t options_offset = ipv6cp_offset + 4;
 
