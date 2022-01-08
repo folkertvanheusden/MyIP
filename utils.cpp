@@ -252,7 +252,7 @@ std::string bin_to_text(const uint8_t *p, const size_t len)
 
 	for(size_t i=0; i<len; i++)
 		// snprintf(&temp[i * 6], 7, "%c[%02x] ", p[i] > 32 && p[i] < 127 ? p[i] : '.', p[i]);
-		snprintf(&temp[i * 3], 7, "%02x ", p[i]);
+		snprintf(&temp[i * 3], 7, "%s%02x", i ? " " : "", p[i]);
 
 	std::string out = temp;
 
