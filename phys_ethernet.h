@@ -20,7 +20,7 @@ public:
 	phys_ethernet(const phys_ethernet &) = delete;
 	virtual ~phys_ethernet();
 
-	bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size);
+	bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size) override;
 
-	void operator()();
+	void operator()() override;
 };

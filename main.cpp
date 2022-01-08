@@ -13,6 +13,7 @@
 #include "stats.h"
 #include "phys_ethernet.h"
 #include "phys_slip.h"
+#include "phys_ppp.h"
 #include "arp.h"
 #include "ipv4.h"
 #include "ipv6.h"
@@ -239,7 +240,7 @@ int main(int argc, char *argv[])
 	for(size_t i=0; i<n_interfaces; i++) {
 		const libconfig::Setting &interface = interfaces[i];
 
-		std::string type = cfg_str(interface, "type", "network interface type (e.g. \"ethernet\" or \"slip\")", true, "ethernet");
+		std::string type = cfg_str(interface, "type", "network interface type (e.g. \"ethernet\", \"ppp\" or \"slip\")", true, "ethernet");
 
 		std::string mac = cfg_str(interface, "mac-address", "MAC address", true, "52:34:84:16:44:22");
 		any_addr my_mac = parse_address(mac.c_str(), 6, ":", 16);
@@ -253,7 +254,7 @@ int main(int argc, char *argv[])
 
 			dev = new phys_ethernet(&s, dev_name, uid, gid);
 		}
-		else if (type == "slip") {
+		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
 
 			int baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
@@ -265,7 +266,19 @@ int main(int argc, char *argv[])
 			else
 				error_exit(false, "\"%d\" cannot be configured", baudrate);
 
-			dev = new phys_slip(&s, dev_name, bps_setting, my_mac);
+			if (type == "slip")
+				dev = new phys_slip(&s, dev_name, bps_setting, my_mac);
+			else if (type == "ppp") {
+				bool emulate_modem_xp = cfg_bool(interface, "emulate-modem-xp", "emulate AT-set modem / XP direct link", true, false);
+
+				std::string oa_str = cfg_str(interface, "opponent-address", "opponent IPv4 address", false, "192.168.3.2");
+				any_addr opponent_address = parse_address(oa_str.c_str(), 4, ".", 10);
+
+				dev = new phys_ppp(&s, dev_name, bps_setting, my_mac, emulate_modem_xp, opponent_address);
+			}
+			else {
+				error_exit(false, "internal error");
+			}
 		}
 		else
 			error_exit(false, "\"%s\" is an unknown network interface type", type.c_str());
@@ -373,6 +386,8 @@ int main(int argc, char *argv[])
 		catch(const libconfig::SettingNotFoundException &nfex) {
 			// just fine
 		}
+
+		dev->start();
 	}
 
 	if (setgid(gid) == -1) {

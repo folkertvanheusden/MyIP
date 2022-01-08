@@ -161,7 +161,7 @@ void phys_ethernet::operator()()
 
 		DOLOG(debug, "phys_ethernet: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
-		packet *p = new packet(ts, src_mac, any_addr(&buffer[6], 6), any_addr(&buffer[0], 6), &buffer[14], size - 14, &buffer[0], 14);
+		packet *p = new packet(ts, src_mac, src_mac, dst_mac, &buffer[14], size - 14, &buffer[0], 14);
 
 		it->second->queue_packet(this, p);
 	}

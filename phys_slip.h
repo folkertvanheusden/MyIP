@@ -13,7 +13,7 @@
 
 class phys_slip : public phys
 {
-private:
+protected:
 	const any_addr my_mac;
 	int fd { -1 };
 
@@ -22,7 +22,9 @@ public:
 	phys_slip(const phys_slip &) = delete;
 	virtual ~phys_slip();
 
-	bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size);
+	virtual void start() override;
 
-	void operator()();
+	virtual bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size) override;
+
+	virtual void operator()() override;
 };

@@ -34,6 +34,10 @@ phys::~phys()
 	delete th;
 }
 
+void phys::start()
+{
+}
+
 void phys::stop()
 {
 	stop_flag = true;

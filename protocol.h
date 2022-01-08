@@ -32,6 +32,8 @@ public:
 	protocol(stats *const s, const std::string & stats_name);
 	virtual ~protocol();
 
+	virtual any_addr get_addr() const = 0;
+
 	void register_default_phys(phys *const p) { default_pdev = p; }
 
 	void register_protocol(const uint8_t protocol, ip_protocol *const p);
