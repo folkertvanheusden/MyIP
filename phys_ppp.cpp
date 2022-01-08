@@ -523,6 +523,29 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 	else if (code == 0x02) {  // options ack
 		lcp_options_acked = true;
 	}
+	else if (code == 0x09) {  // echo request
+		DOLOG(debug, "\techo request: %s\n", std::string((const char *)(data.data() + lcp_offset + 8), length - 8).c_str());
+
+		DOLOG(debug, "send 0x09 LCP reply\n");
+
+		std::vector<uint8_t> out;
+		out.push_back(10);  // code
+		out.push_back(data.at(lcp_offset + 1));  // identifier
+		out.push_back(0x00);  // length
+		out.push_back(8);  // length
+		out.push_back(magic >> 24);
+		out.push_back(magic >> 16);
+		out.push_back(magic >>  8);
+		out.push_back(magic);
+
+		std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, 0xC021, ACCM_tx, false);
+
+		send_lock.lock();
+		if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
+			printf("write error\n");
+		send_lock.unlock();
+		
+	}
 	else if (code == 0x0c) {  // identifier (12)
 		DOLOG(debug, "\tmessage: %s\n", std::string((const char *)(data.data() + lcp_offset + 8), length - 8).c_str());
 
