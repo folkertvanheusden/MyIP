@@ -36,7 +36,7 @@ private:
 	void send_ack(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);
 	void send_nak(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);
 
-	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool apply_compression);
+	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool not_ppp_meta);
 
 public:
 	phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp, const any_addr & opponent_address);

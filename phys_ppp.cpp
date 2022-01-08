@@ -56,16 +56,16 @@ void phys_ppp::start()
 	th = new std::thread(std::ref(*this));
 }
 
-std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool apply_compression)
+std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> ACCM, const bool not_ppp_meta)
 {
 	std::vector<uint8_t> temp;
 
-	if (!ac_field_compression || !apply_compression) {
+	if (!ac_field_compression || !not_ppp_meta) {
 		temp.push_back(0xff);  // standard broadcast address
 		temp.push_back(0x03);  // unnumbered data
 	}
 
-	if (protocol_compression && protocol < 0x0100 && apply_compression)
+	if (protocol_compression && protocol < 0x0100 && not_ppp_meta)
 		temp.push_back(protocol);
 	else {
 		temp.push_back(protocol >> 8);
@@ -78,14 +78,16 @@ std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & pa
 	std::vector<uint8_t> out;
 	out.push_back(0x7e);  // flag
 
+	printf("%s\n", bin_to_text(temp.data(), temp.size()).c_str());
+
 	uint16_t fcs = 0xFFFF;
 
-	for(int i = 0; i < temp.size(); i++) {
-		int index = uint8_t((fcs ^ temp.at(i)) & 0xff);
-		fcs = uint16_t((fcs >> 8) ^ fcstab[index]);
-	}
+	for(int i = 0; i < temp.size(); i++)
+		fcs = (fcs >> 8) ^ fcstab[(fcs ^ temp.at(i)) & 0xff];
 
 	fcs ^= 0xFFFF;
+
+	printf("%04x\n", fcs);
 
 	temp.push_back(fcs);
 	temp.push_back(fcs >> 8);
@@ -93,7 +95,7 @@ std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & pa
 	for(size_t i=0; i<temp.size(); i++) {
 		uint8_t b = temp.at(i);
 
-		if (b == 0x7d || b == 0x7e || (ACCM.at(b >> 3) & (1 << (b & 7)))) {
+		if (b == 0x7d || b == 0x7e || (ACCM.at(b >> 3) & (1 << (b & 7))) || (b < 0x20 && !not_ppp_meta)) {
 			out.push_back(0x7d);
 			out.push_back(b ^ 0x20);
 		}
