@@ -183,6 +183,15 @@ uint64_t hash_address(const any_addr & a, const int local_port, const int peer_p
 	return a.get_hash() ^ (uint64_t(local_port) << 32) ^ (uint64_t(peer_port) << 48);
 }
 
+void tcp::set_state(tcp_session_t *const session, const tcp_state_t new_state)
+{
+	DOLOG(debug, "TCP[%012" PRIx64 "]: changing state from %s to %s\n", session->id, states[session->state], states[new_state]);
+
+	session->state = new_state;
+
+	session->state_changed.notify_all();
+}
+
 void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag)
 {
 	set_thread_name("myip-pkt-handler");
@@ -312,7 +321,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				// send SYN + ACK
 				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_SYN | FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 
-				cur_session->state = tcp_syn_rcvd;
+				set_state(cur_session, tcp_syn_rcvd);
 			}
 			else if (cur_session->state != tcp_syn_sent) { // not a client?
 				DOLOG(debug, "TCP[%012" PRIx64 "]: unexpected SYN\n", id);
@@ -329,12 +338,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				cur_session->my_seq_nr += 1;
 
-				cur_session->state = tcp_established;
+				set_state(cur_session, tcp_established);
 			}
 			// listener (server)
 			else if (cur_session->state == tcp_syn_rcvd) {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: received ACK: session is established\n", id);
-				cur_session->state = tcp_established;
+				set_state(cur_session, tcp_established);
 
 				stats_inc_counter(tcp_succ_estab);
 
@@ -354,7 +363,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			}
 			else if (cur_session->state == tcp_last_ack) {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: received ACK: session is finished\n", id);
-				cur_session->state = tcp_listen;  // tcp_closed really
+				set_state(cur_session, tcp_listen);  // tcp_closed really
 				delete_entry = true;
 			}
 			// opponent acknowledges the reception of a bit of data
@@ -387,7 +396,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 						send_segment(cur_session, cur_session->id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) | (1 << 0) /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 
-						cur_session->state = tcp_fin_wait_1;
+						set_state(cur_session, tcp_fin_wait_1);
 					}
 				}
 
@@ -403,7 +412,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		if (flag_rst) {
 			if (cur_session->state == tcp_syn_rcvd) {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: received RST: session setup aborted\n", id);
-				cur_session->state = tcp_listen;
+				set_state(cur_session, tcp_listen);
 				delete_entry = true;
 			}		
 			else {
@@ -414,12 +423,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		if (flag_fin) {
 			if (cur_session->state == tcp_established) {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: received FIN: send ACK + FIN\n", id);
-				cur_session->state = tcp_close_wait;
+				set_state(cur_session, tcp_close_wait);
 				// send ACK + FIN
 				cur_session->their_seq_nr++;
 				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 
-				cur_session->state = tcp_last_ack;
+				set_state(cur_session, tcp_last_ack);
 			}
 			else {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: unexpected FIN\n", id);
@@ -757,7 +766,7 @@ void tcp::end_session(tcp_session_t *const ts)
 
 		send_segment(ts, ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
 
-		ts->state = tcp_fin_wait_1;
+		set_state(ts, tcp_fin_wait_1);
 	}
 	else {
 		DOLOG(debug, "TCP[%012" PRIx64 "]: schedule end session, after %ld bytes\n", ts->id, ts->unacked_size);
@@ -889,5 +898,19 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 
 	dolog(debug, "client_session_send_data: found session-data, send_data\n");
 
+	dolog(debug, "client STATE IS %s\n", states[sd_it->second->state]);
+	while(sd_it->second->state < tcp_established && !stop_flag) {
+		sd_it->second->state_changed.wait_for(lck, 100ms);
+		dolog(debug, "client STATE IS %s\n", states[sd_it->second->state]);
+	}
+
+	sd_it = sessions.find(it_id->second);
+	if (sd_it == sessions.end()) {
+		dolog(debug, "client_session_send_data: session ended before we could send data\n");
+		return;
+	}
+
 	send_data(sd_it->second, data, len);
+
+	dolog(debug, "client_session_send_data: found session-data, data sent\n");
 }

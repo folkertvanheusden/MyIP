@@ -155,6 +155,8 @@ bool socks_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, s
 {
 	int fd = dynamic_cast<socks_private_data *>(pd)->get_fd();
 
+	dolog(debug, "socks_new_data for fd %d (%s)\n", fd, std::string((const char *)data, data_len).c_str());
+
 	return WRITE(fd, data, data_len) != ssize_t(data_len);
 }
 
@@ -212,7 +214,7 @@ static void socks_handler(const int fd, tcp *const t)
 	DOLOG(debug, "socks_handler: allocate client session\n");
 	int src_port = t->allocate_client_session(socks_new_data, dest, port, &spd);
 
-	DOLOG(debug, "socks_handler: client session allocated, local port: %d\n", src_port);
+	DOLOG(debug, "socks_handler: client session allocated, local port: %d, fd: %d\n", src_port, fd);
 
 	for(;;) {
 		uint8_t buffer[512];

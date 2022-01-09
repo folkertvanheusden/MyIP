@@ -38,6 +38,7 @@ typedef struct {
 	uint16_t window_size;
 
 	tcp_state_t state;
+	std::condition_variable state_changed;
 	uint64_t last_pkt;
 	uint32_t my_seq_nr, their_seq_nr;
 	uint32_t initial_my_seq_nr, initial_their_seq_nr;
@@ -105,6 +106,8 @@ private:
 	void cleanup_session_helper(std::map<uint64_t, tcp_session_t *>::iterator *it);
 	void session_cleaner();
 	void unacked_sender();
+
+	void set_state(tcp_session_t *const session, const tcp_state_t new_state);
 
 	std::optional<tcp_port_handler_t> get_lock_listener(const int dst_port, const uint64_t id);
 	void release_listener_lock();
