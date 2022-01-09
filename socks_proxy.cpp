@@ -209,7 +209,10 @@ static void socks_handler(const int fd, tcp *const t)
 
 	socks_private_data spd(fd);
 
+	DOLOG(debug, "socks_handler: allocate client session\n");
 	int src_port = t->allocate_client_session(socks_new_data, dest, port, &spd);
+
+	DOLOG(debug, "socks_handler: client session allocated, local port: %d\n", src_port);
 
 	for(;;) {
 		uint8_t buffer[512];
@@ -224,6 +227,8 @@ static void socks_handler(const int fd, tcp *const t)
 			DOLOG(debug, "socks_handler: error (%s)\n", strerror(errno));
 			break;
 		}
+
+		dolog(debug, "%s\n", std::string((char *)buffer, n).c_str());
 
 		t->client_session_send_data(src_port, buffer, n);
 	}
@@ -245,7 +250,7 @@ void socks_proxy::operator()()
 
                 int cfd = accept(fd, nullptr, nullptr);
 		if (cfd == -1) {
-			DOLOG(info, "accept for socks-proxy failed");
+			DOLOG(info, "accept for socks-proxy failed\n");
 			continue;
 		}
 

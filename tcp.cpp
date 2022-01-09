@@ -178,6 +178,11 @@ void tcp::release_listener_lock()
 	listeners_lock.unlock();
 }
 
+uint64_t hash_address(const any_addr & a, const int local_port, const int peer_port)
+{
+	return a.get_hash() ^ (uint64_t(local_port) << 32) ^ (uint64_t(peer_port) << 48);
+}
+
 void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag)
 {
 	set_thread_name("myip-pkt-handler");
@@ -212,7 +217,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	int win_size = (p[14] << 8) | p[15];
 
 	auto src = pkt->get_src_addr();
-	uint64_t id = src.get_hash() ^ (uint64_t(src_port) << 31);
+	uint64_t id = hash_address(src, dst_port, src_port);
 
 	char *flag_str = flags_to_str(p[13]);
 	DOLOG(debug, "TCP[%012" PRIx64 "]: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
@@ -309,13 +314,25 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				cur_session->state = tcp_syn_rcvd;
 			}
-			else {
+			else if (cur_session->state != tcp_syn_sent) { // not a client?
 				DOLOG(debug, "TCP[%012" PRIx64 "]: unexpected SYN\n", id);
 			}
 		}
 
 		if (flag_ack) {
-			if (cur_session->state == tcp_syn_rcvd) {
+			if (cur_session->state == tcp_syn_sent) { // new session from a client
+				DOLOG(debug, "TCP[%012" PRIx64 "]: received ACK%s: session established\n", id, flag_syn ? " and SYN" : "");
+
+				cur_session->their_seq_nr = their_seq_nr + 1;
+
+				send_segment(cur_session, cur_session->id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+
+				cur_session->my_seq_nr += 1;
+
+				cur_session->state = tcp_established;
+			}
+			// listener (server)
+			else if (cur_session->state == tcp_syn_rcvd) {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: received ACK: session is established\n", id);
 				cur_session->state = tcp_established;
 
@@ -324,7 +341,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				auto cb = get_lock_listener(dst_port, id);
 
 				if (cb.has_value()) {
-					if (cb.value().new_session(cur_session, pkt, cb.value().pd) == false) {
+					if (cb.value().new_session && cb.value().new_session(cur_session, pkt, cb.value().pd) == false) {
 						DOLOG(debug, "TCP[%012" PRIx64 "]: session terminated by layer 7\n", id);
 						fail = true;
 					}
@@ -448,7 +465,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				if (cur_session->unacked_size == 0) {
 					DOLOG(debug, "TCP[%012" PRIx64 "]: acknowledging received content\n", id);
 
-					send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+					send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 				}
 			}
 		}
@@ -756,9 +773,6 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 	handler.pd = pd;
 
 	// generate id/port mapping
-	uint64_t id = 0;
-	get_random((uint8_t *)&id, sizeof id);
-
 	uint16_t port = 0;
 
 	// lock all sesions
@@ -771,6 +785,10 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 		if (port > 0 && port < 65535 && tcp_clients.find(port) == tcp_clients.end())
 			break;
 	}
+
+	const any_addr src = idev->get_addr();
+
+	uint64_t id = hash_address(dst_addr, port, dst_port);
 
 	tcp_clients.insert({ id, port });
 
@@ -793,7 +811,7 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 
 	new_session->window_size = idev->get_max_packet_size();
 
-	new_session->org_src_addr = idev->get_addr();
+	new_session->org_src_addr = src;
 	new_session->org_src_port = port;
 
 	new_session->org_dst_addr = dst_addr;
@@ -807,9 +825,18 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 	// connect id to session data
 	sessions.insert({ id, new_session });
 
-	DOLOG(debug, "TCP[%012" PRIx64 "]: new_session, my seq nr: %u\n", id, new_session->initial_my_seq_nr);
+	add_handler(port, handler);
 
-	// TODO: syn, syn ack, ack
+	lck.unlock();
+
+	DOLOG(debug, "TCP[%012" PRIx64 "]: new client session, my seq nr: %u, local port: %d\n", id, new_session->initial_my_seq_nr, port);
+
+	// start session
+	new_session->tlock.lock();
+
+	send_segment(new_session, id, new_session->org_src_addr, new_session->org_src_port, new_session->org_dst_addr, new_session->org_dst_port, 512, FLAG_SYN, new_session->their_seq_nr, &new_session->my_seq_nr, nullptr, 0);
+
+	new_session->tlock.unlock();
 
 	return port;
 }
@@ -851,6 +878,8 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 	auto sd_it = sessions.find(it_id->second);
 	if (sd_it == sessions.end())
 		return;
+
+	dolog(debug, "client_session_send_data: send_data\n");
 
 	send_data(sd_it->second, data, len);
 }
