@@ -790,7 +790,7 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 
 	uint64_t id = hash_address(dst_addr, port, dst_port);
 
-	tcp_clients.insert({ id, port });
+	tcp_clients.insert({ port, id });
 
 	// generate tcp session
 	tcp_session_t *new_session = new tcp_session_t();
@@ -867,19 +867,27 @@ void tcp::close_client_session(const int port)
 
 void tcp::client_session_send_data(const int local_port, const uint8_t *const data, const size_t len)
 {
+	dolog(debug, "client_session_send_data: lock all sessions\n");
+
 	// lock all sessions
 	std::unique_lock<std::mutex> lck(sessions_lock);
 
+	dolog(debug, "client_session_send_data: find session id for %d\n", local_port);
+
 	// find id of the session
 	auto it_id = tcp_clients.find(local_port);
-	if (it_id == tcp_clients.end())
+	if (it_id == tcp_clients.end()) {
+		dolog(debug, "client_session_send_data: session id not found\n");
 		return;
+	}
+
+	dolog(debug, "client_session_send_data: session id: [%012" PRIx64 "]\n", it_id->second);
 
 	auto sd_it = sessions.find(it_id->second);
 	if (sd_it == sessions.end())
 		return;
 
-	dolog(debug, "client_session_send_data: send_data\n");
+	dolog(debug, "client_session_send_data: found session-data, send_data\n");
 
 	send_data(sd_it->second, data, len);
 }
