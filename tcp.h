@@ -27,6 +27,8 @@ typedef struct {
 
 	tcp *t;
 
+	bool is_client;
+
 	any_addr org_src_addr;
 	int org_src_port;
 

@@ -260,6 +260,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			new_session->id = id;
 
+			new_session->is_client = false;
+
 			new_session->unacked = nullptr;
 			new_session->unacked_start_seq_nr = 0;
 			new_session->unacked_size = 0;
@@ -330,13 +332,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		if (flag_ack) {
 			if (cur_session->state == tcp_syn_sent) { // new session from a client
-				DOLOG(debug, "TCP[%012" PRIx64 "]: received ACK%s: session established\n", id, flag_syn ? " and SYN" : "");
-
+				cur_session->initial_their_seq_nr = their_seq_nr;
 				cur_session->their_seq_nr = their_seq_nr + 1;
 
-				send_segment(cur_session, cur_session->id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+				DOLOG(debug, "TCP[%012" PRIx64 "]: received ACK%s: session established, their seq: %u, my seq: %u\n", id, flag_syn ? " and SYN" : "", cur_session->their_seq_nr, cur_session->my_seq_nr);
 
-				cur_session->my_seq_nr += 1;
+				send_segment(cur_session, cur_session->id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 
 				set_state(cur_session, tcp_established);
 			}
@@ -634,7 +635,10 @@ void tcp::unacked_sender()
 
 				DOLOG(debug, "tcp-unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", send_n, rel_seqnr(it->second, true, it->second->my_seq_nr), it->second->window_size, it->second->unacked_size, it->second->data_since_last_ack);
 
-				send_segment(it->second, it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, FLAG_ACK, it->second->their_seq_nr, &resend_nr, &it->second->unacked[i], send_n);
+				if (it->second->is_client)
+					send_segment(it->second, it->second->id, it->second->org_src_addr, it->second->org_src_port, it->second->org_dst_addr, it->second->org_dst_port, 0, FLAG_ACK, it->second->their_seq_nr, &resend_nr, &it->second->unacked[i], send_n);
+				else
+					send_segment(it->second, it->second->id, it->second->org_dst_addr, it->second->org_dst_port, it->second->org_src_addr, it->second->org_src_port, 0, FLAG_ACK, it->second->their_seq_nr, &resend_nr, &it->second->unacked[i], send_n);
 
 				it->second->data_since_last_ack += send_n;
 
@@ -724,8 +728,6 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 	uint64_t internal_id = get_us();
 
 	DOLOG(debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %lu packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
-//	std::string content = bin_to_text(data, std::min(len, size_t(32)));
-//	DOLOG(debug, "TCP[%012" PRIx64 "]: %s\n", ts->id, content.c_str());
 
 	for(;;) {
 		// lock for unacked and for my_seq_nr
@@ -804,6 +806,8 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 	// generate tcp session
 	tcp_session_t *new_session = new tcp_session_t();
 	new_session->state = tcp_syn_sent;
+
+	new_session->is_client = true;
 
 	get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
 	new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
@@ -898,10 +902,9 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 
 	dolog(debug, "client_session_send_data: found session-data, send_data\n");
 
-	dolog(debug, "client STATE IS %s\n", states[sd_it->second->state]);
 	while(sd_it->second->state < tcp_established && !stop_flag) {
 		sd_it->second->state_changed.wait_for(lck, 100ms);
-		dolog(debug, "client STATE IS %s\n", states[sd_it->second->state]);
+		dolog(debug, "client waiting for 'established': STATE NOW IS %s\n", states[sd_it->second->state]);
 	}
 
 	sd_it = sessions.find(it_id->second);
