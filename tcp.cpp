@@ -339,6 +339,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				send_segment(cur_session, cur_session->id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 
+//				cur_session->my_seq_nr += 1;
+
 				set_state(cur_session, tcp_established);
 			}
 			// listener (server)
@@ -777,11 +779,12 @@ void tcp::end_session(tcp_session_t *const ts)
 	}
 }
 
-int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const any_addr & dst_addr, const int dst_port, private_data *const pd)
+int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_1, const any_addr & dst_addr, const int dst_port, private_data *const pd)
 {
 	tcp_port_handler_t handler { 0 };
 	handler.new_data = new_data;
 	handler.pd = pd;
+	handler.session_closed_1 = session_closed_1;
 
 	// generate id/port mapping
 	uint16_t port = 0;

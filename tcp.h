@@ -124,7 +124,7 @@ public:
 	void end_session(tcp_session_t *const ts);
 
 	// returns a port number
-	int allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const any_addr & dst_addr, const int dst_port, private_data *const pd);
+	int allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_1, const any_addr & dst_addr, const int dst_port, private_data *const pd);
 	void client_session_send_data(const int local_port, const uint8_t *const data, const size_t len);
 	void close_client_session(const int port);
 
