@@ -157,7 +157,7 @@ bool socks_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, s
 
 	dolog(debug, "socks_new_data for fd %d (%s)\n", fd, std::string((const char *)data, data_len).c_str());
 
-	return WRITE(fd, data, data_len) != ssize_t(data_len);
+	return WRITE(fd, data, data_len) == ssize_t(data_len);
 }
 
 void socks_session_closed_1(tcp_session_t *ts, private_data *pd)

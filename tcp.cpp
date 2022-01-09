@@ -288,7 +288,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		}
 		else {
 			sessions_lock.unlock();
-			DOLOG(info, "TCP: new session which does not start with SYN\n");
+			DOLOG(info, "TCP[%012" PRIx64 "]: new session which does not start with SYN\n", id);
 			delete pkt;
 			stats_inc_counter(tcp_errors);
 			*finished_flag = true;
