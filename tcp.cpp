@@ -232,18 +232,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	DOLOG(debug, "TCP[%012" PRIx64 "]: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
 	free(flag_str);
 
-	// TODO time-limit zodat 
-	if (!sessions_lock.try_lock()) {
-		myusleep(1000);
-
-		if (!sessions_lock.try_lock()) {
-			DOLOG(info, "TCP: too many packets queued\n");
-			delete pkt;
-			stats_inc_counter(tcp_errors);
-			*finished_flag = true;
-			return;
-		}
-	}
+	sessions_lock.lock();
 
 	auto cur_it = sessions.find(id);
 
