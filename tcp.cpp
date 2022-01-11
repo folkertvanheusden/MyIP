@@ -201,7 +201,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	const int size = pkt->get_size();
 
 	if (size < 20) {
-		DOLOG(info, "TCP: packet too short\n");
+		DOLOG(info, "TCP: packet too short [IC]\n");
 		delete pkt;
 		stats_inc_counter(tcp_errors);
 		*finished_flag = true;
@@ -281,7 +281,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		}
 		else {
 			sessions_lock.unlock();
-			DOLOG(info, "TCP[%012" PRIx64 "]: new session which does not start with SYN\n", id);
+			DOLOG(info, "TCP[%012" PRIx64 "]: new session which does not start with SYN [IC]\n", id);
 			delete pkt;
 			stats_inc_counter(tcp_errors);
 			*finished_flag = true;
@@ -302,7 +302,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	bool delete_entry = false;
 
 	if (header_size > size) {
-		DOLOG(info, "TCP[%012" PRIx64 "]: header with options > packet size\n", id);
+		DOLOG(info, "TCP[%012" PRIx64 "]: header with options > packet size [F]\n", id);
 		fail = true;
 	}
 
@@ -418,7 +418,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		if (flag_fin) {
 			if (cur_session->state == tcp_established) {
-				DOLOG(debug, "TCP[%012" PRIx64 "]: received FIN: send ACK + FIN\n", id);
+				DOLOG(debug, "TCP[%012" PRIx64 "]: received FIN\n", id);
 
 				DOLOG(debug, "TCP[%012" PRIx64 "]: cur_session->their_seq_nr %ld, their: %ld\n", id, cur_session->their_seq_nr, their_seq_nr);
 
@@ -430,11 +430,14 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		}
 
 		if (cur_session->fin_when_all_received && cur_session->their_seq_nr == their_seq_nr) {
-			DOLOG(debug, "TCP[%012" PRIx64 "]: ackin FIN after all data has been received\n", id);
+			DOLOG(debug, "TCP[%012" PRIx64 "]: ack FIN after all data has been received\n", id);
 
 			// send ACK + FIN
 			cur_session->their_seq_nr++;
-			send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+			if (cur_session->is_client)
+				send_segment(cur_session, id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+			else
+				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 		}
 	}
 
@@ -472,22 +475,26 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			if (fail == false) {
 				cur_session->their_seq_nr += data_len;  // TODO handle missing segments
 
-				// well be acked in the 'unacked_sender'-thread
+				// will be acked in the 'unacked_sender'-thread
 				if (cur_session->unacked_size == 0) {
 					DOLOG(debug, "TCP[%012" PRIx64 "]: acknowledging received content\n", id);
 
-					send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+					if (cur_session->is_client)
+						send_segment(cur_session, id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+					else
+						send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
 				}
 			}
 		}
 		else {
 			DOLOG(info, "TCP[%012" PRIx64 "]: unexpected sequence nr %u, expected: %u\n", id, rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
 
-			if (their_seq_nr < cur_session->their_seq_nr) {
-				DOLOG(debug, "TCP[%012" PRIx64 "]: other end did not receive our ACK, resending it upto %d\n", cur_session->their_seq_nr);
+			uint32_t ack_to = cur_session->their_seq_nr >= their_seq_nr ? their_seq_nr : cur_session->their_seq_nr;
 
-				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) /* ACK */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
-			}
+			if (cur_session->is_client)
+				send_segment(cur_session, id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0);
+			else
+				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0);
 		}
 
 		unacked_cv.notify_all();
@@ -507,8 +514,11 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		delete_entry = true;
 
-		DOLOG(info, "TCP[%012" PRIx64 "]: sending fail packet\n", id);
-		send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 2) | (1 << 4) /* RST, ACK */, their_seq_nr + 1, nullptr, nullptr, 0);
+		DOLOG(info, "TCP[%012" PRIx64 "]: sending fail packet [IC]\n", id);
+		if (cur_session->is_client)
+			send_segment(cur_session, id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0);
+		else
+			send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0);
 	}
 
 	cur_session->tlock.unlock();
