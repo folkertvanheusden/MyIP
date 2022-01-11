@@ -434,11 +434,10 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			DOLOG(debug, "TCP[%012" PRIx64 "]: ack FIN after all data has been received\n", id);
 
 			// send ACK + FIN
-			cur_session->their_seq_nr++;
 			if (cur_session->is_client)
-				send_segment(cur_session, id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+				send_segment(cur_session, id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0);
 			else
-				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0);
 		}
 	}
 
