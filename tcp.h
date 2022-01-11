@@ -40,6 +40,8 @@ typedef struct {
 	uint16_t window_size;
 
 	tcp_state_t state;
+	bool here_fin, there_fin;
+
 	std::condition_variable state_changed;
 	uint64_t last_pkt;
 	uint32_t my_seq_nr, their_seq_nr;
@@ -101,6 +103,7 @@ private:
 	uint64_t *tcp_rst { nullptr };
 	uint64_t *tcp_sessions_closed_1 { nullptr };
 	uint64_t *tcp_sessions_closed_2 { nullptr };
+	uint64_t *tcp_cur_n_sessions { nullptr };
 
 	void send_segment(tcp_session_t *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
 
@@ -124,7 +127,7 @@ public:
 	void end_session(tcp_session_t *const ts);
 
 	// returns a port number
-	int allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_1, const any_addr & dst_addr, const int dst_port, private_data *const pd);
+	int allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd);
 	void client_session_send_data(const int local_port, const uint8_t *const data, const size_t len);
 	void close_client_session(const int port);
 

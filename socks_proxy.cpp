@@ -160,11 +160,11 @@ bool socks_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, s
 	return WRITE(fd, data, data_len) == ssize_t(data_len);
 }
 
-void socks_session_closed_1(tcp_session_t *ts, private_data *pd)
+void socks_session_closed_2(tcp_session_t *ts, private_data *pd)
 {
 	int fd = dynamic_cast<socks_private_data *>(pd)->get_fd();
 
-	dolog(debug, "socks_session_closed_1 for fd %d\n", fd);
+	dolog(debug, "socks_session_closed_2 for fd %d\n", fd);
 
 	close(fd);
 }
@@ -221,7 +221,7 @@ static void socks_handler(const int fd, tcp *const t)
 	socks_private_data spd(fd);
 
 	DOLOG(debug, "socks_handler: allocate client session\n");
-	int src_port = t->allocate_client_session(socks_new_data, socks_session_closed_1, dest, port, &spd);
+	int src_port = t->allocate_client_session(socks_new_data, socks_session_closed_2, dest, port, &spd);
 
 	DOLOG(debug, "socks_handler: client session allocated, local port: %d, fd: %d\n", src_port, fd);
 

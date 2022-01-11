@@ -70,6 +70,7 @@ tcp::tcp(stats *const s) : ip_protocol(s, "tcp")
 	tcp_sessions_closed_1 = s->register_stat("tcp_sessions_closed1");
 	tcp_sessions_closed_2 = s->register_stat("tcp_sessions_closed2");
 	tcp_rst = s->register_stat("tcp_rst");
+	tcp_cur_n_sessions = s->register_stat("tcp_cur_n_sessions");
 
 	th = new std::thread(std::ref(*this));
 }
@@ -165,7 +166,7 @@ std::optional<tcp_port_handler_t> tcp::get_lock_listener(const int dst_port, con
 	auto cb_it = listeners.find(dst_port);
 
 	if (cb_it == listeners.end()) {
-		DOLOG(info, "TCP[%012" PRIx64 "]: no listener for that port\n", id);
+		DOLOG(info, "TCP[%012" PRIx64 "]: no listener for that (%d) port\n", id, dst_port);
 
 		return { };
 	}
@@ -239,7 +240,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	if (cur_it == sessions.end()) {
 		if (flag_syn) {  // MUST start with SYN
 			tcp_session_t *new_session = new tcp_session_t();
+
 			new_session->state = tcp_listen;
+			new_session->here_fin = new_session->there_fin = false;
 
 			get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
 			new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
@@ -268,6 +271,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			new_session->t = this;
 
 			sessions.insert({ id, new_session });
+
+			stats_set(tcp_cur_n_sessions, sessions.size());
 
 			stats_inc_counter(tcp_new_sessions);
 
@@ -303,7 +308,18 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	}
 
 	if (!fail) {
-		if (flag_syn) {
+		if (flag_rst) {
+			if (cur_session->state >= tcp_syn_rcvd) {
+				DOLOG(debug, "TCP[%012" PRIx64 "]: received RST: session setup aborted\n", id);
+				set_state(cur_session, tcp_closing);
+				delete_entry = true;
+			}		
+			else {
+				DOLOG(debug, "TCP[%012" PRIx64 "]: unexpected RST\n", id);
+			}
+		}
+
+		if (flag_syn && !delete_entry) {
 			stats_inc_counter(tcp_syn);
 
 			// tcp_syn_rcvd: opponent may not have received the syn,ack reply
@@ -319,7 +335,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			}
 		}
 
-		if (flag_ack) {
+		if (flag_ack && !delete_entry) {
 			if (cur_session->state == tcp_syn_sent) { // new session from a client
 				cur_session->initial_their_seq_nr = their_seq_nr;
 				cur_session->their_seq_nr = their_seq_nr + 1;
@@ -386,7 +402,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 					if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
 						DOLOG(debug, "TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n", id);
 
-						send_segment(cur_session, cur_session->id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, (1 << 4) | (1 << 0) /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+						send_segment(cur_session, cur_session->id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK | FLAG_FIN /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+
+						cur_session->here_fin = true;
 
 						set_state(cur_session, tcp_fin_wait_1);
 					}
@@ -401,26 +419,14 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			cur_session->data_since_last_ack = 0;
 		}
 
-		if (flag_rst) {
-			if (cur_session->state == tcp_syn_rcvd) {
-				DOLOG(debug, "TCP[%012" PRIx64 "]: received RST: session setup aborted\n", id);
-				set_state(cur_session, tcp_listen);
-				delete_entry = true;
-			}		
-			else {
-				DOLOG(debug, "TCP[%012" PRIx64 "]: unexpected RST\n", id);
-			}
-		}
-
 		if (flag_fin) {
 			if (cur_session->state == tcp_established) {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: received FIN: send ACK + FIN\n", id);
-				set_state(cur_session, tcp_close_wait);
+				cur_session->there_fin = true;
+
 				// send ACK + FIN
 				cur_session->their_seq_nr++;
 				send_segment(cur_session, id, cur_session->org_dst_addr, cur_session->org_dst_port, cur_session->org_src_addr, cur_session->org_src_port, win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
-
-				set_state(cur_session, tcp_last_ack);
 			}
 			else {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: unexpected FIN\n", id);
@@ -514,14 +520,21 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 		if (cur_it != sessions.end()) {
 			tcp_session_t *pointer = cur_it->second;
+			bool is_client = pointer->is_client;
+
 			sessions.erase(cur_it);
+			stats_set(tcp_cur_n_sessions, sessions.size());
 			sessions_lock.unlock();
 
 			// call session_closed_2
-			auto cb_org = get_lock_listener(pointer->org_dst_port, id);
+			int close_port = is_client ? pointer->org_src_port : pointer->org_dst_port;
+
+			auto cb_org = get_lock_listener(close_port, id);
 
 			if (cb_org.has_value())  // session not initiated here?
 				cb_org.value().session_closed_2(pointer, cb_org.value().pd);
+			else
+				DOLOG(info, "TCP[%012" PRIx64 "]: port %d not known\n", id, close_port);
 
 			release_listener_lock();
 
@@ -578,16 +591,23 @@ void tcp::session_cleaner()
 				free_tcp_session(it->second);
 
 				it = sessions.erase(it);
+				stats_set(tcp_cur_n_sessions, sessions.size());
 
 				stats_inc_counter(tcp_sessions_to);
 			}
 			else if (it->second->state == tcp_time_wait && age >= 2) {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: session clean-up after tcp_time_wait state\n", it->first);
 
+				if (it->second->is_client) {
+					// forget client session
+					tcp_clients.erase(it->second->org_src_port);
+				}
+
 				// clean-up
 				free_tcp_session(it->second);
 
 				it = sessions.erase(it);
+				stats_set(tcp_cur_n_sessions, sessions.size());
 			}
 			else {
 				++it;
@@ -759,6 +779,8 @@ void tcp::end_session(tcp_session_t *const ts)
 
 		send_segment(ts, ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
 
+		ts->here_fin = true;
+
 		set_state(ts, tcp_fin_wait_1);
 	}
 	else {
@@ -768,12 +790,12 @@ void tcp::end_session(tcp_session_t *const ts)
 	}
 }
 
-int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_1, const any_addr & dst_addr, const int dst_port, private_data *const pd)
+int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd)
 {
 	tcp_port_handler_t handler { 0 };
 	handler.new_data = new_data;
 	handler.pd = pd;
-	handler.session_closed_1 = session_closed_1;
+	handler.session_closed_2 = session_closed_2;
 
 	// generate id/port mapping
 	uint16_t port = 0;
@@ -785,7 +807,7 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 	for(;;) {
 		get_random((uint8_t *)&port, sizeof port);
 
-		if (port > 0 && port < 65535 && tcp_clients.find(port) == tcp_clients.end())
+		if (port > 1023 && port < 65535 && tcp_clients.find(port) == tcp_clients.end())
 			break;
 	}
 
@@ -829,12 +851,13 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 
 	// connect id to session data
 	sessions.insert({ id, new_session });
+	stats_set(tcp_cur_n_sessions, sessions.size());
 
 	add_handler(port, handler);
 
 	lck.unlock();
 
-	DOLOG(debug, "TCP[%012" PRIx64 "]: new client session, my seq nr: %u, local port: %d\n", id, new_session->initial_my_seq_nr, port);
+	DOLOG(debug, "TCP[%012" PRIx64 "]: new client session, my seq nr: %u, local port: %d, destination port: %d\n", id, new_session->initial_my_seq_nr, port, dst_port);
 
 	// start session
 	new_session->tlock.lock();
@@ -845,6 +868,29 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 
 	return port;
 }
+
+#if 0
+void tcp::client_session_send_syn(const int port)
+{
+	// lock all sessions
+	std::unique_lock<std::mutex> lck(sessions_lock);
+
+	// find id of the session
+	auto it_id = tcp_clients.find(port);
+	if (it_id == tcp_clients.end())
+		return;
+
+	// find session data
+	auto sd_it = sessions.find(it_id->second);
+	if (sd_it == sessions.end())
+		return;
+
+	// send FIN
+	sd_it->second->tlock.lock();
+	send_segment(new_session, id, new_session->org_src_addr, new_session->org_src_port, new_session->org_dst_addr, new_session->org_dst_port, 512, FLAG_SYN, new_session->their_seq_nr, &new_session->my_seq_nr, nullptr, 0);
+	sd_it->second->tlock.unlock();
+}
+#endif
 
 void tcp::close_client_session(const int port)
 {
@@ -865,9 +911,6 @@ void tcp::close_client_session(const int port)
 	sd_it->second->tlock.lock();
 	end_session(sd_it->second);
 	sd_it->second->tlock.unlock();
-
-	// forget client session
-	tcp_clients.erase(port);
 }
 
 void tcp::client_session_send_data(const int local_port, const uint8_t *const data, const size_t len)
