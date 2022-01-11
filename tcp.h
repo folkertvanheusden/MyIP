@@ -51,8 +51,10 @@ typedef struct {
 	size_t data_since_last_ack;
 	size_t unacked_size;
 	bool fin_after_unacked_empty;
-	bool fin_when_all_received;
 	std::condition_variable unacked_sent_cv;
+
+	uint32_t seq_for_fin_when_all_received;
+	bool flag_fin_when_all_received;
 
 	session_data *p;
 } tcp_session_t;

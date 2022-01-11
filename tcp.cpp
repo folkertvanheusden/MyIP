@@ -422,14 +422,15 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 				DOLOG(debug, "TCP[%012" PRIx64 "]: cur_session->their_seq_nr %ld, their: %ld\n", id, cur_session->their_seq_nr, their_seq_nr);
 
-				cur_session->fin_when_all_received = true;
+				cur_session->seq_for_fin_when_all_received = their_seq_nr;
+				cur_session->flag_fin_when_all_received = true;
 			}
 			else {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: unexpected FIN\n", id);
 			}
 		}
 
-		if (cur_session->fin_when_all_received && cur_session->their_seq_nr == their_seq_nr) {
+		if (cur_session->flag_fin_when_all_received && cur_session->seq_for_fin_when_all_received == cur_session->their_seq_nr) {
 			DOLOG(debug, "TCP[%012" PRIx64 "]: ack FIN after all data has been received\n", id);
 
 			// send ACK + FIN
@@ -445,6 +446,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	int data_len = size - header_size;
 	if (data_len > 0 && fail == false) {
 		DOLOG(debug, "TCP[%012" PRIx64 "]: packet len %d, header size: %d, payload size: %d\n", id, size, header_size, data_len);
+
+		DOLOG(debug, "TCP[%012" PRIx64 "]: %s\n", id, std::string((const char *)&p[header_size], data_len).c_str());
 
 		if (their_seq_nr == cur_session->their_seq_nr) {
 			const uint8_t *data_start = &p[header_size];
@@ -753,6 +756,7 @@ void tcp::send_data(tcp_session_t *const ts, const uint8_t *const data, const si
 	uint64_t internal_id = get_us();
 
 	DOLOG(debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %lu packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
+	DOLOG(debug, "TCP[%012" PRIx64 "]: %s\n", ts->id, std::string((const char *)data, len).c_str());
 
 	for(;;) {
 		// lock for unacked and for my_seq_nr
@@ -848,7 +852,7 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 	new_session->unacked_size = 0;
 	new_session->fin_after_unacked_empty = false;
 
-	new_session->fin_when_all_received = false;
+	new_session->seq_for_fin_when_all_received = 0;
 
 	new_session->window_size = idev->get_max_packet_size();
 
