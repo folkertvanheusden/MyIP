@@ -40,7 +40,6 @@ typedef struct {
 	uint16_t window_size;
 
 	tcp_state_t state;
-	bool here_fin, there_fin;
 
 	std::condition_variable state_changed;
 	uint64_t last_pkt;
@@ -52,6 +51,7 @@ typedef struct {
 	size_t data_since_last_ack;
 	size_t unacked_size;
 	bool fin_after_unacked_empty;
+	bool fin_when_all_received;
 	std::condition_variable unacked_sent_cv;
 
 	session_data *p;
