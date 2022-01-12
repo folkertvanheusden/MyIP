@@ -946,6 +946,13 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 			break;
 		}
 
+
+		if (time(nullptr) - cur_session->state_since >= 30) {
+			end_session(sd_it->second);
+			DOLOG(debug, "client_session_send_data: session setup time-out\n");
+			return;
+		}
+
 		if (++counter == 3) {
 			counter = 0;
 
