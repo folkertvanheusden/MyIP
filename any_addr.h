@@ -36,6 +36,8 @@ public:
 
 	int get_len() const { return addr_size; }
 
+	bool is_set() const { return addr_size != 0; }
+
 	uint64_t get_hash() const;
 
 	void set(const uint8_t src[], const int src_size);
