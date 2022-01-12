@@ -796,7 +796,10 @@ void tcp::end_session(tcp_session_t *const ts)
 	if (ts->unacked_size == 0) {
 		DOLOG(debug, "TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, rel_seqnr(ts, true, ts->my_seq_nr));
 
-		send_segment(ts, ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
+		if (ts->is_client)
+			send_segment(ts, ts->id, ts->org_src_addr, ts->org_src_port, ts->org_dst_addr, ts->org_dst_port, 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
+		else
+			send_segment(ts, ts->id, ts->org_dst_addr, ts->org_dst_port, ts->org_src_addr, ts->org_src_port, 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
 
 		set_state(ts, tcp_fin_wait_1);
 	}

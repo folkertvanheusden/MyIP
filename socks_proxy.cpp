@@ -196,7 +196,7 @@ static void socks_handler(const int fd, tcp *const t)
 	int port = (header[2] << 8) | header[3];
 	any_addr dest(&header[4], 4);
 
-	DOLOG(info, "socks_handler: connect to [%s]:%d\n", dest.to_str().c_str(), port);
+	std::string id;
 
 	// id
 	for(;;) {
@@ -210,7 +210,11 @@ static void socks_handler(const int fd, tcp *const t)
 
 		if (buffer == 0x00)
 			break;
+
+		id += buffer;
 	}
+
+	DOLOG(info, "socks_handler: connect to [%s]:%d (%s)\n", dest.to_str().c_str(), port, id.c_str());
 
 	socks_private_data spd(fd);
 
@@ -236,7 +240,7 @@ static void socks_handler(const int fd, tcp *const t)
 		int n = read(fd, buffer, sizeof buffer);
 
 		if (n == 0) {
-			DOLOG(debug, "socks_handler: closed\n");
+			DOLOG(debug, "socks_handler: closed (port %d, fd %)\n", port, fd);
 			break;
 		}
 
@@ -252,7 +256,7 @@ static void socks_handler(const int fd, tcp *const t)
 
 	close(fd);
 
-	DOLOG(debug, "socks_handler: end\n");
+	DOLOG(debug, "socks_handler: end (port %d, fd %)\n", port, fd);
 }
 
 void socks_proxy::operator()()
