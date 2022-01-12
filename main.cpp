@@ -1,4 +1,4 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <errno.h>
 #include <libconfig.h++>
 #include <signal.h>
@@ -15,6 +15,7 @@
 #include "phys_slip.h"
 #include "phys_ppp.h"
 #include "arp.h"
+#include "dns.h"
 #include "ipv4.h"
 #include "ipv6.h"
 #include "icmp.h"
@@ -207,12 +208,11 @@ int main(int argc, char *argv[])
 	std::vector<protocol *> protocols;
 	std::vector<ip_protocol *> ip_protocols;
 	std::vector<application *> applications;
+	std::vector<socks_proxy *> socks_proxies;
 
 	/// network interfaces
 	const libconfig::Setting &interfaces = root["interfaces"];
 	size_t n_interfaces = interfaces.getLength();
-
-	socks_proxy *so { nullptr };
 
 	std::vector<phys *> devs;
 
@@ -383,7 +383,40 @@ int main(int argc, char *argv[])
 
 			printf("Starting socks listener on %s:%d\n", interface.c_str(), port);
 
-			so = new socks_proxy(interface, port, ipv4_tcp);
+			socks_proxy *so = new socks_proxy(interface, port, ipv4_tcp);
+			socks_proxies.push_back(so);
+
+			// DNS
+			try {
+				const libconfig::Setting & s_dns = socks.lookup("dns");
+
+				std::string dns_u_ip_str = cfg_str(s_dns, "host", "upstream DNS server", false, "");
+				any_addr upstream_dns_server = parse_address(dns_u_ip_str.c_str(), 4, ".", 10);
+
+				dns *dns_ = nullptr;
+
+				for(auto & dev : devs) {
+					ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+					if (!i4)
+						continue;
+
+					udp *const u = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+					if (!u)
+						continue;
+
+					dns_ = new dns(&s, u, i4->get_addr(), upstream_dns_server);
+
+					u->add_handler(53, std::bind(&dns::input, dns_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+					applications.push_back(dns_);
+				}
+
+				if (dns_)
+					so->register_dns(dns_);
+			}
+			catch(const libconfig::SettingNotFoundException &nfex) {
+				// just fine
+			}
 		}
 		catch(const libconfig::SettingNotFoundException &nfex) {
 			// just fine
@@ -596,7 +629,8 @@ int main(int argc, char *argv[])
 	DOLOG(info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating\n");
 
-	delete so;
+	for(auto & s : socks_proxies)
+		delete s;
 
 	for(auto & a : applications)
 		delete a;

@@ -169,7 +169,29 @@ void socks_session_closed_2(tcp_session_t *ts, private_data *pd)
 	close(fd);
 }
 
-static void socks_handler(const int fd, tcp *const t)
+static std::string get_0x00_terminated_string(const int fd)
+{
+	std::string str;
+
+	// id
+	for(;;) {
+		uint8_t buffer = 0;
+
+		if (READ(fd, &buffer, 1) != 1) {
+			DOLOG(debug, "socks_handler: problem receiving string\n");
+			break;
+		}
+
+		if (buffer == 0x00)
+			break;
+
+		str += buffer;
+	}
+
+	return str;
+}
+
+static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 {
 	DOLOG(debug, "socks_handler: handler started\n");
 
@@ -196,22 +218,23 @@ static void socks_handler(const int fd, tcp *const t)
 	int port = (header[2] << 8) | header[3];
 	any_addr dest(&header[4], 4);
 
-	std::string id;
+	std::string id = get_0x00_terminated_string(fd);
 
-	// id
-	for(;;) {
-		uint8_t buffer = 0;
+	if (dest[0] == 0 && dest[1] == 0 && dest[2] == 0 && dest[3] != 0) {  // socks4a
+		std::string host = get_0x00_terminated_string(fd);
 
-		if (READ(fd, &buffer, 1) != 1) {
+		DOLOG(info, "socks_handler: resolving \"%s\" for fd %d\n", host.c_str(), fd);
+
+		// resolve host
+		auto a = dns_->query(host, 5000);  // FIXME time-out
+
+		if (a.has_value() == false) {
 			close(fd);
-			DOLOG(debug, "socks_handler: problem receiving id\n");
-			break;
+			DOLOG(debug, "socks_handler: cannot resolve\n");
+			return;
 		}
 
-		if (buffer == 0x00)
-			break;
-
-		id += buffer;
+		dest = a.value();
 	}
 
 	DOLOG(info, "socks_handler: connect to [%s]:%d (%s)\n", dest.to_str().c_str(), port, id.c_str());
@@ -273,7 +296,7 @@ void socks_proxy::operator()()
 			continue;
 		}
 
-		std::thread *th = new std::thread(socks_handler, cfd, t);
+		std::thread *th = new std::thread(socks_handler, cfd, t, dns_);
 		th->detach();
 	}
 }
