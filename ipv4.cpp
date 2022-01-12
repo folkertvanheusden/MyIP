@@ -200,7 +200,7 @@ void ipv4::operator()()
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
 			delete pkt;
-			DOLOG(info, "IPv4[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", id, protocol, size);
+			DOLOG(debug, "IPv4[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", id, protocol, size);
 			stats_inc_counter(ipv4_unk_prot);
 			stats_inc_counter(ip_n_disc);
 			continue;

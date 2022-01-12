@@ -283,7 +283,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		}
 		else {
 			sessions_lock.unlock();
-			DOLOG(info, "TCP[%012" PRIx64 "]: new session which does not start with SYN [IC]\n", id);
+			DOLOG(debug, "TCP[%012" PRIx64 "]: new session which does not start with SYN [IC]\n", id);
 			delete pkt;
 			stats_inc_counter(tcp_errors);
 			*finished_flag = true;
@@ -912,28 +912,28 @@ void tcp::close_client_session(const int port)
 
 void tcp::client_session_send_data(const int local_port, const uint8_t *const data, const size_t len)
 {
-	dolog(debug, "client_session_send_data: lock all sessions\n");
+	DOLOG(debug, "client_session_send_data: lock all sessions\n");
 
 	while(!stop_flag) {
 		// lock all sessions
 		std::unique_lock<std::mutex> lck(sessions_lock);
 
-		dolog(debug, "client_session_send_data: find session id for %d\n", local_port);
+		DOLOG(debug, "client_session_send_data: find session id for %d\n", local_port);
 
 		// find id of the session
 		auto it_id = tcp_clients.find(local_port);
 		if (it_id == tcp_clients.end()) {
-			dolog(debug, "client_session_send_data: session id not found\n");
+			DOLOG(debug, "client_session_send_data: session id not found\n");
 			return;
 		}
 
-		dolog(debug, "client_session_send_data: session id: [%012" PRIx64 "]\n", it_id->second);
+		DOLOG(debug, "client_session_send_data: session id: [%012" PRIx64 "]\n", it_id->second);
 
 		auto sd_it = sessions.find(it_id->second);
 		if (sd_it == sessions.end())
 			return;
 
-		dolog(debug, "client_session_send_data: found session-data, send_data\n");
+		DOLOG(debug, "client_session_send_data: found session-data, send_data\n");
 
 		tcp_session_t *const cur_session = sd_it->second;
 		int counter = 0;
@@ -941,7 +941,7 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 		if (cur_session->state >= tcp_established) {
 			send_data(cur_session, data, len);
 
-			dolog(debug, "client_session_send_data: found session-data, data sent\n");
+			DOLOG(debug, "client_session_send_data: found session-data, data sent\n");
 
 			break;
 		}
@@ -956,7 +956,7 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 			cur_session->tlock.unlock();
 		}
 
-		dolog(debug, "client waiting for 'established': STATE NOW IS %s\n", states[sd_it->second->state]);
+		DOLOG(debug, "client waiting for 'established': STATE NOW IS %s\n", states[sd_it->second->state]);
 
 		cur_session->state_changed.wait_for(lck, 500ms);
 		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid

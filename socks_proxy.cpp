@@ -155,7 +155,7 @@ bool socks_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, s
 {
 	int fd = dynamic_cast<socks_private_data *>(pd)->get_fd();
 
-	dolog(debug, "socks_new_data for fd %d (%s)\n", fd, std::string((const char *)data, data_len).c_str());
+	DOLOG(debug, "socks_new_data for fd %d\n", fd);
 
 	return WRITE(fd, data, data_len) == ssize_t(data_len);
 }
@@ -164,7 +164,7 @@ void socks_session_closed_2(tcp_session_t *ts, private_data *pd)
 {
 	int fd = dynamic_cast<socks_private_data *>(pd)->get_fd();
 
-	dolog(debug, "socks_session_closed_2 for fd %d\n", fd);
+	DOLOG(debug, "socks_session_closed_2 for fd %d\n", fd);
 
 	close(fd);
 }
@@ -195,6 +195,8 @@ static void socks_handler(const int fd, tcp *const t)
 
 	int port = (header[2] << 8) | header[3];
 	any_addr dest(&header[4], 4);
+
+	DOLOG(info, "socks_handler: connect to [%s]:%d\n", dest.to_str().c_str(), port);
 
 	// id
 	for(;;) {
@@ -238,8 +240,6 @@ static void socks_handler(const int fd, tcp *const t)
 			DOLOG(debug, "socks_handler: error (%s)\n", strerror(errno));
 			break;
 		}
-
-		dolog(debug, "%s\n", std::string((char *)buffer, n).c_str());
 
 		t->client_session_send_data(src_port, buffer, n);
 	}

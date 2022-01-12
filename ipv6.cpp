@@ -195,7 +195,7 @@ void ipv6::operator()()
 
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
-			DOLOG(info, "IPv6[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", flow_label, protocol, size);
+			DOLOG(debug, "IPv6[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", flow_label, protocol, size);
 			delete pkt;
 			stats_inc_counter(ipv6_unk_prot);
 			stats_inc_counter(ip_n_disc);
