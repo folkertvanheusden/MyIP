@@ -133,6 +133,7 @@ public:
 	int allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd);
 	void client_session_send_data(const int local_port, const uint8_t *const data, const size_t len);
 	void close_client_session(const int port);
+	void wait_for_client_connected_state(const int local_port);
 
 	virtual void operator()() override;
 };

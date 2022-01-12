@@ -212,6 +212,17 @@ static void socks_handler(const int fd, tcp *const t)
 			break;
 	}
 
+	socks_private_data spd(fd);
+
+	DOLOG(debug, "socks_handler: allocate client session\n");
+	int src_port = t->allocate_client_session(socks_new_data, socks_session_closed_2, dest, port, &spd);
+
+	DOLOG(debug, "socks_handler: waiting for session started\n");
+
+	t->wait_for_client_connected_state(src_port);
+
+	DOLOG(debug, "socks_handler: client session allocated, local port: %d, fd: %d\n", src_port, fd);
+
 	// send response
 	uint8_t response[8] { 0, 0x5a, uint8_t(port >> 8), uint8_t(port), 0 };
 	if (WRITE(fd, response, sizeof response) != sizeof response) {
@@ -219,13 +230,6 @@ static void socks_handler(const int fd, tcp *const t)
 		DOLOG(debug, "socks_handler: problem sending response\n");
 		return;
 	}
-
-	socks_private_data spd(fd);
-
-	DOLOG(debug, "socks_handler: allocate client session\n");
-	int src_port = t->allocate_client_session(socks_new_data, socks_session_closed_2, dest, port, &spd);
-
-	DOLOG(debug, "socks_handler: client session allocated, local port: %d, fd: %d\n", src_port, fd);
 
 	for(;;) {
 		uint8_t buffer[512];

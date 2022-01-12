@@ -910,46 +910,43 @@ void tcp::close_client_session(const int port)
 	sd_it->second->tlock.unlock();
 }
 
-void tcp::client_session_send_data(const int local_port, const uint8_t *const data, const size_t len)
+void tcp::wait_for_client_connected_state(const int local_port)
 {
-	DOLOG(debug, "client_session_send_data: lock all sessions\n");
-
 	while(!stop_flag) {
+		DOLOG(debug, "wait_for_client_connected_state: lock all sessions\n");
+
 		// lock all sessions
 		std::unique_lock<std::mutex> lck(sessions_lock);
 
-		DOLOG(debug, "client_session_send_data: find session id for %d\n", local_port);
+		DOLOG(debug, "wait_for_client_connected_state: find session id for %d\n", local_port);
 
 		// find id of the session
 		auto it_id = tcp_clients.find(local_port);
 		if (it_id == tcp_clients.end()) {
-			DOLOG(debug, "client_session_send_data: session id not found\n");
+			DOLOG(debug, "wait_for_client_connected_state: session id not found\n");
 			return;
 		}
 
-		DOLOG(debug, "client_session_send_data: session id: [%012" PRIx64 "]\n", it_id->second);
+		DOLOG(debug, "wait_for_client_connected_state: session id: [%012" PRIx64 "]\n", it_id->second);
 
 		auto sd_it = sessions.find(it_id->second);
 		if (sd_it == sessions.end())
 			return;
 
-		DOLOG(debug, "client_session_send_data: found session-data, send_data\n");
+		DOLOG(debug, "wait_for_client_connected_state: found session-data, send_data\n");
 
 		tcp_session_t *const cur_session = sd_it->second;
 		int counter = 0;
 
 		if (cur_session->state >= tcp_established) {
-			send_data(cur_session, data, len);
-
-			DOLOG(debug, "client_session_send_data: found session-data, data sent\n");
-
+			DOLOG(debug, "wait_for_client_connected_state: found session-data, data sent\n");
 			break;
 		}
 
 
 		if (time(nullptr) - cur_session->state_since >= 30) {
 			end_session(sd_it->second);
-			DOLOG(debug, "client_session_send_data: session setup time-out\n");
+			DOLOG(debug, "wait_for_client_connected_state: session setup time-out\n");
 			return;
 		}
 
@@ -966,6 +963,38 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 		DOLOG(debug, "client waiting for 'established': STATE NOW IS %s\n", states[sd_it->second->state]);
 
 		cur_session->state_changed.wait_for(lck, 500ms);
-		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid
+		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid as
+		// lck gets unlocked by the wait_for
 	}
+}
+
+void tcp::client_session_send_data(const int local_port, const uint8_t *const data, const size_t len)
+{
+	DOLOG(debug, "client_session_send_data: lock all sessions\n");
+
+	// lock all sessions
+	std::unique_lock<std::mutex> lck(sessions_lock);
+
+	DOLOG(debug, "client_session_send_data: find session id for %d\n", local_port);
+
+	// find id of the session
+	auto it_id = tcp_clients.find(local_port);
+	if (it_id == tcp_clients.end()) {
+		DOLOG(debug, "client_session_send_data: session id not found\n");
+		return;
+	}
+
+	DOLOG(debug, "client_session_send_data: session id: [%012" PRIx64 "]\n", it_id->second);
+
+	auto sd_it = sessions.find(it_id->second);
+	if (sd_it == sessions.end())
+		return;
+
+	DOLOG(debug, "client_session_send_data: found session-data, send_data\n");
+
+	tcp_session_t *const cur_session = sd_it->second;
+
+	send_data(cur_session, data, len);
+
+	DOLOG(debug, "client_session_send_data: found session-data, data sent\n");
 }
