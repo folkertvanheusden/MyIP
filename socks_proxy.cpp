@@ -266,6 +266,6 @@ void socks_proxy::operator()()
 		}
 
 		std::thread *th = new std::thread(socks_handler, cfd, t);
-		// TODO
+		th->detach();
 	}
 }
