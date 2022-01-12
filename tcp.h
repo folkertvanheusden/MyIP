@@ -40,6 +40,7 @@ typedef struct {
 	uint16_t window_size;
 
 	tcp_state_t state;
+	time_t state_since;
 
 	std::condition_variable state_changed;
 	uint64_t last_pkt;

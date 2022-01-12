@@ -189,6 +189,7 @@ void tcp::set_state(tcp_session_t *const session, const tcp_state_t new_state)
 	DOLOG(debug, "TCP[%012" PRIx64 "]: changing state from %s to %s\n", session->id, states[session->state], states[new_state]);
 
 	session->state = new_state;
+	session->state_since = time(nullptr);
 
 	session->state_changed.notify_all();
 }
@@ -242,6 +243,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			tcp_session_t *new_session = new tcp_session_t();
 
 			new_session->state = tcp_listen;
+			new_session->state_since = 0;
 
 			get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
 			new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
@@ -835,6 +837,7 @@ int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const
 	// generate tcp session
 	tcp_session_t *new_session = new tcp_session_t();
 	new_session->state = tcp_syn_sent;
+	new_session->state_since = time(nullptr);
 
 	new_session->is_client = true;
 
@@ -931,9 +934,22 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 
 	dolog(debug, "client_session_send_data: found session-data, send_data\n");
 
-	while(sd_it->second->state < tcp_established && !stop_flag) {
-		sd_it->second->state_changed.wait_for(lck, 100ms);
+	tcp_session_t *const cur_session = sd_it->second;
+	int counter = 0;
+
+	while(cur_session->state < tcp_established && !stop_flag) {
+		cur_session->state_changed.wait_for(lck, 100ms);
 		dolog(debug, "client waiting for 'established': STATE NOW IS %s\n", states[sd_it->second->state]);
+
+		if (++counter == 10) {
+			counter = 0;
+
+			cur_session->tlock.lock();
+
+			send_segment(cur_session, cur_session->id, cur_session->org_src_addr, cur_session->org_src_port, cur_session->org_dst_addr, cur_session->org_dst_port, 512, FLAG_SYN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+
+			cur_session->tlock.unlock();
+		}
 	}
 
 	sd_it = sessions.find(it_id->second);
