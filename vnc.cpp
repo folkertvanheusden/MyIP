@@ -368,7 +368,7 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 	return true;
 }
 
-bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, void *private_data)
+bool vnc_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, void *private_data)
 {
 	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 
@@ -384,7 +384,6 @@ bool vnc_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, siz
 	}
 
 	vnc_thread_work_t *work = new vnc_thread_work_t;
-	work->pkt = pkt->duplicate();
 	work->data = (char *)duplicate((const uint8_t *)data, data_len);
 	work->data_len = data_len;
 
@@ -751,7 +750,6 @@ void vnc_thread(void *ts_in)
 			vs->state = vs_terminate;
 
 		if (work) {
-			delete work->pkt;
 			delete [] work->data;
 			delete work;
 		}

@@ -42,6 +42,8 @@ typedef struct {
 	tcp_state_t state;
 	time_t state_since;
 
+	std::map<uint32_t, std::vector<uint8_t> > fragments;
+
 	std::condition_variable state_changed;
 	uint64_t last_pkt;
 	uint32_t my_seq_nr, their_seq_nr;
@@ -63,7 +65,7 @@ typedef struct {
 typedef struct {
 	std::function<void()> init;
 	std::function<bool(tcp_session_t *, const packet *pkt, private_data *)> new_session;
-	std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> new_data;
+	std::function<bool(tcp_session_t *, const uint8_t *data, size_t len, private_data *)> new_data;
 	std::function<void(tcp_session_t *, private_data *)> session_closed_1;  // please terminate
 	std::function<void(tcp_session_t *, private_data *)> session_closed_2;  // should be terminated, clean up
 	std::function<void()> deinit;
@@ -130,7 +132,7 @@ public:
 	void end_session(tcp_session_t *const ts);
 
 	// returns a port number
-	int allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd);
+	int allocate_client_session(const std::function<bool(tcp_session_t *, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd);
 	void client_session_send_data(const int local_port, const uint8_t *const data, const size_t len);
 	void close_client_session(const int port);
 	void wait_for_client_connected_state(const int local_port);

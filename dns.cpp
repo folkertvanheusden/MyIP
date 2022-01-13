@@ -216,12 +216,14 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 // flush cache periodically
 void dns::operator()()
 {
+	set_thread_name("myip-dns");
+
 	int count = 0;
 
 	while(!stop_flag) {
-		count++;
 		myusleep(500000);
-		if (count < 60)
+
+		if (++count < 60)
 			continue;
 
 		count = 0;

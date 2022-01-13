@@ -151,7 +151,7 @@ socks_proxy::~socks_proxy()
 	delete th;
 }
 
-bool socks_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, private_data *pd)
+bool socks_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, private_data *pd)
 {
 	int fd = dynamic_cast<socks_private_data *>(pd)->get_fd();
 
