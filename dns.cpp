@@ -121,7 +121,7 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 			std::string name = name_len.first.substr(0, name_len.first.size() - 1);  // remove '.'
 
-			DOLOG(debug, "DNS: Mapping %s to %s\n", name, a.to_str().c_str());
+			DOLOG(debug, "DNS: Mapping %s to %s\n", name.c_str(), a.to_str().c_str());
 
 			std::unique_lock lck(lock);
 
@@ -216,12 +216,14 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 // flush cache periodically
 void dns::operator()()
 {
+	set_thread_name("myip-dns");
+
 	int count = 0;
 
 	while(!stop_flag) {
-		count++;
 		myusleep(500000);
-		if (count < 60)
+
+		if (++count < 60)
 			continue;
 
 		count = 0;
