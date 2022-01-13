@@ -448,25 +448,19 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	if (data_len > 0 && fail == false) {
 		DOLOG(debug, "TCP[%012" PRIx64 "]: packet len %d, header size: %d, payload size: %d\n", id, size, header_size, data_len);
 
+		const uint8_t *data_start = &p[header_size];
+
 		DOLOG(debug, "TCP[%012" PRIx64 "]: %s\n", id, std::string((const char *)&p[header_size], data_len).c_str());
 
 		if (their_seq_nr == cur_session->their_seq_nr) {
-			const uint8_t *data_start = &p[header_size];
-
 //			std::string content = bin_to_text(data_start, data_len);
 //			DOLOG(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
 
 			auto cb = get_lock_listener(dst_port, id);
 
 			if (cb.has_value()) {
-				try {
-					if (cb.value().new_data(cur_session, pkt, data_start, data_len, cb.value().pd) == false) {
-						DOLOG(ll_error, "TCP[%012" PRIx64 "]: layer 7 indicated an error\n", id);
-						fail = true;
-					}
-				}
-				catch(...) {
-					DOLOG(ll_error, "TCP[%012" PRIx64 "]: EXCEPTION IN new_data()\n", id);
+				if (cb.value().new_data(cur_session, data_start, data_len, cb.value().pd) == false) {
+					DOLOG(ll_error, "TCP[%012" PRIx64 "]: layer 7 indicated an error\n", id);
 					fail = true;
 				}
 			}
@@ -479,6 +473,32 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			if (fail == false) {
 				cur_session->their_seq_nr += data_len;  // TODO handle missing segments
 
+				for(;;) {
+					auto it = cur_session->fragments.find(cur_session->their_seq_nr);
+					if (it == cur_session->fragments.end())
+						break;
+
+					DOLOG(debug, "TCP[%012" PRIx64 "]: use from fragment cache\n", id);
+
+					auto cb = get_lock_listener(dst_port, id);
+
+					if (cb.value().new_data(cur_session, it->second.data(), it->second.size(), cb.value().pd) == false) {
+						DOLOG(ll_error, "TCP[%012" PRIx64 "]: layer 7 indicated an error\n", id);
+						fail = true;
+					}
+
+					release_listener_lock();
+
+					cur_session->their_seq_nr += it->second.size();
+
+					cur_session->fragments.erase(it);
+
+					if (fail)
+						break;
+				}
+			}
+
+			if (fail == false) {
 				// will be acked in the 'unacked_sender'-thread
 				if (cur_session->unacked_size == 0) {
 					DOLOG(debug, "TCP[%012" PRIx64 "]: acknowledging received content\n", id);
@@ -492,6 +512,14 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		}
 		else {
 			DOLOG(info, "TCP[%012" PRIx64 "]: unexpected sequence nr %u, expected: %u\n", id, rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
+
+			if (their_seq_nr > cur_session->their_seq_nr) {
+				std::vector<uint8_t> fragment(data_start, data_start + data_len);
+
+				cur_session->fragments.insert({ their_seq_nr, std::move(fragment) });
+
+				DOLOG(info, "TCP[%012" PRIx64 "]: number of fragments in cache: %zu\n", id, cur_session->fragments.size());
+			}
 
 			uint32_t ack_to = cur_session->their_seq_nr >= their_seq_nr ? their_seq_nr : cur_session->their_seq_nr;
 
@@ -810,7 +838,7 @@ void tcp::end_session(tcp_session_t *const ts)
 	}
 }
 
-int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const packet *pkt, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd)
+int tcp::allocate_client_session(const std::function<bool(tcp_session_t *, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd)
 {
 	tcp_port_handler_t handler { 0 };
 	handler.new_data = new_data;

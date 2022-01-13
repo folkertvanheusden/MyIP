@@ -205,7 +205,7 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 	free(reply);
 }
 
-bool http_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, private_data *pd)
+bool http_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, private_data *pd)
 {
 	http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
 

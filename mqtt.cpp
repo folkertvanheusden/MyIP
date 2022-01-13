@@ -187,7 +187,7 @@ bool mqtt_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 	return true;
 }
 
-bool mqtt_new_data(tcp_session_t *ts, const packet *pkt, const uint8_t *data, size_t data_len, void *private_data)
+bool mqtt_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, void *private_data)
 {
 	mqtt_session_data *ms = dynamic_cast<mqtt_session_data *>(ts->p);
 
