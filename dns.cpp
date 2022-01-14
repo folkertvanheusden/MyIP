@@ -27,7 +27,7 @@ dns::~dns()
 	delete th;
 }
 
-std::pair<std::string, int> get_name(const uint8_t *const base, const uint8_t *const buffer)
+std::pair<std::string, int> get_name(const uint8_t *const base, const uint8_t *const buffer, const bool first)
 {
 	std::string name;
 	int tl = 0;  // total len
@@ -42,9 +42,12 @@ std::pair<std::string, int> get_name(const uint8_t *const base, const uint8_t *c
 			uint16_t offset = ((len & ~0xc0) << 8) | buffer[tl++];
 			printf("offset %d, len: %d\n", offset, base[offset]);
 
-			auto sub = get_name(base, &base[offset]);
+			// apparently it is only 1 level deep, this compression
+			if (first) {
+				auto sub = get_name(base, &base[offset], false);
 
-			name += sub.first;
+				name += sub.first;
+			}
 
 			break;
 		}
@@ -85,7 +88,7 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	DOLOG(debug, "DNS QDCOUNT: %d\n", qdcount);
 
 	for(int i=0; i<qdcount; i++) {
-		auto name_len = get_name(p->get_data(), work_p);
+		auto name_len = get_name(p->get_data(), work_p, true);
 		work_p += name_len.second;
 
 		uint16_t type = (work_p[0] << 8) | work_p[1];
@@ -100,7 +103,7 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	DOLOG(debug, "DNS ANCOUNT: %d\n", ancount);
 
 	for(int i=0; i<ancount; i++) {
-		auto name_len = get_name(p->get_data(), work_p);
+		auto name_len = get_name(p->get_data(), work_p, true);
 		work_p += name_len.second;
 
 		uint16_t type = (work_p[0] << 8) | work_p[1];
