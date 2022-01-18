@@ -234,7 +234,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	DOLOG(debug, "TCP[%012" PRIx64 "]: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
 	free(flag_str);
 
-	sessions_lock.lock();
+	std::unique_lock<std::mutex> lck(sessions_lock);
 
 	auto cur_it = sessions.find(id);
 
@@ -282,7 +282,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			cur_it = sessions.find(id);
 		}
 		else {
-			sessions_lock.unlock();
+			lck.unlock();
 			DOLOG(debug, "TCP[%012" PRIx64 "]: new session which does not start with SYN [IC]\n", id);
 			delete pkt;
 			stats_inc_counter(tcp_errors);
@@ -555,12 +555,12 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 	cur_session->tlock.unlock();
 
-	sessions_lock.unlock();
+	lck.unlock();
 
 	if (delete_entry) {
 		DOLOG(info, "TCP[%012" PRIx64 "]: cleaning up session\n", id);
 
-		sessions_lock.lock();
+		lck.lock();
 
 		cur_it = sessions.find(id);
 
@@ -570,7 +570,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			sessions.erase(cur_it);
 			stats_set(tcp_cur_n_sessions, sessions.size());
-			sessions_lock.unlock();
+			lck.unlock();
 
 			// call session_closed_2
 			int close_port = is_client ? pointer->org_src_port : pointer->org_dst_port;
@@ -588,7 +588,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			free_tcp_session(pointer);
 		}
 		else {
-			sessions_lock.unlock();
+			lck.unlock();
 		}
 
 		stats_inc_counter(tcp_sessions_rem);

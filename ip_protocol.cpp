@@ -1,10 +1,10 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <chrono>
 
 #include "ip_protocol.h"
 #include "utils.h"
 
-constexpr size_t pkts_max_size { 512 };
+constexpr size_t pkts_max_size { 256 };
 
 ip_protocol::ip_protocol(stats *const s, const std::string & stats_name)
 {
