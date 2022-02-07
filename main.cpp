@@ -152,9 +152,6 @@ int main(int argc, char *argv[])
 	}
 
 	signal(SIGCHLD, SIG_IGN);
-#ifdef linux
-	signal(33, SIG_IGN);
-#endif
 
 	libconfig::Config lc_cfg;
 
