@@ -767,12 +767,6 @@ void vnc_close_session_1(tcp_session_t *ts, private_data *pd)
 	if (ts -> p) {
 		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
 
-		{
-			const std::lock_guard<std::mutex> lck(vs->w_lock);
-			vs->wq.push(nullptr);
-			vs->w_cond.notify_one();
-		}
-
 		stats_add_average(vs->vpd->vnc_duration, time(nullptr) - vs->start);
 	}
 }
@@ -781,6 +775,10 @@ void vnc_close_session_2(tcp_session_t *ts, private_data *pd)
 {
 	if (ts -> p) {
 		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
+
+		const std::lock_guard<std::mutex> lck(vs->w_lock);
+		vs->wq.push(nullptr);
+		vs->w_cond.notify_one();
 
 		vs->th->join();
 		delete vs->th;
