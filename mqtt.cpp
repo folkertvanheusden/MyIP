@@ -440,6 +440,11 @@ void mqtt_close_session_2(tcp_session_t *ts, private_data *pd)
 	if (ts -> p) {
 		mqtt_session_data *ms = dynamic_cast<mqtt_session_data *>(ts->p);
 
+		ms->terminate = true;
+
+		const std::lock_guard<std::mutex> lck(ms->w_lock);
+		ms->w_cond.notify_one();
+
 		ms->th->join();
 		delete ms->th;
 
