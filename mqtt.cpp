@@ -442,8 +442,10 @@ void mqtt_close_session_2(tcp_session_t *ts, private_data *pd)
 
 		ms->terminate = true;
 
-		const std::lock_guard<std::mutex> lck(ms->w_lock);
-		ms->w_cond.notify_one();
+		{
+			const std::lock_guard<std::mutex> lck(ms->w_lock);
+			ms->w_cond.notify_one();
+		}
 
 		ms->th->join();
 		delete ms->th;
