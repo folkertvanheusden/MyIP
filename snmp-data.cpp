@@ -162,28 +162,6 @@ std::optional<snmp_elem *> snmp_data::find_by_oid(const std::string & oid)
 	return { };
 }
 
-std::string snmp_data::get_sibling(std::map<std::string, snmp_data_type *> & m, const int who)
-{
-	if (m.empty())
-		return "";
-
-	struct int_cmp {
-		bool operator()(const std::pair<std::string, snmp_data_type *> & lhs, const std::pair<std::string, snmp_data_type *> & rhs) {
-			return lhs.second->get_index() < rhs.second->get_index();
-		}
-	};
-
-	std::vector<std::pair<std::string, snmp_data_type *> > temp(m.begin(), m.end());
-	std::stable_sort(temp.begin(), temp.end(), int_cmp());
-
-	for(size_t i=0; i<temp.size(); i++) {
-		if (temp.at(i).second->get_index() > who)
-			return temp.at(i).second->get_oid();
-	}
-
-	return "";
-}
-
 std::string snmp_data::find_next_oid(const std::string & oid)
 {
 	std::string out;
@@ -194,30 +172,26 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 
 	std::vector<std::string> parts = split(oid, ".");
 
+	std::string cur_oid;
+
 	for(size_t i=0; i<parts.size(); i++) {
-		auto it = p_lut->find(parts.at(i));
+		if (cur_oid.empty() == false)
+			cur_oid += ".";
+
+		cur_oid += parts.at(i);
+
+		auto it = p_lut->find(cur_oid);
 
 		if (it == p_lut->end())
-			break;
-
-		if (i == parts.size() - 1) {
-			out = get_sibling(*p_lut, atoi(parts.at(i).c_str()));
-
-			if (out.empty() == true) {
-				p_lut = it->second->get_children();
-
-				out = get_sibling(*p_lut, -1);
-			}
-
-			break;
-		}
+			return "";
 
 		p_lut = it->second->get_children();
 	}
 
-	lock.unlock();
+	if (p_lut->empty())
+		return "";
 
-	return out;
+	return p_lut->begin()->second->get_oid();
 }
 
 void snmp_data::walk_tree(snmp_data_type & node)
