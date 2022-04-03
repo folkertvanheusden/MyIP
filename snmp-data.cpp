@@ -5,6 +5,18 @@
 #include "utils.h"
 
 
+static ssize_t find_oid_in_vector(std::vector<snmp_data_type *> *vec, const std::string & oid)
+{
+	ssize_t n = vec->size();
+
+	for(ssize_t i=0; i<n; i++) {
+		if (vec->at(i)->get_oid() == oid)
+			return i;
+	}
+
+	return -1;
+}
+
 snmp_data_type::snmp_data_type()
 {
 }
@@ -13,14 +25,18 @@ snmp_data_type::~snmp_data_type()
 {
 }
 
-std::map<std::string, snmp_data_type *> * snmp_data_type::get_children()
+std::vector<snmp_data_type *> * snmp_data_type::get_children()
 {
-	return &children;
+	return &data;
 }
 
 void snmp_data_type::set_tree_data(const std::string & oid)
 {
 	this->oid = oid;
+
+	std::size_t dot = oid.rfind('.');
+	if (dot != std::string::npos)
+		oid_idx = atoi(oid.substr(dot + 1).c_str());
 }
 
 snmp_elem * snmp_data_type::get_data()
@@ -28,9 +44,14 @@ snmp_elem * snmp_data_type::get_data()
 	return nullptr;
 }
 
-std::string snmp_data_type::get_oid()
+std::string snmp_data_type::get_oid() const
 {
 	return oid;
+}
+
+int snmp_data_type::get_oid_idx() const
+{
+	return oid_idx;
 }
 
 snmp_data_type_static::snmp_data_type_static(const std::string & content) :
@@ -84,20 +105,20 @@ snmp_data::snmp_data()
 snmp_data::~snmp_data()
 {
 	for(auto e : data)
-		delete e.second;
+		delete e;
 }
 
 void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
 {
 	assert(e);
 
-	std::map<std::string, snmp_data_type *> *p_lut = &data;
+	std::vector<snmp_data_type *> *p_lut = &data;
 
-	std::vector<std::string>     parts = split(oid, ".");
+	std::vector<std::string>       parts = split(oid, ".");
 
-	std::string                  cur_oid;
+	std::string                    cur_oid;
 
-	std::unique_lock<std::mutex> lck(lock);
+	std::unique_lock<std::mutex>   lck(lock);
 
 	for(size_t i=0; i<parts.size(); i++) {
 		if (cur_oid.empty() == false)
@@ -105,18 +126,29 @@ void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
 
 		cur_oid += parts.at(i);
 
-		auto it = p_lut->find(cur_oid);
+		ssize_t idx = find_oid_in_vector(p_lut, cur_oid);
 
-		if (it == p_lut->end()) {
+		if (idx == -1) {
 			snmp_data_type *temp_e = i == parts.size() - 1 ? e : new snmp_data_type();
 			temp_e->set_tree_data(cur_oid);
 
-			p_lut->insert({ cur_oid, temp_e});
+			bool inserted = false;
+
+			for(size_t i=0; i<p_lut->size(); i++) {
+				if (temp_e->get_oid_idx() < p_lut->at(i)->get_oid_idx()) {
+					inserted = true;
+					p_lut->insert(p_lut->begin() + i, temp_e);
+					break;
+				}
+			}
+
+			if (!inserted)
+				p_lut->push_back(temp_e);
 
 			p_lut = temp_e->get_children();
 		}
 		else {
-			p_lut = it->second->get_children();
+			p_lut = p_lut->at(idx)->get_children();
 		}
 	}
 }
@@ -130,7 +162,7 @@ std::optional<snmp_elem *> snmp_data::find_by_oid(const std::string & oid)
 {
 	std::unique_lock<std::mutex> lck(lock);
 
-	std::map<std::string, snmp_data_type *> *p_lut = &data;
+	std::vector<snmp_data_type *> *p_lut = &data;
 
 	std::vector<std::string> parts = split(oid, ".");
 
@@ -142,15 +174,15 @@ std::optional<snmp_elem *> snmp_data::find_by_oid(const std::string & oid)
 
 		cur_oid += parts.at(i);
 
-		auto it = p_lut->find(cur_oid);
+		ssize_t idx = find_oid_in_vector(p_lut, cur_oid);
 
-		if (it == p_lut->end())
+		if (idx == -1)
 			break;
 
 		if (i == parts.size() - 1)
-			return it->second->get_data();
+			return p_lut->at(idx)->get_data();
 
-		p_lut = it->second->get_children();
+		p_lut = p_lut->at(idx)->get_children();
 	}
 
 	return { };
@@ -158,19 +190,16 @@ std::optional<snmp_elem *> snmp_data::find_by_oid(const std::string & oid)
 
 std::string snmp_data::find_next_oid(const std::string & oid)
 {
-	std::string out;
-
 	std::unique_lock<std::mutex> lck(lock);
 
-	snmp_data_type *p_pp  = nullptr;
-	snmp_data_type *p_prv = nullptr;
-	snmp_data_type *p_cur = nullptr;
-
-	std::map<std::string, snmp_data_type *> *p_lut = &data;
+	std::vector<snmp_data_type *> *p_lut = &data;
+	snmp_data_type *parent = nullptr;
 
 	std::vector<std::string> parts = split(oid, ".");
 
 	std::string cur_oid;
+
+	std::vector<std::pair<snmp_data_type *, ssize_t> > branch;
 
 	for(size_t i=0; i<parts.size(); i++) {
 		if (cur_oid.empty() == false)
@@ -178,35 +207,38 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 
 		cur_oid += parts.at(i);
 
-		auto it = p_lut->find(cur_oid);
+		ssize_t idx = find_oid_in_vector(p_lut, cur_oid);
 
-		if (it == p_lut->end())
-			return "";
+		if (idx == -1)
+			break;
 
-		p_pp  = p_prv;  // parent-parent
-		p_prv = p_cur;
-		p_cur = it->second;
+		branch.push_back({ parent, idx });
 
-		p_lut = p_cur->get_children();
+		parent = p_lut->at(idx);
+		p_lut = parent->get_children();
 	}
 
-	// no children? find sibling
-	if (p_lut->empty() && p_pp) {
-		std::string parent_oid = p_prv->get_oid();
+	if (p_lut->empty() == false)
+		return p_lut->at(0)->get_oid();
 
-		// find current parent
-		auto it = p_pp->get_children()->find(parent_oid);
+	printf("# items: %zu\n", branch.size());
 
-		// skip to sibling
-		it++;
+	while(branch.empty() == false) {
+		snmp_data_type *element = branch.back().first;
+		ssize_t         index   = branch.back().second;
 
-		if (it == p_pp->get_children()->end())
-			return "";
+		if (element == nullptr)  // top node
+			break;
 
-		return it->second->get_oid();
+		branch.pop_back();
+
+		printf("%s %zd out of %zu\n", element->get_oid().c_str(), index, element->get_children()->size());
+
+		if (index + 1 < element->get_children()->size())
+			return element->get_children()->at(index + 1)->get_oid();
 	}
 
-	return p_lut->begin()->second->get_oid();
+	return "";
 }
 
 void snmp_data::walk_tree(snmp_data_type & node)
@@ -216,11 +248,11 @@ void snmp_data::walk_tree(snmp_data_type & node)
 	fprintf(stderr, " \"%s\" [shape=circle];\n", cur_oid.c_str());
 
 	for(auto k : *node.get_children()) {
-		std::string child_oid = k.first;
+		std::string child_oid = k->get_oid();
 	
 		fprintf(stderr, " \"%s\" -> \"%s\";\n", cur_oid.c_str(), child_oid.c_str());
 
-		walk_tree(*k.second);
+		walk_tree(*k);
 	}
 }
 
@@ -228,7 +260,7 @@ void snmp_data::dump_tree()
 {
 	fprintf(stderr, "digraph test {\n");
 
-	walk_tree(*data.begin()->second);
+	walk_tree(*data.at(0));
 
 	fprintf(stderr, "}\n");
 }

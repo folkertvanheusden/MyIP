@@ -1,8 +1,9 @@
 #pragma once
 
-#include <map>
 #include <mutex>
+#include <optional>
 #include <stdint.h>
+#include <vector>
 
 #include "snmp-elem.h"
 
@@ -10,10 +11,10 @@
 class snmp_data_type
 {
 protected:
-	int         index { -1 };
+	int         oid_idx { 0 };
 	std::string oid;
 
-	std::map<std::string, snmp_data_type *> children;
+	std::vector<snmp_data_type *> data;
 
 public:
 	snmp_data_type();
@@ -21,10 +22,10 @@ public:
 
 	virtual snmp_elem * get_data();
 
-	std::map<std::string, snmp_data_type *> * get_children();
-	void        set_tree_data(const int index, const std::string & oid);
-	int         get_index();
-	std::string get_oid();
+	std::vector<snmp_data_type *> * get_children();
+	void        set_tree_data(const std::string & oid);
+	int         get_oid_idx() const;
+	std::string get_oid() const;
 };
 
 class snmp_data_type_static : public snmp_data_type
@@ -66,10 +67,8 @@ public:
 class snmp_data
 {
 private:
-	std::map<std::string, snmp_data_type *> data;
-	std::mutex     lock;
-
-	std::string get_sibling(std::map<std::string, snmp_data_type *> & m, const int who);
+	std::vector<snmp_data_type *> data;
+	std::mutex lock;
 
 	void walk_tree(snmp_data_type & node);
 
