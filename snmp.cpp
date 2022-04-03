@@ -201,7 +201,7 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 				return false;
 
 			if (is_getnext) {
-				std::string oid_next = s->find_next_oid(oid_out);
+				std::string oid_next = sd->find_next_oid(oid_out);
 
 				if (oid_next.empty()) {
 					oids_req->err = 2;

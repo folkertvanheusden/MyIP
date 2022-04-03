@@ -1,5 +1,4 @@
 // (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
-#include <algorithm>
 #include <assert.h>
 #include <cstring>
 #include <fcntl.h>
@@ -44,8 +43,9 @@ void stats_add_average(uint64_t *const p, const int val)
 #endif
 }
 
-
-stats::stats(const int size) : size(size)
+stats::stats(const int size, snmp_data *const sd) :
+	size(size),
+	sd(sd)
 {
 	fd = shm_open(shm_name, O_RDWR | O_CREAT, 0644);
 	if (fd == -1) {
@@ -110,15 +110,11 @@ uint64_t * stats::register_stat(const std::string & name, const std::string & oi
 		return nullptr;
 	}
 
-	lock.lock();
+	std::unique_lock<std::mutex> lck(lock);
 
 	auto lut_it = lut.find(name);
-	if (lut_it != lut.end()) {
-		uint64_t *rc = lut_it->second.p;
-		lock.unlock();
-
-		return rc;
-	}
+	if (lut_it != lut.end())
+		return lut_it->second.p;
 
 	uint8_t *p_out = (uint8_t *)&p[len];
 
@@ -133,60 +129,16 @@ uint64_t * stats::register_stat(const std::string & name, const std::string & oi
 
 	len += 48;
 
-	stats_t st;
-	st.p = reinterpret_cast<uint64_t *>(p_out);
-	st.oid = oid;
+	sd->register_oid(oid, new snmp_data_type_stats(reinterpret_cast<uint64_t *>(p_out)));
 
-	auto lut_rc = lut.insert(std::pair<std::string, stats_t>(name, st));
-	assert(lut_rc.second);
-
-	if (oid.empty() == false) {
-		std::map<std::string, oid_t> *p_lut = &lut_oid;
-
-		std::vector<std::string> parts = split(oid, ".");
-
-		std::string cur_oid;
-
-		for(size_t i=0; i<parts.size(); i++) {
-			auto it = p_lut->find(parts.at(i));
-
-			if (cur_oid.empty() == false)
-				cur_oid += ".";
-
-			cur_oid += parts.at(i);
-
-			if (it == p_lut->end()) {
-				oid_t o;
-				o.s.oid = cur_oid;
-				o.index = atoi(parts.at(i).c_str());
-
-				auto rc = p_lut->insert(std::pair<std::string, oid_t>(parts.at(i), o));
-
-				it = rc.first;
-			}
-
-			if (i == parts.size() - 1) {
-				it->second.s = st;
-				it->second.index = atoi(parts.at(i).c_str());
-			}
-			else {
-				p_lut = &it->second.children;
-			}
-		}
-	}
-
-	lock.unlock();
-
-	return (uint64_t *)p_out;
+	return reinterpret_cast<uint64_t *>(p_out);
 }
 
 void stats::register_fifo_stats(const std::string & name, fifo_stats *const fs)
 {
-	lock.lock();
+	std::unique_lock<std::mutex> lck(lock);
 
 	this->fs.insert({ name, fs });
-
-	lock.unlock();
 }
 
 std::string stats::to_json() const
@@ -194,103 +146,14 @@ std::string stats::to_json() const
 	return stats_to_json(p, get_fifo_stats(), size);
 }
 
-uint64_t * stats::find_by_oid(const std::string & oid)
-{
-	uint64_t *rc = nullptr;
-
-	lock.lock();
-
-	std::map<std::string, oid_t> *p_lut = &lut_oid;
-
-	std::vector<std::string> parts = split(oid, ".");
-
-	for(size_t i=0; i<parts.size(); i++) {
-		auto it = p_lut->find(parts.at(i));
-
-		if (it == p_lut->end())
-			break;
-
-		if (i == parts.size() - 1)
-			rc = it->second.s.p;
-		else
-			p_lut = &it->second.children;
-	}
-
-	lock.unlock();
-
-	return rc;
-}
-
-std::string get_sibling(std::map<std::string, oid_t> & m, const int who)
-{
-	if (m.empty())
-		return "";
-
-	struct int_cmp {
-		bool operator()(const std::pair<std::string, oid_t> & lhs, const std::pair<std::string, oid_t> & rhs) {
-			return lhs.second.index < rhs.second.index;
-		}
-	};
-
-	std::vector<std::pair<std::string, oid_t> > temp(m.begin(), m.end());
-	std::stable_sort(temp.begin(), temp.end(), int_cmp());
-
-	for(size_t i=0; i<temp.size(); i++) {
-		if (temp.at(i).second.index > who)
-			return temp.at(i).second.s.oid;
-	}
-
-	return "";
-}
-
-std::string stats::find_next_oid(const std::string & oid)
-{
-	std::string out;
-
-	lock.lock();
-
-//	dump_tree(lut_oid);
-
-	std::map<std::string, oid_t> *p_lut = &lut_oid;
-
-	std::vector<std::string> parts = split(oid, ".");
-
-	for(size_t i=0; i<parts.size(); i++) {
-		auto it = p_lut->find(parts.at(i));
-
-		if (it == p_lut->end())
-			break;
-
-		if (i == parts.size() - 1) {
-			out = get_sibling(*p_lut, atoi(parts.at(i).c_str()));
-
-			if (out.empty() == true) {
-				p_lut = &it->second.children;
-
-				out = get_sibling(*p_lut, -1);
-			}
-
-			break;
-		}
-
-		p_lut = &it->second.children;
-	}
-
-	lock.unlock();
-
-	return out;
-}
-
 std::vector<std::pair<const std::string, const fifo_stats *> > stats::get_fifo_stats() const
 {
 	std::vector<std::pair<const std::string, const fifo_stats *> > out;
 
-	lock.lock();
+	std::unique_lock<std::mutex> lck(lock);
 
 	for(auto & item : fs)
 		out.push_back({ item.first, item.second });
-
-	lock.unlock();
 
 	return out;
 }

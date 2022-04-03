@@ -207,7 +207,12 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, ss);
 
-	stats s(8192);
+	snmp_data sd;
+	sd.add_oid("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
+	sd.add_oid("1.3.6.1.2.1.1.5", "MyIP");
+	sd.add_oid("1.3.6.1.2.1.1.6", "The Netherlands, Europe, Earth");
+
+	stats s(8192, &sd);
 
 	/// environment
 	int uid = 1000, gid = 1000;
@@ -230,11 +235,6 @@ int main(int argc, char *argv[])
 	std::vector<protocol *> protocols;
 	std::vector<ip_protocol *> ip_protocols;
 	std::vector<application *> applications;
-
-	snmp_data sd;
-	sd.add_oid("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
-	sd.add_oid("1.3.6.1.2.1.1.5", "MyIP");
-	sd.add_oid("1.3.6.1.2.1.1.6", "The Netherlands, Europe, Earth");
 
 	/// network interfaces
 	const libconfig::Setting &interfaces = root["interfaces"];
