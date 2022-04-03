@@ -231,10 +231,10 @@ int main(int argc, char *argv[])
 	std::vector<ip_protocol *> ip_protocols;
 	std::vector<application *> applications;
 
-	snmp_static ss;
-	ss.add_data("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
-	ss.add_data("1.3.6.1.2.1.1.5", "MyIP");
-	ss.add_data("1.3.6.1.2.1.1.6", "The Netherlands, Europe, Earth");
+	snmp_data sd;
+	sd.add_oid("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
+	sd.add_oid("1.3.6.1.2.1.1.5", "MyIP");
+	sd.add_oid("1.3.6.1.2.1.1.6", "The Netherlands, Europe, Earth");
 
 	/// network interfaces
 	const libconfig::Setting &interfaces = root["interfaces"];
@@ -257,14 +257,14 @@ int main(int argc, char *argv[])
 		if (type == "ethernet") {
 			std::string dev_name = cfg_str(interface, "dev-name", "device name", true, "myip");
 
-			ss.add_data(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
+			sd.add_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
 
 			dev = new phys_ethernet(i + 1, &s, dev_name, uid, gid);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
 
-			ss.add_data(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
+			sd.add_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
 
 			int baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
 			int bps_setting = 0;
@@ -534,7 +534,7 @@ int main(int argc, char *argv[])
 			if (!u4)
 				continue;
 
-			snmp *snmp_4 = new snmp(&ss, &s, u4);
+			snmp *snmp_4 = new snmp(&sd, &s, u4);
 			u4->add_handler(port, std::bind(&snmp::input, snmp_4, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
@@ -545,7 +545,7 @@ int main(int argc, char *argv[])
 			if (!u6)
 				continue;
 
-			snmp *snmp_6 = new snmp(&ss, &s, u6);
+			snmp *snmp_6 = new snmp(&sd, &s, u6);
 			u6->add_handler(port, std::bind(&snmp::input, snmp_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			applications.push_back(snmp_4);

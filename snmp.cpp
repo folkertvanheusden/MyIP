@@ -10,8 +10,8 @@
 #include "utils.h"
 
 
-snmp::snmp(snmp_static *const ss, stats *const s, udp *const u) :
-	ss(ss),
+snmp::snmp(snmp_data *const sd, stats *const s, udp *const u) :
+	sd(sd),
 	s(s),
 	u(u)
 {
@@ -278,13 +278,11 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 		varbind->add(new snmp_oid(e));
 
-		uint64_t *vp = s->find_by_oid(e);
+		std::optional<snmp_elem *> rc = sd->find_by_oid(e);
 
-		if (vp) {
-			DOLOG(debug, "SNMP: requested %s gives %lu\n", e.c_str(), *vp);
-
-			varbind->add(new snmp_integer(*vp));
-		}
+		if (rc.has_value())
+			varbind->add(rc.value());
+#if 0  // move to snmp_data
 		else if (e == "1.3.6.1.2.1.1.1") {  // system description
 			std::string descr = "MyIP - an IP-stack implemented in C++ running in userspace";
 
@@ -304,17 +302,12 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 			varbind->add(new snmp_integer(services));
 		}
+#endif
 		else {
-			auto record = ss->get_oid(e);
+			DOLOG(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
 
-			if (record.has_value())
-				varbind->add(new snmp_octet_string(reinterpret_cast<const uint8_t *>(record.value().c_str()), record.value().size()));
-			else {
-				DOLOG(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
-
-				// FIXME snmp_null?
-				varbind->add(new snmp_null());
-			}
+			// FIXME snmp_null?
+			varbind->add(new snmp_null());
 		}
 	}
 
