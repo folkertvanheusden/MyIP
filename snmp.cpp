@@ -280,6 +280,9 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 			varbind->add(new snmp_integer(*vp));
 		}
+		else if (e == "1.3.6.1.2.1.1.6") {  // location
+			varbind->add(new snmp_octet_string(reinterpret_cast<const uint8_t *>("here"), 4));
+		}
 		else {  // FIXME snmp_null?
 			DOLOG(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
 
