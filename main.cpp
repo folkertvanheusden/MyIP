@@ -208,9 +208,9 @@ int main(int argc, char *argv[])
 	signal(SIGINT, ss);
 
 	snmp_data sd;
-	sd.add_oid("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
-	sd.add_oid("1.3.6.1.2.1.1.5", "MyIP");
-	sd.add_oid("1.3.6.1.2.1.1.6", "The Netherlands, Europe, Earth");
+	sd.register_oid("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
+	sd.register_oid("1.3.6.1.2.1.1.5", "MyIP");
+	sd.register_oid("1.3.6.1.2.1.1.6", "The Netherlands, Europe, Earth");
 
 	stats s(8192, &sd);
 
@@ -257,14 +257,14 @@ int main(int argc, char *argv[])
 		if (type == "ethernet") {
 			std::string dev_name = cfg_str(interface, "dev-name", "device name", true, "myip");
 
-			sd.add_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
 
 			dev = new phys_ethernet(i + 1, &s, dev_name, uid, gid);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
 
-			sd.add_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
 
 			int baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
 			int bps_setting = 0;
@@ -597,6 +597,8 @@ int main(int argc, char *argv[])
 	DOLOG(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
+
+	sd.dump_tree();
 
 	getchar();
 

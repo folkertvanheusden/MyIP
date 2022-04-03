@@ -64,6 +64,8 @@ snmp_sequence::~snmp_sequence()
 
 void snmp_sequence::add(const snmp_elem * const e)
 {
+	assert(e);
+
 	sequence.push_back(e);
 }
 

@@ -82,27 +82,6 @@ stats::~stats()
 	shm_unlink(shm_name);
 }
 
-void walk_tree(const std::map<std::string, oid_t> & tree, const std::string & parent)
-{
-	for(auto k : tree) {
-		std::string child = parent + "." + k.first;
-
-		fprintf(stderr, " \"%s\" [shape=circle];\n", child.c_str());
-
-		fprintf(stderr, " \"%s\" -> \"%s\";\n", parent.c_str(), child.c_str());
-
-		walk_tree(k.second.children, k.second.s.oid);
-	}
-}
-
-void dump_tree(const std::map<std::string, oid_t> & tree)
-{
-	fprintf(stderr, "digraph test {\n");
-	fprintf(stderr, " top [shape=circle];\n");
-	walk_tree(tree, "top");
-	fprintf(stderr, "}\n");
-}
-
 uint64_t * stats::register_stat(const std::string & name, const std::string & oid)
 {
 	if (len + 48 > size) {

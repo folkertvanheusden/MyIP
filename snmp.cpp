@@ -280,8 +280,15 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 		std::optional<snmp_elem *> rc = sd->find_by_oid(e);
 
-		if (rc.has_value())
-			varbind->add(rc.value());
+		if (rc.has_value()) {
+			auto current_element = rc.value();
+
+			if (current_element)
+				varbind->add(current_element);
+			else
+				varbind->add(new snmp_null());
+		}
+
 #if 0  // move to snmp_data
 		else if (e == "1.3.6.1.2.1.1.1") {  // system description
 			std::string descr = "MyIP - an IP-stack implemented in C++ running in userspace";

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <assert.h>
 
 #include "snmp-data.h"
 #include "utils.h"
@@ -94,6 +95,8 @@ snmp_data::~snmp_data()
 
 void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
 {
+	assert(e);
+
 	std::map<std::string, snmp_data_type *> *p_lut = &data;
 
 	std::vector<std::string>     parts = split(oid, ".");
@@ -124,16 +127,9 @@ void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
 	}
 }
 
-void snmp_data::add_oid(const std::string & oid, const std::string & static_data)
+void snmp_data::register_oid(const std::string & oid, const std::string & static_data)
 {
-	add_oid(oid, new snmp_data_type_static(static_data));
-}
-
-void snmp_data::add_oid(const std::string & oid, snmp_data_type *const dynamic_data)
-{
-	std::unique_lock<std::mutex> lck(lock);
-
-	data.insert_or_assign(oid, dynamic_data);
+	register_oid(oid, new snmp_data_type_static(static_data));
 }
 
 std::optional<snmp_elem *> snmp_data::find_by_oid(const std::string & oid)
@@ -144,8 +140,15 @@ std::optional<snmp_elem *> snmp_data::find_by_oid(const std::string & oid)
 
 	std::vector<std::string> parts = split(oid, ".");
 
+	std::string cur_oid;
+
 	for(size_t i=0; i<parts.size(); i++) {
-		auto it = p_lut->find(parts.at(i));
+		if (cur_oid.empty() == false)
+			cur_oid += ".";
+
+		cur_oid += parts.at(i);
+
+		auto it = p_lut->find(cur_oid);
 
 		if (it == p_lut->end())
 			break;
@@ -215,4 +218,28 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 	lock.unlock();
 
 	return out;
+}
+
+void snmp_data::walk_tree(snmp_data_type & node)
+{
+	std::string cur_oid = node.get_oid();
+
+	fprintf(stderr, " \"%s\" [shape=circle];\n", cur_oid.c_str());
+
+	for(auto k : *node.get_children()) {
+		std::string child_oid = k.first;
+	
+		fprintf(stderr, " \"%s\" -> \"%s\";\n", cur_oid.c_str(), child_oid.c_str());
+
+		walk_tree(*k.second);
+	}
+}
+
+void snmp_data::dump_tree()
+{
+	fprintf(stderr, "digraph test {\n");
+
+	walk_tree(*data.begin()->second);
+
+	fprintf(stderr, "}\n");
 }

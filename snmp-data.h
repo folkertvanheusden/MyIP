@@ -71,15 +71,17 @@ private:
 
 	std::string get_sibling(std::map<std::string, snmp_data_type *> & m, const int who);
 
+	void walk_tree(snmp_data_type & node);
+
 public:
 	snmp_data();
 	virtual ~snmp_data();
 
-	void add_oid(const std::string & oid, const std::string & static_data);
-	void add_oid(const std::string & oid, snmp_data_type *const dynamic_data);
-
+	void register_oid(const std::string & oid, const std::string & static_data);
 	void register_oid(const std::string & oid, snmp_data_type *const e);
 
 	std::optional<snmp_elem *> find_by_oid(const std::string & oid);
 	std::string find_next_oid(const std::string & oid);
+
+	void dump_tree();
 };
