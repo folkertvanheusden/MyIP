@@ -18,20 +18,14 @@ std::map<std::string, snmp_data_type *> * snmp_data_type::get_children()
 	return &children;
 }
 
-void snmp_data_type::set_tree_data(const int index, const std::string & oid)
+void snmp_data_type::set_tree_data(const std::string & oid)
 {
-	this->index = index;
-	this->oid   = oid;
+	this->oid = oid;
 }
 
 snmp_elem * snmp_data_type::get_data()
 {
 	return nullptr;
-}
-
-int snmp_data_type::get_index()
-{
-	return index;
 }
 
 std::string snmp_data_type::get_oid()
@@ -114,8 +108,8 @@ void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
 		auto it = p_lut->find(cur_oid);
 
 		if (it == p_lut->end()) {
-			snmp_data_type *temp_e = new snmp_data_type();
-			temp_e->set_tree_data(i, cur_oid);
+			snmp_data_type *temp_e = i == parts.size() - 1 ? e : new snmp_data_type();
+			temp_e->set_tree_data(cur_oid);
 
 			p_lut->insert({ cur_oid, temp_e});
 
@@ -168,6 +162,10 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 
 	std::unique_lock<std::mutex> lck(lock);
 
+	snmp_data_type *p_pp  = nullptr;
+	snmp_data_type *p_prv = nullptr;
+	snmp_data_type *p_cur = nullptr;
+
 	std::map<std::string, snmp_data_type *> *p_lut = &data;
 
 	std::vector<std::string> parts = split(oid, ".");
@@ -185,11 +183,28 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 		if (it == p_lut->end())
 			return "";
 
-		p_lut = it->second->get_children();
+		p_pp  = p_prv;  // parent-parent
+		p_prv = p_cur;
+		p_cur = it->second;
+
+		p_lut = p_cur->get_children();
 	}
 
-	if (p_lut->empty())
-		return "";
+	// no children? find sibling
+	if (p_lut->empty() && p_pp) {
+		std::string parent_oid = p_prv->get_oid();
+
+		// find current parent
+		auto it = p_pp->get_children()->find(parent_oid);
+
+		// skip to sibling
+		it++;
+
+		if (it == p_pp->get_children()->end())
+			return "";
+
+		return it->second->get_oid();
+	}
 
 	return p_lut->begin()->second->get_oid();
 }
