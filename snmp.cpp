@@ -15,6 +15,8 @@ snmp::snmp(stats *const s, udp *const u) : s(s), u(u)
 	// 1.3.6.1.2.1.4.57850.1.5: snmp
 	snmp_requests = s->register_stat("snmp_requests", "1.3.6.1.2.1.4.57850.1.5.1");
 	snmp_invalid  = s->register_stat("snmp_invalid", "1.3.6.1.2.1.4.57850.1.5.2");
+
+	running_since = get_us() / 1000;
 }
 
 snmp::~snmp()
@@ -280,8 +282,35 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 			varbind->add(new snmp_integer(*vp));
 		}
-		else if (e == "1.3.6.1.2.1.1.6") {  // location
+		else if (e == "1.3.6.1.2.1.1.1") {  // system description
+			std::string descr = "MyIP - an IP-stack implemented in C++ running in userspace";
+
+			varbind->add(new snmp_octet_string(reinterpret_cast<const uint8_t *>(descr.c_str()), descr.size()));
+		}
+		else if (e == "1.3.6.1.2.1.1.2") {  // system id
+			varbind->add(new snmp_oid("iso.3.6.1.2.1.4.57850.1"));
+		}
+		else if (e == "1.3.6.1.2.1.1.3") {  // system uptime
+			uint64_t now = get_us() / 1000;
+
+			varbind->add(new snmp_integer((now - running_since) / 10));  // 100ths of a second
+		}
+		else if (e == "1.3.6.1.2.1.1.4") {  // system contact
+			std::string contact = "mail@vanheusden.com";
+
+			varbind->add(new snmp_octet_string(reinterpret_cast<const uint8_t *>(contact.c_str()), contact.size()));
+		}
+		else if (e == "1.3.6.1.2.1.1.5") {  // system name
+			varbind->add(new snmp_octet_string(reinterpret_cast<const uint8_t *>("MyIP"), 4));
+		}
+		else if (e == "1.3.6.1.2.1.1.6") {  // system location
 			varbind->add(new snmp_octet_string(reinterpret_cast<const uint8_t *>("here"), 4));
+		}
+		else if (e == "1.3.6.1.2.1.1.7") {  // system services
+			// most of the 7 layers
+			int services = (1 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (1 << 3) | (1 << 2) | (1 << 1);
+
+			varbind->add(new snmp_integer(services));
 		}
 		else {  // FIXME snmp_null?
 			DOLOG(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
