@@ -24,8 +24,10 @@ protected:
 
 	std::map<uint16_t, protocol *> prot_map;
 
+	const size_t dev_index { 0 };
+
 public:
-	phys(stats *const s);
+	phys(const size_t dev_index, stats *const s);
 	phys(const phys &) = delete;
 	virtual ~phys();
 

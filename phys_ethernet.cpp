@@ -25,7 +25,7 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 	ifr->ifr_name[IFNAMSIZ - 1] = 0x00;
 }
 
-phys_ethernet::phys_ethernet(stats *const s, const std::string & dev_name, const int uid, const int gid) : phys(s)
+phys_ethernet::phys_ethernet(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid) : phys(dev_index, s)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
 		DOLOG(error, "open /dev/net/tun: %s", strerror(errno));

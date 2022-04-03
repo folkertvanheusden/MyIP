@@ -16,7 +16,9 @@
 #include "packet.h"
 #include "utils.h"
 
-phys_slip::phys_slip(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac) : phys(s), my_mac(my_mac)
+phys_slip::phys_slip(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac) :
+	phys(dev_index, s),
+	my_mac(my_mac)
 {
 	assert(my_mac.get_len() == 6);
 

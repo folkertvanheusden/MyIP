@@ -13,7 +13,8 @@
 #include "packet.h"
 #include "utils.h"
 
-phys::phys(stats *const s)
+phys::phys(const size_t dev_index, stats *const s) :
+	dev_index(dev_index)  // used for SNMP
 {
 	// 1.3.6.1.2.1.4.57850.1.8: physical device
 	phys_recv_frame = s->register_stat("phys_recv_frame", "1.3.6.1.2.1.4.57850.1.8.1");
