@@ -201,8 +201,6 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 
 	std::vector<std::pair<snmp_data_type *, ssize_t> > branch;
 
-	printf("searching for %s\n", oid.c_str());
-
 	for(size_t i=0; i<parts.size(); i++) {
 		if (cur_oid.empty() == false)
 			cur_oid += ".";
@@ -211,18 +209,14 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 
 		ssize_t idx = find_oid_in_vector(p_lut, cur_oid);
 
-		if (idx == -1) {
-			printf("OID not found\n");
+		if (idx == -1)
 			break;
-		}
 
 		branch.push_back({ parent, idx });
 
 		parent = p_lut->at(idx);
 		p_lut = parent->get_children();
 	}
-
-	printf("end: %s\n", parent->get_oid().c_str());
 
 	// search for end of branch
 	while(p_lut->empty() == false) {
@@ -232,13 +226,8 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 		p_lut = parent->get_children();
 	}
 
-	printf("full: %s\n", parent->get_oid().c_str());
-
-	if (parent->get_oid() != oid) {
-		printf("returning %s\n", parent->get_oid().c_str());
-
+	if (parent->get_oid() != oid)
 		return parent->get_oid();
-	}
 
 	branch.push_back({ parent, 0 });
 
@@ -252,29 +241,20 @@ std::string snmp_data::find_next_oid(const std::string & oid)
 			break;
 		}
 
-		printf("checking %s which has %zu children and is %zu of parent|%s\n", element->get_oid().c_str(), element->get_children()->size(), index + 1, element->get_oid().c_str());
-
 		branch.pop_back();
 
 		if (index + 1 < element->get_children()->size()) {
 			ssize_t nr = index + 1;
 
-			printf("%p/%s/%zd\n", element, element->get_oid().c_str(), nr);
-
 			do {
-			printf("check %zd - %s - %p\n", nr, element->get_children()->at(nr)->get_oid().c_str(), element->get_children()->at(nr)->get_data());
 				element = element->get_children()->at(nr);
 				nr = 0;
 			}
 			while(element->get_children()->empty() == false);
 
-			printf("RETURNING %p -> %s | %zd\n", element, element->get_oid().c_str(), nr);
-
 			return element->get_oid();
 		}
 	}
-
-	printf("returning nothing found\n");
 
 	return "";
 }
