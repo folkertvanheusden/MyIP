@@ -98,6 +98,7 @@ bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	out[out_o++] = 0xc0;  // END
 
 	stats_add_counter(phys_ifOutOctets, out_o);
+	stats_add_counter(phys_ifHCOutOctets, out_o);
 	stats_inc_counter(phys_ifOutUcastPkts);
 
 	bool ok = true;
@@ -147,6 +148,7 @@ void phys_slip::operator()()
 			continue;
 
 		stats_add_counter(phys_ifInOctets, size);
+		stats_add_counter(phys_ifHCInOctets, size);
 		stats_inc_counter(phys_ifInUcastPkts);
 
 		if (buffer == 0xdb) {

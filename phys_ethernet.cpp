@@ -92,6 +92,7 @@ bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & s
 	// crc32 is not included in a tap device
 
 	stats_add_counter(phys_ifOutOctets, out_size);
+	stats_add_counter(phys_ifHCOutOctets, out_size);
 	stats_inc_counter(phys_ifOutUcastPkts);
 
 	bool ok = true;
@@ -143,6 +144,7 @@ void phys_ethernet::operator()()
 		stats_inc_counter(phys_recv_frame);
 		stats_inc_counter(phys_ifInUcastPkts);
 		stats_add_counter(phys_ifInOctets, size);
+		stats_add_counter(phys_ifHCInOctets, size);
 
 		if (size < 14) {
 			stats_inc_counter(phys_invl_frame);
