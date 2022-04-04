@@ -208,9 +208,11 @@ int main(int argc, char *argv[])
 	signal(SIGINT, ss);
 
 	snmp_data sd;
+	sd.register_oid("1.3.6.1.2.1.1.1.0", "MyIP - an IP-stack implemented in C++ running in userspace");
 	sd.register_oid("1.3.6.1.2.1.1.4.0", "mail@vanheusden.com");
 	sd.register_oid("1.3.6.1.2.1.1.5.0", "MyIP");
 	sd.register_oid("1.3.6.1.2.1.1.6.0", "The Netherlands, Europe, Earth");
+	sd.register_oid("1.3.6.1.2.1.1.7.0", 254 /* everything but the physical layer */);
 
 	stats s(8192, &sd);
 

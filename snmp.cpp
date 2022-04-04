@@ -278,6 +278,8 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 		varbind->add(new snmp_oid(e));
 
+		DOLOG(debug, "SNMP requested: %s\n", e.c_str());
+
 		std::optional<snmp_elem *> rc = sd->find_by_oid(e);
 
 		if (rc.has_value()) {
@@ -290,11 +292,6 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 		}
 
 #if 0  // move to snmp_data
-		else if (e == "1.3.6.1.2.1.1.1") {  // system description
-			std::string descr = "MyIP - an IP-stack implemented in C++ running in userspace";
-
-			varbind->add(new snmp_octet_string(reinterpret_cast<const uint8_t *>(descr.c_str()), descr.size()));
-		}
 		else if (e == "1.3.6.1.2.1.1.2") {  // system id
 			varbind->add(new snmp_oid("iso.3.6.1.2.1.4.57850.1"));
 		}
@@ -302,12 +299,6 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 			uint64_t now = get_us() / 1000;
 
 			varbind->add(new snmp_integer((now - running_since) / 10));  // 100ths of a second
-		}
-		else if (e == "1.3.6.1.2.1.1.7") {  // system services
-			// most of the 7 layers
-			int services = (1 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (1 << 3) | (1 << 2) | (1 << 1);
-
-			varbind->add(new snmp_integer(services));
 		}
 #endif
 		else {
