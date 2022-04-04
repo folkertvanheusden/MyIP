@@ -19,8 +19,11 @@ protected:
 	uint64_t *phys_invl_frame  { nullptr };
 	uint64_t *phys_ign_frame   { nullptr };
 	uint64_t *phys_transmit    { nullptr };
-	uint64_t *phys_ifInOctets  { nullptr };
-	uint64_t *phys_ifOutOctets { nullptr };
+
+	uint64_t *phys_ifInOctets     { nullptr };
+	uint64_t *phys_ifInUcastPkts  { nullptr };
+	uint64_t *phys_ifOutOctets    { nullptr };
+	uint64_t *phys_ifOutUcastPkts { nullptr };
 
 	int       mtu_size         { 0 };
 

@@ -187,6 +187,7 @@ bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 	std::vector<uint8_t> ppp_frame = wrap_in_ppp_frame(temp, 0x0021 /* IP */, ACCM_tx, true);
 
 	stats_add_counter(phys_ifOutOctets, ppp_frame.size());
+	stats_inc_counter(phys_ifOutUcastPkts);
 
 	bool ok = true;
 
@@ -668,6 +669,7 @@ void phys_ppp::operator()()
 			continue;
 
 		stats_add_counter(phys_ifInOctets, size);
+		stats_inc_counter(phys_ifInUcastPkts);
 
 		if (buffer == 0x7e) {
 			if (packet_buffer.empty() == false) {  // START/END of packet
