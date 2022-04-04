@@ -55,7 +55,15 @@ int snmp_data_type::get_oid_idx() const
 }
 
 snmp_data_type_static::snmp_data_type_static(const std::string & content) :
-	data(content)
+	data(content),
+	data_int(-1),
+	is_string(true)
+{
+}
+
+snmp_data_type_static::snmp_data_type_static(const int content) :
+	data_int(content),
+	is_string(false)
 {
 }
 
@@ -65,7 +73,10 @@ snmp_data_type_static::~snmp_data_type_static()
 
 snmp_elem * snmp_data_type_static::get_data()
 {
-	return new snmp_octet_string(reinterpret_cast<const uint8_t *>(data.c_str()), data.size());
+	if (is_string)
+		return new snmp_octet_string(reinterpret_cast<const uint8_t *>(data.c_str()), data.size());
+
+	return new snmp_integer(data_int);
 }
 
 snmp_data_type_stats::snmp_data_type_stats(uint64_t *const counter) :
@@ -154,6 +165,11 @@ void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
 }
 
 void snmp_data::register_oid(const std::string & oid, const std::string & static_data)
+{
+	register_oid(oid, new snmp_data_type_static(static_data));
+}
+
+void snmp_data::register_oid(const std::string & oid, const int static_data)
 {
 	register_oid(oid, new snmp_data_type_static(static_data));
 }
