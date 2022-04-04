@@ -11,7 +11,7 @@
 
 
 void stats_inc_counter(uint64_t *const p);
-void stats_add_counter(uint64_t *const p, const uint16_t value);
+void stats_add_counter(uint64_t *const p, const uint64_t value);
 void stats_set(uint64_t *const p, const uint64_t value);
 void stats_add_average(uint64_t *const p, const int value);
 
@@ -48,7 +48,7 @@ public:
 	stats(const int size, snmp_data *const sd);
 	virtual ~stats();
 
-	uint64_t * register_stat(const std::string & name, const std::string & oid = "");
+	uint64_t * register_stat(const std::string & name, const std::string & oid = "", const snmp_integer::snmp_integer_type type = snmp_integer::si_integer);
 
 	void register_fifo_stats(const std::string & name, fifo_stats *const fs);
 	std::vector<std::pair<const std::string, const fifo_stats *> > get_fifo_stats() const;

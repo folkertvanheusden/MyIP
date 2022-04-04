@@ -251,7 +251,7 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 {
 	snmp_sequence *se = new snmp_sequence();
 
-	se->add(new snmp_integer(oids_req.version));  // version
+	se->add(new snmp_integer(snmp_integer::si_integer, oids_req.version));  // version
 
 	std::string community = oids_req.community;
 	if (community.empty())
@@ -263,11 +263,11 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 	snmp_pdu *GetResponsePDU = new snmp_pdu(0xa2);
 	se->add(GetResponsePDU);
 
-	GetResponsePDU->add(new snmp_integer(oids_req.req_id));  // ID
+	GetResponsePDU->add(new snmp_integer(snmp_integer::si_integer, oids_req.req_id));  // ID
 
-	GetResponsePDU->add(new snmp_integer(oids_req.err));  // error
+	GetResponsePDU->add(new snmp_integer(snmp_integer::si_integer, oids_req.err));  // error
 
-	GetResponsePDU->add(new snmp_integer(oids_req.err_idx));  // error index
+	GetResponsePDU->add(new snmp_integer(snmp_integer::si_integer, oids_req.err_idx));  // error index
 
 	snmp_sequence *varbind_list = new snmp_sequence();
 	GetResponsePDU->add(varbind_list);

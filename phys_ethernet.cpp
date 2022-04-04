@@ -77,8 +77,6 @@ bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & s
 {
 	DOLOG(debug, "phys_ethernet: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
-	stats_inc_counter(phys_transmit);
-
 	size_t out_size = pl_size + 14;
 	uint8_t *out = new uint8_t[out_size];
 

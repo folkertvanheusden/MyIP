@@ -23,12 +23,16 @@ public:
 
 class snmp_integer : public snmp_elem
 {
+public:
+	enum snmp_integer_type { si_counter32, si_integer, si_counter64 };
+
 private:
-	uint64_t v { 0 };
+	snmp_integer_type type { si_integer };
+	uint64_t          v    { 0 };
 
 public:
-	explicit snmp_integer(const uint64_t v, const int len);
-	explicit snmp_integer(const uint64_t v);
+	explicit snmp_integer(const snmp_integer_type type, const uint64_t v, const int len);
+	explicit snmp_integer(const snmp_integer_type type, const uint64_t v);
 	virtual ~snmp_integer();
 
 	std::pair<uint8_t *, uint8_t> get_payload() const override;
