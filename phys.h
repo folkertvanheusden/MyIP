@@ -18,7 +18,6 @@ protected:
 	uint64_t *phys_recv_frame  { nullptr };
 	uint64_t *phys_invl_frame  { nullptr };
 	uint64_t *phys_ign_frame   { nullptr };
-	uint64_t *phys_transmit    { nullptr };
 
 	uint64_t *phys_ifInOctets     { nullptr };
 	uint64_t *phys_ifInUcastPkts  { nullptr };
