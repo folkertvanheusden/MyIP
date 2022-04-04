@@ -282,6 +282,12 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 		std::optional<snmp_elem *> rc = sd->find_by_oid(e);
 
+		std::size_t dot       = e.rfind('.');
+		std::string ends_with = dot != std::string::npos ? e.substr(dot) : "";
+
+		if (!rc.has_value() && ends_with == ".0")
+			rc = sd->find_by_oid(e.substr(0, dot));
+
 		if (rc.has_value()) {
 			auto current_element = rc.value();
 
