@@ -55,15 +55,16 @@ int snmp_data_type::get_oid_idx() const
 }
 
 snmp_data_type_static::snmp_data_type_static(const std::string & content) :
+	is_string(true),
 	data(content),
-	data_int(-1),
-	is_string(true)
+	data_int(-1)
 {
 }
 
-snmp_data_type_static::snmp_data_type_static(const int content) :
-	data_int(content),
-	is_string(false)
+snmp_data_type_static::snmp_data_type_static(const snmp_integer::snmp_integer_type type, const int content) :
+	is_string(false),
+	type(type),
+	data_int(content)
 {
 }
 
@@ -76,7 +77,7 @@ snmp_elem * snmp_data_type_static::get_data()
 	if (is_string)
 		return new snmp_octet_string(reinterpret_cast<const uint8_t *>(data.c_str()), data.size());
 
-	return new snmp_integer(data_int);
+	return new snmp_integer(snmp_integer::si_integer, data_int);
 }
 
 snmp_data_type_stats::snmp_data_type_stats(uint64_t *const counter) :
@@ -90,7 +91,7 @@ snmp_data_type_stats::~snmp_data_type_stats()
 
 snmp_elem * snmp_data_type_stats::get_data()
 {
-	return new snmp_integer(*counter);
+	return new snmp_integer(snmp_integer::si_counter, *counter);
 }
 
 snmp_data_type_running_since::snmp_data_type_running_since():
@@ -106,7 +107,7 @@ snmp_elem * snmp_data_type_running_since::get_data()
 {
 	uint64_t now = get_us() / 10000;
 
-	return new snmp_integer(now - running_since);  // 100ths of a second
+	return new snmp_integer(snmp_integer::si_integer, now - running_since);  // 100ths of a second
 }
 
 snmp_data::snmp_data()
@@ -168,9 +169,9 @@ void snmp_data::register_oid(const std::string & oid, const std::string & static
 	register_oid(oid, new snmp_data_type_static(static_data));
 }
 
-void snmp_data::register_oid(const std::string & oid, const int static_data)
+void snmp_data::register_oid(const std::string & oid, const snmp_integer::snmp_integer_type type, const int static_data)
 {
-	register_oid(oid, new snmp_data_type_static(static_data));
+	register_oid(oid, new snmp_data_type_static(type, static_data));
 }
 
 std::optional<snmp_elem *> snmp_data::find_by_oid(const std::string & oid)

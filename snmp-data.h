@@ -31,13 +31,14 @@ public:
 class snmp_data_type_static : public snmp_data_type
 {
 private:
-	const bool        is_string;
+	const bool        is_string { false};
 	const std::string data;
-	const int         data_int;
+	const snmp_integer::snmp_integer_type type { snmp_integer::si_integer };
+	const int         data_int  { 0 };
 
 public:
 	snmp_data_type_static(const std::string & content);
-	snmp_data_type_static(const int content);
+	snmp_data_type_static(const snmp_integer::snmp_integer_type type, const int content);
 	~snmp_data_type_static();
 
 	snmp_elem * get_data() override;
@@ -95,7 +96,7 @@ public:
 	virtual ~snmp_data();
 
 	void register_oid(const std::string & oid, const std::string & static_data);
-	void register_oid(const std::string & oid, const int static_data);
+	void register_oid(const std::string & oid, const snmp_integer::snmp_integer_type type, const int static_data);
 	void register_oid(const std::string & oid, snmp_data_type *const e);
 
 	std::optional<snmp_elem *> find_by_oid(const std::string & oid);
