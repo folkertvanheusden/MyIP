@@ -23,6 +23,15 @@ void stats_inc_counter(uint64_t *const p)
 #endif
 }
 
+void stats_add_counter(uint64_t *const p, const uint16_t value)
+{
+#if defined(GCC_VERSION) && GCC_VERSION >= 40700
+	__atomic_add_fetch(p, value, __ATOMIC_SEQ_CST);
+#else
+	(*p) += value; // hope for the best
+#endif
+}
+
 void stats_set(uint64_t *const p, const uint64_t value)
 {
 	// TODO atomic
