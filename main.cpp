@@ -602,8 +602,6 @@ int main(int argc, char *argv[])
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
 
-	sd.dump_tree();
-
 	getchar();
 
 	DOLOG(info, " *** TERMINATING ***\n");
