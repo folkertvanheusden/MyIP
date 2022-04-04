@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
 
 	snmp_data sd;
 	sd.register_oid("1.3.6.1.2.1.1.1", "MyIP - an IP-stack implemented in C++ running in userspace");
-	sd.register_oid("1.3.6.1.2.1.1.2", new snmp_data_type_oid("iso.3.6.1.2.1.4.57850.1"));
+	sd.register_oid("1.3.6.1.2.1.1.2", new snmp_data_type_oid("1.3.6.1.2.1.4.57850.1"));
 	sd.register_oid("1.3.6.1.2.1.1.3", &running_since);
 	sd.register_oid("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
 	sd.register_oid("1.3.6.1.2.1.1.5", "MyIP");
