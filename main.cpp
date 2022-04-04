@@ -207,8 +207,12 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, ss);
 
+	snmp_data_type_running_since running_since;
+
 	snmp_data sd;
 	sd.register_oid("1.3.6.1.2.1.1.1.0", "MyIP - an IP-stack implemented in C++ running in userspace");
+	sd.register_oid("1.3.6.1.2.1.1.2.0", new snmp_data_type_oid("iso.3.6.1.2.1.4.57850.1"));
+	sd.register_oid("1.3.6.1.2.1.1.3.0", &running_since);
 	sd.register_oid("1.3.6.1.2.1.1.4.0", "mail@vanheusden.com");
 	sd.register_oid("1.3.6.1.2.1.1.5.0", "MyIP");
 	sd.register_oid("1.3.6.1.2.1.1.6.0", "The Netherlands, Europe, Earth");
@@ -242,6 +246,8 @@ int main(int argc, char *argv[])
 	const libconfig::Setting &interfaces = root["interfaces"];
 	size_t n_interfaces = interfaces.getLength();
 
+	sd.register_oid("1.3.6.1.2.1.2.1.0", int(n_interfaces));
+
 	std::vector<phys *> devs;
 
 	for(size_t i=0; i<n_interfaces; i++) {
@@ -253,6 +259,8 @@ int main(int argc, char *argv[])
 		any_addr my_mac = parse_address(mac.c_str(), 6, ":", 16);
 
 		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
+
+		sd.register_oid("1.3.6.1.2.1.2.2.1.0", int(i + 1));
 
 		phys *dev = nullptr;
 

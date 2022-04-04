@@ -67,6 +67,21 @@ public:
 	snmp_elem * get_data() override;
 };
 
+class snmp_data_type_oid : public snmp_data_type
+{
+private:
+	const std::string oid;
+
+public:
+	snmp_data_type_oid(const std::string & oid) : oid(oid) {
+	}
+
+	~snmp_data_type_oid() {
+	}
+
+	snmp_elem * get_data() override { return new snmp_oid(oid); }
+};
+
 class snmp_data
 {
 private:

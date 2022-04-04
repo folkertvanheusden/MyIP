@@ -290,17 +290,6 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 			else
 				varbind->add(new snmp_null());
 		}
-
-#if 0  // move to snmp_data
-		else if (e == "1.3.6.1.2.1.1.2") {  // system id
-			varbind->add(new snmp_oid("iso.3.6.1.2.1.4.57850.1"));
-		}
-		else if (e == "1.3.6.1.2.1.1.3") {  // system uptime
-			uint64_t now = get_us() / 1000;
-
-			varbind->add(new snmp_integer((now - running_since) / 10));  // 100ths of a second
-		}
-#endif
 		else {
 			DOLOG(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
 
