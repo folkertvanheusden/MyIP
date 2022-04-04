@@ -115,8 +115,7 @@ snmp_data::snmp_data()
 
 snmp_data::~snmp_data()
 {
-	for(auto e : data)
-		delete e;
+	// delete tree 'data'
 }
 
 void snmp_data::register_oid(const std::string & oid, snmp_data_type *const e)
