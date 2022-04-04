@@ -185,7 +185,18 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, ss);
 
-	stats s(8192);
+	snmp_data_type_running_since running_since;
+
+	snmp_data sd;
+	sd.register_oid("1.3.6.1.2.1.1.1.0", "MyIP - an IP-stack implemented in C++ running in userspace");
+	sd.register_oid("1.3.6.1.2.1.1.2.0", new snmp_data_type_oid("iso.3.6.1.2.1.4.57850.1"));
+	sd.register_oid("1.3.6.1.2.1.1.3.0", &running_since);
+	sd.register_oid("1.3.6.1.2.1.1.4.0", "mail@vanheusden.com");
+	sd.register_oid("1.3.6.1.2.1.1.5.0", "MyIP");
+	sd.register_oid("1.3.6.1.2.1.1.6.0", "The Netherlands, Europe, Earth");
+	sd.register_oid("1.3.6.1.2.1.1.7.0", 254 /* everything but the physical layer */);
+
+	stats s(8192, &sd);
 
 	/// environment
 	int uid = 1000, gid = 1000;
@@ -214,6 +225,8 @@ int main(int argc, char *argv[])
 	const libconfig::Setting &interfaces = root["interfaces"];
 	size_t n_interfaces = interfaces.getLength();
 
+	sd.register_oid("1.3.6.1.2.1.2.1.0", int(n_interfaces));
+
 	std::vector<phys *> devs;
 
 	for(size_t i=0; i<n_interfaces; i++) {
@@ -226,15 +239,24 @@ int main(int argc, char *argv[])
 
 		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
 
+		sd.register_oid("1.3.6.1.2.1.2.2.1.0", int(i + 1));
+
 		phys *dev = nullptr;
 
 		if (type == "ethernet") {
 			std::string dev_name = cfg_str(interface, "dev-name", "device name", true, "myip");
 
-			dev = new phys_ethernet(&s, dev_name, uid, gid);
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu.0", i + 1), dev_name);  // name
+			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu.0", i + 1), "MyIP Ethernet device");  // description
+			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu.0", i + 1), 1);  // device is up (1)
+
+			dev = new phys_ethernet(i + 1, &s, dev_name, uid, gid);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
+
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu.0", i + 1), dev_name);
+			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu.0", i + 1), myformat("MyIP %s device", type.c_str()));
 
 			int baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
 			int bps_setting = 0;
@@ -246,14 +268,14 @@ int main(int argc, char *argv[])
 				error_exit(false, "\"%d\" cannot be configured", baudrate);
 
 			if (type == "slip")
-				dev = new phys_slip(&s, dev_name, bps_setting, my_mac);
+				dev = new phys_slip(i + 1, &s, dev_name, bps_setting, my_mac);
 			else if (type == "ppp") {
 				bool emulate_modem_xp = cfg_bool(interface, "emulate-modem-xp", "emulate AT-set modem / XP direct link", true, false);
 
 				std::string oa_str = cfg_str(interface, "opponent-address", "opponent IPv4 address", false, "192.168.3.2");
 				any_addr opponent_address = parse_address(oa_str.c_str(), 4, ".", 10);
 
-				dev = new phys_ppp(&s, dev_name, bps_setting, my_mac, emulate_modem_xp, opponent_address);
+				dev = new phys_ppp(i + 1, &s, dev_name, bps_setting, my_mac, emulate_modem_xp, opponent_address);
 			}
 			else {
 				error_exit(false, "internal error");
@@ -560,7 +582,7 @@ int main(int argc, char *argv[])
 			if (!u4)
 				continue;
 
-			snmp *snmp_4 = new snmp(&s, u4);
+			snmp *snmp_4 = new snmp(&sd, &s, u4);
 			u4->add_handler(port, std::bind(&snmp::input, snmp_4, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
@@ -571,7 +593,7 @@ int main(int argc, char *argv[])
 			if (!u6)
 				continue;
 
-			snmp *snmp_6 = new snmp(&s, u6);
+			snmp *snmp_6 = new snmp(&sd, &s, u6);
 			u6->add_handler(port, std::bind(&snmp::input, snmp_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			applications.push_back(snmp_4);

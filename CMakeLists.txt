@@ -37,6 +37,7 @@ add_executable(myip
 	protocol.cpp
 	sip.cpp
 	snmp.cpp
+	snmp-data.cpp
 	snmp-elem.cpp
 	socks_proxy.cpp
 	stats.cpp

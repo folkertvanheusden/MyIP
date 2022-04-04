@@ -18,7 +18,7 @@ protected:
 	int fd { -1 };
 
 public:
-	phys_slip(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac);
+	phys_slip(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac);
 	phys_slip(const phys_slip &) = delete;
 	virtual ~phys_slip();
 

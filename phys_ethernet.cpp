@@ -25,7 +25,7 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 	ifr->ifr_name[IFNAMSIZ - 1] = 0x00;
 }
 
-phys_ethernet::phys_ethernet(stats *const s, const std::string & dev_name, const int uid, const int gid) : phys(s)
+phys_ethernet::phys_ethernet(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid) : phys(dev_index, s)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
 		DOLOG(ll_error, "open /dev/net/tun: %s", strerror(errno));
@@ -93,6 +93,9 @@ bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & s
 
 	// crc32 is not included in a tap device
 
+	stats_add_counter(phys_ifOutOctets, out_size);
+	stats_inc_counter(phys_ifOutUcastPkts);
+
 	bool ok = true;
 
 	int rc = write(fd, out, out_size);
@@ -140,6 +143,8 @@ void phys_ethernet::operator()()
 			DOLOG(warning, "clock_gettime failed: %s", strerror(errno));
 
 		stats_inc_counter(phys_recv_frame);
+		stats_inc_counter(phys_ifInUcastPkts);
+		stats_add_counter(phys_ifInOctets, size);
 
 		if (size < 14) {
 			stats_inc_counter(phys_invl_frame);

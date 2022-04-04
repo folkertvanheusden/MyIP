@@ -13,13 +13,19 @@
 #include "packet.h"
 #include "utils.h"
 
-phys::phys(stats *const s)
+phys::phys(const size_t dev_index, stats *const s) :
+	dev_index(dev_index)  // used for SNMP
 {
 	// 1.3.6.1.2.1.4.57850.1.8: physical device
 	phys_recv_frame = s->register_stat("phys_recv_frame", "1.3.6.1.2.1.4.57850.1.8.1");
 	phys_invl_frame = s->register_stat("phys_invl_frame", "1.3.6.1.2.1.4.57850.1.8.2");
-	phys_ign_frame = s->register_stat("phys_ign_frame", "1.3.6.1.2.1.4.57850.1.8.3");
-	phys_transmit = s->register_stat("phys_transmit", "1.3.6.1.2.1.4.57850.1.8.4");
+	phys_ign_frame  = s->register_stat("phys_ign_frame",  "1.3.6.1.2.1.4.57850.1.8.3");
+	phys_transmit   = s->register_stat("phys_transmit",   "1.3.6.1.2.1.4.57850.1.8.4");
+
+	phys_ifInOctets     = s->register_stat("phys_ifInOctets",     myformat("1.3.6.1.2.1.2.2.1.10.%zu", dev_index));
+	phys_ifInUcastPkts  = s->register_stat("phys_ifInUcastPkts",  myformat("1.3.6.1.2.1.2.2.1.11.%zu", dev_index));
+	phys_ifOutOctets    = s->register_stat("phys_ifOutOctets",    myformat("1.3.6.1.2.1.2.2.1.16.%zu", dev_index));
+	phys_ifOutUcastPkts = s->register_stat("phys_ifOutUcastPkts", myformat("1.3.6.1.2.1.2.2.1.17.%zu", dev_index));
 
 	// MTU size for Ethernet
 	mtu_size = 1500;

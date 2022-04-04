@@ -10,11 +10,16 @@
 #include "utils.h"
 
 
-snmp::snmp(stats *const s, udp *const u) : s(s), u(u)
+snmp::snmp(snmp_data *const sd, stats *const s, udp *const u) :
+	sd(sd),
+	s(s),
+	u(u)
 {
 	// 1.3.6.1.2.1.4.57850.1.5: snmp
 	snmp_requests = s->register_stat("snmp_requests", "1.3.6.1.2.1.4.57850.1.5.1");
 	snmp_invalid  = s->register_stat("snmp_invalid", "1.3.6.1.2.1.4.57850.1.5.2");
+
+	running_since = get_us() / 1000;
 }
 
 snmp::~snmp()
@@ -196,7 +201,7 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 				return false;
 
 			if (is_getnext) {
-				std::string oid_next = s->find_next_oid(oid_out);
+				std::string oid_next = sd->find_next_oid(oid_out);
 
 				if (oid_next.empty()) {
 					oids_req->err = 2;
@@ -273,16 +278,22 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 		varbind->add(new snmp_oid(e));
 
-		uint64_t *vp = s->find_by_oid(e);
+		DOLOG(debug, "SNMP requested: %s\n", e.c_str());
 
-		if (vp) {
-			DOLOG(debug, "SNMP: requested %s gives %lu\n", e.c_str(), *vp);
+		std::optional<snmp_elem *> rc = sd->find_by_oid(e);
 
-			varbind->add(new snmp_integer(*vp));
+		if (rc.has_value()) {
+			auto current_element = rc.value();
+
+			if (current_element)
+				varbind->add(current_element);
+			else
+				varbind->add(new snmp_null());
 		}
-		else {  // FIXME snmp_null?
+		else {
 			DOLOG(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
 
+			// FIXME snmp_null?
 			varbind->add(new snmp_null());
 		}
 	}
