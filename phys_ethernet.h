@@ -16,7 +16,7 @@ private:
 	int fd { -1 };
 
 public:
-	phys_ethernet(stats *const s, const std::string & dev_name, const int uid, const int gid);
+	phys_ethernet(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid);
 	phys_ethernet(const phys_ethernet &) = delete;
 	virtual ~phys_ethernet();
 

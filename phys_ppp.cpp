@@ -16,7 +16,10 @@
 #include "packet.h"
 #include "utils.h"
 
-phys_ppp::phys_ppp(stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp, const any_addr & opponent_address) : phys_slip(s, dev_name, bps, my_mac), emulate_modem_xp(emulate_modem_xp), opponent_address(opponent_address)
+phys_ppp::phys_ppp(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp, const any_addr & opponent_address) :
+	phys_slip(dev_index, s, dev_name, bps, my_mac),
+	emulate_modem_xp(emulate_modem_xp),
+	opponent_address(opponent_address)
 {
 	ACCM_rx.resize(32);
 	ACCM_rx.at(0) = 0xff;
@@ -182,6 +185,10 @@ bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 {
 	std::vector temp(payload, &payload[pl_size]);
 	std::vector<uint8_t> ppp_frame = wrap_in_ppp_frame(temp, 0x0021 /* IP */, ACCM_tx, true);
+
+	stats_add_counter(phys_ifOutOctets, ppp_frame.size());
+	stats_add_counter(phys_ifHCOutOctets, ppp_frame.size());
+	stats_inc_counter(phys_ifOutUcastPkts);
 
 	bool ok = true;
 
@@ -661,6 +668,10 @@ void phys_ppp::operator()()
 		int size = read(fd, (char *)&buffer, 1);
 		if (size == -1)
 			continue;
+
+		stats_add_counter(phys_ifInOctets, size);
+		stats_add_counter(phys_ifHCInOctets, size);
+		stats_inc_counter(phys_ifInUcastPkts);
 
 		if (buffer == 0x7e) {
 			if (packet_buffer.empty() == false) {  // START/END of packet

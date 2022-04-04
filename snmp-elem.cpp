@@ -19,12 +19,15 @@ std::pair<uint8_t *, uint8_t> snmp_elem::get_payload() const
 
 //---
 
-snmp_integer::snmp_integer(const uint64_t v, const int len) : v(v)
+snmp_integer::snmp_integer(const snmp_integer_type type, const uint64_t v, const int len) :
+	type(type),
+	v(v)
 {
 	this->len = len;
 }
 
-snmp_integer::snmp_integer(const uint64_t v)
+snmp_integer::snmp_integer(const snmp_integer_type type, const uint64_t v) :
+	type(type)
 {
 	if (v <= 0xffffffff)
 		this->v = v, len = 4;
@@ -38,10 +41,21 @@ snmp_integer::~snmp_integer()
 
 std::pair<uint8_t *, uint8_t> snmp_integer::get_payload() const
 {
+	uint8_t snmp_type = 0x00;
+
+	if (type == si_integer)
+		snmp_type = 0x02;
+	else if (type == si_counter32)
+		snmp_type = 0x41;  // counter32
+	else if (type == si_counter64)
+		snmp_type = 0x46;  // counter64
+	else
+		assert(0);
+
 	uint8_t size = len + 2;
 	uint8_t *out = (uint8_t *)malloc(size);
 
-	out[0] = 0x02;
+	out[0] = snmp_type;
 	out[1] = len;
 
 	for(int i=0; i<len; i++)
@@ -64,6 +78,8 @@ snmp_sequence::~snmp_sequence()
 
 void snmp_sequence::add(const snmp_elem * const e)
 {
+	assert(e);
+
 	sequence.push_back(e);
 }
 

@@ -12,20 +12,28 @@
 class phys
 {
 protected:
-	std::thread *th { nullptr };
+	std::thread     *th        { nullptr };
 	std::atomic_bool stop_flag { false };
 
-	uint64_t *phys_recv_frame { nullptr };
-	uint64_t *phys_invl_frame { nullptr };
-	uint64_t *phys_ign_frame { nullptr };
-	uint64_t *phys_transmit { nullptr };
+	uint64_t *phys_recv_frame  { nullptr };
+	uint64_t *phys_invl_frame  { nullptr };
+	uint64_t *phys_ign_frame   { nullptr };
 
-	int mtu_size { 0 };
+	uint64_t *phys_ifInOctets     { nullptr };
+	uint64_t *phys_ifHCInOctets   { nullptr };
+	uint64_t *phys_ifInUcastPkts  { nullptr };
+	uint64_t *phys_ifOutOctets    { nullptr };
+	uint64_t *phys_ifHCOutOctets  { nullptr };
+	uint64_t *phys_ifOutUcastPkts { nullptr };
+
+	int       mtu_size         { 0 };
 
 	std::map<uint16_t, protocol *> prot_map;
 
+	const size_t dev_index     { 0 };
+
 public:
-	phys(stats *const s);
+	phys(const size_t dev_index, stats *const s);
 	phys(const phys &) = delete;
 	virtual ~phys();
 
