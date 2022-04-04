@@ -8,7 +8,7 @@
 
 #include "any_addr.h"
 #include "application.h"
-#include "snmp-static.h"
+#include "snmp-data.h"
 #include "stats.h"
 
 class packet;
@@ -29,9 +29,9 @@ typedef struct _oid_req_t_ {
 class snmp : public application
 {
 private:
-	snmp_static *const ss;
-	stats       *const s;
-	udp         *const u;
+	snmp_data *const sd;
+	stats     *const s;
+	udp       *const u;
 
 	uint64_t running_since { 0 }; // ms
 
@@ -48,7 +48,7 @@ private:
 	void gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *const output_size);
 
 public:
-	snmp(snmp_static *const ss, stats *const s, udp *const u);
+	snmp(snmp_data *const sd, stats *const s, udp *const u);
 	snmp(const snmp &) = delete;
 	virtual ~snmp();
 

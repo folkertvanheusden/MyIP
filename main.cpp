@@ -207,14 +207,25 @@ int main(int argc, char *argv[])
 
 	signal(SIGINT, ss);
 
-	stats s(8192);
+	snmp_data_type_running_since running_since;
+
+	snmp_data sd;
+	sd.register_oid("1.3.6.1.2.1.1.1", "MyIP - an IP-stack implemented in C++ running in userspace");
+	sd.register_oid("1.3.6.1.2.1.1.2", new snmp_data_type_oid("1.3.6.1.2.1.4.57850.1"));
+	sd.register_oid("1.3.6.1.2.1.1.3", &running_since);
+	sd.register_oid("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
+	sd.register_oid("1.3.6.1.2.1.1.5", "MyIP");
+	sd.register_oid("1.3.6.1.2.1.1.6", "The Netherlands, Europe, Earth");
+	sd.register_oid("1.3.6.1.2.1.1.7", snmp_integer::si_integer, 254 /* everything but the physical layer */);
+
+	stats s(8192, &sd);
 
 	/// environment
 	int uid = 1000, gid = 1000;
 	{
 		const libconfig::Setting & environment = root.lookup("environment");
 
-		int uid = cfg_int(environment, "run-as", "user to run as", true, 1000);
+		int uid = cfg_int(environment, "run-as", "user to run as",  true, 1000);
 		int gid = cfg_int(environment, "run-in", "group to run in", true, 1000);
 		setloguid(uid, gid);
 
@@ -231,14 +242,11 @@ int main(int argc, char *argv[])
 	std::vector<ip_protocol *> ip_protocols;
 	std::vector<application *> applications;
 
-	snmp_static ss;
-	ss.add_data("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
-	ss.add_data("1.3.6.1.2.1.1.5", "MyIP");
-	ss.add_data("1.3.6.1.2.1.1.6", "The Netherlands, Europe, Earth");
-
 	/// network interfaces
 	const libconfig::Setting &interfaces = root["interfaces"];
 	size_t n_interfaces = interfaces.getLength();
+
+	sd.register_oid("1.3.6.1.2.1.2.1", snmp_integer::si_integer, int(n_interfaces));
 
 	std::vector<phys *> devs;
 
@@ -252,19 +260,24 @@ int main(int argc, char *argv[])
 
 		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
 
+		sd.register_oid("1.3.6.1.2.1.2.2.1", snmp_integer::si_integer, int(i + 1));
+
 		phys *dev = nullptr;
 
 		if (type == "ethernet") {
 			std::string dev_name = cfg_str(interface, "dev-name", "device name", true, "myip");
 
-			ss.add_data(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);  // name
+			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP Ethernet device");  // description
+			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
 			dev = new phys_ethernet(i + 1, &s, dev_name, uid, gid);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
 
-			ss.add_data(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
+			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), myformat("MyIP %s device", type.c_str()));
 
 			int baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
 			int bps_setting = 0;
@@ -289,8 +302,9 @@ int main(int argc, char *argv[])
 				error_exit(false, "internal error");
 			}
 		}
-		else
+		else {
 			error_exit(false, "\"%s\" is an unknown network interface type", type.c_str());
+		}
 
 		devs.push_back(dev);
 
@@ -534,7 +548,7 @@ int main(int argc, char *argv[])
 			if (!u4)
 				continue;
 
-			snmp *snmp_4 = new snmp(&ss, &s, u4);
+			snmp *snmp_4 = new snmp(&sd, &s, u4);
 			u4->add_handler(port, std::bind(&snmp::input, snmp_4, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
@@ -545,7 +559,7 @@ int main(int argc, char *argv[])
 			if (!u6)
 				continue;
 
-			snmp *snmp_6 = new snmp(&ss, &s, u6);
+			snmp *snmp_6 = new snmp(&sd, &s, u6);
 			u6->add_handler(port, std::bind(&snmp::input, snmp_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			applications.push_back(snmp_4);

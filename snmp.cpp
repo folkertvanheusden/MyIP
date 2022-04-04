@@ -10,8 +10,8 @@
 #include "utils.h"
 
 
-snmp::snmp(snmp_static *const ss, stats *const s, udp *const u) :
-	ss(ss),
+snmp::snmp(snmp_data *const sd, stats *const s, udp *const u) :
+	sd(sd),
 	s(s),
 	u(u)
 {
@@ -201,7 +201,7 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 				return false;
 
 			if (is_getnext) {
-				std::string oid_next = s->find_next_oid(oid_out);
+				std::string oid_next = sd->find_next_oid(oid_out);
 
 				if (oid_next.empty()) {
 					oids_req->err = 2;
@@ -251,7 +251,7 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 {
 	snmp_sequence *se = new snmp_sequence();
 
-	se->add(new snmp_integer(oids_req.version));  // version
+	se->add(new snmp_integer(snmp_integer::si_integer, oids_req.version));  // version
 
 	std::string community = oids_req.community;
 	if (community.empty())
@@ -263,11 +263,11 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 	snmp_pdu *GetResponsePDU = new snmp_pdu(0xa2);
 	se->add(GetResponsePDU);
 
-	GetResponsePDU->add(new snmp_integer(oids_req.req_id));  // ID
+	GetResponsePDU->add(new snmp_integer(snmp_integer::si_integer, oids_req.req_id));  // ID
 
-	GetResponsePDU->add(new snmp_integer(oids_req.err));  // error
+	GetResponsePDU->add(new snmp_integer(snmp_integer::si_integer, oids_req.err));  // error
 
-	GetResponsePDU->add(new snmp_integer(oids_req.err_idx));  // error index
+	GetResponsePDU->add(new snmp_integer(snmp_integer::si_integer, oids_req.err_idx));  // error index
 
 	snmp_sequence *varbind_list = new snmp_sequence();
 	GetResponsePDU->add(varbind_list);
@@ -278,43 +278,29 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 
 		varbind->add(new snmp_oid(e));
 
-		uint64_t *vp = s->find_by_oid(e);
+		DOLOG(debug, "SNMP requested: %s\n", e.c_str());
 
-		if (vp) {
-			DOLOG(debug, "SNMP: requested %s gives %lu\n", e.c_str(), *vp);
+		std::optional<snmp_elem *> rc = sd->find_by_oid(e);
 
-			varbind->add(new snmp_integer(*vp));
-		}
-		else if (e == "1.3.6.1.2.1.1.1") {  // system description
-			std::string descr = "MyIP - an IP-stack implemented in C++ running in userspace";
+		std::size_t dot       = e.rfind('.');
+		std::string ends_with = dot != std::string::npos ? e.substr(dot) : "";
 
-			varbind->add(new snmp_octet_string(reinterpret_cast<const uint8_t *>(descr.c_str()), descr.size()));
-		}
-		else if (e == "1.3.6.1.2.1.1.2") {  // system id
-			varbind->add(new snmp_oid("iso.3.6.1.2.1.4.57850.1"));
-		}
-		else if (e == "1.3.6.1.2.1.1.3") {  // system uptime
-			uint64_t now = get_us() / 1000;
+		if (!rc.has_value() && ends_with == ".0")
+			rc = sd->find_by_oid(e.substr(0, dot));
 
-			varbind->add(new snmp_integer((now - running_since) / 10));  // 100ths of a second
-		}
-		else if (e == "1.3.6.1.2.1.1.7") {  // system services
-			// most of the 7 layers
-			int services = (1 << 7) | (1 << 6) | (1 << 5) | (1 << 4) | (1 << 3) | (1 << 2) | (1 << 1);
+		if (rc.has_value()) {
+			auto current_element = rc.value();
 
-			varbind->add(new snmp_integer(services));
+			if (current_element)
+				varbind->add(current_element);
+			else
+				varbind->add(new snmp_null());
 		}
 		else {
-			auto record = ss->get_oid(e);
+			DOLOG(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
 
-			if (record.has_value())
-				varbind->add(new snmp_octet_string(reinterpret_cast<const uint8_t *>(record.value().c_str()), record.value().size()));
-			else {
-				DOLOG(debug, "SNMP: requested %s not found, returning null\n", e.c_str());
-
-				// FIXME snmp_null?
-				varbind->add(new snmp_null());
-			}
+			// FIXME snmp_null?
+			varbind->add(new snmp_null());
 		}
 	}
 

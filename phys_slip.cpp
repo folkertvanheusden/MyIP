@@ -77,8 +77,6 @@ bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 {
 	DOLOG(debug, "phys_slip: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
-	stats_inc_counter(phys_transmit);
-
 	size_t out_size = pl_size * 2 + 2;
 	uint8_t *out = new uint8_t[out_size];
 
@@ -98,6 +96,10 @@ bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 		}
 	}
 	out[out_o++] = 0xc0;  // END
+
+	stats_add_counter(phys_ifOutOctets, out_o);
+	stats_add_counter(phys_ifHCOutOctets, out_o);
+	stats_inc_counter(phys_ifOutUcastPkts);
 
 	bool ok = true;
 
@@ -144,6 +146,10 @@ void phys_slip::operator()()
 		int size = read(fd, (char *)&buffer, 1);
 		if (size == -1)
 			continue;
+
+		stats_add_counter(phys_ifInOctets, size);
+		stats_add_counter(phys_ifHCInOctets, size);
+		stats_inc_counter(phys_ifInUcastPkts);
 
 		if (buffer == 0xdb) {
 			uint8_t buffer2 = 0x00;

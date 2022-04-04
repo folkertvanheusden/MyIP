@@ -186,6 +186,10 @@ bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 	std::vector temp(payload, &payload[pl_size]);
 	std::vector<uint8_t> ppp_frame = wrap_in_ppp_frame(temp, 0x0021 /* IP */, ACCM_tx, true);
 
+	stats_add_counter(phys_ifOutOctets, ppp_frame.size());
+	stats_add_counter(phys_ifHCOutOctets, ppp_frame.size());
+	stats_inc_counter(phys_ifOutUcastPkts);
+
 	bool ok = true;
 
 	send_lock.lock();
@@ -664,6 +668,10 @@ void phys_ppp::operator()()
 		int size = read(fd, (char *)&buffer, 1);
 		if (size == -1)
 			continue;
+
+		stats_add_counter(phys_ifInOctets, size);
+		stats_add_counter(phys_ifHCInOctets, size);
+		stats_inc_counter(phys_ifInUcastPkts);
 
 		if (buffer == 0x7e) {
 			if (packet_buffer.empty() == false) {  // START/END of packet
