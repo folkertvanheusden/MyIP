@@ -80,7 +80,8 @@ snmp_elem * snmp_data_type_static::get_data()
 	return new snmp_integer(snmp_integer::si_integer, data_int);
 }
 
-snmp_data_type_stats::snmp_data_type_stats(uint64_t *const counter) :
+snmp_data_type_stats::snmp_data_type_stats(const snmp_integer::snmp_integer_type type, uint64_t *const counter) :
+	type(type),
 	counter(counter)
 {
 }
@@ -91,7 +92,7 @@ snmp_data_type_stats::~snmp_data_type_stats()
 
 snmp_elem * snmp_data_type_stats::get_data()
 {
-	return new snmp_integer(snmp_integer::si_counter, *counter);
+	return new snmp_integer(type, *counter);
 }
 
 snmp_data_type_running_since::snmp_data_type_running_since():

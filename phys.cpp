@@ -21,10 +21,10 @@ phys::phys(const size_t dev_index, stats *const s) :
 	phys_invl_frame = s->register_stat("phys_invl_frame", "1.3.6.1.2.1.4.57850.1.8.2");
 	phys_ign_frame  = s->register_stat("phys_ign_frame",  "1.3.6.1.2.1.4.57850.1.8.3");
 
-	phys_ifInOctets     = s->register_stat("phys_ifInOctets",     myformat("1.3.6.1.2.1.2.2.1.10.%zu", dev_index));
-	phys_ifInUcastPkts  = s->register_stat("phys_ifInUcastPkts",  myformat("1.3.6.1.2.1.2.2.1.11.%zu", dev_index));
-	phys_ifOutOctets    = s->register_stat("phys_ifOutOctets",    myformat("1.3.6.1.2.1.2.2.1.16.%zu", dev_index));
-	phys_ifOutUcastPkts = s->register_stat("phys_ifOutUcastPkts", myformat("1.3.6.1.2.1.2.2.1.17.%zu", dev_index));
+	phys_ifInOctets     = s->register_stat("phys_ifInOctets",     myformat("1.3.6.1.2.1.2.2.1.10.%zu", dev_index), snmp_integer::si_counter64);
+	phys_ifInUcastPkts  = s->register_stat("phys_ifInUcastPkts",  myformat("1.3.6.1.2.1.2.2.1.11.%zu", dev_index), snmp_integer::si_counter64);
+	phys_ifOutOctets    = s->register_stat("phys_ifOutOctets",    myformat("1.3.6.1.2.1.2.2.1.16.%zu", dev_index), snmp_integer::si_counter64);
+	phys_ifOutUcastPkts = s->register_stat("phys_ifOutUcastPkts", myformat("1.3.6.1.2.1.2.2.1.17.%zu", dev_index), snmp_integer::si_counter64);
 
 	// MTU size for Ethernet
 	mtu_size = 1500;

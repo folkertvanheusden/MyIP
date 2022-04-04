@@ -91,7 +91,7 @@ stats::~stats()
 	shm_unlink(shm_name);
 }
 
-uint64_t * stats::register_stat(const std::string & name, const std::string & oid)
+uint64_t * stats::register_stat(const std::string & name, const std::string & oid, const snmp_integer::snmp_integer_type type)
 {
 	if (len + 48 > size) {
 		DOLOG(error, "stats: shm is full\n");
@@ -118,7 +118,7 @@ uint64_t * stats::register_stat(const std::string & name, const std::string & oi
 	len += 48;
 
 	if (oid.empty() == false)
-		sd->register_oid(oid, new snmp_data_type_stats(reinterpret_cast<uint64_t *>(p_out)));
+		sd->register_oid(oid, new snmp_data_type_stats(type, reinterpret_cast<uint64_t *>(p_out)));
 
 	return reinterpret_cast<uint64_t *>(p_out);
 }

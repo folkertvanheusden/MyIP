@@ -48,7 +48,7 @@ public:
 	stats(const int size, snmp_data *const sd);
 	virtual ~stats();
 
-	uint64_t * register_stat(const std::string & name, const std::string & oid = "");
+	uint64_t * register_stat(const std::string & name, const std::string & oid = "", const snmp_integer::snmp_integer_type type = snmp_integer::si_integer);
 
 	void register_fifo_stats(const std::string & name, fifo_stats *const fs);
 	std::vector<std::pair<const std::string, const fifo_stats *> > get_fifo_stats() const;

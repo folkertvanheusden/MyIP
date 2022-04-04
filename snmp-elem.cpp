@@ -41,18 +41,21 @@ snmp_integer::~snmp_integer()
 
 std::pair<uint8_t *, uint8_t> snmp_integer::get_payload() const
 {
-	uint8_t size = len + 2;
-	uint8_t *out = (uint8_t *)malloc(size);
+	uint8_t snmp_type = 0x00;
 
 	if (type == si_integer)
-		out[0] = 0x02;
-	else if (len == 4)
-		out[0] = 0x41;  // counter32
-	else if (len == 8)
-		out[0] = 0x46;  // counter64
+		snmp_type = 0x02;
+	else if (type == si_counter32)
+		snmp_type = 0x41;  // counter32
+	else if (type == si_counter64)
+		snmp_type = 0x46;  // counter64
 	else
 		assert(0);
 
+	uint8_t size = len + 2;
+	uint8_t *out = (uint8_t *)malloc(size);
+
+	out[0] = snmp_type;
 	out[1] = len;
 
 	for(int i=0; i<len; i++)
