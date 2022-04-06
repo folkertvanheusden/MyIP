@@ -24,7 +24,7 @@ public:
 class snmp_integer : public snmp_elem
 {
 public:
-	enum snmp_integer_type { si_counter32, si_integer, si_counter64 };
+	enum snmp_integer_type { si_counter32, si_integer, si_counter64, si_ticks };
 
 private:
 	snmp_integer_type type { si_integer };

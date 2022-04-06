@@ -188,13 +188,13 @@ int main(int argc, char *argv[])
 	snmp_data_type_running_since running_since;
 
 	snmp_data sd;
-	sd.register_oid("1.3.6.1.2.1.1.1", "MyIP - an IP-stack implemented in C++ running in userspace");
-	sd.register_oid("1.3.6.1.2.1.1.2", new snmp_data_type_oid("1.3.6.1.2.1.4.57850.1"));
-	sd.register_oid("1.3.6.1.2.1.1.3", &running_since);
-	sd.register_oid("1.3.6.1.2.1.1.4", "mail@vanheusden.com");
-	sd.register_oid("1.3.6.1.2.1.1.5", "MyIP");
-	sd.register_oid("1.3.6.1.2.1.1.6", "The Netherlands, Europe, Earth");
-	sd.register_oid("1.3.6.1.2.1.1.7", snmp_integer::si_integer, 254 /* everything but the physical layer */);
+	sd.register_oid("1.3.6.1.2.1.1.1.0", "MyIP - an IP-stack implemented in C++ running in userspace");
+	sd.register_oid("1.3.6.1.2.1.1.2.0", new snmp_data_type_oid("1.3.6.1.2.1.4.57850.1"));
+	sd.register_oid("1.3.6.1.2.1.1.3.0", &running_since);
+	sd.register_oid("1.3.6.1.2.1.1.4.0", "Folkert van Heusden <mail@vanheusden.com>");
+	sd.register_oid("1.3.6.1.2.1.1.5.0", "MyIP");
+	sd.register_oid("1.3.6.1.2.1.1.6.0", "The Netherlands, Europe, Earth");
+	sd.register_oid("1.3.6.1.2.1.1.7.0", snmp_integer::si_integer, 254 /* everything but the physical layer */);
 
 	stats s(8192, &sd);
 

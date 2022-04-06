@@ -108,7 +108,7 @@ snmp_elem * snmp_data_type_running_since::get_data()
 {
 	uint64_t now = get_us() / 10000;
 
-	return new snmp_integer(snmp_integer::si_integer, now - running_since);  // 100ths of a second
+	return new snmp_integer(snmp_integer::si_ticks, now - running_since);  // 100ths of a second
 }
 
 snmp_data::snmp_data()

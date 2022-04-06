@@ -46,9 +46,11 @@ std::pair<uint8_t *, uint8_t> snmp_integer::get_payload() const
 	if (type == si_integer)
 		snmp_type = 0x02;
 	else if (type == si_counter32)
-		snmp_type = 0x41;  // counter32
+		snmp_type = 0x41;  // COUNTER32
 	else if (type == si_counter64)
-		snmp_type = 0x46;  // counter64
+		snmp_type = 0x46;  // COUNTER64
+	else if (type == si_ticks)
+		snmp_type = 0x43;  // TIME_TICKS
 	else
 		assert(0);
 
