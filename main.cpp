@@ -190,11 +190,12 @@ int main(int argc, char *argv[])
 	snmp_data sd;
 	sd.register_oid("1.3.6.1.2.1.1.1.0", "MyIP - an IP-stack implemented in C++ running in userspace");
 	sd.register_oid("1.3.6.1.2.1.1.2.0", new snmp_data_type_oid("1.3.6.1.2.1.4.57850.1"));
-	sd.register_oid("1.3.6.1.2.1.1.3.0", &running_since);
+	sd.register_oid("1.3.6.1.2.1.1.3.0", &running_since);  // "The time since the network management portion of the system was last re-initialized.
 	sd.register_oid("1.3.6.1.2.1.1.4.0", "Folkert van Heusden <mail@vanheusden.com>");
 	sd.register_oid("1.3.6.1.2.1.1.5.0", "MyIP");
 	sd.register_oid("1.3.6.1.2.1.1.6.0", "The Netherlands, Europe, Earth");
 	sd.register_oid("1.3.6.1.2.1.1.7.0", snmp_integer::si_integer, 254 /* everything but the physical layer */);
+	sd.register_oid("1.3.6.1.2.1.1.8.0", snmp_integer::si_integer, 0);  // The value of sysUpTime at the time of the most recent change in state or value of any instance of sysORID.
 
 	stats s(8192, &sd);
 
