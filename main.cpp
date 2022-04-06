@@ -226,7 +226,7 @@ int main(int argc, char *argv[])
 	const libconfig::Setting &interfaces = root["interfaces"];
 	size_t n_interfaces = interfaces.getLength();
 
-	sd.register_oid("1.3.6.1.2.1.2.1", snmp_integer::si_integer, int(n_interfaces));
+	sd.register_oid("1.3.6.1.2.1.2.1.0", snmp_integer::si_integer, int(n_interfaces));
 
 	std::vector<phys *> devs;
 
