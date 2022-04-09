@@ -35,6 +35,11 @@ void udp::operator()()
 		const uint8_t *const p = pkt->get_data();
 		const int size = pkt->get_size();
 
+		if (size < 8) {
+			DOLOG(debug, "UDP: packet too small (%d bytes)\n", size);
+			continue;
+		}
+
 		uint16_t src_port = (p[0] << 8) | p[1];
 		uint16_t dst_port = (p[2] << 8) | p[3];
 

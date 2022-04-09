@@ -159,6 +159,11 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 
 bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids_req, const bool is_getnext, const int is_top)
 {
+	if (len < 2) {
+		DOLOG(warning, "SNMP: BER too small\n");
+		return false;
+	}
+
 	const uint8_t *pnt = p;
 	bool first_integer = true;
 	bool first_octet_str = true;
