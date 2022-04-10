@@ -37,6 +37,7 @@ void udp::operator()()
 
 		if (size < 8) {
 			DOLOG(debug, "UDP: packet too small (%d bytes)\n", size);
+			delete pkt;
 			continue;
 		}
 
