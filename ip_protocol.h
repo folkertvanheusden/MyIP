@@ -27,6 +27,8 @@ public:
 	ip_protocol(stats *const s, const std::string & stats_name);
 	virtual ~ip_protocol();
 
+	void ask_to_stop() { stop_flag = true; }
+
 	void register_ip(protocol *const p) { idev = p; }
 
 	void queue_packet(const packet *p);
