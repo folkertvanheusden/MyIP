@@ -1,4 +1,4 @@
-// (C) 2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2021-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <stdint.h>
 #include <unistd.h>
 #include <arpa/inet.h>
