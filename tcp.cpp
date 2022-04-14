@@ -943,6 +943,8 @@ void tcp::close_client_session(const int port)
 
 void tcp::wait_for_client_connected_state(const int local_port)
 {
+	int counter = 0;
+
 	while(!stop_flag) {
 		DOLOG(debug, "wait_for_client_connected_state: lock all sessions\n");
 
@@ -967,7 +969,6 @@ void tcp::wait_for_client_connected_state(const int local_port)
 		DOLOG(debug, "wait_for_client_connected_state: found session-data, send_data\n");
 
 		tcp_session_t *const cur_session = sd_it->second;
-		int counter = 0;
 
 		if (cur_session->state >= tcp_established) {
 			DOLOG(debug, "wait_for_client_connected_state: found session-data, data sent\n");
