@@ -178,13 +178,14 @@ void phys_slip::operator()()
 
 			DOLOG(debug, "phys_slip: queing packet, size %zu\n", packet_buffer.size());
 
-			packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
-
 			auto it = prot_map.find(0x800);  // assuming IPv4
 			if (it == prot_map.end())
 				DOLOG(warning, "phys_slip: no IPv4 stack attached to SLIP device (yet)\n");
-			else
+			else {
+				packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
+
 				it->second->queue_packet(this, p);
+			}
 
 			packet_buffer.clear();
 		}
