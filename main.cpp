@@ -652,16 +652,26 @@ int main(int argc, char *argv[])
 	getchar();
 
 	DOLOG(info, " *** TERMINATING ***\n");
-	fprintf(stderr, "terminating\n");
+	fprintf(stderr, "terminating fase 1\n");
 
+	for(auto & s : socks_proxies)
+		s-> ask_to_stop();
+
+	for(auto & a : applications)
+		a->ask_to_stop();
+
+	for(auto & d : devs)
+		d->ask_to_stop();
+
+	for(auto & p : ip_protocols)
+		p->ask_to_stop();
+
+	fprintf(stderr, "terminating fase 2\n");
 	for(auto & s : socks_proxies)
 		delete s;
 
 	for(auto & a : applications)
 		delete a;
-
-	for(auto & d : devs)
-		d->stop();
 
 	for(auto & p : ip_protocols)
 		delete p;

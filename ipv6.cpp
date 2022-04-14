@@ -32,7 +32,7 @@ ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : protocol(s,
 
 ipv6::~ipv6()
 {
-	ipv6_stop_flag = true;
+	stop_flag = true;
 	ipv6_th->join();
 	delete ipv6_th;
 }
@@ -110,7 +110,7 @@ void ipv6::operator()()
 {
 	set_thread_name("myip-ipv6");
 
-	while(!ipv6_stop_flag) {
+	while(!stop_flag) {
 		auto po = pkts->get(500);
 		if (!po.has_value())
 			continue;

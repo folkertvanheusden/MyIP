@@ -37,6 +37,8 @@ public:
 	phys(const phys &) = delete;
 	virtual ~phys();
 
+	void ask_to_stop();
+
 	virtual void start();
 	void stop();
 
