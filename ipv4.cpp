@@ -33,7 +33,7 @@ ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : protocol(s,
 
 ipv4::~ipv4()
 {
-	ipv4_stop_flag = true;
+	stop_flag = true;
 	ipv4_th->join();
 	delete ipv4_th;
 }
@@ -122,7 +122,7 @@ void ipv4::operator()()
 {
 	set_thread_name("myip-ipv4");
 
-	while(!ipv4_stop_flag) {
+	while(!stop_flag) {
 		auto po = pkts->get(500);
 		if (!po.has_value())
 			continue;

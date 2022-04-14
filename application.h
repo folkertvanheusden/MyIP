@@ -12,6 +12,10 @@ public:
 	}
 
 	virtual ~application() {
+		ask_to_stop();
+	}
+
+	void ask_to_stop() {
 		stop_flag = true;
 	}
 };

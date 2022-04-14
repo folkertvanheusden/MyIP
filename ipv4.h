@@ -34,7 +34,6 @@ private:
 	uint64_t *ipv4_tx_err { nullptr };
 
 	std::thread *ipv4_th { nullptr };
-	std::atomic_bool ipv4_stop_flag { false };
 
 	void send_ttl_exceeded(const packet *const pkt) const;
 

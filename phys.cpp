@@ -45,7 +45,7 @@ void phys::start()
 {
 }
 
-void phys::stop()
+void phys::ask_to_stop()
 {
 	stop_flag = true;
 }

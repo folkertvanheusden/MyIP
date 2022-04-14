@@ -28,9 +28,13 @@ protected:
 
 	std::map<uint8_t, ip_protocol *> prot_map;
 
+	std::atomic_bool stop_flag { false };
+
 public:
 	protocol(stats *const s, const std::string & stats_name);
 	virtual ~protocol();
+
+	void ask_to_stop() { stop_flag = true; }
 
 	virtual any_addr get_addr() const = 0;
 

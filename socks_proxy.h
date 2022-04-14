@@ -18,6 +18,10 @@ public:
 	socks_proxy(const std::string & interface, const int port, tcp *const t);
 	virtual ~socks_proxy();
 
+	void ask_to_stop() {
+		stop_flag = true;
+	}
+
 	void register_dns(dns *const dns_) { this->dns_ = dns_; }
 
 	void operator()();
