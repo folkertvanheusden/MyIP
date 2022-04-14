@@ -69,6 +69,7 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	if (src_ip != dns_ip) {
 		DOLOG(info, "DNS response from unexpected address (%s)\n", src_ip.to_str().c_str());
 		stats_inc_counter(dns_queries_alien_reply);
+		return;
 	}
 
 	const uint16_t *const header = (const uint16_t *)p->get_data();
