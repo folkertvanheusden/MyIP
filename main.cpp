@@ -201,6 +201,8 @@ int main(int argc, char *argv[])
 
 	/// environment
 	int uid = 1000, gid = 1000;
+	std::string run_at_started;
+
 	{
 		const libconfig::Setting & environment = root.lookup("environment");
 
@@ -214,6 +216,8 @@ int main(int argc, char *argv[])
 			DOLOG(ll_error, "chdir: %s", strerror(errno));
 			return 1;
 		}
+
+		run_at_started = cfg_str(environment, "ifup", "program to run when network interfaces are up", true, "");
 	}
 
 	// used for clean-up
@@ -449,6 +453,9 @@ int main(int argc, char *argv[])
 
 		dev->start();
 	}
+
+	if (run_at_started.empty() == false)
+		run(run_at_started);
 
 	if (setgid(gid) == -1) {
 		DOLOG(ll_error, "setgid: %s", strerror(errno));
@@ -690,10 +697,6 @@ int main(int argc, char *argv[])
 	// something that silently drops packet for a port
 	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
 	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-
-	std::string run_at_started = iniparser_getstring(ini, "cfg:ifup", "");
-	if (run_at_started.empty() == false)
-		run(run_at_started);
 
 
 	std::string run_at_shutdown = iniparser_getstring(ini, "cfg:ifdown", "");
