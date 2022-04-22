@@ -63,6 +63,12 @@ void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 {
 	stats_inc_counter(ntp_requests);
 
+	if (p->get_size() < sizeof(sntp_datagram *)) {
+		stats_inc_counter(ntp_invalid);
+
+		return;
+	}
+
 	sntp_datagram *sntp = reinterpret_cast<sntp_datagram *>(p->get_data());
 
 	if (sntp->mode == 1 || sntp->mode == 3) { // time request
