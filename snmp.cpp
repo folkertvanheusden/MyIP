@@ -31,7 +31,7 @@ uint64_t snmp::get_INTEGER(const uint8_t *p, const size_t length)
 	uint64_t v = 0;
 
 	if (length > 8)
-		DOLOG(info, "SNMP: INTEGER truncated (%zu bytes)", length);
+		DOLOG(info, "SNMP: INTEGER truncated (%zu bytes)\n", length);
 
 	for(size_t i=0; i<length; i++) {
 		v <<= 8;
