@@ -58,7 +58,7 @@ std::pair<uint16_t, buffer_in> sctp::get_parameter(buffer_in & chunk_payload)
 	return { type, value };
 }
 
-buffer_out sctp::init(buffer_in & chunk_payload)
+buffer_out sctp::init(sctp_session *const session, buffer_in & chunk_payload)
 {
 	uint32_t initiate_tag = chunk_payload.get_net_long();
 	uint32_t a_rwnd       = chunk_payload.get_net_long();
@@ -99,6 +99,7 @@ void sctp::operator()()
 			continue;
 		}
 
+		// TODO move this into a thread
 		try {
 			std::shared_lock<std::shared_mutex> slck(sessions_lock, std::defer_lock_t());
 			std::unique_lock<std::shared_mutex> ulck(sessions_lock, std::defer_lock_t());
@@ -112,7 +113,7 @@ void sctp::operator()()
 			uint32_t verification_tag = b.get_net_long();
 			uint32_t checksum         = b.get_net_long();
 
-			sctp_session *session = new sctp_session();
+			sctp_session *session           = new sctp_session();
 			session->their_verification_tag = verification_tag;
 			session->their_port_number      = source_port;
 			session->my_port_number         = destination_port;
@@ -133,7 +134,8 @@ void sctp::operator()()
 				
 				ulck.lock();  // lock unique
 
-				// TODO generate my_verification_tag in 'session'
+				// TODO: check that it is not set to 0
+				get_random(reinterpret_cast<uint8_t *>(&session->my_verification_tag), sizeof session->my_verification_tag);
 
 				sessions.insert({ hash, session });
 
@@ -155,9 +157,10 @@ void sctp::operator()()
 			// session is now created/allocated
 			// sessions is now shared-locked
 
-			reply.add_net_short(destination_port);
-			reply.add_net_short(source_port);
-			// TODO other fields
+			reply.add_net_short(session->my_port_number);
+			reply.add_net_short(session->their_port_number);
+			reply.add_net_long (session->my_verification_tag);
+			reply.add_net_long (0);  // place-holder for crc
 
 			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d\n", source_port, destination_port, size);
 
@@ -181,7 +184,7 @@ void sctp::operator()()
 				if (type == 1) {  // INIT
 					DOLOG(dl, "SCTP: INIT chunk of length %d\n", chunk.get_n_bytes_left());
 
-					reply.add_buffer_out(init(chunk));
+					reply.add_buffer_out(init(session, chunk));
 				}
 				else {
 					DOLOG(dl, "SCTP: %d is an unknown chunk type\n", type);

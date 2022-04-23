@@ -25,6 +25,8 @@ private:
 		uint16_t their_port_number      { 0 };
 		uint16_t my_port_number         { 0 };
 
+		char     buffer[4096]           { 0 };
+
 		sctp_session() {
 		}
 
@@ -56,7 +58,7 @@ private:
 	uint64_t *sctp_failed_msgs { nullptr };
 
 	std::pair<uint16_t, buffer_in> get_parameter(buffer_in & chunk_payload);
-	buffer_out                     init(buffer_in & in);
+	buffer_out                     init(sctp_session *const session, buffer_in & in);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);
