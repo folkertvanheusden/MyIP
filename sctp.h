@@ -5,7 +5,7 @@
 #include <map>
 #include <shared_mutex>
 
-#include "buffer.h"
+#include "buffer_in.h"
 #include "ip_protocol.h"
 #include "packet.h"
 #include "stats.h"
@@ -24,8 +24,8 @@ private:
 	uint64_t *sctp_msgs        { nullptr };
 	uint64_t *sctp_failed_msgs { nullptr };
 
-	std::pair<uint16_t, buffer> get_parameter(buffer & chunk_payload);
-	void                        init(buffer & in);
+	std::pair<uint16_t, buffer_in> get_parameter(buffer_in & chunk_payload);
+	void                           init(buffer_in & in);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);

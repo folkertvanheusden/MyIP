@@ -16,7 +16,8 @@ add_executable(myip
 	address_cache.cpp
 	any_addr.cpp
 	arp.cpp
-	buffer.cpp
+	buffer_in.cpp
+	buffer_out.cpp
 	dns.cpp
 	fifo-stats.cpp
 	font.cpp

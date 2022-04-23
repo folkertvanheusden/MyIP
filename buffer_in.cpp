@@ -1,7 +1,7 @@
 #include <stdexcept>
 #include <stdint.h>
 
-#include "buffer.h"
+#include "buffer_in.h"
 
 
 uint16_t get_net_short(const uint8_t *const p)
@@ -26,30 +26,30 @@ uint64_t get_net_long_long(const uint8_t *const p)
 	return out;
 }
 
-buffer::buffer(const uint8_t *p, const int size) : p(p), size(size)
+buffer_in::buffer_in(const uint8_t *p, const int size) : p(p), size(size)
 {
 }
 
-buffer::buffer(const buffer & b) : p(b.get_pointer()), size(b.get_size())
+buffer_in::buffer_in(const buffer_in & b) : p(b.get_pointer()), size(b.get_size())
 {
 }
 
-buffer::~buffer()
+buffer_in::~buffer_in()
 {
 }
 
-uint8_t  buffer::get_byte()
+uint8_t  buffer_in::get_net_byte()
 {
 	if (o >= size)
-		throw std::out_of_range("buffer::get_byte");
+		throw std::out_of_range("buffer_in::get_net_byte");
 
 	return p[o++];
 }
 
-uint16_t buffer::get_net_short()
+uint16_t buffer_in::get_net_short()
 {
 	if (o + 2 > size)
-		throw std::out_of_range("buffer::get_net_short");
+		throw std::out_of_range("buffer_in::get_net_short");
 
 	uint16_t temp = ::get_net_short(&p[o]);
 	o += 2;
@@ -57,10 +57,10 @@ uint16_t buffer::get_net_short()
 	return temp;
 }
 
-uint32_t buffer::get_net_long()
+uint32_t buffer_in::get_net_long()
 {
 	if (o + 4 > size)
-		throw std::out_of_range("buffer::get_net_long");
+		throw std::out_of_range("buffer_in::get_net_long");
 
 	uint32_t temp = ::get_net_long(&p[o]);
 	o += 4;
@@ -68,10 +68,10 @@ uint32_t buffer::get_net_long()
 	return temp;
 }
 
-uint64_t buffer::get_net_long_long()
+uint64_t buffer_in::get_net_long_long()
 {
 	if (o + 8 > size)
-		throw std::out_of_range("buffer::get_net_long_long");
+		throw std::out_of_range("buffer_in::get_net_long_long");
 
 	uint64_t temp = ::get_net_long_long(&p[o]);
 	o += 8;
@@ -79,10 +79,10 @@ uint64_t buffer::get_net_long_long()
 	return temp;
 }
 
-float buffer::get_net_float()
+float buffer_in::get_net_float()
 {
 	if (o + 4 > size)
-		throw std::out_of_range("buffer::get_net_float");
+		throw std::out_of_range("buffer_in::get_net_float");
 
 	uint32_t temp = ::get_net_long(&p[o]);
 	o += 4;
@@ -90,10 +90,10 @@ float buffer::get_net_float()
 	return *reinterpret_cast<float *>(&temp);
 }
 
-double buffer::get_net_double()
+double buffer_in::get_net_double()
 {
 	if (o + 8 > size)
-		throw std::out_of_range("buffer::get_net_double");
+		throw std::out_of_range("buffer_in::get_net_double");
 
 	uint64_t temp = ::get_net_long_long(&p[o]);
 	o += 8;
@@ -101,21 +101,21 @@ double buffer::get_net_double()
 	return *reinterpret_cast<double *>(&temp);
 }
 
-buffer buffer::get_segment(const int len)
+buffer_in buffer_in::get_segment(const int len)
 {
 	if (o + len > size)
-		throw std::out_of_range("buffer::get_segment");
+		throw std::out_of_range("buffer_in::get_segment");
 
-	buffer temp = buffer(&p[o], len);
+	buffer_in temp = buffer_in(&p[o], len);
 	o += len;
 
 	return temp;
 }
 
-std::string buffer::get_string(const int len)
+std::string buffer_in::get_string(const int len)
 {
 	if (o + len > size)
-		throw std::out_of_range("buffer::get_segment");
+		throw std::out_of_range("buffer_in::get_segment");
 
 	std::string temp = std::string(reinterpret_cast<const char *>(&p[o]), len);
 	o += len;
@@ -123,28 +123,28 @@ std::string buffer::get_string(const int len)
 	return temp;
 }
 
-void buffer::seek(const int len)
+void buffer_in::seek(const int len)
 {
 	if (o + len > size)
-		throw std::out_of_range("buffer::seek");
+		throw std::out_of_range("buffer_in::seek");
 
 	o += len;
 }
 
-bool buffer::end_reached() const
+bool buffer_in::end_reached() const
 {
 	return o == size;
 }
 
-int buffer::get_n_bytes_left() const
+int buffer_in::get_n_bytes_left() const
 {
 	return size - o;
 }
 
-const uint8_t *buffer::get_bytes(const int len)
+const uint8_t *buffer_in::get_bytes(const int len)
 {
 	if (o + len > size)
-		throw std::out_of_range("buffer::get_bytes");
+		throw std::out_of_range("buffer_in::get_bytes");
 
 	int temp = o;
 	o += len;
@@ -152,13 +152,13 @@ const uint8_t *buffer::get_bytes(const int len)
 	return &p[temp];
 }
 
-uint64_t get_variable_size_integer(buffer & data_source, const int len)
+uint64_t get_variable_size_integer(buffer_in & data_source, const int len)
 {
 	uint64_t out = 0;
 
 	for(int i=0; i<len; i++) {
 		out <<= 8;
-		out |= data_source.get_byte();
+		out |= data_source.get_net_byte();
 	}
 
 	return out;

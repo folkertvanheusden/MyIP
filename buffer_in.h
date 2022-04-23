@@ -4,7 +4,7 @@
 #include <string>
 
 
-class buffer
+class buffer_in
 {
 private:
 	const uint8_t *const p { nullptr };
@@ -15,11 +15,11 @@ private:
 	int             get_size()    const { return size; };
 
 public:
-	buffer(const uint8_t *p, const int size);
-	buffer(const buffer & b);
-	virtual ~buffer();
+	buffer_in(const uint8_t *p, const int size);
+	buffer_in(const buffer_in & b);
+	virtual ~buffer_in();
 
-	uint8_t     get_byte();
+	uint8_t     get_net_byte();
 	uint16_t    get_net_short();  // 2 bytes
 	uint32_t    get_net_long();  // 4 bytes
 	uint64_t    get_net_long_long();  // 8 bytes
@@ -27,7 +27,7 @@ public:
 	double      get_net_double();
 	const uint8_t * get_bytes(const int len);
 
-	buffer      get_segment(const int len);
+	buffer_in      get_segment(const int len);
 
 	std::string get_string(const int len);
 
@@ -37,4 +37,4 @@ public:
 	int         get_n_bytes_left() const;
 };
 
-uint64_t get_variable_size_integer(buffer & data_source, const int len);
+uint64_t get_variable_size_integer(buffer_in & data_source, const int len);

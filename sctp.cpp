@@ -1,13 +1,13 @@
 // (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <chrono>
 
-#include "buffer.h"
+#include "buffer_in.h"
 #include "ipv4.h"
 #include "icmp.h"
 #include "sctp.h"
 #include "utils.h"
 
-// This code uses the 'buffer' object: it is a test for how well it is usable when
+// This code uses the 'buffer_in' object: it is a test for how well it is usable when
 // implementing something like a protocol stack.
 // Methods can be quite large as they're written *while* reading the RFC.
 
@@ -30,7 +30,7 @@ sctp::~sctp()
 	delete th;
 }
 
-std::pair<uint16_t, buffer> sctp::get_parameter(buffer & chunk_payload)
+std::pair<uint16_t, buffer_in> sctp::get_parameter(buffer_in & chunk_payload)
 {
 	uint16_t type      = chunk_payload.get_net_short();
 	uint8_t  type_type = type & 0x3fff;
@@ -44,7 +44,7 @@ std::pair<uint16_t, buffer> sctp::get_parameter(buffer & chunk_payload)
 
 	DOLOG(dl, "SCTP parameter of type %d/%d and length %d\n", type_unh, type_type, len);
 
-	buffer   value     = chunk_payload.get_segment(len - 4);
+	buffer_in   value     = chunk_payload.get_segment(len - 4);
 
 	uint8_t  padding   = len & 3;
 	if (padding) {
@@ -58,7 +58,7 @@ std::pair<uint16_t, buffer> sctp::get_parameter(buffer & chunk_payload)
 	return { type, value };
 }
 
-void sctp::init(buffer & chunk_payload)
+void sctp::init(buffer_in & chunk_payload)
 {
 	uint32_t initiate_tag = chunk_payload.get_net_long();
 	uint32_t a_rwnd       = chunk_payload.get_net_long();
@@ -96,7 +96,7 @@ void sctp::operator()()
 		}
 
 		try {
-			buffer b(p, size);
+			buffer_in b(p, size);
 
 			uint16_t source_port      = b.get_net_short();
 			uint16_t destination_port = b.get_net_short();
@@ -106,8 +106,8 @@ void sctp::operator()()
 			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d\n", source_port, destination_port, size);
 
 			while(b.end_reached() == false) {
-				uint8_t  type      = b.get_byte();
-				uint8_t  flags     = b.get_byte();
+				uint8_t  type      = b.get_net_byte();
+				uint8_t  flags     = b.get_net_byte();
 				uint16_t len       = b.get_net_short();
 
 				uint8_t  type_type = type & 63;
@@ -118,7 +118,7 @@ void sctp::operator()()
 					break;
 				}
 
-				buffer chunk    = b.get_segment(len - 4);
+				buffer_in chunk    = b.get_segment(len - 4);
 
 				DOLOG(dl, "SCTP: type %d flags %d length %d\n", type, flags, len);
 
