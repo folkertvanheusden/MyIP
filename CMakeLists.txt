@@ -16,6 +16,7 @@ add_executable(myip
 	address_cache.cpp
 	any_addr.cpp
 	arp.cpp
+	buffer.cpp
 	dns.cpp
 	fifo-stats.cpp
 	font.cpp
@@ -35,6 +36,7 @@ add_executable(myip
 	phys_ppp.cpp
 	phys_slip.cpp
 	protocol.cpp
+	sctp.cpp
 	sip.cpp
 	snmp.cpp
 	snmp-data.cpp

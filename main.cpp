@@ -27,6 +27,7 @@
 #include "ntp.h"
 #include "syslog.h"
 #include "snmp.h"
+#include "sctp.h"
 #include "tcp.h"
 #include "tcp_udp_fw.h"
 #include "http.h"
@@ -333,6 +334,14 @@ int main(int argc, char *argv[])
 				ipv4_instance->register_protocol(0x06, t);
 
 				ipv4_tcp = t;
+
+				ip_protocols.push_back(t);
+			}
+
+			bool use_sctp = cfg_bool(ipv4_, "use-sctp", "wether to enable sctp", true, true);
+			if (use_sctp) {
+				sctp *t = new sctp(&s, icmp_);
+				ipv4_instance->register_protocol(0x84, t);
 
 				ip_protocols.push_back(t);
 			}
