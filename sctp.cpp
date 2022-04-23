@@ -11,6 +11,9 @@
 // implementing something like a protocol stack.
 // Methods can be quite large as they're written *while* reading the RFC.
 
+// debug level
+constexpr log_level_t dl = info;
+
 sctp::sctp(stats *const s, icmp *const icmp_) : ip_protocol(s, "sctp"), icmp_(icmp_)
 {
 	sctp_msgs        = s->register_stat("sctp_msgs");
@@ -39,7 +42,7 @@ std::pair<uint16_t, buffer> sctp::get_parameter(buffer & chunk_payload)
 	if (len < 4)
 		throw std::out_of_range("sctp::get_parameter");
 
-	DOLOG(debug, "SCTP parameter of type %d/%d and length %d\n", type_unh, type_type, len);
+	DOLOG(dl, "SCTP parameter of type %d/%d and length %d\n", type_unh, type_type, len);
 
 	buffer   value     = chunk_payload.get_segment(len - 4);
 
@@ -47,7 +50,7 @@ std::pair<uint16_t, buffer> sctp::get_parameter(buffer & chunk_payload)
 	if (padding) {
 		padding = 4 - padding;
 
-		DOLOG(debug, "SCTP parameter padding: %d bytes\n", padding);
+		DOLOG(dl, "SCTP parameter padding: %d bytes\n", padding);
 
 		chunk_payload.seek(padding);
 	}
@@ -66,13 +69,9 @@ void sctp::init(buffer & chunk_payload)
 	uint32_t initial_tsn  = chunk_payload.get_net_long();
 
 	while(chunk_payload.end_reached() == false) {
-		DOLOG(debug, "GREP1 %d\n", chunk_payload.get_n_bytes_left());
-
 		auto parameter = get_parameter(chunk_payload);
 
-		DOLOG(debug, "SCTP: INIT parameter block of type %d and size %d\n", parameter.first, parameter.second.get_n_bytes_left());
-
-		DOLOG(debug, "GREP2 %d\n", chunk_payload.get_n_bytes_left());
+		DOLOG(dl, "SCTP: INIT parameter block of type %d and size %d\n", parameter.first, parameter.second.get_n_bytes_left());
 	}
 }
 
@@ -91,7 +90,7 @@ void sctp::operator()()
 		const int            size = pkt->get_size();
 
 		if (size < 12) {
-			DOLOG(debug, "SCTP: packet too small (%d bytes)\n", size);
+			DOLOG(dl, "SCTP: packet too small (%d bytes)\n", size);
 			delete pkt;
 			continue;
 		}
@@ -104,7 +103,7 @@ void sctp::operator()()
 			uint32_t verification_tag = b.get_net_long();
 			uint32_t checksum         = b.get_net_long();
 
-			DOLOG(debug, "SCTP: source port %d destination port %d, size: %d\n", source_port, destination_port, size);
+			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d\n", source_port, destination_port, size);
 
 			while(b.end_reached() == false) {
 				uint8_t  type      = b.get_byte();
@@ -115,35 +114,35 @@ void sctp::operator()()
 				uint8_t  type_unh  = type >> 6;  // what to do when it can not be processed
 
 				if (len < 4) {
-					DOLOG(debug, "SCTP: chunk too short\n");
+					DOLOG(dl, "SCTP: chunk too short\n");
 					break;
 				}
 
 				buffer chunk    = b.get_segment(len - 4);
 
-				DOLOG(debug, "SCTP: type %d flags %d length %d\n", type, flags, len);
+				DOLOG(dl, "SCTP: type %d flags %d length %d\n", type, flags, len);
 
 				if (type == 1) {  // INIT
-					DOLOG(debug, "SCTP: INIT chunk of length %d\n", chunk.get_n_bytes_left());
+					DOLOG(dl, "SCTP: INIT chunk of length %d\n", chunk.get_n_bytes_left());
 
 					init(chunk);
 				}
 				else {
-					DOLOG(debug, "SCTP: %d is an unknown chunk type\n", type);
+					DOLOG(dl, "SCTP: %d is an unknown chunk type\n", type);
 				}
 
 				uint8_t  padding   = len & 3;
 				if (padding) {
 					padding = 4 - padding;
 
-					DOLOG(debug, "SCTP chunk padding: %d bytes\n", padding);
+					DOLOG(dl, "SCTP chunk padding: %d bytes\n", padding);
 
 					b.seek(padding);
 				}
 			}
 		}
 		catch(std::out_of_range & e) {
-			DOLOG(debug, "SCTP: truncated\n");
+			DOLOG(dl, "SCTP: truncated\n");
 		}
 
 		delete pkt;
