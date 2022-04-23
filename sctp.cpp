@@ -58,7 +58,7 @@ std::pair<uint16_t, buffer_in> sctp::get_parameter(buffer_in & chunk_payload)
 	return { type, value };
 }
 
-void sctp::init(buffer_in & chunk_payload)
+buffer_out & sctp::init(buffer_in & chunk_payload)
 {
 	uint32_t initiate_tag = chunk_payload.get_net_long();
 	uint32_t a_rwnd       = chunk_payload.get_net_long();
@@ -73,6 +73,10 @@ void sctp::init(buffer_in & chunk_payload)
 
 		DOLOG(dl, "SCTP: INIT parameter block of type %d and size %d\n", parameter.first, parameter.second.get_n_bytes_left());
 	}
+
+	buffer_out out;
+
+	return out;
 }
 
 void sctp::operator()()
@@ -96,12 +100,61 @@ void sctp::operator()()
 		}
 
 		try {
+			std::shared_lock<std::shared_mutex> slck(sessions_lock, std::defer_lock_t());
+			std::unique_lock<std::shared_mutex> ulck(sessions_lock, std::defer_lock_t());
+
+			buffer_out reply;
+
 			buffer_in b(p, size);
 
 			uint16_t source_port      = b.get_net_short();
 			uint16_t destination_port = b.get_net_short();
 			uint32_t verification_tag = b.get_net_long();
 			uint32_t checksum         = b.get_net_long();
+
+			sctp_session *session = new sctp_session();
+			session->their_verification_tag = verification_tag;
+			session->their_port_number      = source_port;
+			session->my_port_number         = destination_port;
+
+			slck.lock();  // lock shared
+
+			uint64_t hash = session->get_id_hash();
+			auto it       = sessions.find(hash);
+			bool found    = it != sessions.end();
+
+			if (found) {
+				delete session;
+
+				session = it->second;
+			}
+			else {
+				slck.unlock();  // unlock shared
+				
+				ulck.lock();  // lock unique
+
+				sessions.insert({ hash, session });
+
+				ulck.unlock(); // unlock unique
+
+				// <-- here an other thread can terminate/delete this thread
+				//     that's perfectly fine; see the find below
+
+				slck.lock();  // lock shared
+
+				it = sessions.find(session->get_id_hash());
+				if (it == sessions.end()) {
+					delete session;
+
+					continue;
+				}
+			}
+
+			// session is now created/allocated
+			// sessions is now shared-locked
+
+			reply.add_net_short(destination_port);
+			reply.add_net_short(source_port);
 
 			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d\n", source_port, destination_port, size);
 
@@ -125,7 +178,7 @@ void sctp::operator()()
 				if (type == 1) {  // INIT
 					DOLOG(dl, "SCTP: INIT chunk of length %d\n", chunk.get_n_bytes_left());
 
-					init(chunk);
+					reply.add_buffer_out(init(chunk));
 				}
 				else {
 					DOLOG(dl, "SCTP: %d is an unknown chunk type\n", type);
@@ -140,6 +193,8 @@ void sctp::operator()()
 					b.seek(padding);
 				}
 			}
+
+			// TODO transmit 'reply'
 		}
 		catch(std::out_of_range & e) {
 			DOLOG(dl, "SCTP: truncated\n");

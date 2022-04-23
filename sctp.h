@@ -6,16 +6,47 @@
 #include <shared_mutex>
 
 #include "buffer_in.h"
+#include "buffer_out.h"
 #include "ip_protocol.h"
 #include "packet.h"
-#include "stats.h"
+#include "utils.h"
+
 
 class icmp;
-class ipv4;
 
 class sctp : public ip_protocol
 {
 private:
+	class sctp_session {
+	public:
+		uint32_t their_verification_tag { 0 };
+		uint32_t my_verification_tag    { 0 };
+
+		uint16_t their_port_number      { 0 };
+		uint16_t my_port_number         { 0 };
+
+		sctp_session() {
+		}
+
+		virtual ~sctp_session() {
+		}
+
+		uint64_t get_id_hash() {
+			buffer_out temp;
+
+			temp.add_net_long (their_verification_tag);
+			temp.add_net_short(their_port_number);
+			temp.add_net_short(my_port_number);
+
+			// TODO: replace 123 by a sane seed
+			return MurmurHash64A(temp.get_content(), temp.get_size(), 123);
+		}
+	};
+
+	// uint64_t: sctp_session::get_id_hash
+	std::map<uint64_t, sctp_session *> sessions;
+	std::shared_mutex                  sessions_lock;
+
 	icmp *const icmp_;
 
 	std::map<int, uint64_t> allocated_ports;
@@ -25,7 +56,7 @@ private:
 	uint64_t *sctp_failed_msgs { nullptr };
 
 	std::pair<uint16_t, buffer_in> get_parameter(buffer_in & chunk_payload);
-	void                           init(buffer_in & in);
+	buffer_out                   & init(buffer_in & in);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);
