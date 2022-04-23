@@ -56,7 +56,7 @@ private:
 	uint64_t *sctp_failed_msgs { nullptr };
 
 	std::pair<uint16_t, buffer_in> get_parameter(buffer_in & chunk_payload);
-	buffer_out                   & init(buffer_in & in);
+	buffer_out                     init(buffer_in & in);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);

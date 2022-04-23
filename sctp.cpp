@@ -58,7 +58,7 @@ std::pair<uint16_t, buffer_in> sctp::get_parameter(buffer_in & chunk_payload)
 	return { type, value };
 }
 
-buffer_out & sctp::init(buffer_in & chunk_payload)
+buffer_out sctp::init(buffer_in & chunk_payload)
 {
 	uint32_t initiate_tag = chunk_payload.get_net_long();
 	uint32_t a_rwnd       = chunk_payload.get_net_long();
@@ -133,6 +133,8 @@ void sctp::operator()()
 				
 				ulck.lock();  // lock unique
 
+				// TODO generate my_verification_tag in 'session'
+
 				sessions.insert({ hash, session });
 
 				ulck.unlock(); // unlock unique
@@ -155,6 +157,7 @@ void sctp::operator()()
 
 			reply.add_net_short(destination_port);
 			reply.add_net_short(source_port);
+			// TODO other fields
 
 			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d\n", source_port, destination_port, size);
 
@@ -193,6 +196,8 @@ void sctp::operator()()
 					b.seek(padding);
 				}
 			}
+
+			// TODO calculate & set crc in 'reply'
 
 			// TODO transmit 'reply'
 		}
