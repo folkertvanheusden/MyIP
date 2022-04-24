@@ -5,6 +5,7 @@
 #include "ipv4.h"
 #include "icmp.h"
 #include "sctp.h"
+#include "sctp_crc32c.h"
 #include "utils.h"
 
 // This code uses the 'buffer_in' object: it is a test for how well it is usable when
@@ -225,7 +226,9 @@ void sctp::operator()()
 				}
 			}
 
-			// TODO calculate & set crc in 'reply'
+			// calculate & set crc in 'reply'
+			uint32_t crc32c = generate_crc32c(reply.get_content(), reply.get_size());
+			reply.add_net_long(crc32c, crc_offset);
 
 			// transmit 'reply' (0x84 is SCTP protocol number)
 			if (idev->transmit_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 0x84, reply.get_content(), reply.get_size(), nullptr) == false)

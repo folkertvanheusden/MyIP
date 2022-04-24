@@ -38,6 +38,7 @@ add_executable(myip
 	phys_slip.cpp
 	protocol.cpp
 	sctp.cpp
+	sctp_crc32c.cpp
 	sip.cpp
 	snmp.cpp
 	snmp-data.cpp
