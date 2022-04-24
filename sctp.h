@@ -29,10 +29,17 @@ private:
 
 		char     buffer[4096]           { 0 };
 
+		uint64_t last_packet            { 0 };
+
 		sctp_session(const any_addr & their_addr) : their_addr(their_addr) {
+			last_packet = get_ms();
 		}
 
 		virtual ~sctp_session() {
+		}
+
+		void update_last_packet() {
+			last_packet = get_ms();
 		}
 
 		uint64_t get_id_hash() {

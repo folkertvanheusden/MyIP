@@ -13,18 +13,56 @@ void buffer_out::add_net_byte(const uint8_t b)
 	buffer.push_back(b);
 }
 
-void buffer_out::add_net_short(const uint8_t s)
+void buffer_out::add_net_short(const uint16_t s)
 {
 	buffer.push_back(s >> 8);
 	buffer.push_back(s);
 }
 
-void buffer_out::add_net_long(const uint8_t l)
+void buffer_out::add_net_long(const uint32_t l)
 {
 	buffer.push_back(l >> 24);
 	buffer.push_back(l >> 16);
 	buffer.push_back(l >>  8);
 	buffer.push_back(l);
+}
+
+size_t buffer_out::add_net_short(const uint16_t s, const ssize_t offset)
+{
+	if (offset != -1) {
+		buffer.at(offset + 0) = s >> 8;
+		buffer.at(offset + 1) = s;
+
+		return offset;
+	}
+
+	size_t o = buffer.size();
+
+	buffer.push_back(s >> 8);
+	buffer.push_back(s);
+
+	return o;
+}
+
+size_t buffer_out::add_net_long(const uint32_t l, const ssize_t offset)
+{
+	if (offset != -1) {
+		buffer.at(offset + 0) = l >> 24;
+		buffer.at(offset + 1) = l >> 16;
+		buffer.at(offset + 2) = l >>  8;
+		buffer.at(offset + 3) = l;
+
+		return offset;
+	}
+
+	size_t o = buffer.size();
+
+	buffer.push_back(l >> 24);
+	buffer.push_back(l >> 16);
+	buffer.push_back(l >>  8);
+	buffer.push_back(l);
+
+	return o;
 }
 
 void buffer_out::add_any_addr(const any_addr & a)

@@ -11,6 +11,9 @@
 // implementing something like a protocol stack.
 // Methods can be quite large as they're written *while* reading the RFC.
 
+// TODO:
+// - session cleaner
+
 // debug level
 constexpr log_level_t dl = info;
 
@@ -76,6 +79,22 @@ buffer_out sctp::init(sctp_session *const session, buffer_in & chunk_payload)
 
 	buffer_out out;
 
+	out.add_net_byte(2);  // INIT ACK
+	out.add_net_byte(0);  // flags
+  	size_t length_offset = out.add_net_short(0, -1);  // place holder for length
+	out.add_net_long(session->my_verification_tag);
+	out.add_net_long(sizeof session->buffer);  // a_rwnd
+	out.add_net_short(1);  // number of outbound streams
+	out.add_net_short(1);  // number of inbound streams
+	out.add_net_long(session->my_verification_tag);  // initial TSN (transmission sequence number)
+
+	out.add_net_short(out.get_size(), length_offset);  // update length field
+
+	int padding = 4 - (out.get_size() & 3);
+
+	while(padding)
+		out.add_net_byte(0), padding--;
+
 	return out;
 }
 
@@ -128,6 +147,8 @@ void sctp::operator()()
 				delete session;
 
 				session = it->second;
+
+				session->update_last_packet();
 			}
 			else {
 				slck.unlock();  // unlock shared
@@ -160,7 +181,7 @@ void sctp::operator()()
 			reply.add_net_short(session->my_port_number);
 			reply.add_net_short(session->their_port_number);
 			reply.add_net_long (session->my_verification_tag);
-			reply.add_net_long (0);  // place-holder for crc
+			size_t crc_offset = reply.add_net_long(0, -1);  // place-holder for crc
 
 			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d\n", source_port, destination_port, size);
 
