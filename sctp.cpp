@@ -139,6 +139,8 @@ void sctp::operator()()
 			uint32_t verification_tag = b.get_net_long();
 			uint32_t checksum         = b.get_net_long();
 
+			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d, verification tag: %08x\n", source_port, destination_port, size, verification_tag);
+
 			sctp_session *session           = new sctp_session(pkt->get_src_addr());
 			session->their_verification_tag = verification_tag;
 			session->their_port_number      = source_port;
@@ -187,12 +189,12 @@ void sctp::operator()()
 			// session is now created/allocated
 			// sessions is now shared-locked
 
+			bool send_reply = true;
+
 			reply.add_net_short(session->my_port_number);
 			reply.add_net_short(session->their_port_number);
 			reply.add_net_long (session->my_verification_tag);
 			size_t crc_offset = reply.add_net_long(0, -1);  // place-holder for crc
-
-			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d\n", source_port, destination_port, size);
 
 			while(b.end_reached() == false) {
 				uint8_t  type      = b.get_net_byte();
@@ -218,6 +220,8 @@ void sctp::operator()()
 				}
 				else {
 					DOLOG(dl, "SCTP: %d is an unknown chunk type\n", type);
+
+					send_reply = false;
 				}
 
 				uint8_t  padding   = len & 3;
@@ -230,13 +234,15 @@ void sctp::operator()()
 				}
 			}
 
-			// calculate & set crc in 'reply'
-			uint32_t crc32c = generate_crc32c(reply.get_content(), reply.get_size());
-			reply.add_net_long(crc32c, crc_offset);
+			if (send_reply) {
+				// calculate & set crc in 'reply'
+				uint32_t crc32c = generate_crc32c(reply.get_content(), reply.get_size());
+				reply.add_net_long(crc32c, crc_offset);
 
-			// transmit 'reply' (0x84 is SCTP protocol number)
-			if (idev->transmit_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 0x84, reply.get_content(), reply.get_size(), nullptr) == false)
-				DOLOG(info, "SCTP: failed to transmit reply packet\n");
+				// transmit 'reply' (0x84 is SCTP protocol number)
+				if (idev->transmit_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 0x84, reply.get_content(), reply.get_size(), nullptr) == false)
+					DOLOG(info, "SCTP: failed to transmit reply packet\n");
+			}
 		}
 		catch(std::out_of_range & e) {
 			DOLOG(dl, "SCTP: truncated\n");
