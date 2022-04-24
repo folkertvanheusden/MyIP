@@ -87,6 +87,16 @@ void buffer_out::add_buffer_in(buffer_in & i)
 		buffer.push_back(i.get_net_byte());
 }
 
+void buffer_out::add_padding(const int m)
+{
+	int padding = m - (buffer.size() % m);
+
+	if (padding != m) {
+		while(padding)
+			buffer.push_back(0), padding--;
+	}
+}
+
 const std::vector<uint8_t> & buffer_out::get_payload() const
 {
 	return buffer;

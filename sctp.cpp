@@ -90,10 +90,7 @@ buffer_out sctp::init(sctp_session *const session, buffer_in & chunk_payload)
 
 	out.add_net_short(out.get_size(), length_offset);  // update length field
 
-	int padding = 4 - (out.get_size() & 3);
-
-	while(padding)
-		out.add_net_byte(0), padding--;
+	out.add_padding(4);
 
 	return out;
 }

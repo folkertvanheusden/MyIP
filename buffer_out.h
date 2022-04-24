@@ -28,6 +28,9 @@ public:
 	void add_buffer_out(const buffer_out & o);
 	void add_buffer_in (      buffer_in  & i);
 
+	// pad to a multiple of m
+	void add_padding(const int m);
+
 	const std::vector<uint8_t> & get_payload() const;
 
 	size_t         get_size() const;
