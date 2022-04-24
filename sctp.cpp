@@ -79,8 +79,8 @@ buffer_out sctp::generate_state_cookie(const any_addr & their_addr, const int th
 
 	sc.add_net_long(state_cookie_key_timestamp);
 
-	uint8_t hash[64] { 0 };
-	HMAC(EVP_sha512(), state_cookie_key, sizeof state_cookie_key, sc.get_content(), sc.get_size(), hash, nullptr);
+	uint8_t hash[28] { 0 };
+	HMAC(EVP_sha3_224(), state_cookie_key, sizeof state_cookie_key, sc.get_content(), sc.get_size(), hash, nullptr);
 
 	sc.add_buffer(hash, sizeof hash);
 
