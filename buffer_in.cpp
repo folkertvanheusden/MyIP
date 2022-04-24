@@ -141,6 +141,11 @@ int buffer_in::get_n_bytes_left() const
 	return size - o;
 }
 
+const std::vector<uint8_t> buffer_in::peek() const
+{
+	return std::vector<uint8_t>(&p[o], &p[size]);
+}
+
 const uint8_t *buffer_in::get_bytes(const int len)
 {
 	if (o + len > size)

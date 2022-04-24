@@ -108,6 +108,11 @@ const std::vector<uint8_t> & buffer_out::get_payload() const
 	return buffer;
 }
 
+bool buffer_out::compare(const buffer_in & b) const
+{
+	return b.peek() == buffer;
+}
+
 size_t buffer_out::get_size() const
 {
 	return buffer.size();

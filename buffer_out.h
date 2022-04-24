@@ -35,6 +35,8 @@ public:
 
 	const std::vector<uint8_t> & get_payload() const;
 
+	bool compare(const buffer_in & b) const;
+
 	size_t         get_size() const;
 	const uint8_t *get_content() const;
 };

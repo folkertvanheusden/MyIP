@@ -29,8 +29,13 @@ private:
 	uint64_t *sctp_failed_msgs { nullptr };
 
 	std::pair<uint16_t, buffer_in> get_parameter(buffer_in & chunk_payload);
-	void                           init(buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag);
-	buffer_out                     generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port);
+
+	buffer_out generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port);
+	buffer_out chunk_gen_abort();
+	buffer_out chunk_gen_cookie_ack();
+
+	void chunk_init(buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag);
+	bool chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);

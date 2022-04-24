@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 
 class buffer_in
@@ -35,6 +36,8 @@ public:
 
 	bool        end_reached() const;
 	int         get_n_bytes_left() const;
+
+	const std::vector<uint8_t> peek() const;
 };
 
 uint64_t get_variable_size_integer(buffer_in & data_source, const int len);
