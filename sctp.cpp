@@ -223,7 +223,9 @@ void sctp::operator()()
 
 			// TODO calculate & set crc in 'reply'
 
-			// TODO transmit 'reply'
+			// transmit 'reply' (0x84 is SCTP protocol number)
+			if (idev->transmit_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 0x84, reply.get_content(), reply.get_size(), nullptr) == false)
+				DOLOG(info, "SCTP: failed to transmit reply packet\n");
 		}
 		catch(std::out_of_range & e) {
 			DOLOG(dl, "SCTP: truncated\n");
