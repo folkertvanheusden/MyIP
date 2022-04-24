@@ -66,9 +66,11 @@ std::pair<uint16_t, buffer_in> sctp::get_parameter(buffer_in & chunk_payload)
 	return { type, value };
 }
 
-buffer_out sctp::generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port)
+buffer_out sctp::generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port, const uint32_t their_verification_tag)
 {
 	buffer_out sc;
+
+	sc.add_net_long(their_verification_tag);
 
 	sc.add_net_byte(their_addr.get_len());
 	sc.add_any_addr(their_addr);
@@ -114,7 +116,7 @@ void sctp::chunk_init(buffer_in & chunk_payload, const uint32_t my_verification_
 
 	// add state cookie (parameter)
 	out->add_net_short(7);  // state cookie
-	auto state_cookie = generate_state_cookie(their_addr, their_port, local_port);
+	auto state_cookie = generate_state_cookie(their_addr, their_port, local_port, *initiate_tag);
 	out->add_net_short(4 + state_cookie.get_size());  // length of this parameter
 	out->add_buffer_out(state_cookie);
 
@@ -146,13 +148,17 @@ buffer_out sctp::chunk_gen_cookie_ack()
 	return out;
 }
 
-bool sctp::chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port)
+void sctp::chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port, bool *const ok, uint32_t *const their_verification_tag)
 {
-	buffer_in  cookie_data = chunk_payload.get_segment(chunk_payload.get_n_bytes_left());
+	buffer_in  cookie_data  = chunk_payload.get_segment(chunk_payload.get_n_bytes_left());
 
-	buffer_out state_cookie = generate_state_cookie(their_addr, their_port, local_port);
+	buffer_in  temp         = cookie_data;
+	*their_verification_tag = temp.get_net_long();
 
-	return state_cookie.compare(cookie_data);
+	buffer_out state_cookie = generate_state_cookie(their_addr, their_port, local_port, *their_verification_tag);
+
+	// sanity of *my_verification_tag is guaranteed by hmac which is verified here as well
+	*ok = state_cookie.compare(cookie_data);
 }
 
 void sctp::operator()()
@@ -181,19 +187,12 @@ void sctp::operator()()
 
 			buffer_in b(p, size);
 
-			uint16_t source_port            = b.get_net_short();  // their port
-			uint16_t destination_port       = b.get_net_short();  // local port
-			uint32_t their_verification_tag = b.get_net_long();
-			uint32_t checksum               = b.get_net_long();
+			uint16_t source_port         = b.get_net_short();  // their port
+			uint16_t destination_port    = b.get_net_short();  // local port
+			uint32_t my_verification_tag = b.get_net_long();
+			uint32_t checksum            = b.get_net_long();
 
-			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d, verification tag: %08x\n", source_port, destination_port, size, their_verification_tag);
-
-			uint32_t my_verification_tag = 0;
-
-			// verification tag may not be 0
-			do {
-				get_random(reinterpret_cast<uint8_t *>(&my_verification_tag), sizeof my_verification_tag);
-			} while(my_verification_tag == 0);
+			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d, verification tag: %08x\n", source_port, destination_port, size, my_verification_tag);
 
 			bool send_reply = true;
 
@@ -201,7 +200,7 @@ void sctp::operator()()
 
 			reply.add_net_short(destination_port);
 			reply.add_net_short(source_port);
-			size_t their_verification_tag_offset = reply.add_net_long(their_verification_tag, -1);  // will be 0 in INIT, will be replaced by initial tag
+			size_t their_verification_tag_offset = reply.add_net_long(-1, -1);  // will be 0 in INIT, will be replaced by their verifiation/initial tag
 			size_t crc_offset = reply.add_net_long(0, -1);  // place-holder for crc
 
 			while(b.end_reached() == false) {
@@ -224,17 +223,30 @@ void sctp::operator()()
 				if (type == 1) {  // INIT
 					DOLOG(dl, "SCTP: INIT chunk of length %d\n", chunk.get_n_bytes_left());
 					
-					uint32_t initial_verification_tag = 0;
+					uint32_t their_initial_verification_tag = 0;
+
+					uint32_t my_new_verification_tag = 0;
+
+					// verification tag may not be 0
+					do {
+						get_random(reinterpret_cast<uint8_t *>(&my_new_verification_tag), sizeof my_new_verification_tag);
+					} while(my_new_verification_tag == 0);
 
 					buffer_out temp;
-					chunk_init(chunk, my_verification_tag, 4096 /* TODO */, their_addr, source_port, destination_port, &temp, &initial_verification_tag);
+					chunk_init(chunk, my_new_verification_tag, 4096 /* TODO */, their_addr, source_port, destination_port, &temp, &their_initial_verification_tag);
 
-					reply.add_net_long(initial_verification_tag, their_verification_tag_offset);
+					reply.add_net_long(their_initial_verification_tag, their_verification_tag_offset);
 
 					reply.add_buffer_out(temp);
 				}
 				else if (type == 10) {  // COOKIE ECHO
-					if (chunk_cookie_echo(chunk, their_addr, source_port, destination_port)) {
+					bool     cookie_ok           = false;
+
+					uint32_t their_verification_tag = 0;
+
+					chunk_cookie_echo(chunk, their_addr, source_port, destination_port, &cookie_ok, &their_verification_tag);
+
+					if (cookie_ok) {
 						// TODO register session
 
 						// send ack
@@ -248,6 +260,8 @@ void sctp::operator()()
 
 						DOLOG(dl, "SCTP: ABORT\n");
 					}
+
+					reply.add_net_long(their_verification_tag, their_verification_tag_offset);
 				}
 				else {
 					DOLOG(dl, "SCTP: %d is an unknown chunk type\n", type);
