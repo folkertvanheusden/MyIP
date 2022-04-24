@@ -113,7 +113,7 @@ void sctp::operator()()
 			uint32_t verification_tag = b.get_net_long();
 			uint32_t checksum         = b.get_net_long();
 
-			sctp_session *session           = new sctp_session();
+			sctp_session *session           = new sctp_session(pkt->get_src_addr());
 			session->their_verification_tag = verification_tag;
 			session->their_port_number      = source_port;
 			session->my_port_number         = destination_port;

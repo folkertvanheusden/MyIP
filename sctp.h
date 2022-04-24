@@ -19,6 +19,8 @@ class sctp : public ip_protocol
 private:
 	class sctp_session {
 	public:
+		any_addr their_addr;
+
 		uint32_t their_verification_tag { 0 };
 		uint32_t my_verification_tag    { 0 };
 
@@ -27,7 +29,7 @@ private:
 
 		char     buffer[4096]           { 0 };
 
-		sctp_session() {
+		sctp_session(const any_addr & their_addr) : their_addr(their_addr) {
 		}
 
 		virtual ~sctp_session() {
@@ -36,7 +38,7 @@ private:
 		uint64_t get_id_hash() {
 			buffer_out temp;
 
-			temp.add_net_long (their_verification_tag);
+			temp.add_any_addr (their_addr);
 			temp.add_net_short(their_port_number);
 			temp.add_net_short(my_port_number);
 

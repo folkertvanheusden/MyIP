@@ -27,6 +27,14 @@ void buffer_out::add_net_long(const uint8_t l)
 	buffer.push_back(l);
 }
 
+void buffer_out::add_any_addr(const any_addr & a)
+{
+	int len = a.get_len();
+
+	for(int i=0; i<len; i++)
+		buffer.push_back(a[i]);
+}
+
 void buffer_out::add_buffer_out(const buffer_out & o)
 {
 	for(auto b : o.get_payload())
