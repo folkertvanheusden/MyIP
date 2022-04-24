@@ -88,7 +88,14 @@ buffer_out sctp::init(sctp_session *const session, buffer_in & chunk_payload)
 	out.add_net_short(1);  // number of inbound streams
 	out.add_net_long(session->my_verification_tag);  // initial TSN (transmission sequence number)
 
-	out.add_net_short(out.get_size(), length_offset);  // update length field
+	// add state cookie (parameter)
+	out.add_net_short(7);  // state cookie
+	out.add_net_short(4);  // length of this parameter
+	// TODO: when POC works, replace current sctp_session thing by proper
+	// cookie-mechanism (see https://datatracker.ietf.org/doc/html/rfc4960#section-5.1.3 )
+
+	// update chunk meta data (length field)
+	out.add_net_short(out.get_size(), length_offset);
 
 	out.add_padding(4);
 
