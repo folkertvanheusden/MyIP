@@ -1,5 +1,6 @@
 // (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
-#include <chrono>
+#include <time.h>
+#include <openssl/hmac.h>
 
 #include "buffer_in.h"
 #include "ipv4.h"
@@ -22,6 +23,9 @@ sctp::sctp(stats *const s, icmp *const icmp_) : ip_protocol(s, "sctp"), icmp_(ic
 {
 	sctp_msgs        = s->register_stat("sctp_msgs");
 	sctp_failed_msgs = s->register_stat("sctp_failed_msgs");
+
+	get_random(state_cookie_key, sizeof state_cookie_key);
+	state_cookie_key_timestamp = time(nullptr);
 
 	th = new std::thread(std::ref(*this));
 }
@@ -62,7 +66,28 @@ std::pair<uint16_t, buffer_in> sctp::get_parameter(buffer_in & chunk_payload)
 	return { type, value };
 }
 
-buffer_out sctp::init(sctp_session *const session, buffer_in & chunk_payload)
+buffer_out sctp::generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port)
+{
+	buffer_out sc;
+
+	sc.add_net_byte(their_addr.get_len());
+	sc.add_any_addr(their_addr);
+
+	sc.add_net_short(their_port);
+
+	sc.add_net_short(local_port);
+
+	sc.add_net_long(time(nullptr));
+
+	uint8_t hash[64] { 0 };
+	HMAC(EVP_sha512(), state_cookie_key, sizeof state_cookie_key, sc.get_content(), sc.get_size(), hash, nullptr);
+
+	sc.add_buffer(hash, sizeof hash);
+
+	return sc;
+}
+
+buffer_out sctp::init(buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port)
 {
 	uint32_t initiate_tag = chunk_payload.get_net_long();
 	uint32_t a_rwnd       = chunk_payload.get_net_long();
@@ -83,19 +108,17 @@ buffer_out sctp::init(sctp_session *const session, buffer_in & chunk_payload)
 	out.add_net_byte(2);  // INIT ACK
 	out.add_net_byte(0);  // flags
   	size_t length_offset = out.add_net_short(0, -1);  // place holder for length
-	out.add_net_long(session->my_verification_tag);
-	out.add_net_long(sizeof session->buffer);  // a_rwnd
+	out.add_net_long(my_verification_tag);
+	out.add_net_long(buffer_size);  // a_rwnd
 	out.add_net_short(1);  // number of outbound streams
 	out.add_net_short(1);  // number of inbound streams
-	out.add_net_long(session->my_verification_tag);  // initial TSN (transmission sequence number)
+	out.add_net_long(my_verification_tag);  // initial TSN (transmission sequence number)
 
 	// add state cookie (parameter)
 	out.add_net_short(7);  // state cookie
-	out.add_net_short(4 + 64);  // length of this parameter
-	for(int i=0; i<16; i++)  // dummy state cookie
-		out.add_net_long(0); 
-	// TODO: when POC works, replace current sctp_session thing by proper
-	// cookie-mechanism (see https://datatracker.ietf.org/doc/html/rfc4960#section-5.1.3 )
+	auto state_cookie = generate_state_cookie(their_addr, their_port, local_port);
+	out.add_net_short(4 + state_cookie.get_size());  // length of this parameter
+	out.add_buffer_out(state_cookie);
 
 	// update chunk meta data (length field)
 	out.add_net_short(out.get_size(), length_offset);
@@ -127,73 +150,31 @@ void sctp::operator()()
 
 		// TODO move this into a thread
 		try {
-			std::shared_lock<std::shared_mutex> slck(sessions_lock, std::defer_lock_t());
-			std::unique_lock<std::shared_mutex> ulck(sessions_lock, std::defer_lock_t());
-
 			buffer_out reply;
+
+			const any_addr their_addr = pkt->get_src_addr();
 
 			buffer_in b(p, size);
 
-			uint16_t source_port      = b.get_net_short();
-			uint16_t destination_port = b.get_net_short();
-			uint32_t verification_tag = b.get_net_long();
-			uint32_t checksum         = b.get_net_long();
+			uint16_t source_port            = b.get_net_short();  // their port
+			uint16_t destination_port       = b.get_net_short();  // local port
+			uint32_t their_verification_tag = b.get_net_long();
+			uint32_t checksum               = b.get_net_long();
 
-			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d, verification tag: %08x\n", source_port, destination_port, size, verification_tag);
+			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d, verification tag: %08x\n", source_port, destination_port, size, their_verification_tag);
 
-			sctp_session *session           = new sctp_session(pkt->get_src_addr());
-			session->their_verification_tag = verification_tag;
-			session->their_port_number      = source_port;
-			session->my_port_number         = destination_port;
+			uint32_t my_verification_tag = 0;
 
-			slck.lock();  // lock shared
-
-			uint64_t hash = session->get_id_hash();
-			auto it       = sessions.find(hash);
-			bool found    = it != sessions.end();
-
-			if (found) {
-				delete session;
-
-				session = it->second;
-
-				session->update_last_packet();
-			}
-			else {
-				slck.unlock();  // unlock shared
-				
-				ulck.lock();  // lock unique
-
-				// verification tag may not be 0
-				do {
-					get_random(reinterpret_cast<uint8_t *>(&session->my_verification_tag), sizeof session->my_verification_tag);
-				} while(session->my_verification_tag == 0);
-
-				sessions.insert({ hash, session });
-
-				ulck.unlock(); // unlock unique
-
-				// <-- here an other thread can terminate/delete this thread
-				//     that's perfectly fine; see the find below
-
-				slck.lock();  // lock shared
-
-				it = sessions.find(session->get_id_hash());
-				if (it == sessions.end()) {
-					delete session;
-
-					continue;
-				}
-			}
-
-			// session is now created/allocated
-			// sessions is now shared-locked
+			// verification tag may not be 0
+			do {
+				get_random(reinterpret_cast<uint8_t *>(&my_verification_tag), sizeof my_verification_tag);
+			} while(my_verification_tag == 0);
 
 			bool send_reply = true;
 
-			reply.add_net_short(session->my_port_number);
-			reply.add_net_short(session->their_port_number);
-			reply.add_net_long (session->my_verification_tag);
+			reply.add_net_short(destination_port);
+			reply.add_net_short(source_port);
+			reply.add_net_long (their_verification_tag);
 			size_t crc_offset = reply.add_net_long(0, -1);  // place-holder for crc
 
 			while(b.end_reached() == false) {
@@ -216,7 +197,7 @@ void sctp::operator()()
 				if (type == 1) {  // INIT
 					DOLOG(dl, "SCTP: INIT chunk of length %d\n", chunk.get_n_bytes_left());
 
-					reply.add_buffer_out(init(session, chunk));
+					reply.add_buffer_out(init(chunk, my_verification_tag, 4096 /* TODO */, their_addr, source_port, destination_port));
 				}
 				else {
 					DOLOG(dl, "SCTP: %d is an unknown chunk type\n", type);
@@ -240,7 +221,7 @@ void sctp::operator()()
 				reply.add_net_long(crc32c, crc_offset);
 
 				// transmit 'reply' (0x84 is SCTP protocol number)
-				if (idev->transmit_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 0x84, reply.get_content(), reply.get_size(), nullptr) == false)
+				if (idev->transmit_packet(their_addr, pkt->get_dst_addr(), 0x84, reply.get_content(), reply.get_size(), nullptr) == false)
 					DOLOG(info, "SCTP: failed to transmit reply packet\n");
 			}
 		}

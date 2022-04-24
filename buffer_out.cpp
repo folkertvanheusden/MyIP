@@ -87,6 +87,12 @@ void buffer_out::add_buffer_in(buffer_in & i)
 		buffer.push_back(i.get_net_byte());
 }
 
+void buffer_out::add_buffer(const uint8_t *const p, const size_t l)
+{
+	for(size_t i=0; i<l; i++)
+		buffer.push_back(p[i]);
+}
+
 void buffer_out::add_padding(const int m)
 {
 	int padding = m - (buffer.size() % m);

@@ -17,46 +17,8 @@ class icmp;
 class sctp : public ip_protocol
 {
 private:
-	class sctp_session {
-	public:
-		any_addr their_addr;
-
-		uint32_t their_verification_tag { 0 };
-		uint32_t my_verification_tag    { 0 };
-
-		uint16_t their_port_number      { 0 };
-		uint16_t my_port_number         { 0 };
-
-		char     buffer[4096]           { 0 };
-
-		uint64_t last_packet            { 0 };
-
-		sctp_session(const any_addr & their_addr) : their_addr(their_addr) {
-			last_packet = get_ms();
-		}
-
-		virtual ~sctp_session() {
-		}
-
-		void update_last_packet() {
-			last_packet = get_ms();
-		}
-
-		uint64_t get_id_hash() {
-			buffer_out temp;
-
-			temp.add_any_addr (their_addr);
-			temp.add_net_short(their_port_number);
-			temp.add_net_short(my_port_number);
-
-			// TODO: replace 123 by a sane seed
-			return MurmurHash64A(temp.get_content(), temp.get_size(), 123);
-		}
-	};
-
-	// uint64_t: sctp_session::get_id_hash
-	std::map<uint64_t, sctp_session *> sessions;
-	std::shared_mutex                  sessions_lock;
+	uint8_t state_cookie_key[32]       { 0 };
+	time_t  state_cookie_key_timestamp { 0 };
 
 	icmp *const icmp_;
 
@@ -67,7 +29,8 @@ private:
 	uint64_t *sctp_failed_msgs { nullptr };
 
 	std::pair<uint16_t, buffer_in> get_parameter(buffer_in & chunk_payload);
-	buffer_out                     init(sctp_session *const session, buffer_in & in);
+	buffer_out                     init(buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port);
+	buffer_out                     generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);

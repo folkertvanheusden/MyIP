@@ -28,6 +28,8 @@ public:
 	void add_buffer_out(const buffer_out & o);
 	void add_buffer_in (      buffer_in  & i);
 
+	void add_buffer(const uint8_t *const p, const size_t l);
+
 	// pad to a multiple of m
 	void add_padding(const int m);
 
