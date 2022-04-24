@@ -10,7 +10,7 @@
 
 // This code uses the 'buffer_in' object: it is a test for how well it is usable when
 // implementing something like a protocol stack.
-// Methods can be quite large as they're written *while* reading the RFC.
+// Methods can be quite large as they're written *while* reading the RFC (4960).
 
 // TODO:
 // - session cleaner
@@ -162,8 +162,10 @@ void sctp::operator()()
 				
 				ulck.lock();  // lock unique
 
-				// TODO: check that it is not set to 0
-				get_random(reinterpret_cast<uint8_t *>(&session->my_verification_tag), sizeof session->my_verification_tag);
+				// verification tag may not be 0
+				do {
+					get_random(reinterpret_cast<uint8_t *>(&session->my_verification_tag), sizeof session->my_verification_tag);
+				} while(session->my_verification_tag == 0);
 
 				sessions.insert({ hash, session });
 
