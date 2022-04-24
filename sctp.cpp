@@ -91,7 +91,9 @@ buffer_out sctp::init(sctp_session *const session, buffer_in & chunk_payload)
 
 	// add state cookie (parameter)
 	out.add_net_short(7);  // state cookie
-	out.add_net_short(4);  // length of this parameter
+	out.add_net_short(4 + 64);  // length of this parameter
+	for(int i=0; i<16; i++)  // dummy state cookie
+		out.add_net_long(0); 
 	// TODO: when POC works, replace current sctp_session thing by proper
 	// cookie-mechanism (see https://datatracker.ietf.org/doc/html/rfc4960#section-5.1.3 )
 
