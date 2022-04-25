@@ -46,6 +46,10 @@ private:
 		}
 
 		uint64_t get_hash() const {
+			return get_hash(their_addr, their_port, my_port);
+		}
+
+		static uint64_t get_hash(const any_addr & their_addr, const uint16_t their_port, const uint16_t my_port) {
 			buffer_out temp;
 
 			temp.add_any_addr(their_addr);

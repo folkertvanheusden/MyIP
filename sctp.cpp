@@ -170,10 +170,12 @@ void sctp::operator()()
 		if (!po.has_value())
 			continue;
 
-		const packet *pkt = po.value();
+		const packet        *pkt        = po.value();
 
-		const uint8_t *const p    = pkt->get_data();
-		const int            size = pkt->get_size();
+		const any_addr       their_addr = pkt->get_src_addr();
+
+		const uint8_t *const p          = pkt->get_data();
+		const int            size       = pkt->get_size();
 
 		if (size < 12) {
 			DOLOG(dl, "SCTP: packet too small (%d bytes)\n", size);
@@ -183,8 +185,6 @@ void sctp::operator()()
 
 		// TODO move this into a thread
 		try {
-			const any_addr their_addr = pkt->get_src_addr();
-
 			buffer_in b(p, size);
 
 			uint16_t source_port         = b.get_net_short();  // their port
@@ -192,7 +192,9 @@ void sctp::operator()()
 			uint32_t my_verification_tag = b.get_net_long();
 			uint32_t checksum            = b.get_net_long();
 
-			DOLOG(dl, "SCTP: source port %d destination port %d, size: %d, verification tag: %08x\n", source_port, destination_port, size, my_verification_tag);
+			uint64_t hash                = sctp_session::get_hash(their_addr, source_port, destination_port);
+
+			DOLOG(dl, "SCTP[%lx]: source port %d destination port %d, size: %d, verification tag: %08x\n", hash, source_port, destination_port, size, my_verification_tag);
 
 			bool send_reply = true;
 
@@ -212,16 +214,16 @@ void sctp::operator()()
 				uint8_t  type_unh  = type >> 6;  // what to do when it can not be processed
 
 				if (len < 4) {
-					DOLOG(dl, "SCTP: chunk too short\n");
+					DOLOG(dl, "SCTP[%lx]: chunk too short\n", hash);
 					break;
 				}
 
 				buffer_in chunk    = b.get_segment(len - 4);
 
-				DOLOG(dl, "SCTP: type %d flags %d length %d\n", type, flags, len);
+				DOLOG(dl, "SCTP[%lx]: type %d flags %d length %d\n", hash, type, flags, len);
 
 				if (type == 1) {  // INIT
-					DOLOG(dl, "SCTP: INIT chunk of length %d\n", chunk.get_n_bytes_left());
+					DOLOG(dl, "SCTP[%lx]: INIT chunk of length %d\n", hash, chunk.get_n_bytes_left());
 					
 					uint32_t their_initial_verification_tag = 0;
 
@@ -247,24 +249,35 @@ void sctp::operator()()
 					chunk_cookie_echo(chunk, their_addr, source_port, destination_port, &cookie_ok, &their_verification_tag);
 
 					if (cookie_ok) {
-						// TODO register session
+						// register session
+						{
+							std::unique_lock<std::shared_mutex> lck(sessions_lock);
+
+							if (sessions.find(hash) != sessions.end())
+								DOLOG(dl, "SCTP[%lx]: session already on-going\n", hash);
+							else {
+								sctp_session *session = new sctp_session(their_addr, source_port, destination_port);
+
+								sessions.insert({ hash, session });
+							}
+						}
 
 						// send ack
 						reply.add_buffer_out(chunk_gen_cookie_ack());
 
-						DOLOG(dl, "SCTP: COOKIE ECHO ACK\n");
+						DOLOG(dl, "SCTP[%lx]: COOKIE ECHO ACK\n", hash);
 					}
 					else {
 						// send deny
 						reply.add_buffer_out(chunk_gen_abort());
 
-						DOLOG(dl, "SCTP: ABORT\n");
+						DOLOG(dl, "SCTP[%lx]: ABORT\n", hash);
 					}
 
 					reply.add_net_long(their_verification_tag, their_verification_tag_offset);
 				}
 				else {
-					DOLOG(dl, "SCTP: %d is an unknown chunk type\n", type);
+					DOLOG(dl, "SCTP[%lx]: %d is an unknown chunk type\n", hash, type);
 
 					send_reply = false;
 				}
@@ -273,7 +286,7 @@ void sctp::operator()()
 				if (padding) {
 					padding = 4 - padding;
 
-					DOLOG(dl, "SCTP chunk padding: %d bytes\n", padding);
+					DOLOG(dl, "SCTP[%lx]: chunk padding: %d bytes\n", hash, padding);
 
 					b.seek(padding);
 				}
@@ -286,11 +299,11 @@ void sctp::operator()()
 
 				// transmit 'reply' (0x84 is SCTP protocol number)
 				if (idev->transmit_packet(their_addr, pkt->get_dst_addr(), 0x84, reply.get_content(), reply.get_size(), nullptr) == false)
-					DOLOG(info, "SCTP: failed to transmit reply packet\n");
+					DOLOG(info, "SCTP[%lx]: failed to transmit reply packet\n", hash);
 			}
 		}
 		catch(std::out_of_range & e) {
-			DOLOG(dl, "SCTP: truncated\n");
+			DOLOG(dl, "SCTP(%s): truncated\n", their_addr.to_str().c_str());
 		}
 
 		delete pkt;
