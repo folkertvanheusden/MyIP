@@ -38,7 +38,7 @@ sctp::~sctp()
 	delete th;
 }
 
-std::pair<uint16_t, buffer_in> sctp::get_parameter(buffer_in & chunk_payload)
+std::pair<uint16_t, buffer_in> sctp::get_parameter(const uint64_t hash, buffer_in & chunk_payload)
 {
 	uint16_t type      = chunk_payload.get_net_short();
 	uint8_t  type_type = type & 0x3fff;
@@ -50,7 +50,7 @@ std::pair<uint16_t, buffer_in> sctp::get_parameter(buffer_in & chunk_payload)
 	if (len < 4)
 		throw std::out_of_range("sctp::get_parameter");
 
-	DOLOG(dl, "SCTP parameter of type %d/%d and length %d\n", type_unh, type_type, len);
+	DOLOG(dl, "SCTP[%lx]: parameter of type %d/%d and length %d\n", hash, type_unh, type_type, len);
 
 	buffer_in   value  = chunk_payload.get_segment(len - 4);
 
@@ -58,7 +58,7 @@ std::pair<uint16_t, buffer_in> sctp::get_parameter(buffer_in & chunk_payload)
 	if (padding) {
 		padding = 4 - padding;
 
-		DOLOG(dl, "SCTP parameter padding: %d bytes\n", padding);
+		DOLOG(dl, "SCTP[%lx]: parameter padding: %d bytes\n", hash, padding);
 
 		chunk_payload.seek(padding);
 	}
@@ -89,7 +89,7 @@ buffer_out sctp::generate_state_cookie(const any_addr & their_addr, const int th
 	return sc;
 }
 
-void sctp::chunk_init(buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag)
+void sctp::chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag)
 {
 	        *initiate_tag = chunk_payload.get_net_long();
 	uint32_t a_rwnd       = chunk_payload.get_net_long();
@@ -100,9 +100,9 @@ void sctp::chunk_init(buffer_in & chunk_payload, const uint32_t my_verification_
 	uint32_t initial_tsn  = chunk_payload.get_net_long();
 
 	while(chunk_payload.end_reached() == false) {
-		auto parameter = get_parameter(chunk_payload);
+		auto parameter = get_parameter(hash, chunk_payload);
 
-		DOLOG(dl, "SCTP: INIT parameter block of type %d and size %d\n", parameter.first, parameter.second.get_n_bytes_left());
+		DOLOG(dl, "SCTP[%lx]: INIT parameter block of type %d and size %d\n", hash, parameter.first, parameter.second.get_n_bytes_left());
 	}
 
 	out->add_net_byte(2);  // INIT ACK
@@ -178,7 +178,7 @@ void sctp::operator()()
 		const int            size       = pkt->get_size();
 
 		if (size < 12) {
-			DOLOG(dl, "SCTP: packet too small (%d bytes)\n", size);
+			DOLOG(dl, "SCTP(%s): packet too small (%d bytes)\n", their_addr.to_str().c_str(), size);
 			delete pkt;
 			continue;
 		}
@@ -235,7 +235,7 @@ void sctp::operator()()
 					} while(my_new_verification_tag == 0);
 
 					buffer_out temp;
-					chunk_init(chunk, my_new_verification_tag, 4096 /* TODO */, their_addr, source_port, destination_port, &temp, &their_initial_verification_tag);
+					chunk_init(hash, chunk, my_new_verification_tag, 4096 /* TODO */, their_addr, source_port, destination_port, &temp, &their_initial_verification_tag);
 
 					reply.add_net_long(their_initial_verification_tag, their_verification_tag_offset);
 
