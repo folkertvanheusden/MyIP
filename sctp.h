@@ -17,6 +17,48 @@ class icmp;
 class sctp : public ip_protocol
 {
 private:
+	class sctp_session {
+	private:
+		const uint16_t their_port { 0 };
+		const uint16_t my_port    { 0 };
+		const any_addr their_addr;
+	
+	public:
+		sctp_session(const any_addr & their_addr, const uint16_t their_port, const uint16_t my_port) :
+			their_port(their_port), my_port(my_port),
+			their_addr(their_addr)
+		{
+		}
+
+		virtual ~sctp_session() {
+		}
+
+		const any_addr get_their_addr() const {
+			return their_addr;
+		}
+
+		const uint16_t get_their_port() const {
+			return their_port;
+		}
+
+		const uint16_t get_my_port() const {
+			return my_port;
+		}
+
+		uint64_t get_hash() const {
+			buffer_out temp;
+
+			temp.add_any_addr(their_addr);
+			temp.add_net_short(their_port);
+			temp.add_net_short(my_port);
+
+			return MurmurHash64A(temp.get_content(), temp.get_size(), 123 /* TODO: replace 123 */);
+		}
+	};
+
+	std::shared_mutex                  sessions_lock;
+	std::map<uint64_t, sctp_session *> sessions;
+
 	uint8_t state_cookie_key[32]       { 0 };
 	time_t  state_cookie_key_timestamp { 0 };
 
