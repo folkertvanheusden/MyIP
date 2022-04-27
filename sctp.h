@@ -22,11 +22,14 @@ private:
 		const uint16_t their_port { 0 };
 		const uint16_t my_port    { 0 };
 		const any_addr their_addr;
+		uint32_t       my_tsn     { 0 };
+		uint32_t       their_tsn  { 0 };
 	
 	public:
-		sctp_session(const any_addr & their_addr, const uint16_t their_port, const uint16_t my_port) :
+		sctp_session(const any_addr & their_addr, const uint16_t their_port, const uint16_t my_port, const uint32_t their_tsn, const uint32_t my_tsn) :
 			their_port(their_port), my_port(my_port),
-			their_addr(their_addr)
+			their_addr(their_addr),
+			my_tsn(my_tsn), their_tsn(their_tsn)
 		{
 		}
 
@@ -43,6 +46,22 @@ private:
 
 		const uint16_t get_my_port() const {
 			return my_port;
+		}
+
+		uint32_t get_my_tsn() const {
+			return my_tsn;
+		}
+
+		void inc_my_tsn(const uint32_t how_much) {
+			my_tsn += how_much;
+		}
+
+		uint32_t get_their_tsn() const {
+			return their_tsn;
+		}
+
+		void inc_their_tsn(const uint32_t how_much) {
+			their_tsn += how_much;
 		}
 
 		uint64_t get_hash() const {
@@ -76,13 +95,13 @@ private:
 
 	std::pair<uint16_t, buffer_in> get_parameter(const uint64_t hash, buffer_in & chunk_payload);
 
-	buffer_out generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port, const uint32_t my_verification_tag);
+	buffer_out generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port, const uint32_t my_verification_tag, const uint32_t their_initial_tsn, const uint32_t my_initial_tsn);
 	buffer_out chunk_gen_abort();
 	buffer_out chunk_gen_cookie_ack();
 	buffer_out chunk_heartbeat_request(buffer_in & chunk_payload);
 
 	void chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag);
-	void chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port, bool *const ok, uint32_t *const my_verification_tag);
+	void chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port, bool *const ok, uint32_t *const my_verification_tag, uint32_t *const their_initial_tsn, uint32_t *const my_initial_tsn);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);

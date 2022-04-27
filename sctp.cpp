@@ -66,11 +66,14 @@ std::pair<uint16_t, buffer_in> sctp::get_parameter(const uint64_t hash, buffer_i
 	return { type, value };
 }
 
-buffer_out sctp::generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port, const uint32_t their_verification_tag)
+buffer_out sctp::generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port, const uint32_t their_verification_tag, const uint32_t their_initial_tsn, const uint32_t my_initial_tsn)
 {
 	buffer_out sc;
 
 	sc.add_net_long(their_verification_tag);
+
+	sc.add_net_long(their_initial_tsn);
+	sc.add_net_long(my_initial_tsn);
 
 	sc.add_net_byte(their_addr.get_len());
 	sc.add_any_addr(their_addr);
@@ -97,7 +100,7 @@ void sctp::chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint
 	uint16_t n_outbound_streams = chunk_payload.get_net_short();
 	uint16_t n_inbound_streams  = chunk_payload.get_net_short();
 
-	uint32_t initial_tsn  = chunk_payload.get_net_long();
+	uint32_t their_initial_tsn  = chunk_payload.get_net_long();
 
 	while(chunk_payload.end_reached() == false) {
 		auto parameter = get_parameter(hash, chunk_payload);
@@ -112,11 +115,12 @@ void sctp::chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint
 	out->add_net_long(buffer_size);  // a_rwnd
 	out->add_net_short(1);  // number of outbound streams
 	out->add_net_short(1);  // number of inbound streams
-	out->add_net_long(my_verification_tag);  // initial TSN (transmission sequence number)
+	uint32_t my_initial_tsn = my_verification_tag;
+	out->add_net_long(my_initial_tsn);  // initial TSN (transmission sequence number)
 
 	// add state cookie (parameter)
 	out->add_net_short(7);  // state cookie
-	auto state_cookie = generate_state_cookie(their_addr, their_port, local_port, *initiate_tag);
+	auto state_cookie = generate_state_cookie(their_addr, their_port, local_port, *initiate_tag, their_initial_tsn, my_initial_tsn);
 	out->add_net_short(4 + state_cookie.get_size());  // length of this parameter
 	out->add_buffer_out(state_cookie);
 
@@ -148,14 +152,16 @@ buffer_out sctp::chunk_gen_cookie_ack()
 	return out;
 }
 
-void sctp::chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port, bool *const ok, uint32_t *const their_verification_tag)
+void sctp::chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port, bool *const ok, uint32_t *const their_verification_tag, uint32_t *const their_initial_tsn, uint32_t *const my_initial_tsn)
 {
 	buffer_in  cookie_data  = chunk_payload.get_segment(chunk_payload.get_n_bytes_left());
 
 	buffer_in  temp         = cookie_data;
 	*their_verification_tag = temp.get_net_long();
+	*their_initial_tsn      = temp.get_net_long();
+	*my_initial_tsn         = temp.get_net_long();
 
-	buffer_out state_cookie = generate_state_cookie(their_addr, their_port, local_port, *their_verification_tag);
+	buffer_out state_cookie = generate_state_cookie(their_addr, their_port, local_port, *their_verification_tag, *their_initial_tsn, *my_initial_tsn);
 
 	// sanity of *my_verification_tag is guaranteed by hmac which is verified here as well
 	*ok = state_cookie.compare(cookie_data);
@@ -259,23 +265,25 @@ void sctp::operator()()
 					reply.add_buffer_out(temp);
 				}
 				else if (type == 4) {  // HEARTBEAT (-request)
-					DOLOG(dl, "SCTP[%lx]: heartbeat request\n", hash);
+					DOLOG(dl, "SCTP[%lx]: heartbeat request received\n", hash);
 
 					reply.add_buffer_out(chunk_heartbeat_request(chunk));
 				}
 				else if (type == 6) {  // ABORT
-					DOLOG(dl, "SCTP[%lx]: abort request\n", hash);
+					DOLOG(dl, "SCTP[%lx]: abort request received\n", hash);
 
 					std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 					sessions.erase(hash);
 				}
 				else if (type == 10) {  // COOKIE ECHO
-					bool     cookie_ok           = false;
+					bool     cookie_ok              = false;
 
 					uint32_t their_verification_tag = 0;
+					uint32_t their_initial_tsn      = 0;
+					uint32_t my_initial_tsn         = 0;
 
-					chunk_cookie_echo(chunk, their_addr, source_port, destination_port, &cookie_ok, &their_verification_tag);
+					chunk_cookie_echo(chunk, their_addr, source_port, destination_port, &cookie_ok, &their_verification_tag, &their_initial_tsn, &my_initial_tsn);
 
 					if (cookie_ok) {
 						// register session
@@ -285,7 +293,9 @@ void sctp::operator()()
 							if (sessions.find(hash) != sessions.end())
 								DOLOG(dl, "SCTP[%lx]: session already on-going\n", hash);
 							else {
-								sctp_session *session = new sctp_session(their_addr, source_port, destination_port);
+								DOLOG(dl, "SCTP[%lx]: their initial tsn: %08x, my initial tsn: %08x\n", hash, their_initial_tsn, my_initial_tsn);
+
+								sctp_session *session = new sctp_session(their_addr, source_port, destination_port, their_initial_tsn, my_initial_tsn);
 
 								sessions.insert({ hash, session });
 							}
