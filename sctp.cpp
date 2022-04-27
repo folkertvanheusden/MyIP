@@ -161,6 +161,23 @@ void sctp::chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_a
 	*ok = state_cookie.compare(cookie_data);
 }
 
+buffer_out sctp::chunk_heartbeat_request(buffer_in & chunk_payload)
+{
+	buffer_out out;
+
+	out.add_net_byte(5);  // SCTP COOKIE ACK
+	out.add_net_byte(0);  // reserved
+	size_t length_offset = out.add_net_short(4, -1);  // length of this chunk
+
+	out.add_buffer_in(chunk_payload);
+
+        out.add_net_short(out.get_size(), length_offset);
+
+        out.add_padding(4);
+
+	return out;
+}
+
 void sctp::operator()()
 {
 	set_thread_name("myip-sctp");
@@ -240,6 +257,11 @@ void sctp::operator()()
 					reply.add_net_long(their_initial_verification_tag, their_verification_tag_offset);
 
 					reply.add_buffer_out(temp);
+				}
+				else if (type == 4) {  // HEARTBEAT (-request)
+					DOLOG(dl, "SCTP[%lx]: heartbeat request\n", hash);
+
+					reply.add_buffer_out(chunk_heartbeat_request(chunk));
 				}
 				else if (type == 10) {  // COOKIE ECHO
 					bool     cookie_ok           = false;
