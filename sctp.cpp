@@ -263,6 +263,13 @@ void sctp::operator()()
 
 					reply.add_buffer_out(chunk_heartbeat_request(chunk));
 				}
+				else if (type == 6) {  // ABORT
+					DOLOG(dl, "SCTP[%lx]: abort request\n", hash);
+
+					std::unique_lock<std::shared_mutex> lck(sessions_lock);
+
+					sessions.erase(hash);
+				}
 				else if (type == 10) {  // COOKIE ECHO
 					bool     cookie_ok           = false;
 
