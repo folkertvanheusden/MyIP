@@ -211,7 +211,7 @@ void sctp::operator()()
 
 			uint64_t hash                = sctp_session::get_hash(their_addr, source_port, destination_port);
 
-			DOLOG(dl, "SCTP[%lx]: source port %d destination port %d, size: %d, verification tag: %08x\n", hash, source_port, destination_port, size, my_verification_tag);
+			DOLOG(dl, "SCTP[%lx]: source addr %s, source port %d, destination port %d, size: %d, verification tag: %08x\n", hash, their_addr.to_str().c_str(), source_port, destination_port, size, my_verification_tag);
 
 			bool send_reply = true;
 
