@@ -141,7 +141,7 @@ void register_tcp_service(std::vector<phys *> *const devs, tcp_port_handler_t & 
 	}
 }
 
-void register_sctp_service(std::vector<phys *> *const devs, sctp_port_handler_t & sph, const int port)
+void register_sctp_service(std::vector<phys *> *const devs, sctp::sctp_port_handler_t & sph, const int port)
 {
 	for(auto & dev : *devs) {
 		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));

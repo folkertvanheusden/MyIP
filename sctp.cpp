@@ -191,7 +191,7 @@ buffer_out sctp::chunk_heartbeat_request(buffer_in & chunk_payload)
 	return out;
 }
 
-std::pair<sctp_data_handling_result_t, buffer_out> sctp::chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(void *private_data, buffer_in data)> & new_data_handler, void *const private_data)
+std::pair<sctp_data_handling_result_t, buffer_out> sctp::chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(sctp_session *const session, buffer_in data)> & new_data_handler)
 {
 	buffer_out out;
 
@@ -202,7 +202,7 @@ std::pair<sctp_data_handling_result_t, buffer_out> sctp::chunk_data(sctp_session
 
 	// TODO verify tsn etc
 
-	bool rc = new_data_handler(private_data, chunk.get_segment(chunk.get_n_bytes_left()));
+	bool rc = new_data_handler(session, chunk.get_segment(chunk.get_n_bytes_left()));
 
 	return { dcb_abort, out };  // TODO
 }
@@ -274,7 +274,7 @@ void sctp::operator()()
 				if (type == 0) {  // DATA
 					DOLOG(dl, "SCTP[%lx]: DATA chunk of length %d\n", hash, chunk.get_n_bytes_left());
 
-					std::function<bool(void *private_data, buffer_in data)> new_data_handler = nullptr;
+					std::function<bool(sctp_session *const session, buffer_in data)> new_data_handler = nullptr;
 
 					{
 						std::shared_lock<std::shared_mutex> lck(listeners_lock);
@@ -291,7 +291,7 @@ void sctp::operator()()
 						auto it = sessions.find(hash);
 
 						if (it != sessions.end()) {
-							auto handling_result = chunk_data(it->second, chunk, &reply, new_data_handler, it->second->get_callback_private_data());
+							auto handling_result = chunk_data(it->second, chunk, &reply, new_data_handler);
 
 							if (handling_result.first == dcb_abort) {
 								// abort session immediately
@@ -379,7 +379,7 @@ void sctp::operator()()
 
 					chunk_cookie_echo(chunk, their_addr, source_port, destination_port, &cookie_ok, &their_verification_tag, &their_initial_tsn, &my_initial_tsn);
 
-					std::function<void *(const any_addr & their_addr, const uint16_t their_port)> new_session_handler = nullptr;
+					std::function<void(sctp_session *const session)> new_session_handler = nullptr;
 
 					{
 						std::shared_lock<std::shared_mutex> lck(listeners_lock);

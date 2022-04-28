@@ -14,21 +14,12 @@
 
 class icmp;
 
-typedef struct {
-	std::function<void()> init;
-	std::function<void *(const any_addr & their_addr, const uint16_t their_port)> new_session;
-	std::function<bool(void *private_data, buffer_in data)> new_data;
-	std::function<void(void *private_data)> session_closed_1;  // please terminate
-	std::function<void(void *private_data)> session_closed_2;  // should be terminated, clean up
-	std::function<void()> deinit;
-} sctp_port_handler_t;
-
 // dcb: data-call-back
 typedef enum { dcb_close, dcb_abort, dcb_continue } sctp_data_handling_result_t;
 
 class sctp : public ip_protocol
 {
-private:
+public:
 	class sctp_session {
 	private:
 		const uint16_t their_port { 0 };
@@ -101,6 +92,16 @@ private:
 		}
 	};
 
+	typedef struct {
+		std::function<void()> init;
+		std::function<void(sctp_session *const session)> new_session;
+		std::function<bool(sctp_session *const session, buffer_in data)> new_data;
+		std::function<void(sctp_session *const session)> session_closed_1;  // please terminate
+		std::function<void(sctp_session *const session)> session_closed_2;  // should be terminated, clean up
+		std::function<void()> deinit;
+	} sctp_port_handler_t;
+
+private:
 	std::shared_mutex                  sessions_lock;
 	std::map<uint64_t, sctp_session *> sessions;
 
@@ -124,7 +125,7 @@ private:
 
 	void chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag);
 	void chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port, bool *const ok, uint32_t *const my_verification_tag, uint32_t *const their_initial_tsn, uint32_t *const my_initial_tsn);
-	std::pair<sctp_data_handling_result_t, buffer_out> chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(void *private_data, buffer_in data)> & new_data_handler, void *const private_data);
+	std::pair<sctp_data_handling_result_t, buffer_out> chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(sctp_session *const session, buffer_in data)> & new_data_handler);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);
