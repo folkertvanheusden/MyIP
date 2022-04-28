@@ -27,14 +27,19 @@ ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : protocol(s,
 
 	assert(myip.get_len() == 16);
 
-	ipv6_th = new std::thread(std::ref(*this));
+	for(int i=0; i<4; i++)
+		ths.push_back(new std::thread(std::ref(*this)));
 }
 
 ipv6::~ipv6()
 {
 	stop_flag = true;
-	ipv6_th->join();
-	delete ipv6_th;
+
+	for(auto & th : ths) {
+		th->join();
+
+		delete th;
+	}
 }
 
 bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)

@@ -102,6 +102,7 @@ private:
 
 	void chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag);
 	void chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port, bool *const ok, uint32_t *const my_verification_tag, uint32_t *const their_initial_tsn, uint32_t *const my_initial_tsn);
+	void chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, buffer_in *const for_callback);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);

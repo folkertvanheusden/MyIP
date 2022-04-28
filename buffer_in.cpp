@@ -26,6 +26,10 @@ uint64_t get_net_long_long(const uint8_t *const p)
 	return out;
 }
 
+buffer_in::buffer_in()
+{
+}
+
 buffer_in::buffer_in(const uint8_t *p, const int size) : p(p), size(size)
 {
 }

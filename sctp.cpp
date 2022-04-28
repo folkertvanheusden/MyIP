@@ -27,15 +27,19 @@ sctp::sctp(stats *const s, icmp *const icmp_) : ip_protocol(s, "sctp"), icmp_(ic
 	get_random(state_cookie_key, sizeof state_cookie_key);
 	state_cookie_key_timestamp = time(nullptr);
 
-	th = new std::thread(std::ref(*this));
+	for(int i=0; i<4; i++)
+		ths.push_back(new std::thread(std::ref(*this)));
 }
 
 sctp::~sctp()
 {
 	stop_flag = true;
 
-	th->join();
-	delete th;
+	for(auto & th : ths) {
+		th->join();
+
+		delete th;
+	}
 }
 
 std::pair<uint16_t, buffer_in> sctp::get_parameter(const uint64_t hash, buffer_in & chunk_payload)
@@ -184,6 +188,19 @@ buffer_out sctp::chunk_heartbeat_request(buffer_in & chunk_payload)
 	return out;
 }
 
+void sctp::chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, buffer_in *const for_callback)
+{
+	uint32_t current_tsn   = chunk.get_net_long();
+	uint16_t stream_id_s   = chunk.get_net_short();
+	uint16_t stream_seq_nr = chunk.get_net_short();
+	uint32_t payload_protocol_identifier = chunk.get_net_long();
+
+	// TODO verify tsn etc
+
+	buffer_in temp(chunk.get_segment(chunk.get_n_bytes_left()));
+	*for_callback = temp;
+}
+
 void sctp::operator()()
 {
 	set_thread_name("myip-sctp");
@@ -206,7 +223,7 @@ void sctp::operator()()
 			continue;
 		}
 
-		// TODO move this into a thread
+		// TODO move this into a thread, including the delete pkt
 		try {
 			buffer_in b(p, size);
 
@@ -245,7 +262,26 @@ void sctp::operator()()
 
 				DOLOG(dl, "SCTP[%lx]: type %d flags %d length %d\n", hash, type, flags, len);
 
-				if (type == 1) {  // INIT
+				if (type == 0) {  // DATA
+					DOLOG(dl, "SCTP[%lx]: DATA chunk of length %d\n", hash, chunk.get_n_bytes_left());
+
+					buffer_in  for_callback;
+
+					buffer_out reply;
+
+					{
+						std::shared_lock<std::shared_mutex> lck(sessions_lock);
+
+						auto it = sessions.find(hash);
+
+						chunk_data(it->second, chunk, &reply, &for_callback);
+					}
+
+					// TODO call callback(for_callback)
+
+					reply.add_buffer_out(reply);
+				}
+				else if (type == 1) {  // INIT
 					DOLOG(dl, "SCTP[%lx]: INIT chunk of length %d\n", hash, chunk.get_n_bytes_left());
 					
 					uint32_t their_initial_verification_tag = 0;

@@ -11,14 +11,19 @@ icmp::icmp(stats *const s) : ip_protocol(s, "icmp(4/6)")
 	icmp_req_ping = s->register_stat("icmp_req_ping");
 	icmp_transmit = s->register_stat("icmp_transmit");
 
-	th = new std::thread(std::ref(*this));
+	for(int i=0; i<4; i++)
+		ths.push_back(new std::thread(std::ref(*this)));
 }
 
 icmp::~icmp()
 {
 	stop_flag = true;
-	th->join();
-	delete th;
+
+	for(auto & th : ths) {
+		th->join();
+
+		delete th;
+	}
 }
 
 void icmp::operator()()
