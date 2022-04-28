@@ -14,6 +14,18 @@
 
 class icmp;
 
+typedef struct {
+	std::function<void()> init;
+	std::function<void *(const any_addr & their_addr, const uint16_t their_port)> new_session;
+	std::function<bool(void *private_data, buffer_in data)> new_data;
+	std::function<void(void *private_data)> session_closed_1;  // please terminate
+	std::function<void(void *private_data)> session_closed_2;  // should be terminated, clean up
+	std::function<void()> deinit;
+} sctp_port_handler_t;
+
+// dcb: data-call-back
+typedef enum { dcb_close, dcb_abort, dcb_continue } sctp_data_handling_result_t;
+
 class sctp : public ip_protocol
 {
 private:
@@ -24,6 +36,7 @@ private:
 		const any_addr their_addr;
 		uint32_t       my_tsn     { 0 };
 		uint32_t       their_tsn  { 0 };
+		void          *callback_private_data { nullptr };
 	
 	public:
 		sctp_session(const any_addr & their_addr, const uint16_t their_port, const uint16_t my_port, const uint32_t their_tsn, const uint32_t my_tsn) :
@@ -34,6 +47,7 @@ private:
 		}
 
 		virtual ~sctp_session() {
+			free(callback_private_data);
 		}
 
 		const any_addr get_their_addr() const {
@@ -77,6 +91,14 @@ private:
 
 			return MurmurHash64A(temp.get_content(), temp.get_size(), 123 /* TODO: replace 123 */);
 		}
+
+		void set_callback_private_data(void *p) {
+			callback_private_data = p;
+		}
+
+		void * get_callback_private_data() {
+			return callback_private_data;
+		}
 	};
 
 	std::shared_mutex                  sessions_lock;
@@ -87,8 +109,8 @@ private:
 
 	icmp *const icmp_;
 
-	std::map<int, uint64_t> allocated_ports;
-	std::mutex              ports_lock;
+	std::shared_mutex                  listeners_lock;
+	std::map<int, sctp_port_handler_t> listeners;
 
 	uint64_t *sctp_msgs        { nullptr };
 	uint64_t *sctp_failed_msgs { nullptr };
@@ -102,14 +124,13 @@ private:
 
 	void chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag);
 	void chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port, bool *const ok, uint32_t *const my_verification_tag, uint32_t *const their_initial_tsn, uint32_t *const my_initial_tsn);
-	void chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, buffer_in *const for_callback);
+	std::pair<sctp_data_handling_result_t, buffer_out> chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(void *private_data, buffer_in data)> & new_data_handler, void *const private_data);
 
 public:
 	sctp(stats *const s, icmp *const icmp_);
 	virtual ~sctp();
 
-	void add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *, void *const pd)> h, void *const pd);
-	void remove_handler(const int port);
+	void add_handler(const int port, sctp_port_handler_t & sph);
 
 	bool transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size);
 

@@ -119,7 +119,10 @@ void sctp::chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint
 	out->add_net_long(buffer_size);  // a_rwnd
 	out->add_net_short(1);  // number of outbound streams
 	out->add_net_short(1);  // number of inbound streams
-	uint32_t my_initial_tsn = my_verification_tag;
+
+	uint32_t my_initial_tsn = my_verification_tag;  // sane default
+	get_random(reinterpret_cast<uint8_t *>(&my_initial_tsn), sizeof my_initial_tsn);
+
 	out->add_net_long(my_initial_tsn);  // initial TSN (transmission sequence number)
 
 	// add state cookie (parameter)
@@ -188,8 +191,10 @@ buffer_out sctp::chunk_heartbeat_request(buffer_in & chunk_payload)
 	return out;
 }
 
-void sctp::chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, buffer_in *const for_callback)
+std::pair<sctp_data_handling_result_t, buffer_out> sctp::chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(void *private_data, buffer_in data)> & new_data_handler, void *const private_data)
 {
+	buffer_out out;
+
 	uint32_t current_tsn   = chunk.get_net_long();
 	uint16_t stream_id_s   = chunk.get_net_short();
 	uint16_t stream_seq_nr = chunk.get_net_short();
@@ -197,8 +202,9 @@ void sctp::chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out
 
 	// TODO verify tsn etc
 
-	buffer_in temp(chunk.get_segment(chunk.get_n_bytes_left()));
-	*for_callback = temp;
+	bool rc = new_data_handler(private_data, chunk.get_segment(chunk.get_n_bytes_left()));
+
+	return { dcb_abort, out };  // TODO
 }
 
 void sctp::operator()()
@@ -223,7 +229,6 @@ void sctp::operator()()
 			continue;
 		}
 
-		// TODO move this into a thread, including the delete pkt
 		try {
 			buffer_in b(p, size);
 
@@ -245,6 +250,8 @@ void sctp::operator()()
 			size_t their_verification_tag_offset = reply.add_net_long(-1, -1);  // will be 0 in INIT, will be replaced by their verifiation/initial tag
 			size_t crc_offset = reply.add_net_long(0, -1);  // place-holder for crc
 
+			bool   terminate_session = false;
+
 			while(b.end_reached() == false) {
 				uint8_t  type      = b.get_net_byte();
 				uint8_t  flags     = b.get_net_byte();
@@ -255,6 +262,8 @@ void sctp::operator()()
 
 				if (len < 4) {
 					DOLOG(dl, "SCTP[%lx]: chunk too short\n", hash);
+
+					terminate_session = true;
 					break;
 				}
 
@@ -265,21 +274,45 @@ void sctp::operator()()
 				if (type == 0) {  // DATA
 					DOLOG(dl, "SCTP[%lx]: DATA chunk of length %d\n", hash, chunk.get_n_bytes_left());
 
-					buffer_in  for_callback;
-
-					buffer_out reply;
+					std::function<bool(void *private_data, buffer_in data)> new_data_handler = nullptr;
 
 					{
+						std::shared_lock<std::shared_mutex> lck(listeners_lock);
+
+						auto it = listeners.find(destination_port);
+
+						if (it != listeners.end())
+							new_data_handler = it->second.new_data;
+					}
+
+					if (new_data_handler) {
 						std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 						auto it = sessions.find(hash);
 
-						chunk_data(it->second, chunk, &reply, &for_callback);
+						if (it != sessions.end()) {
+							auto handling_result = chunk_data(it->second, chunk, &reply, new_data_handler, it->second->get_callback_private_data());
+
+							if (handling_result.first == dcb_abort) {
+								// abort session immediately
+								terminate_session = true;
+
+								break;
+							}
+							else {
+								reply.add_buffer_out(handling_result.second);
+
+								if (handling_result.first == dcb_close) {
+									// TODO add chunk with instructions to close the session ("association"?)
+								}
+							}
+						}
 					}
+					else {
+						DOLOG(dl, "SCTP[%lx]: DATA: new_data_handler went away?\n", hash);
 
-					// TODO call callback(for_callback)
-
-					reply.add_buffer_out(reply);
+						terminate_session = true;
+					}
 				}
 				else if (type == 1) {  // INIT
 					DOLOG(dl, "SCTP[%lx]: INIT chunk of length %d\n", hash, chunk.get_n_bytes_left());
@@ -308,9 +341,9 @@ void sctp::operator()()
 				else if (type == 6) {  // ABORT
 					DOLOG(dl, "SCTP[%lx]: abort request received\n", hash);
 
-					std::unique_lock<std::shared_mutex> lck(sessions_lock);
+					terminate_session = true;
 
-					sessions.erase(hash);
+					break;
 				}
 				else if (type == 10) {  // COOKIE ECHO
 					bool     cookie_ok              = false;
@@ -319,22 +352,35 @@ void sctp::operator()()
 					uint32_t their_initial_tsn      = 0;
 					uint32_t my_initial_tsn         = 0;
 
+					std::function<void *(const any_addr & their_addr, const uint16_t their_port)> new_session_handler = nullptr;
+
 					chunk_cookie_echo(chunk, their_addr, source_port, destination_port, &cookie_ok, &their_verification_tag, &their_initial_tsn, &my_initial_tsn);
 
 					if (cookie_ok) {
+						std::shared_lock<std::shared_mutex> lck(listeners_lock);
+
+						auto it = listeners.find(destination_port);
+
+						if (it != listeners.end())
+							new_session_handler = it->second.new_session;
+						else
+							DOLOG(dl, "SCTP[%lx]: no listener for port %d\n", hash, destination_port);
+					}
+
+					if (new_session_handler != nullptr) {
 						// register session
-						{
-							std::unique_lock<std::shared_mutex> lck(sessions_lock);
+						std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
-							if (sessions.find(hash) != sessions.end())
-								DOLOG(dl, "SCTP[%lx]: session already on-going\n", hash);
-							else {
-								DOLOG(dl, "SCTP[%lx]: their initial tsn: %08x, my initial tsn: %08x\n", hash, their_initial_tsn, my_initial_tsn);
+						if (sessions.find(hash) != sessions.end())
+							DOLOG(dl, "SCTP[%lx]: session already on-going\n", hash);
+						else {
+							DOLOG(dl, "SCTP[%lx]: their initial tsn: %08x, my initial tsn: %08x\n", hash, their_initial_tsn, my_initial_tsn);
 
-								sctp_session *session = new sctp_session(their_addr, source_port, destination_port, their_initial_tsn, my_initial_tsn);
+							sctp_session *session = new sctp_session(their_addr, source_port, destination_port, their_initial_tsn, my_initial_tsn);
 
-								sessions.insert({ hash, session });
-							}
+							session->set_callback_private_data(new_session_handler(their_addr, source_port));
+
+							sessions.insert({ hash, session });
 						}
 
 						// send ack
@@ -367,7 +413,12 @@ void sctp::operator()()
 				}
 			}
 
-			if (send_reply) {
+			if (terminate_session) {
+				std::unique_lock<std::shared_mutex> lck(sessions_lock);
+
+				sessions.erase(hash);
+			}
+			else if (send_reply) {
 				// calculate & set crc in 'reply'
 				uint32_t crc32c = generate_crc32c(reply.get_content(), reply.get_size());
 				reply.add_net_long(crc32c, crc_offset);
@@ -385,15 +436,14 @@ void sctp::operator()()
 	}
 }
 
-void sctp::add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *, void *const pd)> h, void *pd)
-{
-}
-
-void sctp::remove_handler(const int port)
-{
-}
-
 bool sctp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
 {
 	return false;
+}
+
+void sctp::add_handler(const int port, sctp_port_handler_t & sph)
+{
+	std::unique_lock<std::shared_mutex> lck(listeners_lock);
+
+	listeners.insert({ port, sph });
 }
