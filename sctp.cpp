@@ -311,12 +311,27 @@ void sctp::operator()()
 					else {
 						DOLOG(dl, "SCTP[%lx]: DATA: new_data_handler went away?\n", hash);
 
+						reply.add_buffer_out(chunk_gen_abort());
+
 						terminate_session = true;
 					}
 				}
 				else if (type == 1) {  // INIT
 					DOLOG(dl, "SCTP[%lx]: INIT chunk of length %d\n", hash, chunk.get_n_bytes_left());
-					
+
+					bool has_listener = false;
+
+					{
+						std::shared_lock<std::shared_mutex> lck(listeners_lock);
+
+						auto it = listeners.find(destination_port);
+
+						if (it != listeners.end())
+							has_listener = true;
+					}
+
+					// also go through this when no listener is registered as we
+					// need the initial verification tag of the other side
 					uint32_t their_initial_verification_tag = 0;
 
 					uint32_t my_new_verification_tag = 0;
@@ -331,7 +346,15 @@ void sctp::operator()()
 
 					reply.add_net_long(their_initial_verification_tag, their_verification_tag_offset);
 
-					reply.add_buffer_out(temp);
+					if (has_listener)
+						reply.add_buffer_out(temp);
+					else {
+						DOLOG(dl, "SCTP[%lx]: no listener for port %d\n", hash, destination_port);
+
+						reply.add_buffer_out(chunk_gen_abort());
+
+						terminate_session = true;
+					}
 				}
 				else if (type == 4) {  // HEARTBEAT (-request)
 					DOLOG(dl, "SCTP[%lx]: heartbeat request received\n", hash);
@@ -343,6 +366,8 @@ void sctp::operator()()
 
 					terminate_session = true;
 
+					send_reply = false;
+
 					break;
 				}
 				else if (type == 10) {  // COOKIE ECHO
@@ -352,11 +377,11 @@ void sctp::operator()()
 					uint32_t their_initial_tsn      = 0;
 					uint32_t my_initial_tsn         = 0;
 
-					std::function<void *(const any_addr & their_addr, const uint16_t their_port)> new_session_handler = nullptr;
-
 					chunk_cookie_echo(chunk, their_addr, source_port, destination_port, &cookie_ok, &their_verification_tag, &their_initial_tsn, &my_initial_tsn);
 
-					if (cookie_ok) {
+					std::function<void *(const any_addr & their_addr, const uint16_t their_port)> new_session_handler = nullptr;
+
+					{
 						std::shared_lock<std::shared_mutex> lck(listeners_lock);
 
 						auto it = listeners.find(destination_port);
@@ -364,10 +389,10 @@ void sctp::operator()()
 						if (it != listeners.end())
 							new_session_handler = it->second.new_session;
 						else
-							DOLOG(dl, "SCTP[%lx]: no listener for port %d\n", hash, destination_port);
+							DOLOG(dl, "SCTP[%lx]: listener for port %d went away?\n", hash, destination_port);
 					}
 
-					if (new_session_handler != nullptr) {
+					if (cookie_ok && new_session_handler) {
 						// register session
 						std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
@@ -375,6 +400,8 @@ void sctp::operator()()
 							DOLOG(dl, "SCTP[%lx]: session already on-going\n", hash);
 						else {
 							DOLOG(dl, "SCTP[%lx]: their initial tsn: %08x, my initial tsn: %08x\n", hash, their_initial_tsn, my_initial_tsn);
+
+							std::function<void *(const any_addr & their_addr, const uint16_t their_port)> new_session_handler = nullptr;
 
 							sctp_session *session = new sctp_session(their_addr, source_port, destination_port, their_initial_tsn, my_initial_tsn);
 
@@ -393,6 +420,8 @@ void sctp::operator()()
 						reply.add_buffer_out(chunk_gen_abort());
 
 						DOLOG(dl, "SCTP[%lx]: ABORT\n", hash);
+
+						terminate_session = true;
 					}
 
 					reply.add_net_long(their_verification_tag, their_verification_tag_offset);
@@ -413,12 +442,7 @@ void sctp::operator()()
 				}
 			}
 
-			if (terminate_session) {
-				std::unique_lock<std::shared_mutex> lck(sessions_lock);
-
-				sessions.erase(hash);
-			}
-			else if (send_reply) {
+			if (send_reply) {
 				// calculate & set crc in 'reply'
 				uint32_t crc32c = generate_crc32c(reply.get_content(), reply.get_size());
 				reply.add_net_long(crc32c, crc_offset);
@@ -426,6 +450,12 @@ void sctp::operator()()
 				// transmit 'reply' (0x84 is SCTP protocol number)
 				if (idev->transmit_packet(their_addr, pkt->get_dst_addr(), 0x84, reply.get_content(), reply.get_size(), nullptr) == false)
 					DOLOG(info, "SCTP[%lx]: failed to transmit reply packet\n", hash);
+			}
+
+			if (terminate_session) {
+				std::unique_lock<std::shared_mutex> lck(sessions_lock);
+
+				sessions.erase(hash);
 			}
 		}
 		catch(std::out_of_range & e) {
