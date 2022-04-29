@@ -40,6 +40,11 @@ sctp::~sctp()
 
 		delete th;
 	}
+
+	for(auto & handler : listeners) {
+		if (handler.second.deinit)
+			handler.second.deinit();
+	}
 }
 
 std::pair<uint16_t, buffer_in> sctp::get_parameter(const uint64_t hash, buffer_in & chunk_payload)
@@ -200,11 +205,22 @@ std::pair<sctp_data_handling_result_t, buffer_out> sctp::chunk_data(sctp_session
 	uint16_t stream_seq_nr = chunk.get_net_short();
 	uint32_t payload_protocol_identifier = chunk.get_net_long();
 
-	// TODO verify tsn etc
+	// TODO verify tsn, fill 'out' etc
 
-	bool rc = new_data_handler(session, chunk.get_segment(chunk.get_n_bytes_left()));
+	if (current_tsn == session->get_their_tsn()) {
+		int payload_size = chunk.get_n_bytes_left();
 
-	return { dcb_abort, out };  // TODO
+		session->inc_their_tsn(payload_size);
+
+		bool rc = new_data_handler(session, chunk.get_segment(payload_size));
+
+		if (!rc)
+			return { dcb_continue, out };
+
+		return { dcb_close, out };
+	}
+
+	return { dcb_continue, out };
 }
 
 void sctp::operator()()
@@ -473,6 +489,9 @@ bool sctp::transmit_packet(const any_addr & dst_ip, const int dst_port, const an
 
 void sctp::add_handler(const int port, sctp_port_handler_t & sph)
 {
+	if (sph.init)
+		sph.init();
+
 	std::unique_lock<std::shared_mutex> lck(listeners_lock);
 
 	listeners.insert({ port, sph });
