@@ -196,31 +196,52 @@ buffer_out sctp::chunk_heartbeat_request(buffer_in & chunk_payload)
 	return out;
 }
 
-std::pair<sctp_data_handling_result_t, buffer_out> sctp::chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(sctp_session *const session, buffer_in data)> & new_data_handler)
+std::pair<sctp_data_handling_result_t, buffer_out> sctp::chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(sctp *const sctp_, sctp_session *const session, buffer_in data)> & new_data_handler)
 {
 	buffer_out out;
+
+	sctp_data_handling_result_t result = dcb_abort;
 
 	uint32_t current_tsn   = chunk.get_net_long();
 	uint16_t stream_id_s   = chunk.get_net_short();
 	uint16_t stream_seq_nr = chunk.get_net_short();
 	uint32_t payload_protocol_identifier = chunk.get_net_long();
-
-	// TODO verify tsn, fill 'out' etc
+	uint32_t tsn_before    = session->get_their_tsn();
 
 	if (current_tsn == session->get_their_tsn()) {
 		int payload_size = chunk.get_n_bytes_left();
 
-		session->inc_their_tsn(payload_size);
+		session->inc_their_tsn(1);
 
-		bool rc = new_data_handler(session, chunk.get_segment(payload_size));
+		buffer_in temp(chunk.get_segment(payload_size));
+		bool rc = new_data_handler(this, session, temp);
 
-		if (!rc)
-			return { dcb_continue, out };
+		if (rc)
+			result = dcb_continue;
+		else
+			result = dcb_close;
+	}
+	else {
+		DOLOG(dl, "SCTP[%lx]: out-of-order data received\n", session->get_hash());
 
-		return { dcb_close, out };
+		result = dcb_continue;
 	}
 
-	return { dcb_continue, out };
+	buffer_out chunk_out;
+
+	chunk_out.add_net_byte(3);  // SACK
+	chunk_out.add_net_byte(3);  // unfragmented message
+	size_t length_offset = chunk_out.add_net_short(0, -1);  // place holder for length
+	chunk_out.add_net_long(tsn_before);  // upto what TSN has all data been received, https://datatracker.ietf.org/doc/html/rfc4960#section-3.3.4
+	chunk_out.add_net_long(4096 /* TODO */);  // receive window
+	chunk_out.add_net_short(0);  // number of gap blocks
+	chunk_out.add_net_short(0);  // duplicate TSN issues
+
+	chunk_out.add_net_short(chunk_out.get_size(), length_offset);
+
+	out.add_buffer_out(chunk_out);
+
+	return { result, out };
 }
 
 void sctp::operator()()
@@ -290,7 +311,7 @@ void sctp::operator()()
 				if (type == 0) {  // DATA
 					DOLOG(dl, "SCTP[%lx]: DATA chunk of length %d\n", hash, chunk.get_n_bytes_left());
 
-					std::function<bool(sctp_session *const session, buffer_in data)> new_data_handler = nullptr;
+					std::function<bool(sctp *const sctp_, sctp_session *const session, buffer_in data)> new_data_handler = nullptr;
 
 					{
 						std::shared_lock<std::shared_mutex> lck(listeners_lock);
@@ -310,8 +331,10 @@ void sctp::operator()()
 							auto handling_result = chunk_data(it->second, chunk, &reply, new_data_handler);
 
 							if (handling_result.first == dcb_abort) {
-								// abort session immediately
+								// abort session...
 								terminate_session = true;
+								// ...after sending abort chunk
+								reply.add_buffer_out(chunk_gen_abort());
 
 								break;
 							}
@@ -321,6 +344,8 @@ void sctp::operator()()
 								if (handling_result.first == dcb_close) {
 									// TODO add chunk with instructions to close the session ("association"?)
 								}
+
+								reply.add_net_long(it->second->get_their_verification_tag(), their_verification_tag_offset);
 							}
 						}
 					}
@@ -395,7 +420,7 @@ void sctp::operator()()
 
 					chunk_cookie_echo(chunk, their_addr, source_port, destination_port, &cookie_ok, &their_verification_tag, &their_initial_tsn, &my_initial_tsn);
 
-					std::function<void(sctp_session *const session)> new_session_handler = nullptr;
+					std::function<void(sctp *const sctp_, sctp_session *const session)> new_session_handler = nullptr;
 
 					{
 						std::shared_lock<std::shared_mutex> lck(listeners_lock);
@@ -415,13 +440,10 @@ void sctp::operator()()
 						if (sessions.find(hash) != sessions.end())
 							DOLOG(dl, "SCTP[%lx]: session already on-going\n", hash);
 						else {
-							DOLOG(dl, "SCTP[%lx]: their initial tsn: %08x, my initial tsn: %08x\n", hash, their_initial_tsn, my_initial_tsn);
+							DOLOG(dl, "SCTP[%lx]: their initial tsn: %lu, my initial tsn: %lu\n", hash, their_initial_tsn, my_initial_tsn);
 
-							std::function<void *(const any_addr & their_addr, const uint16_t their_port)> new_session_handler = nullptr;
-
-							sctp_session *session = new sctp_session(their_addr, source_port, destination_port, their_initial_tsn, my_initial_tsn);
-
-							session->set_callback_private_data(new_session_handler(their_addr, source_port));
+							sctp_session *session = new sctp_session(their_addr, source_port, pkt->get_dst_addr(), destination_port, their_initial_tsn, my_initial_tsn, their_verification_tag);
+							new_session_handler(this, session);
 
 							sessions.insert({ hash, session });
 						}
@@ -463,8 +485,10 @@ void sctp::operator()()
 				uint32_t crc32c = generate_crc32c(reply.get_content(), reply.get_size());
 				reply.add_net_long(crc32c, crc_offset);
 
+				DOLOG(dl, "SCTP[%lx]: CRC32c over %zu bytes: %08lx\n", hash, reply.get_size(), crc32c);
+
 				// transmit 'reply' (0x84 is SCTP protocol number)
-				if (idev->transmit_packet(their_addr, pkt->get_dst_addr(), 0x84, reply.get_content(), reply.get_size(), nullptr) == false)
+				if (transmit_packet(their_addr, pkt->get_dst_addr(), reply.get_content(), reply.get_size()) == false)
 					DOLOG(info, "SCTP[%lx]: failed to transmit reply packet\n", hash);
 			}
 
@@ -482,9 +506,60 @@ void sctp::operator()()
 	}
 }
 
-bool sctp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
+bool sctp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size)
 {
-	return false;
+	return idev->transmit_packet(dst_ip, src_ip, 0x84, payload, pl_size, nullptr);
+}
+
+bool sctp::send_data(sctp_session *const session, buffer_in & payload)
+{
+	bool     ok          = true;
+
+	// TODO store these messages for resend
+
+	while(payload.end_reached() == false) {
+		buffer_out out;
+
+		out.add_net_short(session->get_my_port());
+		out.add_net_short(session->get_their_port());
+		out.add_net_long(session->get_my_tsn());
+		size_t crc_offset = out.add_net_long(0, -1);  // place-holder for crc
+
+		// add payload
+		out.add_net_byte(0);  // chunk type 'DATA'
+		out.add_net_byte(3);  // unfragmented data
+		// length of payload in this chunk
+		int n_bytes_to_add = std::min(payload.get_n_bytes_left(), idev->get_max_packet_size() - 50 /* TODO */);
+		out.add_net_short(n_bytes_to_add + 16);
+		// TSN
+		out.add_net_long(session->get_my_tsn());
+		session->inc_my_tsn(1);
+		//
+		out.add_net_short(0);  // stream identifier s
+		out.add_net_short(session->get_my_stream_sequence_nr());  // stream sequence number
+		session->inc_my_stream_sequence_nr();
+		out.add_net_long(0);  // payload protocol identifier
+		// payload:
+		buffer_in temp_payload = payload.get_segment(n_bytes_to_add);
+		out.add_buffer_in(temp_payload);
+
+		out.add_padding(4);
+
+		// calculate & set crc in 'reply'
+		uint32_t crc32c = generate_crc32c(out.get_content(), out.get_size());
+		out.add_net_long(crc32c, crc_offset);
+
+		// transmit 'reply' (0x84 is SCTP protocol number)
+		if (transmit_packet(session->get_their_addr(), session->get_my_addr(), out.get_content(), out.get_size()) == false) {
+			ok = false;
+
+			DOLOG(info, "SCTP[%lx]: failed to transmit send_data packet\n", session->get_hash());
+
+			break;
+		}
+	}
+
+	return ok;
 }
 
 void sctp::add_handler(const int port, sctp_port_handler_t & sph)

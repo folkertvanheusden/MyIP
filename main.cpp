@@ -35,6 +35,7 @@
 #include "mqtt.h"
 #include "utils.h"
 #include "socks_proxy.h"
+#include "echo_sctp.h"
 
 void free_handler(const tcp_port_handler_t & tph)
 {
@@ -145,11 +146,15 @@ void register_sctp_service(std::vector<phys *> *const devs, sctp::sctp_port_hand
 {
 	for(auto & dev : *devs) {
 		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
-		if (!i4) {
+		if (i4) {
+			printf("hier\n");
 			sctp *const s4 = dynamic_cast<sctp *>(i4->get_ip_protocol(0x84));
 
-			if (s4)
+			if (s4) {
+			printf("daar\n");
+				DOLOG(debug, "Adding port %d to SCTP over IPv4\n", port);
 				s4->add_handler(port, sph);
+			}
 		}
 
 		ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
@@ -358,10 +363,12 @@ int main(int argc, char *argv[])
 
 			bool use_sctp = cfg_bool(ipv4_, "use-sctp", "wether to enable sctp", true, true);
 			if (use_sctp) {
-				sctp *t = new sctp(&s, icmp_);
-				ipv4_instance->register_protocol(0x84, t);
+				DOLOG(debug, "Adding SCTP to IPv4\n");
 
-				ip_protocols.push_back(t);
+				sctp *stcp_ = new sctp(&s, icmp_);
+				ipv4_instance->register_protocol(0x84, stcp_);
+
+				ip_protocols.push_back(stcp_);
 			}
 
 			bool use_udp = cfg_bool(ipv4_, "use-udp", "wether to enable udp", true, true);
@@ -641,6 +648,10 @@ int main(int argc, char *argv[])
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine
 	}
+
+	// echo
+	sctp::sctp_port_handler_t echo_sph = sctp_echo_get_handler();
+	register_sctp_service(&devs, echo_sph, 7);  // port 7 (TCP) is 'echo'
 
 	// SYSLOG
 	try {

@@ -19,6 +19,7 @@ add_executable(myip
 	buffer_in.cpp
 	buffer_out.cpp
 	dns.cpp
+	echo_sctp.cpp
 	fifo-stats.cpp
 	font.cpp
 	http.cpp
