@@ -16,7 +16,9 @@ class icmp;
 class ipv4 : public protocol
 {
 private:
-	arp *const iarp;
+	std::vector<std::thread *> ths;
+
+	arp  *const iarp { nullptr };
 	icmp *icmp_ { nullptr };
 
 	const any_addr myip;
@@ -32,8 +34,6 @@ private:
 	uint64_t *ipv4_unk_prot { nullptr };
 	uint64_t *ipv4_n_tx { nullptr };
 	uint64_t *ipv4_tx_err { nullptr };
-
-	std::thread *ipv4_th { nullptr };
 
 	void send_ttl_exceeded(const packet *const pkt) const;
 

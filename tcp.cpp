@@ -72,15 +72,19 @@ tcp::tcp(stats *const s) : ip_protocol(s, "tcp")
 	tcp_rst = s->register_stat("tcp_rst");
 	tcp_cur_n_sessions = s->register_stat("tcp_cur_n_sessions");
 
-	th = new std::thread(std::ref(*this));
+	for(int i=0; i<4; i++)
+		ths.push_back(new std::thread(std::ref(*this)));
 }
 
 tcp::~tcp()
 {
 	stop_flag = true;
 
-	th->join();
-	delete th;
+	for(auto & th : ths) {
+		th->join();
+
+		delete th;
+	}
 }
 
 int rel_seqnr(const tcp_session_t *const ts, const bool mine, const uint32_t nr)

@@ -11,14 +11,19 @@ udp::udp(stats *const s, icmp *const icmp_) : ip_protocol(s, "udp"), icmp_(icmp_
 	udp_requests = s->register_stat("udp_requests");
 	udp_refused = s->register_stat("udp_refused");
 
-	th = new std::thread(std::ref(*this));
+	for(int i=0; i<4; i++)
+		ths.push_back(new std::thread(std::ref(*this)));
 }
 
 udp::~udp()
 {
 	stop_flag = true;
-	th->join();
-	delete th;
+
+	for(auto & th : ths) {
+		th->join();
+
+		delete th;
+	}
 }
 
 void udp::operator()()

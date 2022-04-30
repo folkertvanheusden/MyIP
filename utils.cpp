@@ -71,6 +71,16 @@ uint64_t get_us()
 	return uint64_t(ts.tv_sec) * uint64_t(1000000l) + uint64_t(ts.tv_nsec / 1000);
 }
 
+uint64_t get_ms()
+{
+	struct timespec ts { 0, 0 };
+
+	if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+		fprintf(stderr, "clock_gettime failed: %s\n", strerror(errno));
+
+	return uint64_t(ts.tv_sec) * uint64_t(1000) + uint64_t(ts.tv_nsec / 1000000);
+}
+
 void get_random(uint8_t *tgt, size_t n)
 {
 	int fd = open("/dev/urandom", O_RDONLY);

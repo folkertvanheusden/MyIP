@@ -27,6 +27,7 @@
 #include "ntp.h"
 #include "syslog.h"
 #include "snmp.h"
+#include "sctp.h"
 #include "tcp.h"
 #include "tcp_udp_fw.h"
 #include "http.h"
@@ -34,6 +35,7 @@
 #include "mqtt.h"
 #include "utils.h"
 #include "socks_proxy.h"
+#include "echo_sctp.h"
 
 void free_handler(const tcp_port_handler_t & tph)
 {
@@ -123,26 +125,48 @@ void register_tcp_service(std::vector<phys *> *const devs, tcp_port_handler_t & 
 {
 	for(auto & dev : *devs) {
 		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
-		if (!i4)
-			continue;
+		if (i4) {
+			tcp *const t4 = dynamic_cast<tcp *>(i4->get_ip_protocol(0x06));
 
-		tcp *const t4 = dynamic_cast<tcp *>(i4->get_ip_protocol(0x06));
-		if (!t4)
-			continue;
-
-		t4->add_handler(port, tph);
+			if (t4)
+				t4->add_handler(port, tph);
+		}
 
 		ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
-		if (!i6)
-			continue;
+		if (i6) {
+			tcp *const t6 = dynamic_cast<tcp *>(i6->get_ip_protocol(0x06));
 
-		tcp *const t6 = dynamic_cast<tcp *>(i6->get_ip_protocol(0x06));
-		if (!t6)
-			continue;
-
-		t6->add_handler(port, tph);
+			if (t6)
+				t6->add_handler(port, tph);
+		}
 	}
 }
+
+void register_sctp_service(std::vector<phys *> *const devs, sctp::sctp_port_handler_t & sph, const int port)
+{
+	for(auto & dev : *devs) {
+		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+		if (i4) {
+			printf("hier\n");
+			sctp *const s4 = dynamic_cast<sctp *>(i4->get_ip_protocol(0x84));
+
+			if (s4) {
+			printf("daar\n");
+				DOLOG(debug, "Adding port %d to SCTP over IPv4\n", port);
+				s4->add_handler(port, sph);
+			}
+		}
+
+		ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
+		if (i6) {
+			sctp *const s6 = dynamic_cast<sctp *>(i6->get_ip_protocol(0x84));
+
+			if (s6)
+				s6->add_handler(port, sph);
+		}
+	}
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -335,6 +359,16 @@ int main(int argc, char *argv[])
 				ipv4_tcp = t;
 
 				ip_protocols.push_back(t);
+			}
+
+			bool use_sctp = cfg_bool(ipv4_, "use-sctp", "wether to enable sctp", true, true);
+			if (use_sctp) {
+				DOLOG(debug, "Adding SCTP to IPv4\n");
+
+				sctp *stcp_ = new sctp(&s, icmp_);
+				ipv4_instance->register_protocol(0x84, stcp_);
+
+				ip_protocols.push_back(stcp_);
 			}
 
 			bool use_udp = cfg_bool(ipv4_, "use-udp", "wether to enable udp", true, true);
@@ -557,20 +591,21 @@ int main(int argc, char *argv[])
 
 		for(auto & dev : devs) {
 			ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
-			if (!i4)
-				continue;
+			if (i4) {
+				udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
 
-			udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
-			if (!u4)
-				continue;
+				if (u4) {
+					sip *sip_ = new sip(&s, u4, sample, mb_path, mb_recv_script, upstream_sip_server, upstream_sip_user, upstream_sip_password, i4->get_addr(), port, sip_register_interval);
 
-			sip *sip_ = new sip(&s, u4, sample, mb_path, mb_recv_script, upstream_sip_server, upstream_sip_user, upstream_sip_password, i4->get_addr(), port, sip_register_interval);
+					u4->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
-			u4->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+					applications.push_back(sip_);
+				}
+			}
 
-			// TODO: ipv6 sip
+			// TODO: ipv6 SIP
 
-			applications.push_back(sip_);
+			// TODO: ipv4/6 SIP over SCTP
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -613,6 +648,10 @@ int main(int argc, char *argv[])
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine
 	}
+
+	// echo
+	sctp::sctp_port_handler_t echo_sph = sctp_echo_get_handler();
+	register_sctp_service(&devs, echo_sph, 7);  // port 7 (TCP) is 'echo'
 
 	// SYSLOG
 	try {

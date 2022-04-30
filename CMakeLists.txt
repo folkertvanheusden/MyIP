@@ -16,7 +16,10 @@ add_executable(myip
 	address_cache.cpp
 	any_addr.cpp
 	arp.cpp
+	buffer_in.cpp
+	buffer_out.cpp
 	dns.cpp
+	echo_sctp.cpp
 	fifo-stats.cpp
 	font.cpp
 	http.cpp
@@ -35,6 +38,8 @@ add_executable(myip
 	phys_ppp.cpp
 	phys_slip.cpp
 	protocol.cpp
+	sctp.cpp
+	sctp_crc32c.cpp
 	sip.cpp
 	snmp.cpp
 	snmp-data.cpp

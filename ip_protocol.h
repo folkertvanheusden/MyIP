@@ -1,4 +1,4 @@
-// (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <atomic>
@@ -16,12 +16,12 @@ class ipv4;
 class ip_protocol
 {
 protected:
-	std::thread *th { nullptr };
-	std::atomic_bool stop_flag { false };
+	std::vector<std::thread *> ths;
+	std::atomic_bool           stop_flag { false };
 
-	fifo<const packet *> *pkts { nullptr };
+	fifo<const packet *>      *pkts      { nullptr };
 
-	protocol *idev { nullptr };
+	protocol                  *idev      { nullptr };
 
 public:
 	ip_protocol(stats *const s, const std::string & stats_name);

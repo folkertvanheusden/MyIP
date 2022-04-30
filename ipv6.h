@@ -16,9 +16,11 @@ class icmp6;
 class ipv6 : public protocol
 {
 private:
+	std::vector<std::thread *> ths;
+
 	icmp6 *icmp6_ { nullptr };
 
-	ndp *indp { nullptr };
+	ndp   *indp   { nullptr };
 
 	const any_addr myip;
 
@@ -33,8 +35,6 @@ private:
 	uint64_t *ipv6_unk_prot { nullptr };
 	uint64_t *ipv6_n_tx { nullptr };
 	uint64_t *ipv6_tx_err { nullptr };
-
-	std::thread *ipv6_th { nullptr };
 
 public:
 	ipv6(stats *const s, ndp *const indp, const any_addr & myip);

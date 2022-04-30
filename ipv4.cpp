@@ -28,14 +28,19 @@ ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : protocol(s,
 
 	assert(myip.get_len() == 4);
 
-	ipv4_th = new std::thread(std::ref(*this));
+	for(int i=0; i<4; i++)
+		ths.push_back(new std::thread(std::ref(*this)));
 }
 
 ipv4::~ipv4()
 {
 	stop_flag = true;
-	ipv4_th->join();
-	delete ipv4_th;
+
+	for(auto & th : ths) {
+		th->join();
+
+		delete th;
+	}
 }
 
 bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
