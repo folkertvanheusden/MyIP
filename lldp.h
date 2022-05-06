@@ -17,6 +17,9 @@ private:
 
 	const any_addr my_mac;
 
+	void add_tlv(std::vector<uint8_t> *const target, const uint8_t type, const std::vector<uint8_t> & payload);
+	std::vector<uint8_t> generate_lldp_packet();
+
 public:
 	lldp(stats *const s, const any_addr & my_mac);
 	virtual ~lldp();
