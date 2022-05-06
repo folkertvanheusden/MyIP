@@ -253,7 +253,7 @@ void sip::reply_to_OPTIONS(const any_addr & src_ip, const int src_port, const an
 	content.push_back("t=0 0");
 	// 1234 could be allocated but as this is send-
 	// only, it is not relevant
-	content.push_back("m=audio 1234 RTP/AVP 8 11");
+	content.push_back("m=audio 1234 RTP/AVP 8 11");  // TODO 97 missing?
 	content.push_back("a=sendrecv");
 	content.push_back(myformat("a=rtpmap:8 PCMA/%u", samplerate));
 	content.push_back(myformat("a=rtpmap:11 L16/%u", samplerate));
