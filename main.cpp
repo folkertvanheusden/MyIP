@@ -36,6 +36,7 @@
 #include "utils.h"
 #include "socks_proxy.h"
 #include "echo_sctp.h"
+#include "lldp.h"
 
 void free_handler(const tcp_port_handler_t & tph)
 {
@@ -317,6 +318,11 @@ int main(int argc, char *argv[])
 		}
 
 		devs.push_back(dev);
+
+		// LLDP
+		lldp *lldp_ = new lldp(&s, my_mac);
+		protocols.push_back(lldp_);
+		dev->register_protocol(0x0806, lldp_);
 
 		tcp *ipv4_tcp { nullptr };
 
