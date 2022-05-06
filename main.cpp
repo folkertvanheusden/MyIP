@@ -295,12 +295,9 @@ int main(int argc, char *argv[])
 
 		devs.push_back(dev);
 
-		// LLDP
-		lldp *lldp_ = new lldp(&s, my_mac);
-		protocols.push_back(lldp_);
-		dev->register_protocol(0x0806, lldp_);
-
 		tcp *ipv4_tcp { nullptr };
+
+		any_addr mgmt_addr;
 
 		// ipv4
 		try {
@@ -308,6 +305,8 @@ int main(int argc, char *argv[])
 
 			std::string ma_str = cfg_str(ipv4_, "my-address", "IPv4 address", false, "192.168.3.2");
 			any_addr my_address = parse_address(ma_str.c_str(), 4, ".", 10);
+
+			mgmt_addr = my_address;
 
 			std::string gw_str = cfg_str(ipv4_, "gateway-mac-address", "default gateway MAC address", false, "42:20:16:2b:6f:9b");
 			any_addr gw_mac = parse_address(gw_str.c_str(), 6, ":", 16);
@@ -366,6 +365,9 @@ int main(int argc, char *argv[])
 			std::string ma_str = cfg_str(ipv6_, "my-address", "IPv6 address", false, "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
 			any_addr my_ip6 = parse_address(ma_str.c_str(), 16, ":", 16);
 
+			if (mgmt_addr.is_set() == false)
+				mgmt_addr = my_ip6;
+
 			printf("%zu] Will listen on IPv6 address: %s\n", i, my_ip6.to_str().c_str());
 
 			ndp *ndp_ = new ndp(&s);
@@ -405,6 +407,11 @@ int main(int argc, char *argv[])
 		catch(const libconfig::SettingNotFoundException &nfex) {
 			// just fine
 		}
+
+		// LLDP
+		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1);
+		protocols.push_back(lldp_);
+		dev->register_protocol(0x0806, lldp_);
 
 		// socks proxy
 		try {

@@ -10,7 +10,7 @@
 #include "phys.h"
 #include "utils.h"
 
-lldp::lldp(stats *const s, const any_addr & my_mac) : protocol(s, "lldp"), my_mac(my_mac)
+lldp::lldp(stats *const s, const any_addr & my_mac, const any_addr & mgmt_addr, const int interface_idx) : protocol(s, "lldp"), my_mac(my_mac), mgmt_addr(mgmt_addr), interface_idx(interface_idx)
 {
 	th = new std::thread(std::ref(*this));
 }
@@ -61,25 +61,47 @@ std::vector<uint8_t> lldp::generate_lldp_packet()
 {
 	std::vector<uint8_t> out;
 
-	std::vector<uint8_t> chassis_id { 4 };
+	// CHASSIS ID
+	std::vector<uint8_t> chassis_id { 4 };  // mac adress
 	for(int i=0; i<6; i++)
 		chassis_id.push_back(my_mac[i]);
 	add_tlv(&out, 1, chassis_id);
 
-	std::vector<uint8_t> port_id { 3 };
+	// PORT ID
+	std::vector<uint8_t> port_id { 3 };  // mac adress
 	for(int i=0; i<6; i++)
 		port_id.push_back(my_mac[i]);
 	add_tlv(&out, 2, port_id);
 
+	// TTL
 	std::vector<uint8_t> ttl;
 	ttl.push_back(0);
-	ttl.push_back(30);
+	ttl.push_back(30);  // 30s
 	add_tlv(&out, 3, ttl);
 
+	// SYSTEM DESCRIPTION
 	std::string description = "MyIP - www.vanheusden.com";
 	std::vector<uint8_t> system_description = str_to_uvec(description);
 	add_tlv(&out, 6, system_description);
 
+	// MANAGEMENT ADDRESS
+	std::vector<uint8_t> mgmt;
+
+	mgmt.push_back(1 + mgmt_addr.get_len());  // the address
+	mgmt.push_back(mgmt_addr.get_len() == 4 ? 1 : 6);  // '6' is a guess (for IPv6)
+	for(int i=0; i<mgmt_addr.get_len(); i++)
+		mgmt.push_back(mgmt_addr[i]);
+
+	mgmt.push_back(2);  // ifIndex
+	mgmt.push_back(interface_idx >> 24);
+	mgmt.push_back(interface_idx >> 16);
+	mgmt.push_back(interface_idx >>  8);
+	mgmt.push_back(interface_idx);
+	mgmt.push_back(0);  // oid string length
+
+	add_tlv(&out, 8, mgmt);
+
+	// end marker
 	add_tlv(&out, 0, { });
 	
 	return out;
@@ -100,8 +122,11 @@ void lldp::operator()()
 	while(!stop_flag) {
 		// every 15s
 		if (++sleep_cnt >= 30) {
-			if (default_pdev)
+			if (default_pdev) {
+				DOLOG(debug, "lldp::operator: transmit LLDP packet\n");
+
 				default_pdev->transmit_packet(dest_mac, my_mac, 0x88cc, payload.data(), payload.size());
+			}
 
 			sleep_cnt = 0;
 		}	
