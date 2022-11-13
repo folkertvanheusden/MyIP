@@ -448,3 +448,26 @@ void error_exit(const bool se, const char *format, ...)
 
 	exit(EXIT_FAILURE);
 }
+
+uint32_t crc32(const uint8_t *const data, const size_t n_data, const uint32_t polynomial)
+{
+	const uint32_t p[] = { 0, polynomial };
+
+	uint32_t crc = 0xFFFFFFFF;
+
+	for(size_t i=0; i<n_data; i++) {
+		uint8_t ch = data[i];
+
+		for(size_t j=0; j<8; j++) {
+			bool b = (ch ^ crc) & 1;
+
+			crc >>= 1;
+
+			crc ^= p[b];
+
+			ch >>= 1;
+		}
+	}
+
+	return ~crc;
+}
