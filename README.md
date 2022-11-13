@@ -3,7 +3,7 @@ what this is
 This is an implementation of an IP-stack (IPv4/IPv6).
 It will listen on a tap-device for ethernet frames containg e.g. ARP-
 requests, IP packets, ICMP(6), UDP and even NTP, VNC, SIP, MQTT and HTTP
-requests. Also LLDP, NDP, Socks, syslog, PPP, SLIP, DNS (client) and SNMP.
+requests. Also LLDP, NDP, Socks, syslog, PPP, SLIP, NRPE, DNS (client) and SNMP.
 
 required
 --------
