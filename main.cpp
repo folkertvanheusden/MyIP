@@ -30,6 +30,7 @@
 #include "tcp.h"
 #include "tcp_udp_fw.h"
 #include "http.h"
+#include "nrpe.h"
 #include "vnc.h"
 #include "mqtt.h"
 #include "utils.h"
@@ -521,6 +522,20 @@ int main(int argc, char *argv[])
 		tcp_port_handler_t http_handler = http_get_handler(&s, web_root, web_logfile);
 
 		register_tcp_service(&devs, http_handler, port);
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+
+	// NRPE
+	try {
+		const libconfig::Setting & s_nrpe = root.lookup("nrpe");
+
+		int port = cfg_int(s_nrpe, "port", "tcp port to listen on", true, 5666);
+
+		tcp_port_handler_t nrpe_handler = nrpe_get_handler(&s);
+
+		register_tcp_service(&devs, nrpe_handler, port);
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine
