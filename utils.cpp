@@ -1,8 +1,10 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -15,12 +17,14 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+
 #if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
 #include <sys/syscall.h>
 #define gettid() pid_t(syscall(SYS_gettid))
 #endif
 
 #include "utils.h"
+
 
 void swap_mac(uint8_t *a, uint8_t *b)
 {
