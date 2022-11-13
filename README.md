@@ -7,9 +7,8 @@ requests. Also LLDP, NDP, socks, syslog, PPP, SLIP and SNMP.
 
 required
 --------
-C++ compiler
-A posix system that has support for 'tap' virtual network devices (e.g.
-Linux and BSD, see https://en.wikipedia.org/wiki/TUN/TAP ).
+* C++ compiler
+* A posix system that has support for 'tap' virtual network devices (e.g. Linux and BSD, see https://en.wikipedia.org/wiki/TUN/TAP ).
 
 how to build
 ------------
