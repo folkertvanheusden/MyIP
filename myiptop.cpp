@@ -1,4 +1,5 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+
 #include <fcntl.h>
 #include <map>
 #include <ncurses.h>
@@ -7,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <time.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -15,8 +17,10 @@
 #include "utils.h"
 #include "stats-utils.h"
 
+
 constexpr char shm_name[] = "/myip";
 constexpr int size = 8192;
+
 
 void ncurses_ui(const uint8_t *const p, const uint8_t *const p_end)
 {
@@ -62,7 +66,7 @@ void ncurses_ui(const uint8_t *const p, const uint8_t *const p_end)
 
 	int cursor = 0;
 
-	struct pollfd fds[] { { 0, POLLIN, 0 } };
+	pollfd fds[] { { 0, POLLIN, 0 } };
 
 	for(;;) {
 		int nr = 0;
@@ -71,7 +75,7 @@ void ncurses_ui(const uint8_t *const p, const uint8_t *const p_end)
 		werase(win_values);
 
 		time_t t = time(nullptr);
-		struct tm tm { 0 };
+		tm tm { 0 };
 		localtime_r(&t, &tm);
 		mvwprintw(win_names, 0, 0, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
 
