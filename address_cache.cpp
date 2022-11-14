@@ -7,7 +7,7 @@
 #include "log.h"
 #include "phys.h"
 #include "time.h"
-#include "utils.h"
+
 
 address_cache::address_cache(stats *const s)
 {

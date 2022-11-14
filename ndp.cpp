@@ -7,6 +7,7 @@
 #include "phys.h"
 #include "utils.h"
 
+
 ndp::ndp(stats *const s) : protocol(s, "ndp"), address_cache(s)
 {
 	// 1.3.6.1.2.1.4.57850.1.9: ndp

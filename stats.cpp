@@ -11,7 +11,6 @@
 #include "log.h"
 #include "stats.h"
 #include "stats-utils.h"
-#include "utils.h"
 
 
 constexpr char shm_name[] = "/myip";

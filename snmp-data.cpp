@@ -4,7 +4,6 @@
 #include "snmp-data.h"
 #include "str.h"
 #include "time.h"
-#include "utils.h"
 
 
 static ssize_t find_oid_in_vector(std::vector<snmp_data_type *> *vec, const std::string & oid)

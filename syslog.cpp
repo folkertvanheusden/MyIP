@@ -7,7 +7,6 @@
 #include "log.h"
 #include "syslog.h"
 #include "udp.h"
-#include "utils.h"
 
 
 syslog_srv::syslog_srv(stats *const s)

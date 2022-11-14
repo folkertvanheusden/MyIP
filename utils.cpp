@@ -13,6 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <vector>
+#include <sys/random.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -24,7 +25,7 @@
 
 #include "log.h"
 #include "time.h"
-#include "utils.h"
+// #include "utils.h"
 
 
 void swap_mac(uint8_t *a, uint8_t *b)
@@ -53,6 +54,22 @@ uint8_t *duplicate(const uint8_t *const in, const size_t size)
 
 void get_random(uint8_t *tgt, size_t n)
 {
+#ifdef linux
+	while(n > 0) {
+		ssize_t rc = getrandom(tgt, n, 0);
+
+		if (rc <= 0) {
+			if (errno == EINTR)
+				continue;
+
+			DOLOG(ll_error, "getrandom: %s", strerror(errno));
+			exit(1);
+		}
+
+		tgt += rc;
+		n   -= rc;
+	}
+#else
 	int fd = open("/dev/urandom", O_RDONLY);
 	if (fd == -1) {
 		DOLOG(ll_error, "open(\"/dev/urandom\"): %s", strerror(errno));
@@ -71,10 +88,11 @@ void get_random(uint8_t *tgt, size_t n)
 		}
 
 		tgt += rc;
-		n -= rc;
+		n   -= rc;
 	}
 
 	close(fd);
+#endif
 }
 
 uint8_t * get_from_buffer(uint8_t **p, size_t *len, size_t get_len)

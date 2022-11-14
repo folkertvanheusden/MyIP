@@ -13,7 +13,6 @@
 #include "phys.h"
 #include "packet.h"
 #include "str.h"
-#include "utils.h"
 
 
 phys::phys(const size_t dev_index, stats *const s) :

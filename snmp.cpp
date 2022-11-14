@@ -10,7 +10,6 @@
 #include "str.h"
 #include "time.h"
 #include "udp.h"
-#include "utils.h"
 
 
 snmp::snmp(snmp_data *const sd, stats *const s, udp *const u) :

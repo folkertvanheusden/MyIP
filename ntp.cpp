@@ -1,4 +1,5 @@
 // (C) 2020 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+
 #include <stdint.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -10,6 +11,7 @@
 #include "time.h"
 #include "udp.h"
 #include "utils.h"
+
 
 #define NTP_EPOCH (86400U * (365U * 70U + 17U))
 

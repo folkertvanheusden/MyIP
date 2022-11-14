@@ -14,8 +14,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "utils.h"
 #include "stats-utils.h"
+#include "utils.h"
 
 
 constexpr char shm_name[] = "/myip";
