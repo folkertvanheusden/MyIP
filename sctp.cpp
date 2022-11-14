@@ -5,6 +5,7 @@
 #include "buffer_in.h"
 #include "ipv4.h"
 #include "icmp.h"
+#include "log.h"
 #include "sctp.h"
 #include "sctp_crc32c.h"
 #include "utils.h"

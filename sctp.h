@@ -7,9 +7,9 @@
 
 #include "buffer_in.h"
 #include "buffer_out.h"
+#include "hash.h"
 #include "ip_protocol.h"
 #include "packet.h"
-#include "utils.h"
 
 
 class icmp;
