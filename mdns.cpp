@@ -5,6 +5,7 @@
 
 #include "log.h"
 #include "mdns.h"
+#include "str.h"
 #include "utils.h"
 
 

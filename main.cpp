@@ -35,6 +35,7 @@
 #include "nrpe.h"
 #include "vnc.h"
 #include "mqtt.h"
+#include "str.h"
 #include "utils.h"
 #include "socks_proxy.h"
 #include "lldp.h"

@@ -13,7 +13,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <vector>
-#include <openssl/md5.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -52,21 +51,6 @@ uint8_t *duplicate(const uint8_t *const in, const size_t size)
 	return out;
 }
 
-std::string myformat(const char *const fmt, ...)
-{
-        char *buffer = nullptr;
-        va_list ap;
-
-        va_start(ap, fmt);
-        (void)vasprintf(&buffer, fmt, ap);
-        va_end(ap);
-
-        std::string result = buffer;
-        free(buffer);
-
-        return result;
-}
-
 void get_random(uint8_t *tgt, size_t n)
 {
 	int fd = open("/dev/urandom", O_RDONLY);
@@ -92,37 +76,6 @@ void get_random(uint8_t *tgt, size_t n)
 
 	close(fd);
 }
-
-std::vector<std::string> split(std::string in, std::string splitter)
-{
-	std::vector<std::string> out;
-	size_t splitter_size = splitter.size();
-
-	for(;;)
-	{
-		size_t pos = in.find(splitter);
-		if (pos == std::string::npos)
-			break;
-
-		std::string before = in.substr(0, pos);
-		out.push_back(before);
-
-		size_t bytes_left = in.size() - (pos + splitter_size);
-		if (bytes_left == 0)
-		{
-			out.push_back("");
-			return out;
-		}
-
-		in = in.substr(pos + splitter_size);
-	}
-
-	if (in.size() > 0)
-		out.push_back(in);
-
-	return out;
-}
-
 
 uint8_t * get_from_buffer(uint8_t **p, size_t *len, size_t get_len)
 {
@@ -159,21 +112,6 @@ void set_thread_name(std::string name)
 	pthread_setname_np(pthread_self(), name.c_str());
 }
 
-std::string bin_to_text(const uint8_t *p, const size_t len)
-{
-	char *temp = (char *)calloc(1, len * 6 + 1);
-
-	for(size_t i=0; i<len; i++)
-		// snprintf(&temp[i * 6], 7, "%c[%02x] ", p[i] > 32 && p[i] < 127 ? p[i] : '.', p[i]);
-		snprintf(&temp[i * 3], 7, "%s%02x", i ? " " : "", p[i]);
-
-	std::string out = temp;
-
-	free(temp);
-
-	return out;
-}
-
 bool file_exists(const std::string & file, size_t *const file_size)
 {
 	struct stat st { 0 };
@@ -186,74 +124,6 @@ bool file_exists(const std::string & file, size_t *const file_size)
 	return rc;
 }
 
-std::string str_tolower(std::string s)
-{
-	std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
-
-	return s;
-}
-
-std::optional<std::string> find_header(const std::vector<std::string> *const lines, const std::string & key, const std::string & seperator)
-{
-	const std::string lkey = str_tolower(key);
-	std::optional<std::string> value;
-
-	for(auto line : *lines) {
-		auto parts = split(line, seperator);
-
-		if (parts.size() >= 2 && str_tolower(parts.at(0)) == lkey) {
-			value = line.substr(key.size() + 1);
-
-			while(value.value().empty() == false && value.value().at(0) == ' ')
-				value = value.value().substr(1);
-		}
-	}
-
-	return value;
-}
-
-std::string merge(const std::vector<std::string> & in, const std::string & seperator)
-{
-	std::string out;
-
-	for(auto l : in)
-		out += l + seperator;
-
-	return out;
-}
-
-std::string md5hex(const std::string & in)
-{
-	unsigned char result[MD5_DIGEST_LENGTH];
-
-	MD5((unsigned char *)in.c_str(), in.size(), result);
-
-	std::string rc;
-	for(int i=0; i<MD5_DIGEST_LENGTH; i++)
-		rc += myformat("%02x", result[i]);
-
-	return rc;
-}
-
-std::string replace(std::string target, const std::string & what, const std::string & by_what)
-{
-	for(;;) {
-		std::size_t found = target.find(what);
-
-		if (found == std::string::npos)
-			break;
-
-		std::string before = target.substr(0, found);
-
-		std::size_t after_offset = found + what.size();
-		std::string after = target.substr(after_offset);
-
-		target = before + by_what + after;
-	}
-
-	return target;
-}
-
 void run(const std::string & what)
 {
 	pid_t pid = fork();
@@ -263,47 +133,6 @@ void run(const std::string & what)
 
 	else if (pid == -1)
 		DOLOG(ll_error, "Failed invoking \"%s\"", what.c_str());
-}
-
-uint64_t MurmurHash64A(const void *const key, const int len, const uint64_t seed)
-{
-	const uint64_t m = 0xc6a4a7935bd1e995LLU;
-	const int r = 47;
-
-	uint64_t h = seed ^ (len * m);
-
-	const uint64_t *data = (const uint64_t *)key;
-	const uint64_t *end = (len >> 3) + data;
-
-	while(data != end) {
-		uint64_t k = *data++;
-
-		k *= m;
-		k ^= k >> r;
-		k *= m;
-
-		h ^= k;
-		h *= m;
-	}
-
-	const uint8_t *data2 = (const uint8_t *)data;
-
-	switch(len & 7) {
-		case 7: h ^= (uint64_t)(data2[6]) << 48;
-		case 6: h ^= (uint64_t)(data2[5]) << 40;
-		case 5: h ^= (uint64_t)(data2[4]) << 32;
-		case 4: h ^= (uint64_t)(data2[3]) << 24;
-		case 3: h ^= (uint64_t)(data2[2]) << 16;
-		case 2: h ^= (uint64_t)(data2[1]) << 8;
-		case 1: h ^= (uint64_t)(data2[0]);
-			h *= m;
-	};
-
-	h ^= h >> r;
-	h *= m;
-	h ^= h >> r;
-
-	return h;
 }
 
 void error_exit(const bool se, const char *format, ...)
@@ -328,27 +157,4 @@ void error_exit(const bool se, const char *format, ...)
 	free(temp);
 
 	exit(EXIT_FAILURE);
-}
-
-uint32_t crc32(const uint8_t *const data, const size_t n_data, const uint32_t polynomial)
-{
-	const uint32_t p[] = { 0, polynomial };
-
-	uint32_t crc = 0xFFFFFFFF;
-
-	for(size_t i=0; i<n_data; i++) {
-		uint8_t ch = data[i];
-
-		for(size_t j=0; j<8; j++) {
-			bool b = (ch ^ crc) & 1;
-
-			crc >>= 1;
-
-			crc ^= p[b];
-
-			ch >>= 1;
-		}
-	}
-
-	return ~crc;
 }

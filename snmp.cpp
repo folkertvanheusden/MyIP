@@ -7,6 +7,7 @@
 #include "log.h"
 #include "snmp.h"
 #include "snmp-elem.h"
+#include "str.h"
 #include "time.h"
 #include "udp.h"
 #include "utils.h"

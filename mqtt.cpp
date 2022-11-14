@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "tcp.h"
+#include "str.h"
 #include "utils.h"
 #include "ipv4.h"
 #include "font.h"

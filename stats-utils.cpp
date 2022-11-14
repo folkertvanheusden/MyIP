@@ -3,7 +3,8 @@
 #include <string>
 
 #include "fifo-stats.h"
-#include "utils.h"
+#include "str.h"
+
 
 std::string stats_to_json(const uint8_t *const p, const std::vector<std::pair<const std::string, const fifo_stats *> > & fs, const int size)
 {

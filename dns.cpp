@@ -5,12 +5,13 @@
 
 #include "dns.h"
 #include "log.h"
+#include "str.h"
 #include "time.h"
 #include "udp.h"
 #include "utils.h"
 
-using namespace std::chrono_literals;
 
+using namespace std::chrono_literals;
 
 dns::dns(stats *const s, udp *const u, const any_addr & my_ip, const any_addr & dns_ip) : u(u), my_ip(my_ip), dns_ip(dns_ip)
 {

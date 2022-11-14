@@ -15,6 +15,7 @@
 #include "log.h"
 #include "phys_ppp.h"
 #include "packet.h"
+#include "str.h"
 #include "utils.h"
 
 

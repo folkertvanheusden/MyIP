@@ -12,6 +12,7 @@
 #include "log.h"
 #include "phys.h"
 #include "packet.h"
+#include "str.h"
 #include "utils.h"
 
 

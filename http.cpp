@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "log.h"
+#include "str.h"
 #include "tcp.h"
 #include "utils.h"
 #include "ipv4.h"

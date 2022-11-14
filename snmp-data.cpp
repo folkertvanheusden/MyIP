@@ -2,6 +2,7 @@
 #include <assert.h>
 
 #include "snmp-data.h"
+#include "str.h"
 #include "time.h"
 #include "utils.h"
 
