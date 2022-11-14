@@ -1,13 +1,16 @@
 // (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <thread>
 #include <zlib.h>
 
+#include "packet.h"
 #include "stats.h"
+
 
 class private_data
 {
@@ -83,14 +86,14 @@ public:
 		}
 	}
 
-	std::thread *th { nullptr };
-	std::atomic_bool terminate { false };
+	std::thread     *th        { nullptr };
+	std::atomic_bool terminate { false   };
 
         std::condition_variable r_cond;
-        mutable std::mutex r_lock;
+        mutable std::mutex      r_lock;
 
 	char *req_data { nullptr };
-	size_t req_len { 0 };
+	size_t req_len { 0       };
 };
 
 class nrpe_session_data : public session_data

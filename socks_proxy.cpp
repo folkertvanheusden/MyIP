@@ -153,22 +153,26 @@ socks_proxy::~socks_proxy()
 	delete th;
 }
 
-bool socks_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, private_data *pd)
+bool socks_new_data(pstream *const ps, session *const s, buffer_in data)
 {
-	int fd = dynamic_cast<socks_private_data *>(pd)->get_fd();
+	int fd = static_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
 
 	DOLOG(debug, "socks_new_data for fd %d\n", fd);
 
-	return WRITE(fd, data, data_len) == ssize_t(data_len);
+	int data_len = data.get_n_bytes_left();
+
+	return WRITE(fd, data.get_bytes(data_len), data_len) == ssize_t(data_len);
 }
 
-void socks_session_closed_2(tcp_session_t *ts, private_data *pd)
+bool socks_session_closed_2(pstream *const ps, session *const s)
 {
-	int fd = dynamic_cast<socks_private_data *>(pd)->get_fd();
+	int fd = static_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
 
 	DOLOG(debug, "socks_session_closed_2 for fd %d\n", fd);
 
 	close(fd);
+
+	return true;
 }
 
 static std::string get_0x00_terminated_string(const int fd)

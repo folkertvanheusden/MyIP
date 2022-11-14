@@ -39,12 +39,13 @@
 #include "str.h"
 #include "utils.h"
 #include "socks_proxy.h"
-#include "echo_sctp.h"
+#include "echo.h"
 #include "lldp.h"
 
-void free_handler(const tcp_port_handler_t & tph)
+
+void free_handler(const port_handler_t & tph)
 {
-	delete tph.pd;
+       delete tph.pd;
 }
 
 log_level_t parse_ll(const std::string & ll)
@@ -126,7 +127,7 @@ int cfg_bool(const libconfig::Setting & cfg, const char *const key, const char *
 	return v;
 }
 
-void register_tcp_service(std::vector<phys *> *const devs, tcp_port_handler_t & tph, const int port)
+void register_tcp_service(std::vector<phys *> *const devs, port_handler_t & tph, const int port)
 {
 	for(auto & dev : *devs) {
 		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
@@ -175,7 +176,7 @@ void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const
 	}
 }
 
-void register_sctp_service(std::vector<phys *> *const devs, sctp::sctp_port_handler_t & sph, const int port)
+void register_sctp_service(std::vector<phys *> *const devs, port_handler_t & sph, const int port)
 {
 	for(auto & dev : *devs) {
 		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
@@ -587,9 +588,11 @@ int main(int argc, char *argv[])
 
 		int port = cfg_int(s_http, "port", "tcp port to listen on", true, 80);
 
-		tcp_port_handler_t http_handler = http_get_handler(&s, web_root, web_logfile);
+		port_handler_t http_handler = http_get_handler(&s, web_root, web_logfile);
 
 		register_tcp_service(&devs, http_handler, port);
+
+		register_sctp_service(&devs, http_handler, port);
 
 		register_mdns_service(mdns_, &devs, port, s_http);
 	}
@@ -603,25 +606,13 @@ int main(int argc, char *argv[])
 
 		int port = cfg_int(s_nrpe, "port", "tcp port to listen on", true, 5666);
 
-		tcp_port_handler_t nrpe_handler = nrpe_get_handler(&s);
+		port_handler_t nrpe_handler = nrpe_get_handler(&s);
 
 		register_tcp_service(&devs, nrpe_handler, port);
+
+		register_sctp_service(&devs, nrpe_handler, port);
 
 		register_mdns_service(mdns_, &devs, port, s_nrpe);
-	}
-	catch(const libconfig::SettingNotFoundException &nfex) {
-		// just fine
-	}
-
-	// NRPE
-	try {
-		const libconfig::Setting & s_nrpe = root.lookup("nrpe");
-
-		int port = cfg_int(s_nrpe, "port", "tcp port to listen on", true, 5666);
-
-		tcp_port_handler_t nrpe_handler = nrpe_get_handler(&s);
-
-		register_tcp_service(&devs, nrpe_handler, port);
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine
@@ -633,9 +624,11 @@ int main(int argc, char *argv[])
 
 		int port = cfg_int(s_vnc, "port", "tcp port to listen on", true, 5900);
 
-		tcp_port_handler_t vnc_handler = vnc_get_handler(&s);
+		port_handler_t vnc_handler = vnc_get_handler(&s);
 
 		register_tcp_service(&devs, vnc_handler, port);
+
+		register_sctp_service(&devs, vnc_handler, port);
 
 		register_mdns_service(mdns_, &devs, port, s_vnc);
 	}
@@ -649,9 +642,11 @@ int main(int argc, char *argv[])
 
 		int port = cfg_int(s_mqtt, "port", "tcp port to listen on", true, 1883);
 
-		tcp_port_handler_t mqtt_handler = mqtt_get_handler(&s);
+		port_handler_t mqtt_handler = mqtt_get_handler(&s);
 
 		register_tcp_service(&devs, mqtt_handler, port);
+
+		register_sctp_service(&devs, mqtt_handler, port);
 
 		register_mdns_service(mdns_, &devs, port, s_mqtt);
 	}
@@ -734,7 +729,10 @@ int main(int argc, char *argv[])
 	}
 
 	// echo
-	sctp::sctp_port_handler_t echo_sph = sctp_echo_get_handler();
+	port_handler_t echo_sph = echo_get_handler();
+
+	register_tcp_service(&devs, echo_sph, 7);  // port 7 (TCP) is 'echo'
+
 	register_sctp_service(&devs, echo_sph, 7);  // port 7 (TCP) is 'echo'
 
 	// SYSLOG

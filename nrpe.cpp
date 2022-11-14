@@ -17,15 +17,15 @@
 #include "utils.h"
 
 
-void send_response(tcp_session_t *ts, struct timespec tv, uint8_t *request, int32_t data_len, private_data *pd);
+void send_response(session *ts, uint8_t *request, int32_t data_len);
 
 using namespace std::chrono_literals;
 
-void nrpe_thread(tcp_session_t *t_s, struct timespec tv, private_data *pd)
+void nrpe_thread(session *t_s)
 {
         set_thread_name("myip-nrpe");
 
-        nrpe_session_data *ts = dynamic_cast<nrpe_session_data *>(t_s->p);
+        nrpe_session_data *ts = dynamic_cast<nrpe_session_data *>(t_s->get_application_private_data());
 
         for(;ts->terminate == false;) {
 		std::unique_lock<std::mutex> lck(ts->r_lock);
@@ -35,7 +35,7 @@ void nrpe_thread(tcp_session_t *t_s, struct timespec tv, private_data *pd)
 				int32_t buffer_length = (ts->req_data[12] << 24) | (ts->req_data[13] << 16) | (ts->req_data[14] << 8) | ts->req_data[15];
 
 				if (ts->req_len >= size_t(16 + buffer_length) && buffer_length > 0)
-					send_response(t_s, tv, ts->req_data, buffer_length, pd);
+					send_response(t_s, ts->req_data, buffer_length);
 			}
 		}
 
@@ -43,25 +43,25 @@ void nrpe_thread(tcp_session_t *t_s, struct timespec tv, private_data *pd)
 	}
 }
 
-bool nrpe_new_session(tcp_session_t *t_s, const packet *pkt, private_data *pd)
+bool nrpe_new_session(pstream *const t, session *t_s)
 {
 	nrpe_session_data *ts = new nrpe_session_data();
 	ts->req_data = nullptr;
 	ts->req_len = 0;
 
-	any_addr src_addr = pkt->get_src_addr();
+	any_addr src_addr = t_s->get_their_addr();
 	ts->client_addr   = src_addr.to_str();
 
-	t_s->p = ts;
+	t_s->set_callback_private_data(ts);
 
-	stats_inc_counter(dynamic_cast<nrpe_private_data *>(pd)->nrpe_requests);
+	stats_inc_counter(dynamic_cast<nrpe_private_data *>(t_s->get_application_private_data())->nrpe_requests);
 
-	ts->th = new std::thread(nrpe_thread, t_s, pkt->get_recv_ts(), pd);
+	ts->th = new std::thread(nrpe_thread, t_s);
 
 	return true;
 }
 
-void send_response(tcp_session_t *t_s, struct timespec tv, uint8_t *request, int32_t data_len, private_data *pd)
+void send_response(session *t_s, uint8_t *request, int32_t data_len)
 {
 	int         response_code    = 3;
 	std::string response_payload;
@@ -119,48 +119,52 @@ void send_response(tcp_session_t *t_s, struct timespec tv, uint8_t *request, int
 	reply[6] = crc >> 8;
 	reply[7] = crc;
 
-	t_s->t->send_data(t_s, reply, total_size);
+	t_s->get_stream_target()->send_data(t_s, reply, total_size);
 
-	t_s->t->end_session(t_s);
+	t_s->get_stream_target()->end_session(t_s);
 }
 
-bool nrpe_new_data(tcp_session_t *t_s, const uint8_t *data, size_t data_len, private_data *pd)
+bool nrpe_new_data(pstream *ps, session *ts, buffer_in b)
 {
-	nrpe_session_data *ts = dynamic_cast<nrpe_session_data *>(t_s->p);
+	nrpe_session_data *t_s = static_cast<nrpe_session_data *>(ts->get_callback_private_data());
 
 	if (!ts) {
 		DOLOG(info, "NRPE: Data for a non-existing session\n");
 
-		stats_inc_counter(dynamic_cast<nrpe_private_data *>(pd)->nrpe_r_err);
+		stats_inc_counter(dynamic_cast<nrpe_private_data *>(ts->get_application_private_data())->nrpe_r_err);
 
 		return false;
 	}
 
-	if (!data) {
+	int data_len = b.get_n_bytes_left();
+
+	if (data_len == 0) {
 		DOLOG(debug, "NRPE: client closed session\n");
 
-		stats_inc_counter(dynamic_cast<nrpe_private_data *>(pd)->nrpe_r_err);
+		stats_inc_counter(dynamic_cast<nrpe_private_data *>(ts->get_application_private_data())->nrpe_r_err);
 
 		return true;
 	}
 
-	const std::lock_guard<std::mutex> lck(ts->r_lock);
+	const std::lock_guard<std::mutex> lck(t_s->r_lock);
 
-	ts->req_data = reinterpret_cast<uint8_t *>(realloc(ts->req_data, ts->req_len + data_len + 1));
+	t_s->req_data = reinterpret_cast<uint8_t *>(realloc(t_s->req_data, t_s->req_len + data_len + 1));
 
-	memcpy(&ts->req_data[ts->req_len], data, data_len);
-	ts->req_len += data_len;
-	ts->req_data[ts->req_len] = 0x00;
+	memcpy(&t_s->req_data[t_s->req_len], b.get_bytes(data_len), data_len);
+	t_s->req_len += data_len;
+	t_s->req_data[t_s->req_len] = 0x00;
 
-	ts->r_cond.notify_one();
+	t_s->r_cond.notify_one();
 
 	return true;
 }
 
-void nrpe_close_session_1(tcp_session_t *t_s, private_data *pd)
+bool nrpe_close_session_1(pstream *const ps, session *t_s)
 {
-	if (t_s->p) {
-		nrpe_session_data *ts = dynamic_cast<nrpe_session_data *>(t_s->p);
+	void *private_data = t_s->get_callback_private_data();
+
+	if (private_data) {
+		nrpe_session_data *ts = static_cast<nrpe_session_data *>(private_data);
 
 		ts->terminate = true;
 
@@ -172,17 +176,20 @@ void nrpe_close_session_1(tcp_session_t *t_s, private_data *pd)
 
 		delete ts;
 
-		t_s->p = nullptr;
+		t_s->set_callback_private_data(nullptr);
 	}
+
+	return true;
 }
 
-void nrpe_close_session_2(tcp_session_t *ts, private_data *pd)
+bool nrpe_close_session_2(pstream *const ps, session *ts)
 {
+	return true;
 }
 
-tcp_port_handler_t nrpe_get_handler(stats *const s)
+port_handler_t nrpe_get_handler(stats *const s)
 {
-	tcp_port_handler_t tcp_nrpe;
+	port_handler_t tcp_nrpe;
 
 	tcp_nrpe.init             = nullptr;
 	tcp_nrpe.new_session      = nrpe_new_session;

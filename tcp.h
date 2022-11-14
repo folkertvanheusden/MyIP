@@ -9,10 +9,14 @@
 #include <shared_mutex>
 
 #include "any_addr.h"
+#include "application.h"
 #include "ip_protocol.h"
 #include "packet.h"
+#include "pstream.h"
+#include "session.h"
 #include "stats.h"
 #include "types.h"
+
 
 class ipv4;
 class tcp;
@@ -22,18 +26,12 @@ constexpr int session_timeout = 300; // in seconds
 
 typedef enum { tcp_closed, tcp_listen, tcp_syn_rcvd, tcp_syn_sent, tcp_established, tcp_fin_wait_1, tcp_fin_wait_2, tcp_close_wait, tcp_last_ack, tcp_closing, tcp_time_wait, tcp_rst_act } tcp_state_t;
 
-typedef struct {
+class tcp_session : public session
+{
+public:
 	std::mutex tlock;
 
-	tcp *t;
-
 	bool is_client;
-
-	any_addr org_src_addr;
-	int org_src_port;
-
-	any_addr org_dst_addr;
-	int org_dst_port;
 
 	uint64_t id;
 
@@ -60,17 +58,15 @@ typedef struct {
 	bool flag_fin_when_all_received;
 
 	session_data *p;
-} tcp_session_t;
 
-typedef struct {
-	std::function<void()> init;
-	std::function<bool(tcp_session_t *, const packet *pkt, private_data *)> new_session;
-	std::function<bool(tcp_session_t *, const uint8_t *data, size_t len, private_data *)> new_data;
-	std::function<void(tcp_session_t *, private_data *)> session_closed_1;  // please terminate
-	std::function<void(tcp_session_t *, private_data *)> session_closed_2;  // should be terminated, clean up
-	std::function<void()> deinit;
-	private_data *pd;
-} tcp_port_handler_t;
+public:
+	tcp_session(pstream *const t, const any_addr & my_addr, const int my_port, const any_addr & their_addr, const int their_port, private_data *app_private_data) :
+		session(t, my_addr, my_port, their_addr, their_port, app_private_data) {
+	}
+
+	~tcp_session() {
+	}
+};
 
 typedef struct {
 	std::thread *th;
@@ -82,17 +78,17 @@ typedef struct {
 	int port;
 } tcp_client_t;
 
-class tcp : public ip_protocol
+class tcp : public ip_protocol, pstream
 {
 private:
 	std::mutex sessions_lock;
 	std::condition_variable sessions_cv, unacked_cv;
 	// the key is an 'internal id'
-	std::map<uint64_t, tcp_session_t *> sessions;
+	std::map<uint64_t, tcp_session *> sessions;
 
 	// listen port -> handler
 	std::mutex listeners_lock;
-	std::map<int, tcp_port_handler_t> listeners;
+	std::map<int, port_handler_t> listeners;
 
 	// client port -> session
 	std::map<int, uint64_t> tcp_clients;
@@ -110,29 +106,29 @@ private:
 	uint64_t *tcp_sessions_closed_2 { nullptr };
 	uint64_t *tcp_cur_n_sessions { nullptr };
 
-	void send_segment(tcp_session_t *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
+	void send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
 
 	void packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag);
-	void cleanup_session_helper(std::map<uint64_t, tcp_session_t *>::iterator *it);
+	void cleanup_session_helper(std::map<uint64_t, tcp_session *>::iterator *it);
 	void session_cleaner();
 	void unacked_sender();
 
-	void set_state(tcp_session_t *const session, const tcp_state_t new_state);
+	void set_state(tcp_session *const session, const tcp_state_t new_state);
 
-	std::optional<tcp_port_handler_t> get_lock_listener(const int dst_port, const uint64_t id);
+	std::optional<port_handler_t> get_lock_listener(const int dst_port, const uint64_t id);
 	void release_listener_lock();
 
 public:
 	tcp(stats *const s);
 	virtual ~tcp();
 
-	void add_handler(const int port, tcp_port_handler_t & tph);
+	void add_handler(const int port, port_handler_t & tph);
 
-	void send_data(tcp_session_t *const ts, const uint8_t *const data, const size_t len);
-	void end_session(tcp_session_t *const ts);
+	bool send_data(session *const ts, const uint8_t *const data, const size_t len) override;
+	void end_session(session *const ts) override;
 
 	// returns a port number
-	int allocate_client_session(const std::function<bool(tcp_session_t *, const uint8_t *data, size_t len, private_data *)> & new_data, const std::function<void(tcp_session_t *, private_data *)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd);
+	int allocate_client_session(const std::function<bool(pstream *const ps, session *const s, buffer_in data)> & new_data, const std::function<bool(pstream *const ps, session *const s)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd);
 	void client_session_send_data(const int local_port, const uint8_t *const data, const size_t len);
 	void close_client_session(const int port);
 	void wait_for_client_connected_state(const int local_port);

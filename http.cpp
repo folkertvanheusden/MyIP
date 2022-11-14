@@ -14,15 +14,15 @@
 #include "stats-utils.h"
 
 
-void send_response(tcp_session_t *ts, struct timespec tv, char *request, private_data *pd);
+void send_response(session *ts, char *request);
 
 using namespace std::chrono_literals;
 
-void http_thread(tcp_session_t *ts, struct timespec tv, private_data *pd)
+void http_thread(session *ts)
 {
         set_thread_name("myip-http");
 
-        http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
+        http_session_data *hs = static_cast<http_session_data *>(ts->get_callback_private_data());
 
         for(;hs->terminate == false;) {
 		std::unique_lock<std::mutex> lck(hs->r_lock);
@@ -30,7 +30,7 @@ void http_thread(tcp_session_t *ts, struct timespec tv, private_data *pd)
 		if (hs->req_data) {
 			char *end_marker = strstr(hs->req_data, "\r\n\r\n");
 			if (end_marker) {
-				send_response(ts, tv, hs->req_data, pd);
+				send_response(ts, hs->req_data);
 				break;
 			}
 		}
@@ -39,29 +39,30 @@ void http_thread(tcp_session_t *ts, struct timespec tv, private_data *pd)
 	}
 }
 
-bool http_new_session(tcp_session_t *ts, const packet *pkt, private_data *pd)
+bool http_new_session(pstream *const t, session *ts)
 {
 	http_session_data *hs = new http_session_data();
 	hs->req_data = nullptr;
-	hs->req_len = 0;
+	hs->req_len  = 0;
 
-	any_addr src_addr = pkt->get_src_addr();
-	hs->client_addr = src_addr.to_str();
+	any_addr src_addr = ts->get_their_addr();
+	hs->client_addr   = src_addr.to_str();
 
-	ts->p = hs;
+	ts->set_callback_private_data(hs);
 
-	stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_requests);
+	stats_inc_counter(dynamic_cast<http_private_data *>(ts->get_application_private_data())->http_requests);
 
-	hs->th = new std::thread(http_thread, ts, pkt->get_recv_ts(), pd);
+	hs->th = new std::thread(http_thread, ts);
 
 	return true;
 }
 
-void send_response(tcp_session_t *ts, struct timespec tv, char *request, private_data *pd)
+void send_response(session *ts, char *request)
 {
-	http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
-	http_private_data *hpd = dynamic_cast<http_private_data *>(pd);
-	std::string logfile = hpd->logfile;
+	http_session_data *hs  = static_cast <http_session_data *>(ts->get_callback_private_data());
+	http_private_data *hpd = dynamic_cast<http_private_data *>(ts->get_application_private_data());
+
+	std::string logfile  = hpd->logfile;
 	std::string web_root = hpd->web_root;
 
 	char *endm = strstr(request, "\r\n\r\n");
@@ -72,7 +73,7 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 
 	if (lines.size() == 0) {
 		DOLOG(info, "HTTP: empty request?\n");
-		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
+		stats_inc_counter(hpd->http_r_err);
 		return;
 	}
 
@@ -80,7 +81,7 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 
 	if (parts.size() < 3) {
 		DOLOG(warning, "HTTP: invalid request: %s\n", lines.at(0).c_str());
-		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
+		stats_inc_counter(hpd->http_r_err);
 		return;
 	}
 
@@ -152,23 +153,25 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 
 	if (rc == 200) {
 		header = myformat("HTTP/1.0 %d OK\r\nServer: MyIP\r\nContent-Type: %s\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n", rc, mime_type.c_str(), content_len);
-		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_200);
+		stats_inc_counter(hpd->http_r_200);
 	}
 	else {
 		header = myformat("HTTP/1.0 %d Something is wrong\r\nServer: MyIP\r\nConnection: close\r\n\r\n", rc);
 
 		if (rc == 404)
-			stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_404);
+			stats_inc_counter(hpd->http_r_404);
 		else if (rc == 500)
-			stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_500);
+			stats_inc_counter(hpd->http_r_500);
 	}
 
 	DOLOG(debug, "HTTP: Send response %d for %s: %s\n", rc, hs->client_addr.c_str(), url.c_str());
 
 	FILE *fh = fopen(logfile.c_str(), "a+");
 	if (fh) {
+		auto      temp = ts->get_session_creation_time();
+
 		struct tm tm { 0 };
-		gmtime_r(&tv.tv_sec, &tm);
+		gmtime_r(&temp.tv_sec, &tm);
 
 		const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
@@ -190,35 +193,37 @@ void send_response(tcp_session_t *ts, struct timespec tv, char *request, private
 		DOLOG(ll_error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
 
-	ts->t->send_data(ts, (const uint8_t *)header.c_str(), header.size());
+	ts->get_stream_target()->send_data(ts, (const uint8_t *)header.c_str(), header.size());
 
 	if (get) {
 		if (reply) {
-			ts->t->send_data(ts, reply, content_len);
+			ts->get_stream_target()->send_data(ts, reply, content_len);
 		}
 		else {
 			const char err[] = "Something went wrong: you should not see this.";
 
-			ts->t->send_data(ts, (const uint8_t *)err, sizeof(err) - 1);
+			ts->get_stream_target()->send_data(ts, (const uint8_t *)err, sizeof(err) - 1);
 		}
 	}
 
-	ts->t->end_session(ts);
+	ts->get_stream_target()->end_session(ts);
 
 	free(reply);
 }
 
-bool http_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, private_data *pd)
+bool http_new_data(pstream *ps, session *ts, buffer_in b)
 {
-	http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
+	http_session_data *hs = static_cast<http_session_data *>(ts->get_callback_private_data());
 
 	if (!hs) {
 		DOLOG(info, "HTTP: Data for a non-existing session\n");
-		stats_inc_counter(dynamic_cast<http_private_data *>(pd)->http_r_err);
+		stats_inc_counter(dynamic_cast<http_private_data *>(ts->get_application_private_data())->http_r_err);
 		return false;
 	}
 
-	if (!data) {
+	int data_len = b.get_n_bytes_left();
+
+	if (data_len == 0) {
 		DOLOG(debug, "HTTP: client closed session\n");
 		return true;
 	}
@@ -227,7 +232,7 @@ bool http_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, priv
 
 	hs->req_data = (char *)realloc(hs->req_data, hs->req_len + data_len + 1);
 
-	memcpy(&hs->req_data[hs->req_len], data, data_len);
+	memcpy(&hs->req_data[hs->req_len], b.get_bytes(data_len), data_len);
 	hs->req_len += data_len;
 	hs->req_data[hs->req_len] = 0x00;
 
@@ -236,10 +241,12 @@ bool http_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, priv
 	return true;
 }
 
-void http_close_session_1(tcp_session_t *ts, private_data *pd)
+bool http_close_session_1(pstream *const ps, session *const ts)
 {
-	if (ts -> p) {
-		http_session_data *hs = dynamic_cast<http_session_data *>(ts->p);
+	void *private_data = ts->get_callback_private_data();
+
+	if (private_data) {
+		http_session_data *hs = static_cast<http_session_data *>(private_data);
 
 		hs->terminate = true;
 
@@ -251,29 +258,34 @@ void http_close_session_1(tcp_session_t *ts, private_data *pd)
 
 		delete hs;
 
-		ts->p = nullptr;
+		ts->set_callback_private_data(nullptr);
 	}
+
+	return true;
 }
 
-void http_close_session_2(tcp_session_t *ts, private_data *pd)
+bool http_close_session_2(pstream *const ps, session *ts)
 {
+	return true;
 }
 
-tcp_port_handler_t http_get_handler(stats *const s, const std::string & web_root, const std::string & logfile)
+port_handler_t http_get_handler(stats *const s, const std::string & web_root, const std::string & logfile)
 {
-	tcp_port_handler_t tcp_http;
+	port_handler_t http;
 
-	tcp_http.init = nullptr;
-	tcp_http.new_session = http_new_session;
-	tcp_http.new_data = http_new_data;
-	tcp_http.session_closed_1 = http_close_session_1;
-	tcp_http.session_closed_2 = http_close_session_2;
-	tcp_http.deinit = nullptr;
+	http.init             = nullptr;
+	http.new_session      = http_new_session;
+	http.new_data         = http_new_data;
+	http.session_closed_1 = http_close_session_1;
+	http.session_closed_2 = http_close_session_2;
+	http.deinit           = nullptr;
 
 	http_private_data *hpd = new http_private_data();
-	hpd->logfile = logfile;
+	hpd->logfile  = logfile;
 	hpd->web_root = web_root;
-	hpd->s = s;
+	hpd->s        = s;
+
+	// waar diew hpd heen?!
 
 	// 1.3.6.1.2.1.4.57850: vanheusden.com
 	// 1.3.6.1.2.1.4.57850.1: myip
@@ -284,7 +296,7 @@ tcp_port_handler_t http_get_handler(stats *const s, const std::string & web_root
 	hpd->http_r_500 = s->register_stat("http_r_500", "1.3.6.1.2.1.4.57850.1.1.4");
 	hpd->http_r_err = s->register_stat("http_r_err", "1.3.6.1.2.1.4.57850.1.1.5");
 
-	tcp_http.pd = hpd;
+	http.pd = hpd;
 
-	return tcp_http;
+	return http;
 }

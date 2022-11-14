@@ -19,7 +19,7 @@ add_executable(myip
 	buffer_in.cpp
 	buffer_out.cpp
 	dns.cpp
-	echo_sctp.cpp
+	echo.cpp
 	fifo-stats.cpp
 	font.cpp
 	hash.cpp
@@ -45,6 +45,7 @@ add_executable(myip
 	protocol.cpp
 	sctp.cpp
 	sctp_crc32c.cpp
+	session.cpp
 	sip.cpp
 	snmp.cpp
 	snmp-data.cpp

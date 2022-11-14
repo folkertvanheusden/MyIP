@@ -197,8 +197,10 @@ buffer_out sctp::chunk_heartbeat_request(buffer_in & chunk_payload)
 	return out;
 }
 
-std::pair<sctp_data_handling_result_t, buffer_out> sctp::chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(sctp *const sctp_, sctp_session *const session, buffer_in data)> & new_data_handler)
+std::pair<sctp_data_handling_result_t, buffer_out> sctp::chunk_data(sctp_session *const s, buffer_in & chunk, buffer_out *const reply, std::function<bool(pstream *const sctp_, session *const s, buffer_in data)> & new_data_handler)
 {
+	sctp_session *session = reinterpret_cast<sctp_session *>(s);
+
 	buffer_out out;
 
 	sctp_data_handling_result_t result = dcb_abort;
@@ -275,7 +277,7 @@ void sctp::operator()()
 			uint32_t my_verification_tag = b.get_net_long();
 			uint32_t checksum            = b.get_net_long();
 
-			uint64_t hash                = sctp_session::get_hash(their_addr, source_port, destination_port);
+			uint64_t hash                = session::get_hash(their_addr, source_port, destination_port);
 
 			DOLOG(dl, "SCTP[%lx]: source addr %s, source port %d, destination port %d, size: %d, verification tag: %08x\n", hash, their_addr.to_str().c_str(), source_port, destination_port, size, my_verification_tag);
 
@@ -312,7 +314,7 @@ void sctp::operator()()
 				if (type == 0) {  // DATA
 					DOLOG(dl, "SCTP[%lx]: DATA chunk of length %d\n", hash, chunk.get_n_bytes_left());
 
-					std::function<bool(sctp *const sctp_, sctp_session *const session, buffer_in data)> new_data_handler = nullptr;
+					std::function<bool(pstream *const ps, session *const s, buffer_in data)> new_data_handler = nullptr;
 
 					{
 						std::shared_lock<std::shared_mutex> lck(listeners_lock);
@@ -421,17 +423,21 @@ void sctp::operator()()
 
 					chunk_cookie_echo(chunk, their_addr, source_port, destination_port, &cookie_ok, &their_verification_tag, &their_initial_tsn, &my_initial_tsn);
 
-					std::function<void(sctp *const sctp_, sctp_session *const session)> new_session_handler = nullptr;
+					std::function<void(pstream *const ps, session *const s)> new_session_handler = nullptr;
+					private_data *application_private_data = nullptr;
 
 					{
 						std::shared_lock<std::shared_mutex> lck(listeners_lock);
 
 						auto it = listeners.find(destination_port);
 
-						if (it != listeners.end())
-							new_session_handler = it->second.new_session;
-						else
+						if (it != listeners.end()) {
+							application_private_data = it->second.pd;
+							new_session_handler      = it->second.new_session;
+						}
+						else {
 							DOLOG(dl, "SCTP[%lx]: listener for port %d went away?\n", hash, destination_port);
+						}
 					}
 
 					if (cookie_ok && new_session_handler) {
@@ -443,10 +449,10 @@ void sctp::operator()()
 						else {
 							DOLOG(dl, "SCTP[%lx]: their initial tsn: %lu, my initial tsn: %lu\n", hash, their_initial_tsn, my_initial_tsn);
 
-							sctp_session *session = new sctp_session(their_addr, source_port, pkt->get_dst_addr(), destination_port, their_initial_tsn, my_initial_tsn, their_verification_tag);
-							new_session_handler(this, session);
+							sctp_session *s = new sctp_session(this, their_addr, source_port, pkt->get_dst_addr(), destination_port, their_initial_tsn, my_initial_tsn, their_verification_tag, application_private_data);
+							new_session_handler(this, s);
 
-							sessions.insert({ hash, session });
+							sessions.insert({ hash, s });
 						}
 
 						// send ack
@@ -512,18 +518,20 @@ bool sctp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 	return idev->transmit_packet(dst_ip, src_ip, 0x84, payload, pl_size, nullptr);
 }
 
-bool sctp::send_data(sctp_session *const session, buffer_in & payload)
+bool sctp::send_data(session *const s_in, buffer_in & payload)
 {
 	bool     ok          = true;
+
+	sctp_session *s = reinterpret_cast<sctp_session *>(s_in);
 
 	// TODO store these messages for resend
 
 	while(payload.end_reached() == false) {
 		buffer_out out;
 
-		out.add_net_short(session->get_my_port());
-		out.add_net_short(session->get_their_port());
-		out.add_net_long(session->get_my_tsn());
+		out.add_net_short(s->get_my_port());
+		out.add_net_short(s->get_their_port());
+		out.add_net_long(s->get_my_tsn());
 		size_t crc_offset = out.add_net_long(0, -1);  // place-holder for crc
 
 		// add payload
@@ -533,12 +541,12 @@ bool sctp::send_data(sctp_session *const session, buffer_in & payload)
 		int n_bytes_to_add = std::min(payload.get_n_bytes_left(), idev->get_max_packet_size() - 50 /* TODO */);
 		out.add_net_short(n_bytes_to_add + 16);
 		// TSN
-		out.add_net_long(session->get_my_tsn());
-		session->inc_my_tsn(1);
+		out.add_net_long(s->get_my_tsn());
+		s->inc_my_tsn(1);
 		//
 		out.add_net_short(0);  // stream identifier s
-		out.add_net_short(session->get_my_stream_sequence_nr());  // stream sequence number
-		session->inc_my_stream_sequence_nr();
+		out.add_net_short(s->get_my_stream_sequence_nr());  // stream sequence number
+		s->inc_my_stream_sequence_nr();
 		out.add_net_long(0);  // payload protocol identifier
 		// payload:
 		buffer_in temp_payload = payload.get_segment(n_bytes_to_add);
@@ -551,10 +559,10 @@ bool sctp::send_data(sctp_session *const session, buffer_in & payload)
 		out.add_net_long(crc32c, crc_offset);
 
 		// transmit 'reply' (0x84 is SCTP protocol number)
-		if (transmit_packet(session->get_their_addr(), session->get_my_addr(), out.get_content(), out.get_size()) == false) {
+		if (transmit_packet(s->get_their_addr(), s->get_my_addr(), out.get_content(), out.get_size()) == false) {
 			ok = false;
 
-			DOLOG(info, "SCTP[%lx]: failed to transmit send_data packet\n", session->get_hash());
+			DOLOG(info, "SCTP[%lx]: failed to transmit send_data packet\n", s->get_hash());
 
 			break;
 		}
@@ -563,7 +571,14 @@ bool sctp::send_data(sctp_session *const session, buffer_in & payload)
 	return ok;
 }
 
-void sctp::add_handler(const int port, sctp_port_handler_t & sph)
+bool sctp::send_data(session *const s, const uint8_t *const data, const size_t len)
+{
+	buffer_in b(data, len);
+
+	return send_data(s, b);
+}
+
+void sctp::add_handler(const int port, port_handler_t & sph)
 {
 	if (sph.init)
 		sph.init();
@@ -571,4 +586,9 @@ void sctp::add_handler(const int port, sctp_port_handler_t & sph)
 	std::unique_lock<std::shared_mutex> lck(listeners_lock);
 
 	listeners.insert({ port, sph });
+}
+
+void sctp::end_session(session *const ts)
+{
+	// TODO
 }

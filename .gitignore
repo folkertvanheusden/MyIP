@@ -33,3 +33,7 @@
 
 *.pcap
 *.wav
+
+build
+tests
+work

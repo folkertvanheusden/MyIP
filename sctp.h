@@ -5,11 +5,14 @@
 #include <map>
 #include <shared_mutex>
 
+#include "application.h"
 #include "buffer_in.h"
 #include "buffer_out.h"
 #include "hash.h"
 #include "ip_protocol.h"
 #include "packet.h"
+#include "pstream.h"
+#include "session.h"
 
 
 class icmp;
@@ -17,48 +20,25 @@ class icmp;
 // dcb: data-call-back
 typedef enum { dcb_close, dcb_abort, dcb_continue } sctp_data_handling_result_t;
 
-class sctp : public ip_protocol
+class sctp : public ip_protocol, pstream
 {
 public:
-	class sctp_session {
+	class sctp_session : public session {
 	private:
-		const uint16_t their_port { 0 };
-		const uint16_t my_port    { 0 };
-		const any_addr their_addr;
-		const any_addr my_addr;
-		uint32_t       my_tsn     { 0 };
-		uint32_t       their_tsn  { 0 };
-		uint16_t       my_stream_sequence_nr  { 0 };
-		uint32_t       their_verification_tag { 0 };
-		void          *callback_private_data { nullptr };
+		uint32_t my_tsn                 { 0 };
+		uint32_t their_tsn              { 0 };
+		uint16_t my_stream_sequence_nr  { 0 };
+		uint32_t their_verification_tag { 0 };
 	
 	public:
-		sctp_session(const any_addr & their_addr, const uint16_t their_port, const any_addr & my_addr, const uint16_t my_port, const uint32_t their_tsn, const uint32_t my_tsn, const uint32_t their_verification_tag) :
-			their_port(their_port), my_port(my_port),
-			their_addr(their_addr), my_addr(my_addr),
+		sctp_session(pstream *const ps, const any_addr & their_addr, const uint16_t their_port, const any_addr & my_addr, const uint16_t my_port, const uint32_t their_tsn, const uint32_t my_tsn, const uint32_t their_verification_tag, private_data *const pd) :
+			session(ps, my_addr, my_port, their_addr, their_port, pd),
 			my_tsn(my_tsn), their_tsn(their_tsn),
 			their_verification_tag(their_verification_tag)
 		{
 		}
 
 		virtual ~sctp_session() {
-			free(callback_private_data);
-		}
-
-		const any_addr get_their_addr() const {
-			return their_addr;
-		}
-
-		const uint16_t get_their_port() const {
-			return their_port;
-		}
-
-		const any_addr get_my_addr() const {
-			return my_addr;
-		}
-
-		const uint16_t get_my_port() const {
-			return my_port;
 		}
 
 		uint32_t get_my_tsn() const {
@@ -88,38 +68,7 @@ public:
 		uint32_t get_their_verification_tag() const {
 			return their_verification_tag;
 		}
-
-		uint64_t get_hash() const {
-			return get_hash(their_addr, their_port, my_port);
-		}
-
-		static uint64_t get_hash(const any_addr & their_addr, const uint16_t their_port, const uint16_t my_port) {
-			buffer_out temp;
-
-			temp.add_any_addr(their_addr);
-			temp.add_net_short(their_port);
-			temp.add_net_short(my_port);
-
-			return MurmurHash64A(temp.get_content(), temp.get_size(), 123 /* TODO: replace 123 */);
-		}
-
-		void set_callback_private_data(void *p) {
-			callback_private_data = p;
-		}
-
-		void * get_callback_private_data() {
-			return callback_private_data;
-		}
 	};
-
-	typedef struct {
-		std::function<void()> init;
-		std::function<void(sctp *const sctp_, sctp_session *const session)> new_session;
-		std::function<bool(sctp *const sctp_, sctp_session *const session, buffer_in data)> new_data;
-		std::function<void(sctp *const sctp_, sctp_session *const session)> session_closed_1;  // please terminate
-		std::function<void(sctp *const sctp_, sctp_session *const session)> session_closed_2;  // should be terminated, clean up
-		std::function<void()> deinit;
-	} sctp_port_handler_t;
 
 private:
 	std::shared_mutex                  sessions_lock;
@@ -131,7 +80,7 @@ private:
 	icmp *const icmp_;
 
 	std::shared_mutex                  listeners_lock;
-	std::map<int, sctp_port_handler_t> listeners;
+	std::map<int, port_handler_t>      listeners;
 
 	uint64_t *sctp_msgs        { nullptr };
 	uint64_t *sctp_failed_msgs { nullptr };
@@ -145,7 +94,7 @@ private:
 
 	void chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag);
 	void chunk_cookie_echo(buffer_in & chunk_payload, const any_addr & their_addr, const int their_port, const int local_port, bool *const ok, uint32_t *const my_verification_tag, uint32_t *const their_initial_tsn, uint32_t *const my_initial_tsn);
-	std::pair<sctp_data_handling_result_t, buffer_out> chunk_data(sctp_session *const session, buffer_in & chunk, buffer_out *const reply, std::function<bool(sctp *const sctp_, sctp_session *const session, buffer_in data)> & new_data_handler);
+	std::pair<sctp_data_handling_result_t, buffer_out> chunk_data(sctp_session *const s, buffer_in & chunk, buffer_out *const reply, std::function<bool(pstream *const sctp_, session *const s, buffer_in data)> & new_data_handler);
 
 	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size);
 
@@ -153,9 +102,12 @@ public:
 	sctp(stats *const s, icmp *const icmp_);
 	virtual ~sctp();
 
-	void add_handler(const int port, sctp_port_handler_t & sph);
+	void add_handler(const int port, port_handler_t & sph);
 
-	bool send_data(sctp_session *const session, buffer_in & payload);
+	bool send_data(session *const s, buffer_in & payload);
+	bool send_data(session *const s, const uint8_t *const data, const size_t len) override;
+
+	void end_session(session *const ts) override;
 
 	virtual void operator()() override;
 };

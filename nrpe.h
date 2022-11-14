@@ -3,4 +3,4 @@
 #include "stats.h"
 #include "tcp.h"
 
-tcp_port_handler_t nrpe_get_handler(stats *const s);
+port_handler_t nrpe_get_handler(stats *const s);

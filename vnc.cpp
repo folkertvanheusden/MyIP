@@ -73,7 +73,7 @@ struct frame_buffer_t
 	}
 } frame_buffer;
 
-void vnc_thread(void *ts_in);
+void vnc_thread(session *ts);
 
 void frame_buffer_thread(void *ts_in);
 
@@ -337,14 +337,14 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	*message_len = o;
 }
 
-bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
+bool vnc_new_session(pstream *const ps, session *const s)
 {
 	vnc_session_data *vs = new vnc_session_data();
 
-	any_addr src_addr = pkt->get_src_addr();
-	vs->client_addr = src_addr.to_str();
+	any_addr src_addr = s->get_their_addr();
+	vs->client_addr   = src_addr.to_str();
 
-	vs->buffer = nullptr;
+	vs->buffer      = nullptr;
 	vs->buffer_size = 0;
 
 	vs->state = vs_initial_handshake_server_send;
@@ -353,17 +353,17 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 
 	vs->start = time(nullptr);
 
-	vs->vpd = static_cast<vnc_private_data *>(private_data);
+	vs->vpd = static_cast<vnc_private_data *>(s->get_callback_private_data());
 	stats_inc_counter(vs->vpd->vnc_requests);
 
-	ts->p = vs;
+	s->set_callback_private_data(vs);
 
 	DOLOG(debug, "VNC: new session with %s\n", vs->client_addr.c_str());
 
-	vs->th = new std::thread(vnc_thread, ts);
+	vs->th = new std::thread(vnc_thread, s);
 
 	vs->strm.zalloc = 0;
-	vs->strm.zfree = 0;
+	vs->strm.zfree  = 0;
 	vs->strm.opaque = 0;
 	if (deflateInit(&vs->strm, Z_DEFAULT_COMPRESSION) != Z_OK)
 		DOLOG(warning, "VNC: zlib init failed\n");
@@ -371,23 +371,25 @@ bool vnc_new_session(tcp_session_t *ts, const packet *pkt, void *private_data)
 	return true;
 }
 
-bool vnc_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, void *private_data)
+bool vnc_new_data(pstream *const ps, session *const s, buffer_in data)
 {
-	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
+	vnc_session_data *vs = static_cast<vnc_session_data *>(s->get_callback_private_data());
 
 	if (!vs) {
 		DOLOG(info, "VNC: Data for a non-existing session\n");
 		return false;
 	}
 
-	if (!data) {
+	int data_len = data.get_n_bytes_left();
+
+	if (data_len == 0) {
 		DOLOG(debug, "VNC: client closed session\n");
 		vs->w_cond.notify_one();
 		return true;
 	}
 
 	vnc_thread_work_t *work = new vnc_thread_work_t;
-	work->data = (char *)duplicate((const uint8_t *)data, data_len);
+	work->data     = reinterpret_cast<char *>(duplicate(reinterpret_cast<const uint8_t *>(data.get_bytes(data_len)), data_len));
 	work->data_len = data_len;
 
 	const std::lock_guard<std::mutex> lck(vs->w_lock);
@@ -397,12 +399,11 @@ bool vnc_new_data(tcp_session_t *ts, const uint8_t *data, size_t data_len, void 
 	return true;
 }
 
-void vnc_thread(void *ts_in)
+void vnc_thread(session *ts)
 {
 	set_thread_name("myip-vnc");
 
-	tcp_session_t *ts = (tcp_session_t *)ts_in;
-	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
+	vnc_session_data *vs  = static_cast<vnc_session_data *>(ts->get_callback_private_data());
 	vnc_private_data *vpd = vs->vpd;
 	bool rc = true, first = true;
 
@@ -458,7 +459,7 @@ void vnc_thread(void *ts_in)
 			const char initial_message[] = "RFB 003.008\n";
 
 			DOLOG(debug, "VNC: send handshake of 12 bytes\n");
-			ts->t->send_data(ts, (const uint8_t *)initial_message, 12);  // must be 12 bytes
+			ts->get_stream_target()->send_data(ts, (const uint8_t *)initial_message, 12);  // must be 12 bytes
 
 			vs->state = vs_initial_handshake_client_resp;
 		}
@@ -489,7 +490,7 @@ void vnc_thread(void *ts_in)
 			};
 
 			DOLOG(debug, "VNC: ack security types, %zu bytes\n", sizeof message);
-			ts->t->send_data(ts, message, sizeof message);
+			ts->get_stream_target()->send_data(ts, message, sizeof message);
 
 			vs->state = vs_security_handshake_client_resp;
 		}
@@ -501,7 +502,7 @@ void vnc_thread(void *ts_in)
 				if (*chosen_sec == 1) {  // must have chosen security type 'None'
 					uint8_t response[] = { 0, 0, 0, 0 };  // OK
 					DOLOG(debug, "VNC: Valid security type chosen, %zu bytes\n", sizeof response);
-					ts->t->send_data(ts, response, sizeof response);
+					ts->get_stream_target()->send_data(ts, response, sizeof response);
 
 					vs->state = vs_client_init;
 				}
@@ -510,7 +511,7 @@ void vnc_thread(void *ts_in)
 
 					uint8_t response[] = { 0, 0, 0, 1 };  // failed
 					DOLOG(info, "VNC: Unexpected/invalid security type: %d (%zu bytes)\n", *chosen_sec, sizeof response);
-					ts->t->send_data(ts, response, sizeof response);
+					ts->get_stream_target()->send_data(ts, response, sizeof response);
 					stats_inc_counter(vpd->vnc_err);
 				}
 
@@ -552,7 +553,7 @@ void vnc_thread(void *ts_in)
 			};
 
 			DOLOG(debug, "VNC: server init, %zu bytes\n", sizeof message);
-			ts->t->send_data(ts, message, sizeof message);
+			ts->get_stream_target()->send_data(ts, message, sizeof message);
 
 			cont_or_initial_upd_frame = true;
 
@@ -569,7 +570,7 @@ void vnc_thread(void *ts_in)
 
 			DOLOG(debug, "VNC: intial (full) framebuffer update\n");
 
-			ts->t->send_data(ts, fb_message, fb_message_len);
+			ts->get_stream_target()->send_data(ts, fb_message, fb_message_len);
 			free(fb_message);
 		}
 
@@ -643,7 +644,7 @@ void vnc_thread(void *ts_in)
 
 					DOLOG(debug, "VNC: framebuffer update %zu bytes for %dx%d at %d,%d: %zu bytes%s\n", message_len, w, h, x, y, message_len, incremental?" (incremental)":"");
 
-					ts->t->send_data(ts, message, message_len);
+					ts->get_stream_target()->send_data(ts, message, message_len);
 
 					free(message);
 
@@ -758,26 +759,32 @@ void vnc_thread(void *ts_in)
 		}
 	}
 
-	ts->t->end_session(ts);
+	ts->get_stream_target()->end_session(ts);
 
 	frame_buffer.unregister_callback(vs);
 
 	DOLOG(info, "VNC: Thread terminating for %s\n", vs->client_addr.c_str());
 }
 
-void vnc_close_session_1(tcp_session_t *ts, private_data *pd)
+bool vnc_close_session_1(pstream *const ps, session *const s)
 {
-	if (ts -> p) {
-		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
+	private_data *const pd = reinterpret_cast<private_data *>(s->get_callback_private_data());
+
+	if (pd) {
+		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(pd);
 
 		stats_add_average(vs->vpd->vnc_duration, time(nullptr) - vs->start);
 	}
+
+	return true;
 }
 
-void vnc_close_session_2(tcp_session_t *ts, private_data *pd)
+bool vnc_close_session_2(pstream *const ps, session *const s)
 {
-	if (ts -> p) {
-		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(ts->p);
+	private_data *const pd = reinterpret_cast<private_data *>(s->get_callback_private_data());
+
+	if (pd) {
+		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(pd);
 
 		{
 			const std::lock_guard<std::mutex> lck(vs->w_lock);
@@ -792,26 +799,28 @@ void vnc_close_session_2(tcp_session_t *ts, private_data *pd)
 
 		delete vs;
 
-		ts->p = nullptr;
+		s->set_callback_private_data(nullptr);
 	}
+
+	return true;
 }
 
-tcp_port_handler_t vnc_get_handler(stats *const s)
+port_handler_t vnc_get_handler(stats *const s)
 {
-	tcp_port_handler_t tcp_vnc;
+	port_handler_t tcp_vnc;
 
-	tcp_vnc.init = vnc_init;
-	tcp_vnc.new_session = vnc_new_session;
-	tcp_vnc.new_data = vnc_new_data;
+	tcp_vnc.init             = vnc_init;
+	tcp_vnc.new_session      = vnc_new_session;
+	tcp_vnc.new_data         = vnc_new_data;
 	tcp_vnc.session_closed_1 = vnc_close_session_1;
 	tcp_vnc.session_closed_2 = vnc_close_session_2;
-	tcp_vnc.deinit = vnc_deinit;
+	tcp_vnc.deinit           = vnc_deinit;
 
 	vnc_private_data *vpd = new vnc_private_data();
 
 	// 1.3.6.1.2.1.4.57850.1.2: vnc
 	vpd->vnc_requests = s->register_stat("vnc_requests", "1.3.6.1.2.1.4.57850.1.2.1");
-	vpd->vnc_err = s->register_stat("vnc_err", "1.3.6.1.2.1.4.57850.1.2.2");
+	vpd->vnc_err      = s->register_stat("vnc_err", "1.3.6.1.2.1.4.57850.1.2.2");
 	vpd->vnc_duration = s->register_stat("vnc_duration", "1.3.6.1.2.1.4.57850.1.2.3");
 
 	tcp_vnc.pd = vpd;
