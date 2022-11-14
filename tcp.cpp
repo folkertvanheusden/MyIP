@@ -10,6 +10,7 @@
 #include "log.h"
 #include "tcp.h"
 #include "ipv4.h"
+#include "str.h"
 #include "time.h"
 #include "utils.h"
 
@@ -203,7 +204,7 @@ void tcp::set_state(tcp_session *const session, const tcp_state_t new_state)
 
 void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag)
 {
-	set_thread_name("myip-pkt-handler");
+	set_thread_name("myip-ptcp-handler");
 
 	const uint8_t *const p = pkt->get_data();
 	const int size = pkt->get_size();
@@ -242,6 +243,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	free(flag_str);
 
 	auto port_record = get_lock_listener(dst_port, id);
+	release_listener_lock();
 
 	std::unique_lock<std::mutex> lck(sessions_lock);
 
@@ -457,8 +459,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		DOLOG(debug, "TCP[%012" PRIx64 "]: %s\n", id, std::string((const char *)&p[header_size], data_len).c_str());
 
 		if (their_seq_nr == cur_session->their_seq_nr) {
-//			std::string content = bin_to_text(data_start, data_len);
-//			DOLOG(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
+			// std::string content = bin_to_text(data_start, data_len);
+			// DOLOG(debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
 
 			auto cb = get_lock_listener(dst_port, id);
 
