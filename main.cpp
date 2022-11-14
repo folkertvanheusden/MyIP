@@ -181,14 +181,10 @@ void register_sctp_service(std::vector<phys *> *const devs, port_handler_t & sph
 	for(auto & dev : *devs) {
 		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
 		if (i4) {
-			printf("hier\n");
 			sctp *const s4 = dynamic_cast<sctp *>(i4->get_ip_protocol(0x84));
 
-			if (s4) {
-			printf("daar\n");
-				DOLOG(debug, "Adding port %d to SCTP over IPv4\n", port);
+			if (s4)
 				s4->add_handler(port, sph);
-			}
 		}
 
 		ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
