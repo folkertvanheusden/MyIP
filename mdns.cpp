@@ -3,8 +3,9 @@
 #include <unistd.h>
 #include <vector>
 
+#include "log.h"
 #include "mdns.h"
-#include "utils.h"
+#include "str.h"
 
 
 constexpr int ttl = 5;

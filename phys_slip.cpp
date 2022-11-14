@@ -1,4 +1,4 @@
-// (C) 2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
@@ -12,9 +12,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "log.h"
 #include "phys_slip.h"
 #include "packet.h"
 #include "utils.h"
+
 
 phys_slip::phys_slip(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac) :
 	phys(dev_index, s),

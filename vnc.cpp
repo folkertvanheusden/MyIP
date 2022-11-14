@@ -1,4 +1,4 @@
-// (C) 2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <atomic>
 #include <climits>
@@ -15,8 +15,11 @@
 #include "utils.h"
 #include "ipv4.h"
 #include "font.h"
+#include "log.h"
 #include "types.h"
 #include "stats.h"
+#include "time.h"
+
 
 using namespace std::chrono_literals;
 

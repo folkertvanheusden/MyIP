@@ -1,4 +1,4 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <algorithm>
 #include <errno.h>
 #include <fcntl.h>
@@ -12,9 +12,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "log.h"
 #include "phys_ethernet.h"
 #include "packet.h"
 #include "utils.h"
+
 
 void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 {

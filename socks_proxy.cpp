@@ -10,8 +10,10 @@
 #include <sys/types.h>
 
 #include "error.h"
+#include "log.h"
 #include "socks_proxy.h"
 #include "utils.h"
+
 
 ssize_t READ(int fd, uint8_t *whereto, size_t len)
 {

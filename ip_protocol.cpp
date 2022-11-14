@@ -2,7 +2,8 @@
 #include <chrono>
 
 #include "ip_protocol.h"
-#include "utils.h"
+#include "log.h"
+
 
 constexpr size_t pkts_max_size { 256 };
 

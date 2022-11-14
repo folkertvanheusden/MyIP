@@ -22,6 +22,7 @@ add_executable(myip
 	echo_sctp.cpp
 	fifo-stats.cpp
 	font.cpp
+	hash.cpp
 	http.cpp
 	icmp.cpp
 	icmp6.cpp
@@ -29,6 +30,7 @@ add_executable(myip
 	ipv4.cpp
 	ipv6.cpp
 	lldp.cpp
+	log.cpp
 	main.cpp
 	mdns.cpp
 	mqtt.cpp
@@ -50,17 +52,22 @@ add_executable(myip
 	socks_proxy.cpp
 	stats.cpp
 	stats-utils.cpp
+	str.cpp
 	syslog.cpp
 	tcp.cpp
 	tcp_udp_fw.cpp
+	time.cpp
 	udp.cpp
 	utils.cpp
 	vnc.cpp
 	)
 
 add_executable(myiptop
+	log.cpp
 	myiptop.cpp
 	stats-utils.cpp
+	str.cpp
+	time.cpp
 	utils.cpp
 	)
 

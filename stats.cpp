@@ -1,4 +1,4 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <cstring>
 #include <fcntl.h>
@@ -8,9 +8,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "log.h"
 #include "stats.h"
 #include "stats-utils.h"
-#include "utils.h"
+
 
 constexpr char shm_name[] = "/myip";
 

@@ -1,11 +1,13 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <string>
 #include <string.h>
 #include <vector>
 
 #include "any_addr.h"
-#include "utils.h"
+#include "hash.h"
+#include "str.h"
+
 
 any_addr::any_addr()
 {

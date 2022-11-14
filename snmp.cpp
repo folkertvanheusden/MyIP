@@ -1,13 +1,15 @@
-// (C) 2021-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <stdint.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
 
+#include "log.h"
 #include "snmp.h"
 #include "snmp-elem.h"
+#include "str.h"
+#include "time.h"
 #include "udp.h"
-#include "utils.h"
 
 
 snmp::snmp(snmp_data *const sd, stats *const s, udp *const u) :
