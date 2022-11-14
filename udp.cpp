@@ -4,7 +4,10 @@
 #include "udp.h"
 #include "ipv4.h"
 #include "icmp.h"
+#include "log.h"
+#include "time.h"
 #include "utils.h"
+
 
 udp::udp(stats *const s, icmp *const icmp_) : ip_protocol(s, "udp"), icmp_(icmp_)
 {

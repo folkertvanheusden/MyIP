@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <vector>
 
+#include "log.h"
 #include "mdns.h"
 #include "utils.h"
 

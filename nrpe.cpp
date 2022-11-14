@@ -7,11 +7,11 @@
 #include <string.h>
 #include <sys/resource.h>
 
-#include "tcp.h"
-#include "utils.h"
 #include "ipv4.h"
-#include "types.h"
+#include "log.h"
 #include "stats-utils.h"
+#include "tcp.h"
+#include "types.h"
 #include "utils.h"
 
 

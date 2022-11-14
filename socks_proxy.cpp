@@ -10,6 +10,7 @@
 #include <sys/types.h>
 
 #include "error.h"
+#include "log.h"
 #include "socks_proxy.h"
 #include "utils.h"
 

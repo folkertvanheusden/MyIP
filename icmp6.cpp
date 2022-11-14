@@ -1,4 +1,4 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <chrono>
 #include <unistd.h>
@@ -6,7 +6,10 @@
 #include "icmp6.h"
 #include "ipv4.h"
 #include "ipv6.h"
+#include "log.h"
+#include "time.h"
 #include "utils.h"
+
 
 icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip) : icmp(s), my_mac(my_mac), my_ip(my_ip)
 {

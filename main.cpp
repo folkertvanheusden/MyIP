@@ -20,6 +20,7 @@
 #include "ipv6.h"
 #include "icmp.h"
 #include "icmp6.h"
+#include "log.h"
 #include "arp.h"
 #include "mdns.h"
 #include "ndp.h"

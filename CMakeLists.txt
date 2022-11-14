@@ -26,6 +26,7 @@ add_executable(myip
 	ipv4.cpp
 	ipv6.cpp
 	lldp.cpp
+	log.cpp
 	main.cpp
 	mdns.cpp
 	mqtt.cpp
@@ -48,14 +49,17 @@ add_executable(myip
 	syslog.cpp
 	tcp.cpp
 	tcp_udp_fw.cpp
+	time.cpp
 	udp.cpp
 	utils.cpp
 	vnc.cpp
 	)
 
 add_executable(myiptop
+	log.cpp
 	myiptop.cpp
 	stats-utils.cpp
+	time.cpp
 	utils.cpp
 	)
 

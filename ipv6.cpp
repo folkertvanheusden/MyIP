@@ -1,4 +1,4 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <chrono>
 #include <stdint.h>
@@ -7,9 +7,11 @@
 #include <arpa/inet.h>
 
 #include "ipv6.h"
+#include "log.h"
 #include "phys.h"
 #include "icmp.h"
 #include "utils.h"
+
 
 ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : protocol(s, "ipv6"), indp(indp), myip(myip)
 {

@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 
+#include "log.h"
 #include "syslog.h"
 #include "udp.h"
 #include "utils.h"

@@ -1,4 +1,4 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <math.h>
 #include <optional>
 #include <samplerate.h>
@@ -9,9 +9,12 @@
 #include <speex/speex.h>
 #include <sys/time.h>
 
+#include "log.h"
 #include "sip.h"
+#include "time.h"
 #include "udp.h"
 #include "utils.h"
+
 
 typedef struct {
 	void *state;

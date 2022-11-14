@@ -7,8 +7,11 @@
 #include <arpa/inet.h>
 
 #include "lldp.h"
+#include "log.h"
 #include "phys.h"
+#include "time.h"
 #include "utils.h"
+
 
 lldp::lldp(stats *const s, const any_addr & my_mac, const any_addr & mgmt_addr, const int interface_idx) : protocol(s, "lldp"), my_mac(my_mac), mgmt_addr(mgmt_addr), interface_idx(interface_idx)
 {

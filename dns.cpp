@@ -4,6 +4,8 @@
 #include <arpa/inet.h>
 
 #include "dns.h"
+#include "log.h"
+#include "time.h"
 #include "udp.h"
 #include "utils.h"
 

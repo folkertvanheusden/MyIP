@@ -1,9 +1,11 @@
-// (C) 2020-2021 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <chrono>
 
 #include "icmp.h"
 #include "ipv4.h"
+#include "log.h"
 #include "utils.h"
+
 
 icmp::icmp(stats *const s) : ip_protocol(s, "icmp(4/6)")
 {
