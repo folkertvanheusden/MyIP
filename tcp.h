@@ -31,33 +31,35 @@ class tcp_session : public session
 public:
 	std::mutex tlock;
 
-	bool is_client;
+	bool is_client       { false };
 
-	uint64_t id;
+	uint64_t id          { 0 };
 
-	uint16_t window_size;
+	uint16_t window_size { 512 };
 
-	tcp_state_t state;
-	time_t state_since;
+	tcp_state_t state    { tcp_closed };
+	time_t state_since   { 0 };
 
 	std::map<uint32_t, std::vector<uint8_t> > fragments;
 
 	std::condition_variable state_changed;
-	uint64_t last_pkt;
-	uint32_t my_seq_nr, their_seq_nr;
-	uint32_t initial_my_seq_nr, initial_their_seq_nr;
+	uint64_t last_pkt     { 0 };
+	uint32_t my_seq_nr    { 0 };
+	uint32_t their_seq_nr { 0 };
+	uint32_t initial_my_seq_nr    { 0 };
+	uint32_t initial_their_seq_nr { 0 };
 
-	uint8_t *unacked;
-	uint32_t unacked_start_seq_nr;
-	size_t data_since_last_ack;
-	size_t unacked_size;
-	bool fin_after_unacked_empty;
+	uint8_t *unacked              { nullptr };
+	uint32_t unacked_start_seq_nr { 0       };
+	size_t data_since_last_ack    { 0       };
+	size_t unacked_size           { 0       };
+	bool fin_after_unacked_empty  { false   };
 	std::condition_variable unacked_sent_cv;
 
-	uint32_t seq_for_fin_when_all_received;
-	bool flag_fin_when_all_received;
+	uint32_t seq_for_fin_when_all_received { 0     };
+	bool flag_fin_when_all_received        { false };
 
-	session_data *p;
+	session_data *p { nullptr };
 
 public:
 	tcp_session(pstream *const t, const any_addr & my_addr, const int my_port, const any_addr & their_addr, const int their_port, private_data *app_private_data) :
