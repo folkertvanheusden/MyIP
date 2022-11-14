@@ -31,6 +31,8 @@ public:
 
 	void register_ip(protocol *const p) { idev = p; }
 
+	any_addr get_ip_address() const { return idev->get_addr(); }
+
 	void queue_packet(const packet *p);
 
 	virtual void operator()() = 0;
