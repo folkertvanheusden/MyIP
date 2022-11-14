@@ -280,10 +280,6 @@ void mdns::operator()()
 
 			auto name = split(hostname, ".");
 
-			printf("len: %zu\n", name.size());
-			for(auto & p : name)
-				printf("part %s\n", p.c_str());
-
 			// PTR record
 			ro += add_ptr(&mdns_buffer[ro], name);
 
