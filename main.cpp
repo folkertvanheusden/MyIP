@@ -21,6 +21,7 @@
 #include "icmp.h"
 #include "icmp6.h"
 #include "arp.h"
+#include "mdns.h"
 #include "ndp.h"
 #include "sip.h"
 #include "udp.h"
@@ -144,6 +145,34 @@ void register_tcp_service(std::vector<phys *> *const devs, tcp_port_handler_t & 
 	}
 }
 
+void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const int port, const libconfig::Setting & settings)
+{
+	try {
+		std::string hostname = (const char *)settings.lookup("mdns");
+
+		for(auto & dev : *devs) {
+			ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+			if (i4) {
+				udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+
+				if (u4)
+					m->add_protocol(u4, port, hostname);
+			}
+
+			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
+			if (i6) {
+				udp *const u6 = dynamic_cast<udp *>(i6->get_ip_protocol(0x11));
+
+				if (u6)
+					m->add_protocol(u6, port, hostname);
+			}
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+}
+
 void register_sctp_service(std::vector<phys *> *const devs, sctp::sctp_port_handler_t & sph, const int port)
 {
 	for(auto & dev : *devs) {
@@ -251,6 +280,9 @@ int main(int argc, char *argv[])
 	std::vector<ip_protocol *> ip_protocols;
 	std::vector<application *> applications;
 	std::vector<socks_proxy *> socks_proxies;
+
+	mdns *mdns_ = new mdns();
+	applications.push_back(mdns_);
 
 	/// network interfaces
 	const libconfig::Setting &interfaces = root["interfaces"];
@@ -556,6 +588,24 @@ int main(int argc, char *argv[])
 		tcp_port_handler_t http_handler = http_get_handler(&s, web_root, web_logfile);
 
 		register_tcp_service(&devs, http_handler, port);
+
+		register_mdns_service(mdns_, &devs, port, s_http);
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+
+	// NRPE
+	try {
+		const libconfig::Setting & s_nrpe = root.lookup("nrpe");
+
+		int port = cfg_int(s_nrpe, "port", "tcp port to listen on", true, 5666);
+
+		tcp_port_handler_t nrpe_handler = nrpe_get_handler(&s);
+
+		register_tcp_service(&devs, nrpe_handler, port);
+
+		register_mdns_service(mdns_, &devs, port, s_nrpe);
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine
@@ -584,6 +634,8 @@ int main(int argc, char *argv[])
 		tcp_port_handler_t vnc_handler = vnc_get_handler(&s);
 
 		register_tcp_service(&devs, vnc_handler, port);
+
+		register_mdns_service(mdns_, &devs, port, s_vnc);
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine
@@ -598,6 +650,8 @@ int main(int argc, char *argv[])
 		tcp_port_handler_t mqtt_handler = mqtt_get_handler(&s);
 
 		register_tcp_service(&devs, mqtt_handler, port);
+
+		register_mdns_service(mdns_, &devs, port, s_mqtt);
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine

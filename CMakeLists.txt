@@ -30,6 +30,7 @@ add_executable(myip
 	ipv6.cpp
 	lldp.cpp
 	main.cpp
+	mdns.cpp
 	mqtt.cpp
 	ndp.cpp
 	nrpe.cpp
