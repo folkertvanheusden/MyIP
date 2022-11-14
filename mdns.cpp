@@ -36,7 +36,7 @@ uint16_t add_ptr(uint8_t *const tgt, const std::vector<std::string> & name)
 	uint16_t ptr_data_len = 1;
 
 	for(size_t i=0; i<name.size(); i++)
-		ptr_data_len += name.at(i).size();
+		ptr_data_len += name.at(i).size() + 1;
 
 	tgt[o++] = ptr_data_len >> 8;
 	tgt[o++] = ptr_data_len;
@@ -272,7 +272,17 @@ void mdns::operator()()
 			mdns_buffer[ro++] = 0x00;  // 0 additional rr
 			mdns_buffer[ro++] = 0x00;
 
-			auto name = split(tgt.hostname, ".");
+			std::string hostname  = tgt.hostname;
+			std::size_t last_char = hostname.size() - 1;
+
+			if (hostname[last_char] == '.')
+				hostname.erase(last_char);
+
+			auto name = split(hostname, ".");
+
+			printf("len: %zu\n", name.size());
+			for(auto & p : name)
+				printf("part %s\n", p.c_str());
 
 			// PTR record
 			ro += add_ptr(&mdns_buffer[ro], name);
