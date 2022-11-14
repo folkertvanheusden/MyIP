@@ -242,7 +242,9 @@ void mdns::operator()()
 	while(!stop_flag) {
 		sleep(5);
 
-		constexpr uint8_t mc_addr[] { 224, 2, 127, 254 };
+		DOLOG(debug, "MDNS: transmit %zu records\n", protocols.size());
+
+		constexpr uint8_t mc_addr[] { 224, 0, 0, 251 };
 
 		any_addr dst_ip(mc_addr, sizeof mc_addr);
 
@@ -281,10 +283,13 @@ void mdns::operator()()
 			// SRV midi record
 			ro += add_srv(&mdns_buffer[ro], name, tgt.port);
 
-			// A record for the hostname to the ip-address
-			ro += add_a(&mdns_buffer[ro], name, tgt.interface->get_ip_address());
+			any_addr src_addr = tgt.interface->get_ip_address();
 
-			tgt.interface->transmit_packet(tgt.interface->get_ip_address(), 9875, dst_ip, 9875, mdns_buffer, ro);
+			// A record for the hostname to the ip-address
+			ro += add_a(&mdns_buffer[ro], name, src_addr);
+
+			if (!tgt.interface->transmit_packet(dst_ip, 5353, src_addr, 5353, mdns_buffer, ro))
+				DOLOG(warning, "MDNS: failed to transmit MDNS record for %s\n", src_addr.to_str().c_str());
 		}
 	}
 }
