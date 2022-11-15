@@ -1,6 +1,6 @@
 // (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
-// https://datatracker.ietf.org/doc/html/draft-eromenko-ethernet-over-udp-tunnel-00
+// https://datatracker.ietf.org/doc/html/rfc6951
 
 #include <algorithm>
 #include <errno.h>
