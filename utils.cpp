@@ -27,22 +27,6 @@
 #include "time.h"
 
 
-void swap_mac(uint8_t *a, uint8_t *b)
-{
-	uint8_t temp[6];
-	memcpy(temp, a, 6);
-	memcpy(a, b, 6);
-	memcpy(b, temp, 6);
-}
-
-void swap_ipv4(uint8_t *a, uint8_t *b)
-{
-	uint8_t temp[4];
-	memcpy(temp, a, 4);
-	memcpy(a, b, 4);
-	memcpy(b, temp, 4);
-}
-
 uint8_t *duplicate(const uint8_t *const in, const size_t size)
 {
 	uint8_t *out = new uint8_t[size];

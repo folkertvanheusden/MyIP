@@ -180,7 +180,7 @@ void ipv4::operator()()
 		}
 
 		int header_size = (payload_header[0] & 15) * 4;
-		int ip_size = (payload_header[2] << 8) | payload_header[3];
+		int ip_size     = (payload_header[2] << 8) | payload_header[3];
 		DOLOG(debug, "IPv4[%04x]: total packet size: %d, IP header says: %d, header size: %d\n", id, size, ip_size, header_size);
 
 		if (ip_size > size) {
