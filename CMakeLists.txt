@@ -35,6 +35,7 @@ add_executable(myip
 	mdns.cpp
 	mqtt.cpp
 	ndp.cpp
+	net.cpp
 	nrpe.cpp
 	ntp.cpp
 	packet.cpp
@@ -42,6 +43,7 @@ add_executable(myip
 	phys_ethernet.cpp
 	phys_ppp.cpp
 	phys_slip.cpp
+	phys_udp.cpp
 	protocol.cpp
 	sctp.cpp
 	sctp_crc32c.cpp

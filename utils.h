@@ -5,9 +5,6 @@
 #include <string>
 #include <vector>
 
-void swap_mac(uint8_t *a, uint8_t *b);
-void swap_ipv4(uint8_t *a, uint8_t *b);
-
 uint8_t *duplicate(const uint8_t *const in, const size_t size);
 
 void get_random(uint8_t *tgt, size_t n);

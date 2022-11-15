@@ -5,6 +5,7 @@
 
 #include "arp.h"
 #include "log.h"
+#include "net.h"
 #include "phys.h"
 #include "utils.h"
 

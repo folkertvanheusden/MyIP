@@ -59,12 +59,12 @@ struct frame_buffer_t
 	void callback() {
 		const std::lock_guard<std::mutex> lck(cb_lock);
 
-		DOLOG(debug, "VNC: %zu callbacks\n", callbacks.size());
+		// DOLOG(debug, "VNC: %zu callbacks\n", callbacks.size());
 
 		for(auto vs : callbacks) {
 			const std::lock_guard<std::mutex> lck(vs->w_lock);
 
-			DOLOG(debug, "VNC: %zu CALLBACK for %s (%p)\n", get_us(), vs->client_addr.c_str(), vs);
+			// DOLOG(debug, "VNC: %zu CALLBACK for %s (%p)\n", get_us(), vs->client_addr.c_str(), vs);
 
 			vs->wq.push(new vnc_thread_work_t());
 
