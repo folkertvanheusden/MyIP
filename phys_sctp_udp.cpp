@@ -39,20 +39,33 @@ phys_sctp_udp::~phys_sctp_udp()
 
 bool phys_sctp_udp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	DOLOG(debug, "phys_sctp_udp: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	DOLOG(debug, "phys_sctp_udp: transmit packet (%zu bytes) %s -> %s\n", pl_size, src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	stats_add_counter(phys_ifOutOctets, pl_size);
 	stats_add_counter(phys_ifHCOutOctets, pl_size);
 	stats_inc_counter(phys_ifOutUcastPkts);
 
+	size_t header_size = (pl_size ? payload[0] & 0x0f : 0) * 4;
+
+	if (pl_size < header_size) {
+		DOLOG(ll_error, "phys_sctp_udp: packet is unexpectedly small (%zu bytes)\n", pl_size);
+
+		return false;
+	}
+
 	bool ok = true;
 
-	// TODO
+	// collect IP addresses from original IP-header
+	sockaddr_in to { 0 };
+	to.sin_family      = AF_INET;
+	to.sin_addr.s_addr = htonl((payload[16] << 24) | (payload[17] << 16) | (payload[18] << 8) | payload[19]);
+	to.sin_port        = htons(9899);  // TODO: where can we obtain this value from?
 
-	int rc = write(fd, payload, pl_size);
+	// strip ip-header(!)
+	int rc = sendto(fd, &payload[header_size], pl_size - header_size, 0, reinterpret_cast<sockaddr *>(&to), sizeof to);
 
-	if (size_t(rc) != pl_size) {
-		DOLOG(ll_error, "phys_sctp_udp: problem sending packet (%d for %zu bytes)\n", rc, pl_size);
+	if (size_t(rc) != pl_size - header_size) {
+		DOLOG(ll_error, "phys_sctp_udp: problem sending packet (%d for %zu bytes)\n", rc, pl_size - header_size);
 
 		if (rc == -1)
 			DOLOG(ll_error, "phys_sctp_udp: %s\n", strerror(errno));
