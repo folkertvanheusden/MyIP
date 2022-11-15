@@ -347,13 +347,16 @@ int main(int argc, char *argv[])
 			}
 		}
 		else if (type == "udp") {
+			std::string addr_str = cfg_str(interface, "ip-address", "local IP address", false, "192.168.3.1");
+			any_addr local_addr = parse_address(addr_str.c_str(), 4, ".", 10);
+
 			int port = cfg_int(interface, "port", "UDP port number", true, 9899);
 
 			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), myformat("udp-%d", port));  // name
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP UDP device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_sctp_udp(i + 1, &s, my_mac, port);
+			dev = new phys_sctp_udp(i + 1, &s, my_mac, local_addr, port);
 		}
 		else {
 			error_exit(false, "\"%s\" is an unknown network interface type", type.c_str());

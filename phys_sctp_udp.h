@@ -17,10 +17,11 @@ class phys_sctp_udp : public phys
 {
 private:
 	const any_addr my_mac;
-	int            fd     { -1 };
+	const any_addr my_addr;  // IPv4 address matching the port
+	int            fd      { -1 };
 
 public:
-	phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const int port);
+	phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const any_addr & my_addr, const int port);
 	phys_sctp_udp(const phys_sctp_udp &) = delete;
 	virtual ~phys_sctp_udp();
 

@@ -25,7 +25,7 @@
 
 
 // port is usually 9899
-phys_sctp_udp::phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const int port) : phys(dev_index, s), my_mac(my_mac)
+phys_sctp_udp::phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const any_addr & my_addr, const int port) : phys(dev_index, s), my_mac(my_mac), my_addr(my_addr)
 {
 	fd = create_datagram_socket(port);
 
@@ -125,7 +125,26 @@ void phys_sctp_udp::operator()()
 
 		DOLOG(debug, "phys_sctp_udp: queing packet from %s (%s) to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), host.value().c_str(), my_mac.to_str().c_str(), ether_type, size);
 
-		packet *p = new packet(ts, src_mac, src_mac, my_mac, buffer, size, nullptr, 0);
+		uint8_t ip_buffer[1620] { 0 };
+
+		ip_buffer[0] = 0x45;  // IP version & length of header in 32b words
+		ip_buffer[1] = 0;     // DSCP/ECN
+		int total_length = size + 20;
+		ip_buffer[2] = total_length >> 8;
+		ip_buffer[3] = total_length;
+		ip_buffer[4] = 0x00;  // identification
+		ip_buffer[5] = 0x00;
+		ip_buffer[6] = 0;     // flags & ...
+		ip_buffer[7] = 0;     // fragment offset
+		ip_buffer[8] = 63;    // TTL
+		ip_buffer[9] = 132;   // SCTP
+	        ip_buffer[10] = 0;    // checksum
+	        ip_buffer[11] = 0;
+		memcpy(&ip_buffer[12], &addr.sin_addr.s_addr, 4);  // FROM
+		my_addr.get(&ip_buffer[16], 4);                    // TO (here)
+		memcpy(&ip_buffer[20], buffer, size);
+
+		packet *p = new packet(ts, src_mac, src_mac, my_mac, ip_buffer, total_length, nullptr, 0);
 
 		it->second->queue_packet(this, p);
 	}
