@@ -20,26 +20,26 @@
 #include "log.h"
 #include "net.h"
 #include "packet.h"
-#include "phys_udp.h"
+#include "phys_sctp_udp.h"
 #include "utils.h"
 
 
 // port is usually 9899
-phys_udp::phys_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const int port) : phys(dev_index, s), my_mac(my_mac)
+phys_sctp_udp::phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const int port) : phys(dev_index, s), my_mac(my_mac)
 {
 	fd = create_datagram_socket(port);
 
 	th = new std::thread(std::ref(*this));
 }
 
-phys_udp::~phys_udp()
+phys_sctp_udp::~phys_sctp_udp()
 {
 	close(fd);
 }
 
-bool phys_udp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
+bool phys_sctp_udp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	DOLOG(debug, "phys_udp: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	DOLOG(debug, "phys_sctp_udp: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	stats_add_counter(phys_ifOutOctets, pl_size);
 	stats_add_counter(phys_ifHCOutOctets, pl_size);
@@ -47,13 +47,15 @@ bool phys_udp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 
 	bool ok = true;
 
+	// TODO
+
 	int rc = write(fd, payload, pl_size);
 
 	if (size_t(rc) != pl_size) {
-		DOLOG(ll_error, "phys_udp: problem sending packet (%d for %zu bytes)\n", rc, pl_size);
+		DOLOG(ll_error, "phys_sctp_udp: problem sending packet (%d for %zu bytes)\n", rc, pl_size);
 
 		if (rc == -1)
-			DOLOG(ll_error, "phys_udp: %s\n", strerror(errno));
+			DOLOG(ll_error, "phys_sctp_udp: %s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -61,11 +63,11 @@ bool phys_udp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 	return ok;
 }
 
-void phys_udp::operator()()
+void phys_sctp_udp::operator()()
 {
-	DOLOG(debug, "phys_udp: thread started\n");
+	DOLOG(debug, "phys_sctp_udp: thread started\n");
 
-	set_thread_name("myip-phys_udp");
+	set_thread_name("myip-phys_sctp_udp");
 
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
@@ -88,30 +90,23 @@ void phys_udp::operator()()
 
 		ssize_t size = recvfrom(fd, buffer, sizeof buffer, 0, reinterpret_cast<struct sockaddr *>(&addr), &addr_len);
 
-		auto    host = get_host_as_text(addr);
-
-		if (host.has_value() == false)
-			continue;
-
-		{
-			std::unique_lock<std::mutex> lck(peers_lock);
-
-			auto it = peers.find(host);
-
-			if (it == peers.end())
-				peers.insert({ host, addr });
-		}
+		printf("%zd\n", size);
 
 	        struct timespec ts { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
 			DOLOG(warning, "clock_gettime failed: %s", strerror(errno));
+
+		auto    host = get_host_as_text(reinterpret_cast<sockaddr *>(&addr));
+
+		if (host.has_value() == false)
+			continue;
 
 		stats_inc_counter(phys_recv_frame);
 		stats_inc_counter(phys_ifInUcastPkts);
 		stats_add_counter(phys_ifInOctets, size);
 		stats_add_counter(phys_ifHCInOctets, size);
 
-		if (size < 14) {
+		if (size < 20) {
 			stats_inc_counter(phys_invl_frame);
 			continue;
 		}
@@ -120,7 +115,7 @@ void phys_udp::operator()()
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
-			DOLOG(info, "phys_udp: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
+			DOLOG(info, "phys_sctp_udp: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
 			stats_inc_counter(phys_ign_frame);
 			continue;
 		}
@@ -128,12 +123,12 @@ void phys_udp::operator()()
 		uint8_t dummy_src_mac[6] { 0, 0, 0, 0, uint8_t(addr.sin_port >> 16), uint8_t(addr.sin_port) };
 		any_addr src_mac(dummy_src_mac, 6);
 
-		DOLOG(debug, "phys_udp: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), my_mac.to_str().c_str(), ether_type, size);
+		DOLOG(debug, "phys_sctp_udp: queing packet from %s (%s) to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), host.value().c_str(), my_mac.to_str().c_str(), ether_type, size);
 
 		packet *p = new packet(ts, src_mac, src_mac, my_mac, buffer, size, nullptr, 0);
 
 		it->second->queue_packet(this, p);
 	}
 
-	DOLOG(info, "phys_udp: thread stopped\n");
+	DOLOG(info, "phys_sctp_udp: thread stopped\n");
 }

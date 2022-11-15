@@ -1,5 +1,7 @@
 #include <errno.h>
+#include <optional>
 #include <stdint.h>
+#include <string>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>

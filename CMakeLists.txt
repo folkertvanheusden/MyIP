@@ -42,8 +42,8 @@ add_executable(myip
 	phys.cpp
 	phys_ethernet.cpp
 	phys_ppp.cpp
+	phys_sctp_udp.cpp
 	phys_slip.cpp
-	phys_udp.cpp
 	protocol.cpp
 	sctp.cpp
 	sctp_crc32c.cpp
