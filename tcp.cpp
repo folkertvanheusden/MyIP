@@ -206,8 +206,8 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 {
 	set_thread_name("myip-ptcp-handler");
 
-	const uint8_t *const p = pkt->get_data();
-	const int size = pkt->get_size();
+	const uint8_t *const p    = pkt->get_data();
+	const int            size = pkt->get_size();
 
 	if (size < 20) {
 		DOLOG(info, "TCP: packet too short [IC]\n");
@@ -228,15 +228,15 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	uint16_t src_port = (p[0] << 8) | p[1];
 	uint16_t dst_port = (p[2] << 8) | p[3];
 
-	uint32_t their_seq_nr = (p[4] << 24) | (p[5] << 16) | (p[6] << 8) | p[7];
-	uint32_t ack_to = (p[8] << 24) | (p[9] << 16) | (p[10] << 8) | p[11];
+	uint32_t their_seq_nr = (p[4] << 24) | (p[5] << 16) | (p[6] << 8)  | p[7];
+	uint32_t ack_to       = (p[8] << 24) | (p[9] << 16) | (p[10] << 8) | p[11];
 
 	int header_size = (p[12] >> 4) * 4;
 
-	int win_size = (p[14] << 8) | p[15];
+	int win_size    = (p[14] << 8) | p[15];
 
-	auto src = pkt->get_src_addr();
-	uint64_t id = hash_address(src, dst_port, src_port);
+	auto     src = pkt->get_src_addr();
+	uint64_t id  = hash_address(src, dst_port, src_port);
 
 	char *flag_str = flags_to_str(p[13]);
 	DOLOG(debug, "TCP[%012" PRIx64 "]: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
@@ -255,22 +255,22 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 			tcp_session *new_session = new tcp_session(this, pkt->get_dst_addr(), dst_port, pkt->get_src_addr(), src_port, pd);
 
-			new_session->state = tcp_listen;
+			new_session->state       = tcp_listen;
 			new_session->state_since = 0;
 
 			get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
 			new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
 
 			new_session->initial_their_seq_nr = their_seq_nr;
-			new_session->their_seq_nr = their_seq_nr + 1;
+			new_session->their_seq_nr         = their_seq_nr + 1;
 
 			new_session->id = id;
 
 			new_session->is_client = false;
 
-			new_session->unacked = nullptr;
-			new_session->unacked_start_seq_nr = 0;
-			new_session->unacked_size = 0;
+			new_session->unacked                 = nullptr;
+			new_session->unacked_start_seq_nr    = 0;
+			new_session->unacked_size            = 0;
 			new_session->fin_after_unacked_empty = false;
 
 			new_session->window_size = win_size;
@@ -306,7 +306,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 	cur_it->second->window_size = std::max(1, win_size);
 
-	bool fail = false;
+	bool fail         = false;
 	bool delete_entry = false;
 
 	if (header_size > size) {
@@ -879,22 +879,22 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 
 	// generate tcp session
 	tcp_session *new_session = new tcp_session(this, dst_addr, dst_port, src, port, pd);
-	new_session->state = tcp_syn_sent;
+	new_session->state       = tcp_syn_sent;
 	new_session->state_since = time(nullptr);
 
-	new_session->is_client = true;
+	new_session->is_client   = true;
 
 	get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
 	new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
 
 	new_session->initial_their_seq_nr = 0;
-	new_session->their_seq_nr = 0;
+	new_session->their_seq_nr         = 0;
 
 	new_session->id = id;
 
-	new_session->unacked = nullptr;
-	new_session->unacked_start_seq_nr = 0;
-	new_session->unacked_size = 0;
+	new_session->unacked                 = nullptr;
+	new_session->unacked_start_seq_nr    = 0;
+	new_session->unacked_size            = 0;
 	new_session->fin_after_unacked_empty = false;
 
 	new_session->seq_for_fin_when_all_received = 0;
