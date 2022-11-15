@@ -232,7 +232,7 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 		DOLOG(info, "socks_handler: resolving \"%s\" for fd %d\n", host.c_str(), fd);
 
 		// resolve host
-		auto a = dns_->query(host, 5000);  // FIXME time-out
+		auto a = dns_->query(host, 2500);  // time-out of 2.5s
 
 		if (a.has_value() == false) {
 			close(fd);

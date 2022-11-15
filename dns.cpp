@@ -1,3 +1,4 @@
+#include <chrono>
 #include <string>
 #include <thread>
 #include <vector>
@@ -15,11 +16,11 @@ using namespace std::chrono_literals;
 
 dns::dns(stats *const s, udp *const u, const any_addr & my_ip, const any_addr & dns_ip) : u(u), my_ip(my_ip), dns_ip(dns_ip)
 {
-	dns_queries = s->register_stat("dns_queries", "1.3.6.1.2.1.4.57850.1.12.1");
-	dns_queries_hit = s->register_stat("dns_queries_miss", "1.3.6.1.2.1.4.57850.1.12.2");
-	dns_queries_miss = s->register_stat("dns_queries_miss", "1.3.6.1.2.1.4.57850.1.12.3");
-	dns_queries_alien_reply = s->register_stat("dns_queries_miss", "1.3.6.1.2.1.4.57850.1.12.4");
-	dns_queries_to = s->register_stat("dns_queries_miss", "1.3.6.1.2.1.4.57850.1.12.5");
+	dns_queries             = s->register_stat("dns_queries",       "1.3.6.1.2.1.4.57850.1.12.1");
+	dns_queries_hit         = s->register_stat("dns_queries_hit",   "1.3.6.1.2.1.4.57850.1.12.2");
+	dns_queries_miss        = s->register_stat("dns_queries_miss",  "1.3.6.1.2.1.4.57850.1.12.3");
+	dns_queries_alien_reply = s->register_stat("dns_queries_alien", "1.3.6.1.2.1.4.57850.1.12.4");
+	dns_queries_to          = s->register_stat("dns_queries_to",    "1.3.6.1.2.1.4.57850.1.12.5");
 
 	th = new std::thread(std::ref(*this));
 }
@@ -33,7 +34,7 @@ dns::~dns()
 std::pair<std::string, int> get_name(const uint8_t *const base, const uint8_t *const buffer, const bool first)
 {
 	std::string name;
-	int tl = 0;  // total len
+	int         tl   = 0;  // total len
 
 	for(;;) {
 		uint8_t len = buffer[tl++];
@@ -142,26 +143,30 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	updated.notify_all();
 }
 
+using namespace std::chrono_literals;
+
 // send query to dns, wait for 'updated' and then
 // check if set in chache. if not, wait. upto to ms.
 std::optional<any_addr> dns::query(const std::string & name, const int to)
 {
 	std::string work = str_tolower(name);
-	int work_to = to;
 
 	stats_inc_counter(dns_queries);
 
-	bool first = true;
+	auto wait_until  = std::chrono::system_clock::now() + 1ms * to;
+
+	bool first       = true;
 
 	std::unique_lock lck(lock);
 
-	for(;work_to > 0;) {
-		auto it = cache.find(work);
+	do {
+		auto   it  = cache.find(work);
 
 		time_t now = time(nullptr);
 
 		if (it != cache.end() && now - it->second.t < it->second.max_age) {
 			stats_inc_counter(dns_queries_miss);
+
 			return it->second.a;
 		}
 
@@ -170,8 +175,8 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 
 			stats_inc_counter(dns_queries_miss);
 
-			uint8_t buffer[256];
-			int offset = 0;
+			uint8_t buffer[256] { 0 };
+			int     offset = 0;
 
 			buffer[offset++] = 0;  // transaction id
 			buffer[offset++] = 0;
@@ -211,9 +216,8 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 			u->transmit_packet(dns_ip, 53, my_ip, 53, buffer, offset);
 		}
 
-		updated.wait_for(lck, 100ms);
-		work_to -= 100;
 	}
+	while (updated.wait_until(lck, wait_until) != std::cv_status::timeout);
 
 	stats_inc_counter(dns_queries_to);
 
@@ -230,17 +234,17 @@ void dns::operator()()
 	while(!stop_flag) {
 		myusleep(500000);
 
-		if (++count < 60)
+		if (++count < 60) // flush every 30s
 			continue;
 
 		count = 0;
 
-		time_t now = time(nullptr);
-
 		std::unique_lock lck(lock);
 
 		if (cache.size() > 1024) {
-			for(auto it=cache.begin(); it != cache.end();) {
+			time_t now = time(nullptr);
+
+			for(auto it = cache.begin(); it != cache.end();) {
 				if (now - it->second.t >= it->second.max_age)
 					it = cache.erase(it);
 				else
