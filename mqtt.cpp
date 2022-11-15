@@ -177,24 +177,24 @@ void mqtt_deinit()
 
 bool mqtt_new_session(pstream *const t, session *ts)
 {
-	mqtt_session_data *ms = new mqtt_session_data();
+	mqtt_session_data *msd = new mqtt_session_data();
 
-	ms->session_name = ms->client_addr = ts->get_their_addr().to_str();
+	msd->session_name = msd->client_addr = ts->get_their_addr().to_str();
 
-	ts->set_callback_private_data(ms);
+	ts->set_callback_private_data(msd);
 
-	DOLOG(debug, "MQTT: new session with %s\n", ms->client_addr.c_str());
+	DOLOG(debug, "MQTT: new session with %s\n", msd->client_addr.c_str());
 
-	ms->th = new std::thread(mqtt_recv_thread, ts);
+	msd->th = new std::thread(mqtt_recv_thread, ts);
 
 	return true;
 }
 
 bool mqtt_new_data(pstream *ps, session *ts, buffer_in b)
 {
-	mqtt_session_data *ms = static_cast<mqtt_session_data *>(ts->get_callback_private_data());
+	mqtt_session_data *msd = static_cast<mqtt_session_data *>(ts->get_callback_private_data());
 
-	if (!ms) {
+	if (!msd) {
 		DOLOG(info, "MQTT: Data for a non-existing session\n");
 		return false;
 	}
@@ -203,23 +203,23 @@ bool mqtt_new_data(pstream *ps, session *ts, buffer_in b)
 
 	if (data_len == 0) {
 		DOLOG(debug, "MQTT: client closed session\n");
-		ms->w_cond.notify_one();
+		msd->w_cond.notify_one();
 		return true;
 	}
 
-	const std::lock_guard<std::mutex> lck(ms->w_lock);
+	const std::lock_guard<std::mutex> lck(msd->w_lock);
 
-	ms->data = static_cast<uint8_t *>(realloc(ms->data, ms->data_len + data_len));
-	memcpy(&ms->data[ms->data_len], b.get_bytes(data_len), data_len);
-	ms->data_len += data_len;
+	msd->data = static_cast<uint8_t *>(realloc(msd->data, msd->data_len + data_len));
+	memcpy(&msd->data[msd->data_len], b.get_bytes(data_len), data_len);
+	msd->data_len += data_len;
 
-	ms->w_cond.notify_one();
+	msd->w_cond.notify_one();
 
 	return true;
 }
 
 // 2nd mqtt event loop
-bool mqtt_get_bytes(tcp_session *const ts, mqtt_session_data *const msd, uint8_t *const tgt, const size_t n)
+bool mqtt_get_bytes(session *const ts, mqtt_session_data *const msd, uint8_t *const tgt, const size_t n)
 {
 	DOLOG(debug, "MQTT(%s): %zu bytes requested, %zu available\n", msd->session_name.c_str(), n, msd->data_len);
 
@@ -257,13 +257,6 @@ bool mqtt_get_bytes(tcp_session *const ts, mqtt_session_data *const msd, uint8_t
 			break;
 		}
 
-		// no more data?
-		if (ts->state >= tcp_last_ack) {
-			DOLOG(debug, "MQTT(%s): (mqtt_get_bytes) no more data; session closed/closing\n", msd->session_name.c_str());
-
-			return false;
-		}
-
 		msd->w_cond.wait(lck);
 	}
 
@@ -272,31 +265,31 @@ bool mqtt_get_bytes(tcp_session *const ts, mqtt_session_data *const msd, uint8_t
 	return true;
 }
 
-bool mqtt_get_byte(tcp_session *const ts, mqtt_session_data *const ms, uint8_t *data)
+bool mqtt_get_byte(session *const ts, mqtt_session_data *const msd, uint8_t *data)
 {
-	return mqtt_get_bytes(ts, ms, data, 1);
+	return mqtt_get_bytes(ts, msd, data, 1);
 }
 
 void mqtt_recv_thread(void *ts_in)
 {
 	set_thread_name("myip-mqtt");
 
-	tcp_session *ts = (tcp_session *)ts_in;
-	mqtt_session_data *ms = dynamic_cast<mqtt_session_data *>(ts->p);
+	session           *ts  = (session *)ts_in;
+	mqtt_session_data *msd = static_cast<mqtt_session_data *>(ts->get_callback_private_data());
 
 	std::string identifier;
 
-	for(;ms->terminate == false;) {
+	for(;msd->terminate == false;) {
 		uint8_t control = 0;
-		if (mqtt_get_byte(ts, ms, &control) == false)
+		if (mqtt_get_byte(ts, msd, &control) == false)
 			break;
 
 		uint32_t len = 0;
 
 		bool finished = false;
-		for(;ms->terminate == false;) {
+		for(;msd->terminate == false;) {
 			uint8_t b = 0;
-			if (!mqtt_get_byte(ts, ms, &b)) {
+			if (!mqtt_get_byte(ts, msd, &b)) {
 				finished = true;
 				break;
 			}
@@ -314,10 +307,10 @@ void mqtt_recv_thread(void *ts_in)
 		uint8_t cmsg = control >> 4;
 		//uint8_t cflags = control & 0x0f;
 
-		DOLOG(debug, "MQTT(%s): control %02x (%d) msg %d, rem. len.: %d\n", ms->session_name.c_str(), control, control, cmsg, len);
+		DOLOG(debug, "MQTT(%s): control %02x (%d) msg %d, rem. len.: %d\n", msd->session_name.c_str(), control, control, cmsg, len);
 		
 		uint8_t *mqtt_msg = new uint8_t[len + 1];
-		if (!mqtt_get_bytes(ts, ms, mqtt_msg, len)) {
+		if (!mqtt_get_bytes(ts, msd, mqtt_msg, len)) {
 			delete [] mqtt_msg;
 			break;
 		}
@@ -327,17 +320,17 @@ void mqtt_recv_thread(void *ts_in)
 		std::string hex;
 		for(uint32_t i=0; i<len; i++)
 			hex += myformat("%02x[%c] ", mqtt_msg[i], mqtt_msg[i] >= 32 ? mqtt_msg[i] : '_');
-		DOLOG(debug, "MQTT(%s): msg hex %s\n", ms->session_name.c_str(), hex.c_str());
+		DOLOG(debug, "MQTT(%s): msg hex %s\n", msd->session_name.c_str(), hex.c_str());
 
 		if (cmsg == 1) {  // CONNECT
 			if (len > 12) {  // should be true (variable header + at least 0x00 for identifier)
 				identifier = (char *)&mqtt_msg[12];
 			}
 
-			DOLOG(debug, "MQTT(%s): Connect by %s\n", ms->session_name.c_str(), identifier.c_str());
+			DOLOG(debug, "MQTT(%s): Connect by %s\n", msd->session_name.c_str(), identifier.c_str());
 
 			if (!identifier.empty())
-				ms->session_name = identifier;
+				msd->session_name = identifier;
 
 			// send CONNACK
 			uint8_t reply[] = { 0x20, 0x02, 0x00 /* reserved */, 0x00 /* accepted */};
@@ -347,11 +340,11 @@ void mqtt_recv_thread(void *ts_in)
 		else if (cmsg == 3) {  // PUBLISH
 			int o = 0;
 			int topic_len = std::min((mqtt_msg[0] << 8) | mqtt_msg[1], int(len));
-			DOLOG(debug, "MQTT(%s): topic len: %d (%d | %d)\n", ms->session_name.c_str(), topic_len, (mqtt_msg[0] << 8) | mqtt_msg[1], len);
+			DOLOG(debug, "MQTT(%s): topic len: %d (%d | %d)\n", msd->session_name.c_str(), topic_len, (mqtt_msg[0] << 8) | mqtt_msg[1], len);
 			std::string topic((const char *)&mqtt_msg[2], topic_len);
 			o += 2 + topic_len;
 
-			DOLOG(debug, "MQTT(%s): publish to %s\n", ms->session_name.c_str(), topic.c_str());
+			DOLOG(debug, "MQTT(%s): publish to %s\n", msd->session_name.c_str(), topic.c_str());
 
 			uint16_t msg_id = 0;
 			if ((control >> 1) & 3) {
@@ -363,9 +356,9 @@ void mqtt_recv_thread(void *ts_in)
 			int32_t payload_len = len - o;
 
 			if (payload_len > 0)
-				publish(ms, topic, payload, payload_len);
+				publish(msd, topic, payload, payload_len);
 
-			DOLOG(debug, "MQTT(%s): %d bytes payload (msg_id %d) for topic %s\n", ms->session_name.c_str(), payload_len, msg_id, topic.c_str());
+			DOLOG(debug, "MQTT(%s): %d bytes payload (msg_id %d) for topic %s\n", msd->session_name.c_str(), payload_len, msg_id, topic.c_str());
 
 			std::vector<uint8_t> reply;
 			reply.push_back(4 << 4);
@@ -382,7 +375,7 @@ void mqtt_recv_thread(void *ts_in)
 			reply.push_back(0);  // will be length
 
 			uint16_t msg_id = (mqtt_msg[0] << 8) | mqtt_msg[1];
-			DOLOG(debug, "MQTT(%s): SUBSCRIBE, msg id: %d\n", ms->session_name.c_str(), msg_id);
+			DOLOG(debug, "MQTT(%s): SUBSCRIBE, msg id: %d\n", msd->session_name.c_str(), msg_id);
 			reply.push_back(mqtt_msg[0]);
 			reply.push_back(mqtt_msg[1]);
 
@@ -390,14 +383,14 @@ void mqtt_recv_thread(void *ts_in)
 			while(o < len) {
 				int topic_len = (mqtt_msg[o] << 8) | mqtt_msg[o + 1];
 				topic_len = std::min(topic_len, int(len - o));
-				DOLOG(debug, "MQTT(%s): topic len: %d\n", ms->session_name.c_str(), topic_len);
+				DOLOG(debug, "MQTT(%s): topic len: %d\n", msd->session_name.c_str(), topic_len);
 				std::string topic((const char *)&mqtt_msg[o + 2], topic_len);
-				DOLOG(debug, "MQTT(%s): subscribe to topic name: %s\n", ms->session_name.c_str(), topic.c_str());
+				DOLOG(debug, "MQTT(%s): subscribe to topic name: %s\n", msd->session_name.c_str(), topic.c_str());
 
-				register_topic(topic, ms);
+				register_topic(topic, msd);
 
 				o += 2 + topic_len;
-				DOLOG(debug, "MQTT(%s): qos: %d\n", ms->session_name.c_str(), mqtt_msg[o]);
+				DOLOG(debug, "MQTT(%s): qos: %d\n", msd->session_name.c_str(), mqtt_msg[o]);
 				reply.push_back(2);
 				o++;
 			}
@@ -407,7 +400,7 @@ void mqtt_recv_thread(void *ts_in)
 			ts->get_stream_target()->send_data(ts, reply.data(), reply.size());
 		}
 		else if (cmsg == 12) {  // PINGREQ
-			DOLOG(debug, "MQTT(%s): PINGREQ\n", ms->session_name.c_str());
+			DOLOG(debug, "MQTT(%s): PINGREQ\n", msd->session_name.c_str());
 			std::vector<uint8_t> reply;
 			reply.push_back(13 << 4);  // PINGRESP
 			reply.push_back(0);  // no extra data
@@ -415,15 +408,15 @@ void mqtt_recv_thread(void *ts_in)
 			ts->get_stream_target()->send_data(ts, reply.data(), reply.size());
 		}
 		else {
-			DOLOG(info, "MQTT(%s): Unexpected command %d received\n", ms->session_name.c_str(), cmsg);
+			DOLOG(info, "MQTT(%s): Unexpected command %d received\n", msd->session_name.c_str(), cmsg);
 		}
 
 		delete [] mqtt_msg;
 	}
 
-	unregister_all_topics(ms);
+	unregister_all_topics(msd);
 
-	DOLOG(info, "MQTT(%s): Thread terminating (and closing session) for %s\n", ms->session_name.c_str(), ms->client_addr.c_str());
+	DOLOG(info, "MQTT(%s): Thread terminating (and closing session) for %s\n", msd->session_name.c_str(), msd->client_addr.c_str());
 
 	ts->get_stream_target()->end_session(ts);
 }
@@ -433,12 +426,12 @@ bool mqtt_close_session_1(pstream *const ps, session *const ts)
         void *private_data = ts->get_callback_private_data();
 
 	if (private_data) {
-		mqtt_session_data *ms = static_cast<mqtt_session_data *>(private_data);
+		mqtt_session_data *msd = static_cast<mqtt_session_data *>(private_data);
 
-		ms->terminate = true;
+		msd->terminate = true;
 
-		const std::lock_guard<std::mutex> lck(ms->w_lock);
-		ms->w_cond.notify_one();
+		const std::lock_guard<std::mutex> lck(msd->w_lock);
+		msd->w_cond.notify_one();
 	}
 
 	return true;
@@ -449,19 +442,19 @@ bool mqtt_close_session_2(pstream *const ps, session *ts)
         void *private_data = ts->get_callback_private_data();
 
 	if (private_data) {
-		mqtt_session_data *ms = static_cast<mqtt_session_data *>(private_data);
+		mqtt_session_data *msd = static_cast<mqtt_session_data *>(private_data);
 
-		ms->terminate = true;
+		msd->terminate = true;
 
 		{
-			const std::lock_guard<std::mutex> lck(ms->w_lock);
-			ms->w_cond.notify_one();
+			const std::lock_guard<std::mutex> lck(msd->w_lock);
+			msd->w_cond.notify_one();
 		}
 
-		ms->th->join();
-		delete ms->th;
+		msd->th->join();
+		delete msd->th;
 
-		delete ms;
+		delete msd;
 
 		ts->set_callback_private_data(nullptr);
 	}
