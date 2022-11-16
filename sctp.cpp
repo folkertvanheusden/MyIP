@@ -599,7 +599,25 @@ void sctp::add_handler(const int port, port_handler_t & sph)
 	listeners.insert({ port, sph });
 }
 
-void sctp::end_session(session *const ts)
+void sctp::end_session(session *const s_in)
 {
-	// TODO
+	sctp_session *s = reinterpret_cast<sctp_session *>(s_in);
+
+	buffer_out out;
+
+	out.add_net_short(s->get_my_port());
+	out.add_net_short(s->get_their_port());
+	out.add_net_long(s->get_their_verification_tag());
+
+	size_t crc_offset = out.add_net_long(0, -1);  // place-holder for crc
+
+	out.add_buffer_out(chunk_gen_shutdown());
+
+	// calculate & set crc in 'reply'
+	uint32_t crc32c = generate_crc32c(out.get_content(), out.get_size());
+	out.add_net_long(crc32c, crc_offset);
+
+	// transmit 'reply' (0x84 is SCTP protocol number)
+	if (transmit_packet(s->get_their_addr(), s->get_my_addr(), out.get_content(), out.get_size()) == false)
+		DOLOG(info, "SCTP[%lx]: failed to transmit shutdown packet\n", s->get_hash());
 }
