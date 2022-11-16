@@ -525,6 +525,7 @@ void sctp::operator()()
 
 bool sctp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size)
 {
+	// 0x84 is SCTP protocol number
 	return idev->transmit_packet(dst_ip, src_ip, 0x84, payload, pl_size, nullptr);
 }
 
@@ -541,7 +542,7 @@ bool sctp::send_data(session *const s_in, buffer_in & payload)
 
 		out.add_net_short(s->get_my_port());
 		out.add_net_short(s->get_their_port());
-		out.add_net_long(s->get_my_tsn());
+		out.add_net_long(s->get_their_verification_tag());
 		size_t crc_offset = out.add_net_long(0, -1);  // place-holder for crc
 
 		// add payload
@@ -568,7 +569,7 @@ bool sctp::send_data(session *const s_in, buffer_in & payload)
 		uint32_t crc32c = generate_crc32c(out.get_content(), out.get_size());
 		out.add_net_long(crc32c, crc_offset);
 
-		// transmit 'reply' (0x84 is SCTP protocol number)
+		// transmit 'reply'
 		if (transmit_packet(s->get_their_addr(), s->get_my_addr(), out.get_content(), out.get_size()) == false) {
 			ok = false;
 
