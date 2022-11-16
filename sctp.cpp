@@ -388,7 +388,7 @@ void sctp::operator()()
 					// need the initial verification tag of the other side
 					uint32_t their_initial_verification_tag = 0;
 
-					uint32_t my_new_verification_tag = 0;
+					uint32_t my_new_verification_tag        = 0;
 
 					// verification tag may not be 0
 					do {
@@ -420,7 +420,7 @@ void sctp::operator()()
 
 					terminate_session = true;
 
-					send_reply = false;
+					send_reply        = false;
 
 					break;
 				}
