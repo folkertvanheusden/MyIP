@@ -154,6 +154,17 @@ buffer_out sctp::chunk_gen_abort()
 	return out;
 }
 
+buffer_out sctp::chunk_gen_shutdown()
+{
+	buffer_out out;
+
+	out.add_net_byte(7);  // SCTP SHUTDOWN
+	out.add_net_byte(0);  // reserved
+	out.add_net_short(4);  // length of this chunk
+
+	return out;
+}
+
 buffer_out sctp::chunk_gen_cookie_ack()
 {
 	buffer_out out;
@@ -344,9 +355,8 @@ void sctp::operator()()
 							else {
 								reply.add_buffer_out(handling_result.second);
 
-								if (handling_result.first == dcb_close) {
-									// TODO add chunk with instructions to close the session ("association"?)
-								}
+								if (handling_result.first == dcb_close) 
+									reply.add_buffer_out(chunk_gen_shutdown());
 
 								reply.add_net_long(it->second->get_their_verification_tag(), their_verification_tag_offset);
 							}

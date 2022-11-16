@@ -90,6 +90,7 @@ private:
 	buffer_out generate_state_cookie(const any_addr & their_addr, const int their_port, const int local_port, const uint32_t my_verification_tag, const uint32_t their_initial_tsn, const uint32_t my_initial_tsn);
 	buffer_out chunk_gen_abort();
 	buffer_out chunk_gen_cookie_ack();
+	buffer_out chunk_gen_shutdown();
 	buffer_out chunk_heartbeat_request(buffer_in & chunk_payload);
 
 	void chunk_init(const uint64_t hash, buffer_in & chunk_payload, const uint32_t my_verification_tag, const uint32_t buffer_size, const any_addr & their_addr, const int their_port, const int local_port, buffer_out *const out, uint32_t *const initiate_tag);
