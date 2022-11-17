@@ -133,7 +133,7 @@ void phys_sctp_udp::operator()()
 			continue;
 		}
 
-		uint8_t dummy_src_mac[6] { 0, 0, 0, 0, uint8_t(addr.sin_port >> 16), uint8_t(addr.sin_port) };
+		uint8_t dummy_src_mac[6] { 0, 0, 0, 0, uint8_t(addr.sin_port >> 8), uint8_t(addr.sin_port) };
 		any_addr src_mac(dummy_src_mac, 6);
 
 		DOLOG(debug, "phys_sctp_udp: queing packet from %s (%s) to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), host.value().c_str(), my_mac.to_str().c_str(), ether_type, size);
