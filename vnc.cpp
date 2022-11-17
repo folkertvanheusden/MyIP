@@ -353,7 +353,7 @@ bool vnc_new_session(pstream *const ps, session *const s)
 
 	vs->start = time(nullptr);
 
-	vs->vpd = static_cast<vnc_private_data *>(s->get_callback_private_data());
+	vs->vpd = static_cast<vnc_private_data *>(s->get_application_private_data());
 	stats_inc_counter(vs->vpd->vnc_requests);
 
 	s->set_callback_private_data(vs);
