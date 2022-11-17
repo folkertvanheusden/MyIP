@@ -78,7 +78,7 @@ std::string collect_performance_metrics()
 	out = myformat("|rss=%lukB;", ru.ru_maxrss);
 
 	// cpu usage
-	out += myformat(" cpu-usage=%f%%;", st.get_cpu_usage());
+	out += myformat(" cpu-usage=%f%%;", st.get_cpu_usage() * 100);
 
 	return out;
 }
