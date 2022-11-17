@@ -49,7 +49,7 @@ static void register_topic(const std::string & topic, mqtt_session_data *const m
 		topic_lck.lock();
 
 		bool found = false;
-		for(auto it : topic_wc_subscriptions) {
+		for(auto & it : topic_wc_subscriptions) {
 			if (it.first == topic) {
 				it.second.insert(msd);
 				found = true;
@@ -76,7 +76,7 @@ static void unregister_topic(const std::string & topic, mqtt_session_data *const
 	if (it != topic_subscriptions.end())
 		it->second.erase(msd);
 
-	for(auto it : topic_wc_subscriptions) {
+	for(auto & it : topic_wc_subscriptions) {
 		if (it.first == topic) {
 			it.second.erase(msd);
 			break;

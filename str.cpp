@@ -79,7 +79,7 @@ std::optional<std::string> find_header(const std::vector<std::string> *const lin
 	const std::string lkey = str_tolower(key);
 	std::optional<std::string> value;
 
-	for(auto line : *lines) {
+	for(auto & line : *lines) {
 		auto parts = split(line, seperator);
 
 		if (parts.size() >= 2 && str_tolower(parts.at(0)) == lkey) {
@@ -97,7 +97,7 @@ std::string merge(const std::vector<std::string> & in, const std::string & seper
 {
 	std::string out;
 
-	for(auto l : in)
+	for(auto & l : in)
 		out += l + seperator;
 
 	return out;

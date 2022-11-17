@@ -279,7 +279,7 @@ void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *c
 	snmp_sequence *varbind_list = new snmp_sequence();
 	GetResponsePDU->add(varbind_list);
 
-	for(auto e : oids_req.oids) {
+	for(auto & e : oids_req.oids) {
 		snmp_sequence *varbind = new snmp_sequence();
 		varbind_list->add(varbind);
 

@@ -251,7 +251,7 @@ void mdns::operator()()
 
 		std::unique_lock<std::mutex> lck(lock);
 
-		for(auto tgt : protocols) {
+		for(auto & tgt : protocols) {
 			uint8_t  mdns_buffer[256] { 0 };
 			uint16_t ro               { 0 };
 

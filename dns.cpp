@@ -198,7 +198,7 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 
 			// name
 			std::vector<std::string> parts = split(work, ".");
-			for(auto p : parts) {
+			for(auto & p : parts) {
 				buffer[offset++] = p.size();
 				memcpy(&buffer[offset], p.data(), p.size());
 				offset += p.size();

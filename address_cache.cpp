@@ -80,7 +80,7 @@ void address_cache::cache_cleaner()
 
 		const std::lock_guard<std::shared_mutex> lock(cache_lock);
 
-		for(auto e : cache) {
+		for(auto & e : cache) {
 			if (e.second.ts == 0)  // some are meant to stay forever
 				continue;
 
@@ -90,7 +90,7 @@ void address_cache::cache_cleaner()
 				delete_.push_back(e.first);
 		}
 
-		for(auto e : delete_) {
+		for(auto & e : delete_) {
 			DOLOG(debug, "address_cache: forgetting %s\n", e.to_str().c_str());
 
 			cache.erase(e);
