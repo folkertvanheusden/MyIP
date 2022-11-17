@@ -479,7 +479,9 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				DOLOG(debug, "TCP[%012" PRIx64 "]: cur_session->their_seq_nr %ld, their: %ld\n", id, cur_session->their_seq_nr, their_seq_nr);
 
 				cur_session->seq_for_fin_when_all_received = their_seq_nr;
-				cur_session->flag_fin_when_all_received = true;
+				cur_session->flag_fin_when_all_received    = true;
+
+				set_state(cur_session, tcp_fin_wait_1);
 			}
 			else {
 				DOLOG(debug, "TCP[%012" PRIx64 "]: unexpected FIN\n", id);
@@ -494,6 +496,10 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 				send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0);
 			else
 				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0);
+
+			set_state(cur_session, tcp_fin_wait_2);
+
+			delete_entry = true;
 		}
 	}
 
