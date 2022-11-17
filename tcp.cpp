@@ -203,6 +203,46 @@ void tcp::set_state(tcp_session *const session, const tcp_state_t new_state)
 	session->state_changed.notify_all();
 }
 
+void tcp::send_rst_for_port(const packet *const pkt, const int dst_port, const int src_port)
+{
+	if (!idev) {
+		DOLOG(debug, "TCP[]: Dropping packet, no physical device assigned (yet)\n");
+		return;
+	}
+
+	DOLOG(debug, "TCP[]: Sending RST for port %d\n", dst_port);
+
+	size_t   temp_len = 20;
+	uint8_t *temp     = new uint8_t[temp_len]();
+
+	temp[0] = dst_port >> 8;
+	temp[1] = dst_port & 255;
+	temp[2] = src_port >> 8;
+	temp[3] = src_port & 255;
+
+	// sequence numbers
+	const uint8_t *const p = pkt->get_data();
+	memcpy(&temp[4], &p[8], 4);
+
+	uint32_t new_ack_nr = ((p[4] << 24) | (p[5] << 16) | (p[6] << 8) | p[7]) + 1;
+	temp[8]  = new_ack_nr >> 24;
+	temp[9]  = new_ack_nr >> 16;
+	temp[10] = new_ack_nr >> 8;
+	temp[11] = new_ack_nr;
+
+	temp[12] = 5 << 4;  // header length
+	temp[13] = FLAG_RST | FLAG_ACK;
+
+	uint16_t checksum = tcp_udp_checksum(pkt->get_src_addr(), pkt->get_dst_addr(), true, temp, temp_len);
+
+	temp[16] = checksum >> 8;
+	temp[17] = checksum;
+
+	idev->transmit_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 0x06, temp, temp_len, nullptr);
+
+	delete [] temp;
+}
+
 void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag)
 {
 	set_thread_name("myip-ptcp-handler");
@@ -248,8 +288,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	release_listener_lock();
 
 	if (!has_listener) {
-		if (icmp_)
-			icmp_->send_destination_port_unreachable(pkt->get_src_addr(), pkt->get_dst_addr(), pkt);
+		send_rst_for_port(pkt, dst_port, src_port);
 
 		return;
 	}
