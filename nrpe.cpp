@@ -5,17 +5,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <thread>
 #include <sys/resource.h>
 
 #include "hash.h"
 #include "ipv4.h"
 #include "log.h"
+#include "stats_tracker.h"
 #include "stats-utils.h"
 #include "str.h"
 #include "tcp.h"
 #include "types.h"
 #include "utils.h"
 
+
+stats_tracker st;
 
 void send_response(session *ts, uint8_t *request, int32_t data_len);
 
@@ -25,7 +29,7 @@ void nrpe_thread(session *t_s)
 {
         set_thread_name("myip-nrpe");
 
-        nrpe_session_data *ts = dynamic_cast<nrpe_session_data *>(t_s->get_application_private_data());
+        nrpe_session_data *ts = static_cast<nrpe_session_data *>(t_s->get_callback_private_data());
 
         for(;ts->terminate == false;) {
 		std::unique_lock<std::mutex> lck(ts->r_lock);
@@ -61,6 +65,24 @@ bool nrpe_new_session(pstream *const t, session *t_s)
 	return true;
 }
 
+std::string collect_performance_metrics()
+{
+	std::string out;
+
+	struct rusage ru { 0 };
+
+	// memory usage
+	if (getrusage(RUSAGE_SELF, &ru) == -1)
+		DOLOG(warning, "NRPE: getrusage failed\n");
+
+	out = myformat("|rss=%lukB;", ru.ru_maxrss);
+
+	// cpu usage
+	out += myformat(" cpu-usage=%f%%;", st.get_cpu_usage());
+
+	return out;
+}
+
 void send_response(session *t_s, uint8_t *request, int32_t data_len)
 {
 	int         response_code    = 3;
@@ -87,13 +109,7 @@ void send_response(session *t_s, uint8_t *request, int32_t data_len)
 	}
 	while(0);
 
-	struct rusage ru { 0 };
-
-	if (getrusage(RUSAGE_SELF, &ru) == -1)
-		DOLOG(warning, "NRPE: getrusage failed\n");
-
-	// TODO cpu usage
-	response_payload += myformat("|rss=%lukB;", ru.ru_maxrss);
+	response_payload += collect_performance_metrics();
 
 	uint8_t reply[16 + 1024] { 0 };
 

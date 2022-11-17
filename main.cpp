@@ -781,7 +781,6 @@ int main(int argc, char *argv[])
 		// just fine
 	}
 
-
 	DOLOG(debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");

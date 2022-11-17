@@ -54,6 +54,7 @@ add_executable(myip
 	snmp-elem.cpp
 	socks_proxy.cpp
 	stats.cpp
+	stats_tracker.cpp
 	stats-utils.cpp
 	str.cpp
 	syslog.cpp
