@@ -11,6 +11,8 @@
 #include "fifo.h"
 #include "packet.h"
 
+
+class icmp;
 class ip_protocol;
 class phys;
 
@@ -19,16 +21,19 @@ typedef struct {
 	const packet *p;
 } fifo_element_t;
 
+
 class protocol
 {
 protected:
-	fifo<fifo_element_t> *pkts { nullptr };
+	fifo<fifo_element_t> *pkts         { nullptr };
 
-	phys *default_pdev { nullptr };
+	phys                 *default_pdev { nullptr };
 
 	std::map<uint8_t, ip_protocol *> prot_map;
 
-	std::atomic_bool stop_flag { false };
+	icmp                 *icmp_        { nullptr };
+
+	std::atomic_bool      stop_flag    { false   };
 
 public:
 	protocol(stats *const s, const std::string & stats_name);
@@ -42,6 +47,8 @@ public:
 
 	void register_protocol(const uint8_t protocol, ip_protocol *const p);
 	ip_protocol *get_ip_protocol(const uint8_t p);
+
+	void register_icmp(icmp *const icmp_) { this->icmp_ = icmp_; }
 
 	virtual void queue_packet(phys *const interface, const packet *p);
 

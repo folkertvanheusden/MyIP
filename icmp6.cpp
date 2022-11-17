@@ -183,7 +183,7 @@ void icmp6::router_solicitation()
 	}
 }
 
-void icmp6::send_destination_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const pkt) const
+void icmp6::send_destination_port_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const pkt) const
 {
 	send_packet(&pkt->get_src_mac_addr(), pkt->get_src_addr(), my_ip, 1, 4, 0, nullptr, 0);
 }

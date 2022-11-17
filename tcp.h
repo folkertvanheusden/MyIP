@@ -83,6 +83,8 @@ typedef struct {
 class tcp : public ip_protocol, pstream
 {
 private:
+	icmp *const icmp_ { nullptr };
+
 	std::mutex sessions_lock;
 	std::condition_variable sessions_cv, unacked_cv;
 	// the key is an 'internal id'
@@ -95,18 +97,18 @@ private:
 	// client port -> session
 	std::map<int, uint64_t> tcp_clients;
 
-	uint64_t *tcp_packets { nullptr };
-	uint64_t *tcp_errors { nullptr };
-	uint64_t *tcp_succ_estab { nullptr };
-	uint64_t *tcp_internal_err { nullptr };
-	uint64_t *tcp_syn { nullptr };
-	uint64_t *tcp_new_sessions { nullptr };
-	uint64_t *tcp_sessions_rem { nullptr };
-	uint64_t *tcp_sessions_to { nullptr };
-	uint64_t *tcp_rst { nullptr };
+	uint64_t *tcp_packets           { nullptr };
+	uint64_t *tcp_errors            { nullptr };
+	uint64_t *tcp_succ_estab        { nullptr };
+	uint64_t *tcp_internal_err      { nullptr };
+	uint64_t *tcp_syn               { nullptr };
+	uint64_t *tcp_new_sessions      { nullptr };
+	uint64_t *tcp_sessions_rem      { nullptr };
+	uint64_t *tcp_sessions_to       { nullptr };
+	uint64_t *tcp_rst               { nullptr };
 	uint64_t *tcp_sessions_closed_1 { nullptr };
 	uint64_t *tcp_sessions_closed_2 { nullptr };
-	uint64_t *tcp_cur_n_sessions { nullptr };
+	uint64_t *tcp_cur_n_sessions    { nullptr };
 
 	void send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
 
@@ -121,7 +123,7 @@ private:
 	void release_listener_lock();
 
 public:
-	tcp(stats *const s);
+	tcp(stats *const s, icmp *const icmp_);
 	virtual ~tcp();
 
 	void add_handler(const int port, port_handler_t & tph);

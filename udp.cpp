@@ -12,7 +12,7 @@
 udp::udp(stats *const s, icmp *const icmp_) : ip_protocol(s, "udp"), icmp_(icmp_)
 {
 	udp_requests = s->register_stat("udp_requests");
-	udp_refused = s->register_stat("udp_refused");
+	udp_refused  = s->register_stat("udp_refused");
 
 	for(int i=0; i<4; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
@@ -61,7 +61,7 @@ void udp::operator()()
 
 		if (it == callbacks.end()) {
 			if (icmp_)
-				icmp_->send_destination_unreachable(pkt->get_src_addr(), pkt->get_dst_addr(), pkt);
+				icmp_->send_destination_port_unreachable(pkt->get_src_addr(), pkt->get_dst_addr(), pkt);
 
 			stats_inc_counter(udp_refused);
 

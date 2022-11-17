@@ -24,13 +24,13 @@ private:
 
 	// src ip, src port, dest ip (=local), dest port, payload-packet
 	std::map<int, cb_t> callbacks;
-	std::shared_mutex cb_lock;
+	std::shared_mutex   cb_lock;
 
 	std::map<int, uint64_t> allocated_ports;
-	std::mutex ports_lock;
+	std::mutex              ports_lock;
 
 	uint64_t *udp_requests { nullptr };
-	uint64_t *udp_refused { nullptr };
+	uint64_t *udp_refused  { nullptr };
 	
 	std::thread *th2 { nullptr };
 

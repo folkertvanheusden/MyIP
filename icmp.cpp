@@ -118,7 +118,7 @@ void icmp::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const u
 	delete [] out;
 }
 
-void icmp::send_destination_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const p) const
+void icmp::send_destination_port_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const p) const
 {
 	send_packet(dst_ip, src_ip, 3, 3, p);
 }

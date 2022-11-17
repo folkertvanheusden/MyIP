@@ -7,10 +7,11 @@
 #include <unistd.h>
 #include <vector>
 
-#include "log.h"
-#include "tcp.h"
+#include "icmp.h"
 #include "ipv4.h"
+#include "log.h"
 #include "str.h"
+#include "tcp.h"
 #include "time.h"
 #include "utils.h"
 
@@ -61,20 +62,20 @@ char *flags_to_str(uint8_t flags)
 	return out;
 }
 
-tcp::tcp(stats *const s) : ip_protocol(s, "tcp")
+tcp::tcp(stats *const s, icmp *const icmp_) : ip_protocol(s, "tcp"), icmp_(icmp_)
 {
-	tcp_packets = s->register_stat("tcp_packets");
-	tcp_errors = s->register_stat("tcp_errors", "1.3.6.1.2.1.6.7");  // tcpAttemptFails
-	tcp_succ_estab = s->register_stat("tcp_succ_estab");
-	tcp_internal_err = s->register_stat("tcp_internal_err");
-	tcp_syn = s->register_stat("tcp_syn");
-	tcp_new_sessions = s->register_stat("tcp_new_sessions");
-	tcp_sessions_rem = s->register_stat("tcp_sessions_rem");
-	tcp_sessions_to = s->register_stat("tcp_sessions_to");
+	tcp_packets           = s->register_stat("tcp_packets");
+	tcp_errors            = s->register_stat("tcp_errors", "1.3.6.1.2.1.6.7");  // tcpAttemptFails
+	tcp_succ_estab        = s->register_stat("tcp_succ_estab");
+	tcp_internal_err      = s->register_stat("tcp_internal_err");
+	tcp_syn               = s->register_stat("tcp_syn");
+	tcp_new_sessions      = s->register_stat("tcp_new_sessions");
+	tcp_sessions_rem      = s->register_stat("tcp_sessions_rem");
+	tcp_sessions_to       = s->register_stat("tcp_sessions_to");
 	tcp_sessions_closed_1 = s->register_stat("tcp_sessions_closed1");
 	tcp_sessions_closed_2 = s->register_stat("tcp_sessions_closed2");
-	tcp_rst = s->register_stat("tcp_rst");
-	tcp_cur_n_sessions = s->register_stat("tcp_cur_n_sessions");
+	tcp_rst               = s->register_stat("tcp_rst");
+	tcp_cur_n_sessions    = s->register_stat("tcp_cur_n_sessions");
 
 	for(int i=0; i<4; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
@@ -238,12 +239,20 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	auto     src = pkt->get_src_addr();
 	uint64_t id  = hash_address(src, dst_port, src_port);
 
-	char *flag_str = flags_to_str(p[13]);
+	char    *flag_str = flags_to_str(p[13]);
 	DOLOG(debug, "TCP[%012" PRIx64 "]: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
 	free(flag_str);
 
-	auto port_record = get_lock_listener(dst_port, id);
+	auto port_record  = get_lock_listener(dst_port, id);
+	bool has_listener = port_record.has_value();
 	release_listener_lock();
+
+	if (!has_listener) {
+		if (icmp_)
+			icmp_->send_destination_port_unreachable(pkt->get_src_addr(), pkt->get_dst_addr(), pkt);
+
+		return;
+	}
 
 	std::unique_lock<std::mutex> lck(sessions_lock);
 
@@ -251,7 +260,7 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 
 	if (cur_it == sessions.end()) {
 		if (flag_syn) {  // MUST start with SYN
-			private_data *pd = port_record.has_value() ? port_record.value().pd : nullptr;
+			private_data *pd = port_record.value().pd;
 
 			tcp_session *new_session = new tcp_session(this, pkt->get_dst_addr(), dst_port, pkt->get_src_addr(), src_port, pd);
 
