@@ -96,7 +96,7 @@ void send_response(session *t_s, uint8_t *request, int32_t data_len)
 
 		const char *msg = reinterpret_cast<const char *>(&request[16]);
 
-		if (strcmp(msg, "%ALL%") == 0) {
+		if (true) { // (strcmp(msg, "%ALL%") == 0) {  change this when individual services are checkable
 			response_code = 0;
 
 			response_payload = "OK";
