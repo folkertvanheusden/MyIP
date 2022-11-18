@@ -40,10 +40,10 @@ add_executable(myip
 	ntp.cpp
 	packet.cpp
 	phys.cpp
-	phys_ethernet.cpp
 	phys_ppp.cpp
 	phys_sctp_udp.cpp
 	phys_slip.cpp
+	phys_tap.cpp
 	protocol.cpp
 	sctp.cpp
 	sctp_crc32c.cpp

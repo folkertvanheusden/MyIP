@@ -13,7 +13,7 @@
 #include <sys/types.h>
 
 #include "log.h"
-#include "phys_ethernet.h"
+#include "phys_tap.h"
 #include "packet.h"
 #include "utils.h"
 
@@ -27,7 +27,7 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 	ifr->ifr_name[IFNAMSIZ - 1] = 0x00;
 }
 
-phys_ethernet::phys_ethernet(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid) : phys(dev_index, s)
+phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid) : phys(dev_index, s)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
 		DOLOG(ll_error, "open /dev/net/tun: %s", strerror(errno));
@@ -70,14 +70,14 @@ phys_ethernet::phys_ethernet(const size_t dev_index, stats *const s, const std::
 	th = new std::thread(std::ref(*this));
 }
 
-phys_ethernet::~phys_ethernet()
+phys_tap::~phys_tap()
 {
 	close(fd);
 }
 
-bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
+bool phys_tap::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	DOLOG(debug, "phys_ethernet: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	DOLOG(debug, "phys_tap: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	size_t out_size = pl_size + 14;
 	uint8_t *out = new uint8_t[out_size];
@@ -102,10 +102,10 @@ bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & s
 	int rc = write(fd, out, out_size);
 
 	if (size_t(rc) != out_size) {
-		DOLOG(ll_error, "phys_ethernet: problem sending packet (%d for %zu bytes)\n", rc, out_size);
+		DOLOG(ll_error, "phys_tap: problem sending packet (%d for %zu bytes)\n", rc, out_size);
 
 		if (rc == -1)
-			DOLOG(ll_error, "phys_ethernet: %s\n", strerror(errno));
+			DOLOG(ll_error, "phys_tap: %s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -115,11 +115,11 @@ bool phys_ethernet::transmit_packet(const any_addr & dst_mac, const any_addr & s
 	return ok;
 }
 
-void phys_ethernet::operator()()
+void phys_tap::operator()()
 {
-	DOLOG(debug, "phys_ethernet: thread started\n");
+	DOLOG(debug, "phys_tap: thread started\n");
 
-	set_thread_name("myip-phys_ethernet");
+	set_thread_name("myip-phys_tap");
 
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
@@ -157,7 +157,7 @@ void phys_ethernet::operator()()
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
-			DOLOG(info, "phys_ethernet: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
+			DOLOG(info, "phys_tap: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
 			stats_inc_counter(phys_ign_frame);
 			continue;
 		}
@@ -166,12 +166,12 @@ void phys_ethernet::operator()()
 
 		any_addr src_mac(&buffer[6], 6);
 
-		DOLOG(debug, "phys_ethernet: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
+		DOLOG(debug, "phys_tap: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
 		packet *p = new packet(ts, src_mac, src_mac, dst_mac, &buffer[14], size - 14, &buffer[0], 14);
 
 		it->second->queue_packet(this, p);
 	}
 
-	DOLOG(info, "phys_ethernet: thread stopped\n");
+	DOLOG(info, "phys_tap: thread stopped\n");
 }
