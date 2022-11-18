@@ -19,11 +19,21 @@
 #include "utils.h"
 
 
-stats_tracker st;
+stats_tracker *st = nullptr;
 
 void send_response(session *ts, uint8_t *request, int32_t data_len);
 
 using namespace std::chrono_literals;
+
+void nrpe_init()
+{
+	st = new stats_tracker();
+}
+
+void nrpe_deinit()
+{
+	delete st;
+}
 
 void nrpe_thread(session *t_s)
 {
@@ -78,7 +88,7 @@ std::string collect_performance_metrics()
 	out = myformat("|rss=%lukB;", ru.ru_maxrss);
 
 	// cpu usage
-	out += myformat(" cpu-usage=%f%%;", st.get_cpu_usage() * 100);
+	out += myformat(" cpu-usage=%f%%;", st->get_cpu_usage() * 100);
 
 	return out;
 }
@@ -207,12 +217,12 @@ port_handler_t nrpe_get_handler(stats *const s)
 {
 	port_handler_t tcp_nrpe;
 
-	tcp_nrpe.init             = nullptr;
+	tcp_nrpe.init             = nrpe_init;
 	tcp_nrpe.new_session      = nrpe_new_session;
 	tcp_nrpe.new_data         = nrpe_new_data;
 	tcp_nrpe.session_closed_1 = nrpe_close_session_1;
 	tcp_nrpe.session_closed_2 = nrpe_close_session_2;
-	tcp_nrpe.deinit           = nullptr;
+	tcp_nrpe.deinit           = nrpe_deinit;
 
 	nrpe_private_data *npd = new nrpe_private_data();
 	npd->s = s;

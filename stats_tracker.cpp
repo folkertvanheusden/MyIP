@@ -15,15 +15,15 @@ stats_tracker::stats_tracker()
 
 stats_tracker::~stats_tracker()
 {
-	m.lock();
-
-	cv_stop_notify = true;
-
-	cv_stop.notify_one();
-
-	m.unlock();
-
 	if (th) {
+		m.lock();
+
+		cv_stop_notify = true;
+
+		cv_stop.notify_one();
+
+		m.unlock();
+
 		th->join();
 
 		delete th;
