@@ -12,6 +12,7 @@
 #include "any_addr.h"
 #include "stats.h"
 #include "phys_tap.h"
+#include "phys_promiscuous.h"
 #include "phys_ppp.h"
 #include "phys_sctp_udp.h"
 #include "phys_slip.h"
@@ -308,7 +309,7 @@ int main(int argc, char *argv[])
 
 		phys *dev = nullptr;
 
-		if (type == "ethernet") {
+		if (type == "tap") {
 			std::string dev_name = cfg_str(interface, "dev-name", "device name", true, "myip");
 
 			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);  // name
@@ -316,6 +317,11 @@ int main(int argc, char *argv[])
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
 			dev = new phys_tap(i + 1, &s, dev_name, uid, gid);
+		}
+		else if (type == "promiscuous") {
+			std::string dev_name = cfg_str(interface, "dev-name", "device name", false, "eth0");
+
+			dev = new phys_promiscuous(i + 1, &s, dev_name);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");

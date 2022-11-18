@@ -1,3 +1,5 @@
+#pragma once
+
 typedef enum { debug, info, warning, ll_error } log_level_t;  // TODO ll_ prefix
 
 void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen);

@@ -41,6 +41,7 @@ add_executable(myip
 	packet.cpp
 	phys.cpp
 	phys_ppp.cpp
+	phys_promiscuous.cpp
 	phys_sctp_udp.cpp
 	phys_slip.cpp
 	phys_tap.cpp
