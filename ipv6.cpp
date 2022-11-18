@@ -158,7 +158,7 @@ void ipv6::operator()()
 		bool link_local_scope_multicast_adress = pkt_dst[0] == 0xff && pkt_dst[1] == 0x02;
 
 		if (pkt_dst != myip && !link_local_scope_multicast_adress) {
-			DOLOG(info, "IPv6[%04x]: packet not for me (=%s)\n", flow_label, myip.to_str().c_str());
+			DOLOG(info, "IPv6[%04x]: packet (%s) not for me (=%s)\n", flow_label, pkt_src.to_str().c_str(), myip.to_str().c_str());
 			delete pkt;
 			stats_inc_counter(ipv6_not_me);
 			stats_inc_counter(ip_n_disc);

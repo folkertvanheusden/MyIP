@@ -262,8 +262,8 @@ int main(int argc, char *argv[])
 	{
 		const libconfig::Setting & environment = root.lookup("environment");
 
-		int uid = cfg_int(environment, "run-as", "user to run as",  true, 1000);
-		int gid = cfg_int(environment, "run-in", "group to run in", true, 1000);
+		uid = cfg_int(environment, "run-as", "user to run as",  true, 1003);
+		gid = cfg_int(environment, "run-in", "group to run in", true, 1003);
 		setloguid(uid, gid);
 
 		std::string chdir_path = cfg_str(environment, "chdir-path", "directory to chdir to", true, "/tmp");
