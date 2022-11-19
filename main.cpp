@@ -253,7 +253,7 @@ int main(int argc, char *argv[])
 	sd.register_oid("1.3.6.1.2.1.1.7.0", snmp_integer::si_integer, 254 /* everything but the physical layer */);
 	sd.register_oid("1.3.6.1.2.1.1.8.0", snmp_integer::si_integer, 0);  // The value of sysUpTime at the time of the most recent change in state or value of any instance of sysORID.
 
-	stats s(8192, &sd);
+	stats s(16384, &sd);
 
 	/// environment
 	int uid = 1000, gid = 1000;
