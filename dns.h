@@ -37,7 +37,7 @@ public:
 	virtual ~dns();
 
 	// verify if packet comes from 'dns_a'!
-	void input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd);
+	void input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd);
 
 	// send query to dns, wait for 'updated' and then
 	// check if set in chache. if not, wait. upto to ms.

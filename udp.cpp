@@ -87,7 +87,7 @@ void udp::operator()()
 	}
 }
 
-void udp::add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *, void *const pd)> h, void *pd)
+void udp::add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *, session_data *const pd)> h, session_data *pd)
 {
 	cb_lock.lock();
 	callbacks.insert({ port, { h, pd } });

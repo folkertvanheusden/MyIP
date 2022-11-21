@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
 	}
 
 	// used for clean-up
-	std::vector<protocol *> protocols;
+	std::vector<protocol *>    protocols;
 	std::vector<ip_protocol *> ip_protocols;
 	std::vector<application *> applications;
 	std::vector<socks_proxy *> socks_proxies;
@@ -555,6 +555,7 @@ int main(int argc, char *argv[])
 	if (run_at_started.empty() == false)
 		run(run_at_started);
 
+#if 0
 	if (setgid(gid) == -1) {
 		DOLOG(ll_error, "setgid: %s", strerror(errno));
 		return 1;
@@ -564,6 +565,7 @@ int main(int argc, char *argv[])
 		DOLOG(ll_error, "setuid: %s", strerror(errno));
 		return 1;
 	}
+#endif
 
 	// NTP
 	try {

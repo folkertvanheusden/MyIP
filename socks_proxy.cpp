@@ -155,7 +155,7 @@ socks_proxy::~socks_proxy()
 
 bool socks_new_data(pstream *const ps, session *const s, buffer_in data)
 {
-	int fd = static_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
+	int fd = dynamic_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
 
 	DOLOG(ll_debug, "socks_new_data for fd %d\n", fd);
 
@@ -166,7 +166,7 @@ bool socks_new_data(pstream *const ps, session *const s, buffer_in data)
 
 bool socks_session_closed_2(pstream *const ps, session *const s)
 {
-	int fd = static_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
+	int fd = dynamic_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
 
 	DOLOG(ll_debug, "socks_session_closed_2 for fd %d\n", fd);
 

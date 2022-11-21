@@ -642,18 +642,20 @@ void tcp::packet_handler(const packet *const pkt)
 
 		if (cur_it != sessions.end()) {
 			tcp_session *pointer = cur_it->second;
-			bool is_client = pointer->is_client;
 
 			sessions.erase(cur_it);
 			stats_set(tcp_cur_n_sessions, sessions.size());
+
 			lck.unlock();
 
+			bool is_client       = pointer->is_client;
+
 			// call session_closed_2
-			int close_port = is_client ? pointer->get_their_port() : pointer->get_my_port();
+			int close_port       = is_client ? pointer->get_their_port() : pointer->get_my_port();
 
-			auto cb_org = get_lock_listener(close_port, id);
+			auto cb_org          = get_lock_listener(close_port, id);
 
-			if (cb_org.has_value())  // session not initiated here?
+			if (cb_org.has_value())  // is session initiated here?
 				cb_org.value().session_closed_2(this, pointer);
 			else
 				DOLOG(ll_info, "TCP[%012" PRIx64 "]: port %d not known\n", id, close_port);
@@ -822,7 +824,7 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 {
 	uint64_t internal_id = get_us();
 
-	tcp_session *const ts = reinterpret_cast<tcp_session *>(ts_in);
+	tcp_session *const ts = dynamic_cast<tcp_session *>(ts_in);
 
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %lu packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: %s\n", ts->id, std::string((const char *)data, len).c_str());
@@ -863,7 +865,7 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 // this method requires tcp_session to be already locked
 void tcp::end_session(session *const ts_in)
 {
-	tcp_session *const ts = reinterpret_cast<tcp_session *>(ts_in);
+	tcp_session *const ts = dynamic_cast<tcp_session *>(ts_in);
 
 	if (ts->unacked_size == 0) {
 		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, rel_seqnr(ts, true, ts->my_seq_nr));

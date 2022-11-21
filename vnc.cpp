@@ -81,7 +81,7 @@ struct frame_buffer_t
 
 void vnc_thread(session *ts);
 
-void frame_buffer_thread(void *ts_in);
+void frame_buffer_thread(frame_buffer_t *ts_in);
 
 void vnc_init()
 {
@@ -138,11 +138,9 @@ void draw_text(frame_buffer_t *fb_in, int x, int y, const char *text)
 	}
 }
 
-void frame_buffer_thread(void *fb_in)
+void frame_buffer_thread(frame_buffer_t *fb_work)
 {
 	set_thread_name("myip-framebuf");
-
-	frame_buffer_t *fb_work = reinterpret_cast<frame_buffer_t *>(fb_in);
 
 	int x = fb_work->w / 2, y = fb_work->h / 2;
 	int dx = 1, dy = 1;
@@ -361,14 +359,12 @@ bool vnc_new_session(pstream *const ps, session *const s)
 
 	vs->start         = time(nullptr);
 
-	vs->vpd           = static_cast<vnc_private_data *>(s->get_application_private_data());
+	vs->vpd           = dynamic_cast<vnc_private_data *>(s->get_application_private_data());
 	stats_inc_counter(vs->vpd->vnc_requests);
 
 	s->set_callback_private_data(vs);
 
 	DOLOG(ll_debug, "VNC: new session with %s\n", vs->client_addr.c_str());
-
-	vs->th            = new std::thread(vnc_thread, s);
 
 	vs->strm.zalloc   = 0;
 	vs->strm.zfree    = 0;
@@ -376,12 +372,14 @@ bool vnc_new_session(pstream *const ps, session *const s)
 	if (deflateInit(&vs->strm, Z_DEFAULT_COMPRESSION) != Z_OK)
 		DOLOG(ll_warning, "VNC: zlib init failed\n");
 
+	vs->th            = new std::thread(vnc_thread, s);
+
 	return true;
 }
 
 bool vnc_new_data(pstream *const ps, session *const s, buffer_in data)
 {
-	vnc_session_data *vs = static_cast<vnc_session_data *>(s->get_callback_private_data());
+	vnc_session_data *vs = dynamic_cast<vnc_session_data *>(s->get_callback_private_data());
 
 	if (!vs) {
 		DOLOG(ll_info, "VNC: Data for a non-existing session\n");
@@ -411,7 +409,7 @@ void vnc_thread(session *ts)
 {
 	set_thread_name("myip-vnc");
 
-	vnc_session_data *vs  = static_cast<vnc_session_data *>(ts->get_callback_private_data());
+	vnc_session_data *vs  = dynamic_cast<vnc_session_data *>(ts->get_callback_private_data());
 	vnc_private_data *vpd = vs->vpd;
 	bool rc = true, first = true;
 
@@ -776,7 +774,7 @@ void vnc_thread(session *ts)
 
 bool vnc_close_session_1(pstream *const ps, session *const s)
 {
-	private_data *const pd = reinterpret_cast<private_data *>(s->get_callback_private_data());
+	private_data *const pd = dynamic_cast<private_data *>(s->get_callback_private_data());
 
 	if (pd) {
 		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(pd);
@@ -789,7 +787,7 @@ bool vnc_close_session_1(pstream *const ps, session *const s)
 
 bool vnc_close_session_2(pstream *const ps, session *const s)
 {
-	private_data *const pd = reinterpret_cast<private_data *>(s->get_callback_private_data());
+	private_data *const pd = dynamic_cast<private_data *>(s->get_callback_private_data());
 
 	if (pd) {
 		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(pd);

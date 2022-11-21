@@ -18,7 +18,7 @@ protected:
 	const any_addr their_addr;
 	const uint16_t their_port { 0 };
 
-	void          *callback_private_data    { nullptr };
+	session_data  *callback_private_data    { nullptr };
 
 	private_data  *application_private_data { nullptr };
 
@@ -42,9 +42,9 @@ public:
 
 	static uint64_t get_hash(const any_addr & their_addr, const uint16_t their_port, const uint16_t my_port);
 
-	void set_callback_private_data(void *p);
+	void set_callback_private_data(session_data *p);
 
-	void * get_callback_private_data();
+	session_data *get_callback_private_data();
 
 	pstream *get_stream_target() { return t; }
 

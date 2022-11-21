@@ -139,7 +139,7 @@ sip::~sip()
 	delete [] samples;
 }
 
-void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
+void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd)
 {
 	DOLOG(ll_info, "SIP: packet from [%s]:%u\n", src_ip.to_str().c_str(), src_port);
 
@@ -348,7 +348,7 @@ codec_t select_schema(const std::vector<std::string> *const body, const int max_
 	return best;
 }
 
-void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body, void *const pd)
+void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, const std::vector<std::string> *const body, session_data *const pd)
 {
 	std::vector<std::string> content;
 	content.push_back("v=0");
@@ -391,14 +391,14 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 			// find port to transmit rtp data to and start send-thread
 			int tgt_rtp_port = m_parts.size() >= 2 ? atoi(m_parts.at(1).c_str()) : 8000;
 
-			sip_session_t *ss = new sip_session_t();
-			ss->start_ts = get_us();
-			ss->headers = *headers;
+			sip_session_data *ss = new sip_session_data();
+			ss->start_ts      = get_us();
+			ss->headers       = *headers;
 			ss->sip_addr_peer = src_ip;
 			ss->sip_port_peer = src_port;
-			ss->sip_addr_me = dst_ip;
-			ss->sip_port_me = dst_port;
-			ss->schema = schema;
+			ss->sip_addr_me   = dst_ip;
+			ss->sip_port_me   = dst_port;
+			ss->schema        = schema;
 
 			std::thread *th = new std::thread(&sip::voicemailbox, this, src_ip, tgt_rtp_port, dst_ip, recv_port, ss, pd);
 
@@ -409,7 +409,7 @@ void sip::reply_to_INVITE(const any_addr & src_ip, const int src_port, const any
 	}
 }
 
-void sip::send_ACK(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, void *const pd)
+void sip::send_ACK(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, session_data *const pd)
 {
 	std::vector<std::string> hout;
 	create_response_headers("SIP/2.0 200 OK", &hout, false, headers, 0, src_ip);
@@ -419,7 +419,7 @@ void sip::send_ACK(const any_addr & src_ip, const int src_port, const any_addr &
 	u->transmit_packet(src_ip, src_port, dst_ip, dst_port, (const uint8_t *)out.c_str(), out.size());
 }
 
-void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, void *const pd)
+void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, session_data *const pd)
 {
 	auto str_wa = find_header(headers, "WWW-Authenticate");
 	if (!str_wa.has_value()) {
@@ -558,7 +558,7 @@ void sip::send_BYE(const any_addr & tgt_addr, const int tgt_port, const any_addr
 	u->transmit_packet(tgt_addr, tgt_port, src_addr, src_port, (const uint8_t *)out.c_str(), out.size());
 }
 
-void sip::transmit_audio(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss, const short *const audio, const int n_audio, uint16_t *const seq_nr, uint32_t *const t, const uint32_t ssrc)
+void sip::transmit_audio(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_data *const ss, const short *const audio, const int n_audio, uint16_t *const seq_nr, uint32_t *const t, const uint32_t ssrc)
 {
 	int n_work = n_audio, offset = 0;
 
@@ -612,7 +612,7 @@ void generate_beep(const double f, const double duration, const int samplerate, 
 		(*beep)[i] = 32767 * sin(mul * (i + i / double(*beep_n)));
 }
 
-void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_t *const ss, void *const pd)
+void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_addr & src_addr, const int src_port, sip_session_data *const ss, session_data *const pd)
 {
 	set_thread_name("myip-siprtp");
 
@@ -733,9 +733,9 @@ int16_t decode_alaw(int8_t number)
 	return sign == 0 ? decoded:-decoded;
 }
 
-void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
+void sip::input_recv(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd)
 {
-	sip_session_t *ss = static_cast<sip_session_t *>(pd);
+	sip_session_data *ss = dynamic_cast<sip_session_data *>(pd);
 
 	if (!ss->sf)
 		return;

@@ -68,7 +68,7 @@ std::pair<std::string, int> get_name(const uint8_t *const base, const uint8_t *c
 }
 
 // verify if packet comes from 'dns_ip'!
-void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
+void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd)
 {
 	if (src_ip != dns_ip) {
 		DOLOG(ll_info, "DNS response from unexpected address (%s)\n", src_ip.to_str().c_str());

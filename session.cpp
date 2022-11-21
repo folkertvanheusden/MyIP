@@ -57,12 +57,12 @@ uint64_t session::get_hash(const any_addr & their_addr, const uint16_t their_por
 	return MurmurHash64A(temp.get_content(), temp.get_size(), 99194853094755497);
 }
 
-void session::set_callback_private_data(void *p)
+void session::set_callback_private_data(session_data *p)
 {
 	callback_private_data = p;
 }
 
-void * session::get_callback_private_data()
+session_data *session::get_callback_private_data()
 {
 	return callback_private_data;
 }

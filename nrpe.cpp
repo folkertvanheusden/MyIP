@@ -35,7 +35,7 @@ void nrpe_thread(session *t_s)
 {
         set_thread_name("myip-nrpe");
 
-        nrpe_session_data *ts = static_cast<nrpe_session_data *>(t_s->get_callback_private_data());
+        nrpe_session_data *ts = dynamic_cast<nrpe_session_data *>(t_s->get_callback_private_data());
 
         for(;ts->terminate == false;) {
 		std::unique_lock<std::mutex> lck(ts->r_lock);
@@ -148,7 +148,7 @@ void send_response(session *t_s, uint8_t *request, int32_t data_len)
 
 bool nrpe_new_data(pstream *ps, session *ts, buffer_in b)
 {
-	nrpe_session_data *t_s = static_cast<nrpe_session_data *>(ts->get_callback_private_data());
+	nrpe_session_data *t_s = dynamic_cast<nrpe_session_data *>(ts->get_callback_private_data());
 
 	if (!ts) {
 		DOLOG(ll_info, "NRPE: Data for a non-existing session\n");
@@ -183,10 +183,10 @@ bool nrpe_new_data(pstream *ps, session *ts, buffer_in b)
 
 bool nrpe_close_session_1(pstream *const ps, session *t_s)
 {
-	void *private_data = t_s->get_callback_private_data();
+	session_data *private_data = t_s->get_callback_private_data();
 
 	if (private_data) {
-		nrpe_session_data *ts = static_cast<nrpe_session_data *>(private_data);
+		nrpe_session_data *ts = dynamic_cast<nrpe_session_data *>(private_data);
 
 		ts->terminate = true;
 

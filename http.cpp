@@ -22,7 +22,7 @@ void http_thread(session *ts)
 {
         set_thread_name("myip-http");
 
-        http_session_data *hs = static_cast<http_session_data *>(ts->get_callback_private_data());
+        http_session_data *hs = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
 
         for(;hs->terminate == false;) {
 		std::unique_lock<std::mutex> lck(hs->r_lock);
@@ -59,7 +59,7 @@ bool http_new_session(pstream *const t, session *ts)
 
 void send_response(session *ts, char *request)
 {
-	http_session_data *hs  = static_cast <http_session_data *>(ts->get_callback_private_data());
+	http_session_data *hs  = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
 	http_private_data *hpd = dynamic_cast<http_private_data *>(ts->get_application_private_data());
 
 	std::string logfile  = hpd->logfile;
@@ -175,7 +175,7 @@ void send_response(session *ts, char *request)
 
 		const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-		auto referer = find_header(&lines, "Referer");
+		auto referer    = find_header(&lines, "Referer");
 		auto user_agent = find_header(&lines, "User-Agent");
 
 		fprintf(fh, "%s - - [%02d/%s/%04d:%02d:%02d:%02d +0000] \"%s\" %d %ld \"%s\" \"%s\"\n",
@@ -193,16 +193,15 @@ void send_response(session *ts, char *request)
 		DOLOG(ll_error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
 
-	ts->get_stream_target()->send_data(ts, (const uint8_t *)header.c_str(), header.size());
+	if (ts->get_stream_target()->send_data(ts, (const uint8_t *)header.c_str(), header.size())) {
+		if (get) {
+			if (reply)
+				ts->get_stream_target()->send_data(ts, reply, content_len);
+			else {
+				const char err[] = "Something went wrong: you should not see this.";
 
-	if (get) {
-		if (reply) {
-			ts->get_stream_target()->send_data(ts, reply, content_len);
-		}
-		else {
-			const char err[] = "Something went wrong: you should not see this.";
-
-			ts->get_stream_target()->send_data(ts, (const uint8_t *)err, sizeof(err) - 1);
+				ts->get_stream_target()->send_data(ts, (const uint8_t *)err, sizeof(err) - 1);
+			}
 		}
 	}
 
@@ -213,7 +212,7 @@ void send_response(session *ts, char *request)
 
 bool http_new_data(pstream *ps, session *ts, buffer_in b)
 {
-	http_session_data *hs = static_cast<http_session_data *>(ts->get_callback_private_data());
+	http_session_data *hs = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
 
 	if (!hs) {
 		DOLOG(ll_info, "HTTP: Data for a non-existing session\n");
@@ -243,11 +242,9 @@ bool http_new_data(pstream *ps, session *ts, buffer_in b)
 
 bool http_close_session_1(pstream *const ps, session *const ts)
 {
-	void *private_data = ts->get_callback_private_data();
+	http_session_data *hs  = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
 
-	if (private_data) {
-		http_session_data *hs = static_cast<http_session_data *>(private_data);
-
+	if (hs) {
 		hs->terminate = true;
 
 		hs->th->join();

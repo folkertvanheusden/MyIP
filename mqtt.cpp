@@ -192,7 +192,7 @@ bool mqtt_new_session(pstream *const t, session *ts)
 
 bool mqtt_new_data(pstream *ps, session *ts, buffer_in b)
 {
-	mqtt_session_data *msd = static_cast<mqtt_session_data *>(ts->get_callback_private_data());
+	mqtt_session_data *msd = dynamic_cast<mqtt_session_data *>(ts->get_callback_private_data());
 
 	if (!msd) {
 		DOLOG(ll_info, "MQTT: Data for a non-existing session\n");
@@ -275,7 +275,7 @@ void mqtt_recv_thread(void *ts_in)
 	set_thread_name("myip-mqtt");
 
 	session           *ts  = (session *)ts_in;
-	mqtt_session_data *msd = static_cast<mqtt_session_data *>(ts->get_callback_private_data());
+	mqtt_session_data *msd = dynamic_cast<mqtt_session_data *>(ts->get_callback_private_data());
 
 	std::string identifier;
 
@@ -423,10 +423,10 @@ void mqtt_recv_thread(void *ts_in)
 
 bool mqtt_close_session_1(pstream *const ps, session *const ts)
 {
-        void *private_data = ts->get_callback_private_data();
+        session_data *private_data = ts->get_callback_private_data();
 
 	if (private_data) {
-		mqtt_session_data *msd = static_cast<mqtt_session_data *>(private_data);
+		mqtt_session_data *msd = dynamic_cast<mqtt_session_data *>(private_data);
 
 		msd->terminate = true;
 
@@ -439,10 +439,10 @@ bool mqtt_close_session_1(pstream *const ps, session *const ts)
 
 bool mqtt_close_session_2(pstream *const ps, session *ts)
 {
-        void *private_data = ts->get_callback_private_data();
+        session_data *private_data = ts->get_callback_private_data();
 
 	if (private_data) {
-		mqtt_session_data *msd = static_cast<mqtt_session_data *>(private_data);
+		mqtt_session_data *msd = dynamic_cast<mqtt_session_data *>(private_data);
 
 		msd->terminate = true;
 
