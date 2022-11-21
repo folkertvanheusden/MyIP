@@ -53,7 +53,8 @@ uint64_t session::get_hash(const any_addr & their_addr, const uint16_t their_por
 	temp.add_net_short(their_port);
 	temp.add_net_short(my_port);
 
-	return MurmurHash64A(temp.get_content(), temp.get_size(), 123 /* TODO: replace 123 */);
+	// 99194853094755497 is a fibonacci prime (see https://en.wikipedia.org/wiki/List_of_prime_numbers )
+	return MurmurHash64A(temp.get_content(), temp.get_size(), 99194853094755497);
 }
 
 void session::set_callback_private_data(void *p)
