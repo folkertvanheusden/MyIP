@@ -46,6 +46,9 @@ sctp::~sctp()
 		if (handler.second.deinit)
 			handler.second.deinit();
 	}
+
+	for(auto & s : sessions)
+		delete s.second;
 }
 
 std::pair<uint16_t, buffer_in> sctp::get_parameter(const uint64_t hash, buffer_in & chunk_payload)
