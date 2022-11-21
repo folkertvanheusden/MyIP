@@ -19,8 +19,11 @@ ip_protocol::~ip_protocol()
 
 void ip_protocol::queue_packet(const packet *p)
 {
-	if (!pkts->try_put(p))
+	if (!pkts->try_put(p)) {
 		DOLOG(ll_warning, "IP-Protocol: packet dropped\n");
+
+		delete p;
+	}
 }
 
 uint16_t tcp_udp_checksum(const any_addr & src_addr, const any_addr & dst_addr, const bool tcp, const uint8_t *const tcp_payload, const int len)
