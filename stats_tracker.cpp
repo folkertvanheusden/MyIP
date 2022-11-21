@@ -1,8 +1,10 @@
 // (C) 2017-2022 by folkert van heusden, released under Apache License v2.0
 
 #include <cstring>
+#include <errno.h>
 
 #include "error.h"
+#include "log.h"
 #include "stats_tracker.h"
 #include "time.h"
 #include "utils.h"
@@ -50,7 +52,11 @@ void stats_tracker::operator()()
 
 		uint64_t latest_ru_ts = get_us();
 
-		getrusage(RUSAGE_SELF, &latest_ru);  // TODO error checking
+		if (getrusage(RUSAGE_SELF, &latest_ru) == -1) {
+			DOLOG(ll_warning, "getrusage failed: %s\n", strerror(errno));
+
+			continue;
+		}
 
 		if (prev_ru_ts) {
 			if (prev_slot_ru != slot) {
