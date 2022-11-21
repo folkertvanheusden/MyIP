@@ -103,8 +103,6 @@ void phys_sctp_udp::operator()()
 
 		ssize_t size = recvfrom(fd, buffer, sizeof buffer, 0, reinterpret_cast<struct sockaddr *>(&addr), &addr_len);
 
-		printf("%zd\n", size);
-
 	        struct timespec ts { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
 			DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
