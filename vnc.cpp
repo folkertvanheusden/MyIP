@@ -27,13 +27,14 @@ static std::atomic_bool stop { false };
 
 struct frame_buffer_t
 {
-	std::thread *th;
-	std::atomic_bool terminate;
+	std::thread     *th        { nullptr };
+	std::atomic_bool terminate { false   };
 
-	int w, h;
+	int              w         { 0       };
+	int              h         { 0       };
 
         mutable std::mutex fb_lock;
-	uint8_t *buffer;
+	uint8_t         *buffer    { nullptr };
 
         mutable std::mutex cb_lock;
 	std::set<vnc_session_data *> callbacks;
@@ -85,19 +86,25 @@ void frame_buffer_thread(frame_buffer_t *ts_in);
 
 void vnc_init()
 {
-	frame_buffer.w = 640;
-	frame_buffer.h = 480;
+	std::unique_lock<std::mutex> lck(frame_buffer.fb_lock);
 
-	size_t n_bytes = size_t(frame_buffer.w) * size_t(frame_buffer.h) * 3;
-	frame_buffer.buffer = new uint8_t[n_bytes]();
+	if (frame_buffer.buffer == nullptr) {
+		frame_buffer.w = 640;
+		frame_buffer.h = 480;
 
-	frame_buffer.terminate = false;
-	frame_buffer.th = new std::thread(frame_buffer_thread, &frame_buffer);
+		size_t n_bytes = size_t(frame_buffer.w) * size_t(frame_buffer.h) * 3;
+		frame_buffer.buffer = new uint8_t[n_bytes]();
+
+		frame_buffer.terminate = false;
+		frame_buffer.th = new std::thread(frame_buffer_thread, &frame_buffer);
+	}
 }
 
 void vnc_deinit()
 {
 	stop = true;
+
+	std::unique_lock<std::mutex> lck(frame_buffer.fb_lock);
 
 	if (frame_buffer.th) {
 		frame_buffer.terminate = true;
@@ -779,7 +786,16 @@ bool vnc_close_session_1(pstream *const ps, session *const s)
 	if (pd) {
 		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(pd);
 
+		{
+			const std::lock_guard<std::mutex> lck(vs->w_lock);
+			vs->wq.push(nullptr);
+			vs->w_cond.notify_one();
+		}
+
 		stats_add_average(vs->vpd->vnc_duration, time(nullptr) - vs->start);
+
+		vs->th->join();
+		delete vs->th;
 	}
 
 	return true;
@@ -791,15 +807,6 @@ bool vnc_close_session_2(pstream *const ps, session *const s)
 
 	if (pd) {
 		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(pd);
-
-		{
-			const std::lock_guard<std::mutex> lck(vs->w_lock);
-			vs->wq.push(nullptr);
-			vs->w_cond.notify_one();
-		}
-
-		vs->th->join();
-		delete vs->th;
 
 		free(vs->buffer);
 
@@ -813,14 +820,14 @@ bool vnc_close_session_2(pstream *const ps, session *const s)
 
 port_handler_t vnc_get_handler(stats *const s)
 {
-	port_handler_t tcp_vnc;
+	port_handler_t stream_vnc;
 
-	tcp_vnc.init             = vnc_init;
-	tcp_vnc.new_session      = vnc_new_session;
-	tcp_vnc.new_data         = vnc_new_data;
-	tcp_vnc.session_closed_1 = vnc_close_session_1;
-	tcp_vnc.session_closed_2 = vnc_close_session_2;
-	tcp_vnc.deinit           = vnc_deinit;
+	stream_vnc.init             = vnc_init;
+	stream_vnc.new_session      = vnc_new_session;
+	stream_vnc.new_data         = vnc_new_data;
+	stream_vnc.session_closed_1 = vnc_close_session_1;
+	stream_vnc.session_closed_2 = vnc_close_session_2;
+	stream_vnc.deinit           = vnc_deinit;
 
 	vnc_private_data *vpd = new vnc_private_data();
 
@@ -829,7 +836,7 @@ port_handler_t vnc_get_handler(stats *const s)
 	vpd->vnc_err      = s->register_stat("vnc_err", "1.3.6.1.2.1.4.57850.1.2.2");
 	vpd->vnc_duration = s->register_stat("vnc_duration", "1.3.6.1.2.1.4.57850.1.2.3");
 
-	tcp_vnc.pd = vpd;
+	stream_vnc.pd = vpd;
 
-	return tcp_vnc;
+	return stream_vnc;
 }
