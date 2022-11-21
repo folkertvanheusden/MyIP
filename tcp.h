@@ -59,8 +59,6 @@ public:
 	uint32_t seq_for_fin_when_all_received { 0     };
 	bool flag_fin_when_all_received        { false };
 
-	session_data *p { nullptr };
-
 public:
 	tcp_session(pstream *const t, const any_addr & my_addr, const int my_port, const any_addr & their_addr, const int their_port, private_data *app_private_data) :
 		session(t, my_addr, my_port, their_addr, their_port, app_private_data) {

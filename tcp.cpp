@@ -32,10 +32,6 @@ constexpr const char *const states[] = { "closed", "listen", "syn_rcvd", "syn_se
 void free_tcp_session(tcp_session *const p)
 {
 	free(p->unacked);
-
-	delete p->p;
-
-	delete p;
 }
 
 char *flags_to_str(uint8_t flags)
@@ -316,12 +312,12 @@ void tcp::packet_handler(const packet *const pkt)
 
 	if (cur_it == sessions.end()) {
 		if (flag_syn) {  // MUST start with SYN
-			private_data *pd = port_record.value().pd;
+			private_data *pd          = port_record.value().pd;
 
-			tcp_session *new_session = new tcp_session(this, pkt->get_dst_addr(), dst_port, pkt->get_src_addr(), src_port, pd);
+			tcp_session  *new_session = new tcp_session(this, pkt->get_dst_addr(), dst_port, pkt->get_src_addr(), src_port, pd);
 
-			new_session->state       = tcp_listen;
-			new_session->state_since = 0;
+			new_session->state        = tcp_listen;
+			new_session->state_since  = 0;
 
 			get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
 			new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
@@ -329,18 +325,16 @@ void tcp::packet_handler(const packet *const pkt)
 			new_session->initial_their_seq_nr = their_seq_nr;
 			new_session->their_seq_nr         = their_seq_nr + 1;
 
-			new_session->id = id;
+			new_session->id           = id;
 
-			new_session->is_client = false;
+			new_session->is_client    = false;
 
-			new_session->unacked                 = nullptr;
+			new_session->unacked      = nullptr;
 			new_session->unacked_start_seq_nr    = 0;
-			new_session->unacked_size            = 0;
+			new_session->unacked_size = 0;
 			new_session->fin_after_unacked_empty = false;
 
-			new_session->window_size = win_size;
-
-			new_session->p = nullptr;
+			new_session->window_size  = win_size;
 
 			sessions.insert({ id, new_session });
 
@@ -934,8 +928,6 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	new_session->seq_for_fin_when_all_received = 0;
 
 	new_session->window_size = idev->get_max_packet_size();
-
-	new_session->p = nullptr;
 
 	stats_inc_counter(tcp_new_sessions);
 
