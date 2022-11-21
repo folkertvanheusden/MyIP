@@ -298,11 +298,19 @@ void tcp::packet_handler(const packet *const pkt)
 
 	if (!has_listener) {
 		send_rst_for_port(pkt, dst_port, src_port);
-
+		delete pkt;
 		return;
 	}
 
 	std::unique_lock<std::mutex> lck(sessions_lock);
+
+	// check concuncurrent session count
+	if (sessions.size() >= 128) {
+		DOLOG(debug, "TCP[%012" PRIx64 "]: too many TCP sessions (%zu)\n", id, sessions.size());
+		// drop packet
+		delete pkt;
+		return;
+	}
 
 	auto cur_it = sessions.find(id);
 
