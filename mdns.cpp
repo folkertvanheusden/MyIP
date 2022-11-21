@@ -287,7 +287,7 @@ void mdns::operator()()
 			// TXT record
 			ro += add_txt(&mdns_buffer[ro], name);
 
-			// SRV midi record
+			// SRV record
 			ro += add_srv(&mdns_buffer[ro], name, tgt.port);
 
 			any_addr src_addr = tgt.interface->get_ip_address();

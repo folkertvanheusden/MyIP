@@ -150,9 +150,6 @@ void register_tcp_service(std::vector<phys *> *const devs, port_handler_t & tph,
 	}
 }
 
-// TODO:
-// problem: - no tcp/udp/sctp selection
-//          - no selection between ipv4 an ipv6
 void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const int port, const libconfig::Setting & settings)
 {
 	try {
