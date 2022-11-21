@@ -127,13 +127,7 @@ bool file_exists(const std::string & file, size_t *const file_size)
 
 void run(const std::string & what)
 {
-	pid_t pid = fork();
-
-	if (pid == 0)
-		exit(system(what.c_str()));
-
-	else if (pid == -1)
-		DOLOG(ll_error, "Failed invoking \"%s\"", what.c_str());
+	system(what.c_str());
 }
 
 void error_exit(const bool se, const char *format, ...)

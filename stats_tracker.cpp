@@ -8,6 +8,8 @@
 #include "utils.h"
 
 
+stats_tracker *st = new stats_tracker();
+
 stats_tracker::stats_tracker()
 {
 	th = new std::thread(std::ref(*this));

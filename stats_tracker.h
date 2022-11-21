@@ -35,3 +35,5 @@ public:
 
 	double get_cpu_usage() const;
 };
+
+extern stats_tracker *st;
