@@ -17,7 +17,7 @@ session::session(pstream *const t, const any_addr & my_addr, const int my_port, 
 
 session::~session()
 {
-	free(callback_private_data);
+	delete callback_private_data;
 }
 
 const any_addr session::get_their_addr() const
