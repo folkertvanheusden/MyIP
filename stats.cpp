@@ -35,13 +35,17 @@ void stats_add_counter(uint64_t *const p, const uint64_t value)
 
 void stats_set(uint64_t *const p, const uint64_t value)
 {
+#if defined(GCC_VERSION) && GCC_VERSION >= 40700
 	__atomic_store(p, &value, __ATOMIC_SEQ_CST);
+#else
+	*p = value; // hope for the best
+#endif
 }
 
 void stats_add_average(uint64_t *const p, const int val)
 {
 #if defined(GCC_VERSION) && GCC_VERSION >= 40700
-	// there's a small window where the values are
+	// there's a window where the values are
 	// not in sync
 	__atomic_add_fetch(p + 1, 1, __ATOMIC_SEQ_CST);
 	__atomic_add_fetch(p, val, __ATOMIC_SEQ_CST);
