@@ -83,10 +83,14 @@ typedef struct {
 class tcp : public ip_protocol, pstream
 {
 private:
-	icmp *const icmp_ { nullptr };
+	icmp  *const icmp_          { nullptr };
 
-	std::mutex sessions_lock;
-	std::condition_variable sessions_cv, unacked_cv;
+	std::thread *th_unacked_sender { nullptr };
+	std::thread *th_cleaner        { nullptr };
+
+	std::mutex              sessions_lock;
+	std::condition_variable sessions_cv;
+	std::condition_variable unacked_cv;
 	// the key is an 'internal id'
 	std::map<uint64_t, tcp_session *> sessions;
 
@@ -114,7 +118,7 @@ private:
 
 	void send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
 
-	void packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag);
+	void packet_handler(const packet *const pkt);
 	void cleanup_session_helper(std::map<uint64_t, tcp_session *>::iterator *it);
 	void session_cleaner();
 	void unacked_sender();

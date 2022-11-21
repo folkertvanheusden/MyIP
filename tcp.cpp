@@ -79,6 +79,10 @@ tcp::tcp(stats *const s, icmp *const icmp_) : ip_protocol(s, "tcp"), icmp_(icmp_
 
 	for(int i=0; i<4; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
+
+	th_cleaner = new std::thread(&tcp::session_cleaner, this);
+
+	th_unacked_sender = new std::thread(&tcp::unacked_sender, this);
 }
 
 tcp::~tcp()
@@ -90,6 +94,12 @@ tcp::~tcp()
 
 		delete th;
 	}
+
+	th_unacked_sender->join();
+	delete th_unacked_sender;
+
+	th_cleaner->join();
+	delete th_cleaner;
 }
 
 int rel_seqnr(const tcp_session *const ts, const bool mine, const uint32_t nr)
@@ -243,7 +253,7 @@ void tcp::send_rst_for_port(const packet *const pkt, const int dst_port, const i
 	delete [] temp;
 }
 
-void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finished_flag)
+void tcp::packet_handler(const packet *const pkt)
 {
 	set_thread_name("myip-ptcp-handler");
 
@@ -254,7 +264,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 		DOLOG(info, "TCP: packet too short [IC]\n");
 		delete pkt;
 		stats_inc_counter(tcp_errors);
-		*finished_flag = true;
 		return;
 	}
 
@@ -340,7 +349,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 			DOLOG(debug, "TCP[%012" PRIx64 "]: new session which does not start with SYN [IC]\n", id);
 			delete pkt;
 			stats_inc_counter(tcp_errors);
-			*finished_flag = true;
 			return;
 		}
 	}
@@ -655,8 +663,6 @@ void tcp::packet_handler(const packet *const pkt, std::atomic_bool *const finish
 	}
 
 	delete pkt;
-
-	*finished_flag = true;
 }
 
 void tcp::session_cleaner()
@@ -772,16 +778,10 @@ void tcp::unacked_sender()
 	}
 }
 
-// queue incoming packets
+// process incoming packets
 void tcp::operator()()
 {
 	set_thread_name("myip-tcp");
-
-	std::thread *cleaner = new std::thread(&tcp::session_cleaner, this);
-
-	std::thread *unacked_sender = new std::thread(&tcp::unacked_sender, this);
-
-	std::vector<tcp_packet_handle_thread_t *> threads;
 
 	while(!stop_flag) {
 		auto po = pkts->get(500);
@@ -792,40 +792,10 @@ void tcp::operator()()
 
 		stats_inc_counter(tcp_packets);
 
-		tcp_packet_handle_thread_t *handler_data = new tcp_packet_handle_thread_t;
-		handler_data->finished_flag = false;
-
-		handler_data->th = new std::thread(&tcp::packet_handler, this, pkt, &handler_data->finished_flag);
-
-		threads.push_back(handler_data);
-
-		for(size_t i=0; i<threads.size();) {
-			if (threads.at(i)->finished_flag) {
-				threads.at(i)->th->join();
-				delete threads.at(i)->th;
-				delete threads.at(i);
-
-				threads.erase(threads.begin() + i);
-			}
-			else {
-				i++;
-			}
-		}
+		packet_handler(pkt);
 
 		sessions_cv.notify_all();
 	}
-
-	for(auto t : threads) {
-		t->th->join();
-		delete t->th;
-		delete t;
-	}
-
-	unacked_sender->join();
-	delete unacked_sender;
-
-	cleaner->join();
-	delete cleaner;
 }
 
 void tcp::add_handler(const int port, port_handler_t & tph)
