@@ -77,7 +77,7 @@ void phys_slip::start()
 
 bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	DOLOG(debug, "phys_slip: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	DOLOG(ll_debug, "phys_slip: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	size_t out_size = pl_size * 2 + 2;
 	uint8_t *out = new uint8_t[out_size];
@@ -123,7 +123,7 @@ bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 
 void phys_slip::operator()()
 {
-	DOLOG(debug, "phys_slip: thread started\n");
+	DOLOG(ll_debug, "phys_slip: thread started\n");
 
 	set_thread_name("myip-phys_slip");
 
@@ -166,7 +166,7 @@ void phys_slip::operator()()
 			stats_inc_counter(phys_recv_frame);
 
 			if (packet_buffer.size() < 20) {
-				DOLOG(debug, "phys_slip: invalid packet, size %zu\n", packet_buffer.size());
+				DOLOG(ll_debug, "phys_slip: invalid packet, size %zu\n", packet_buffer.size());
 
 				if (size)
 					stats_inc_counter(phys_invl_frame);
@@ -178,11 +178,11 @@ void phys_slip::operator()()
 
 			any_addr src_mac((const uint8_t *)"\0\0\0\0\0\1", 6);
 
-			DOLOG(debug, "phys_slip: queing packet, size %zu\n", packet_buffer.size());
+			DOLOG(ll_debug, "phys_slip: queing packet, size %zu\n", packet_buffer.size());
 
 			auto it = prot_map.find(0x800);  // assuming IPv4
 			if (it == prot_map.end())
-				DOLOG(warning, "phys_slip: no IPv4 stack attached to SLIP device (yet)\n");
+				DOLOG(ll_warning, "phys_slip: no IPv4 stack attached to SLIP device (yet)\n");
 			else {
 				packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
 
@@ -196,5 +196,5 @@ void phys_slip::operator()()
 		}
 	}
 
-	DOLOG(info, "phys_slip: thread stopped\n");
+	DOLOG(ll_info, "phys_slip: thread stopped\n");
 }

@@ -79,7 +79,7 @@ std::string collect_performance_metrics()
 
 	// memory usage
 	if (getrusage(RUSAGE_SELF, &ru) == -1)
-		DOLOG(warning, "NRPE: getrusage failed\n");
+		DOLOG(ll_warning, "NRPE: getrusage failed\n");
 
 	out = myformat("|rss=%lukB;", ru.ru_maxrss);
 
@@ -151,7 +151,7 @@ bool nrpe_new_data(pstream *ps, session *ts, buffer_in b)
 	nrpe_session_data *t_s = static_cast<nrpe_session_data *>(ts->get_callback_private_data());
 
 	if (!ts) {
-		DOLOG(info, "NRPE: Data for a non-existing session\n");
+		DOLOG(ll_info, "NRPE: Data for a non-existing session\n");
 
 		stats_inc_counter(dynamic_cast<nrpe_private_data *>(ts->get_application_private_data())->nrpe_r_err);
 
@@ -161,7 +161,7 @@ bool nrpe_new_data(pstream *ps, session *ts, buffer_in b)
 	int data_len = b.get_n_bytes_left();
 
 	if (data_len == 0) {
-		DOLOG(debug, "NRPE: client closed session\n");
+		DOLOG(ll_debug, "NRPE: client closed session\n");
 
 		stats_inc_counter(dynamic_cast<nrpe_private_data *>(ts->get_application_private_data())->nrpe_r_err);
 

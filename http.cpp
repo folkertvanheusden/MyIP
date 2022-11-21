@@ -72,7 +72,7 @@ void send_response(session *ts, char *request)
 	std::vector<std::string> lines = split(request, "\r\n");
 
 	if (lines.size() == 0) {
-		DOLOG(info, "HTTP: empty request?\n");
+		DOLOG(ll_info, "HTTP: empty request?\n");
 		stats_inc_counter(hpd->http_r_err);
 		return;
 	}
@@ -80,7 +80,7 @@ void send_response(session *ts, char *request)
 	auto parts = split(lines.at(0), " ");
 
 	if (parts.size() < 3) {
-		DOLOG(warning, "HTTP: invalid request: %s\n", lines.at(0).c_str());
+		DOLOG(ll_warning, "HTTP: invalid request: %s\n", lines.at(0).c_str());
 		stats_inc_counter(hpd->http_r_err);
 		return;
 	}
@@ -123,7 +123,7 @@ void send_response(session *ts, char *request)
 		rc = 404;
 		reply = (uint8_t *)strdup("File does not exist.");
 		content_len = strlen((const char *)reply);
-		DOLOG(debug, "HTTP: requested file \"%s\" does not exist", path.c_str());
+		DOLOG(ll_debug, "HTTP: requested file \"%s\" does not exist", path.c_str());
 	}
 	else {
 		reply = (uint8_t *)calloc(1, file_size);
@@ -164,7 +164,7 @@ void send_response(session *ts, char *request)
 			stats_inc_counter(hpd->http_r_500);
 	}
 
-	DOLOG(debug, "HTTP: Send response %d for %s: %s\n", rc, hs->client_addr.c_str(), url.c_str());
+	DOLOG(ll_debug, "HTTP: Send response %d for %s: %s\n", rc, hs->client_addr.c_str(), url.c_str());
 
 	FILE *fh = fopen(logfile.c_str(), "a+");
 	if (fh) {
@@ -216,7 +216,7 @@ bool http_new_data(pstream *ps, session *ts, buffer_in b)
 	http_session_data *hs = static_cast<http_session_data *>(ts->get_callback_private_data());
 
 	if (!hs) {
-		DOLOG(info, "HTTP: Data for a non-existing session\n");
+		DOLOG(ll_info, "HTTP: Data for a non-existing session\n");
 		stats_inc_counter(dynamic_cast<http_private_data *>(ts->get_application_private_data())->http_r_err);
 		return false;
 	}
@@ -224,7 +224,7 @@ bool http_new_data(pstream *ps, session *ts, buffer_in b)
 	int data_len = b.get_n_bytes_left();
 
 	if (data_len == 0) {
-		DOLOG(debug, "HTTP: client closed session\n");
+		DOLOG(ll_debug, "HTTP: client closed session\n");
 		return true;
 	}
 

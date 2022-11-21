@@ -126,7 +126,7 @@ void lldp::operator()()
 		// every 15s
 		if (++sleep_cnt >= 30) {
 			if (default_pdev) {
-				DOLOG(debug, "lldp::operator: transmit LLDP packet\n");
+				DOLOG(ll_debug, "lldp::operator: transmit LLDP packet\n");
 
 				default_pdev->transmit_packet(dest_mac, my_mac, 0x88cc, payload.data(), payload.size());
 			}

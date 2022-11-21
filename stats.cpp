@@ -89,7 +89,7 @@ stats::stats(const int size, snmp_data *const sd) :
 
 stats::~stats()
 {
-	DOLOG(debug, "Removing shared memory segment\n");
+	DOLOG(ll_debug, "Removing shared memory segment\n");
 	munmap(p, size);
 
 	shm_unlink(shm_name);

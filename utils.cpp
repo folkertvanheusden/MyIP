@@ -108,7 +108,7 @@ void set_thread_name(std::string name)
 	if (name.length() > 15)
 		name = name.substr(0, 15);
 
-	DOLOG(debug, "Set name of thread %d to \"%s\"\n", gettid(), name.c_str());
+	DOLOG(ll_debug, "Set name of thread %d to \"%s\"\n", gettid(), name.c_str());
 
 	pthread_setname_np(pthread_self(), name.c_str());
 }

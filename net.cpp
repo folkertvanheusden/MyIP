@@ -56,7 +56,7 @@ std::optional<std::string> get_host_as_text(struct sockaddr *const a)
 		struct sockaddr_in6 *addr_in6 = reinterpret_cast<struct sockaddr_in6 *>(a);
 
 		if (!inet_ntop(a->sa_family, &addr_in6->sin6_addr, buffer, INET6_ADDRSTRLEN)) {
-			DOLOG(info, "Problem converting sockaddr: %s\n", strerror(errno));
+			DOLOG(ll_info, "Problem converting sockaddr: %s\n", strerror(errno));
 
 			return { };
 		}
@@ -65,13 +65,13 @@ std::optional<std::string> get_host_as_text(struct sockaddr *const a)
 		struct sockaddr_in *addr_in = reinterpret_cast<struct sockaddr_in *>(a);
 
 		if (!inet_ntop(a->sa_family, &addr_in->sin_addr, buffer, INET_ADDRSTRLEN)) {
-			DOLOG(info, "Problem converting sockaddr: %s\n", strerror(errno));
+			DOLOG(ll_info, "Problem converting sockaddr: %s\n", strerror(errno));
 
 			return { };
 		}
 	}
 	else {
-		DOLOG(warning, "Unsupported address family %d\n", a->sa_family);
+		DOLOG(ll_warning, "Unsupported address family %d\n", a->sa_family);
 
 		return { };
 	}

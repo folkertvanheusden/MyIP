@@ -12,11 +12,12 @@
 #include "time.h"
 
 
-static const char *logfile = strdup("/tmp/myip.log");
-log_level_t log_level_file = warning;
-log_level_t log_level_screen = warning;
-static FILE *lfh = nullptr;
-static int lf_uid = 0, lf_gid = 0;
+static const char *logfile          = strdup("/tmp/myip.log");
+log_level_t        log_level_file   = ll_warning;
+log_level_t        log_level_screen = ll_warning;
+static FILE       *lfh              = nullptr;
+static int         lf_uid           = 0;
+static int         lf_gid           = 0;
 
 void setlog(const char *lf, const log_level_t ll_file, const log_level_t ll_screen)
 {

@@ -54,7 +54,7 @@ std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip)
 
 	auto it = cache.find(ip);
 	if (it == cache.end()) {
-		DOLOG(warning, "address_cache: %s is not in the cache\n", ip.to_str().c_str());
+		DOLOG(ll_warning, "address_cache: %s is not in the cache\n", ip.to_str().c_str());
 		return { nullptr, nullptr };
 	}
 
@@ -91,7 +91,7 @@ void address_cache::cache_cleaner()
 		}
 
 		for(auto & e : delete_) {
-			DOLOG(debug, "address_cache: forgetting %s\n", e.to_str().c_str());
+			DOLOG(ll_debug, "address_cache: forgetting %s\n", e.to_str().c_str());
 
 			cache.erase(e);
 		}

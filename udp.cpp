@@ -44,7 +44,7 @@ void udp::operator()()
 		const int            size = pkt->get_size();
 
 		if (size < 8) {
-			DOLOG(debug, "UDP: packet too small (%d bytes)\n", size);
+			DOLOG(ll_debug, "UDP: packet too small (%d bytes)\n", size);
 			delete pkt;
 			continue;
 		}
@@ -54,7 +54,7 @@ void udp::operator()()
 
 		stats_inc_counter(udp_requests);
 
-		DOLOG(debug, "UDP: packet for port %d from port %d\n", dst_port, src_port);
+		DOLOG(ll_debug, "UDP: packet for port %d from port %d\n", dst_port, src_port);
 
 		cb_lock.lock_shared();
 		auto it = callbacks.find(dst_port);
@@ -103,7 +103,7 @@ void udp::remove_handler(const int port)
 
 bool udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
 {
-	DOLOG(debug, "UDP: transmit packet %d -> %d\n", src_port, dst_port);
+	DOLOG(ll_debug, "UDP: transmit packet %d -> %d\n", src_port, dst_port);
 
 	int out_size = 8 + pl_size;
 

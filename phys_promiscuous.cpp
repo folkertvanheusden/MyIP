@@ -65,7 +65,7 @@ phys_promiscuous::~phys_promiscuous()
 
 bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	DOLOG(debug, "phys_promiscuous: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	DOLOG(ll_debug, "phys_promiscuous: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	size_t   out_size = pl_size + 14;
 	uint8_t *out      = new uint8_t[out_size];
@@ -108,7 +108,7 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 
 void phys_promiscuous::operator()()
 {
-	DOLOG(debug, "phys_promiscuous: thread started\n");
+	DOLOG(ll_debug, "phys_promiscuous: thread started\n");
 
 	set_thread_name("myip-phys_promiscuous");
 
@@ -132,7 +132,7 @@ void phys_promiscuous::operator()()
 
 	        struct timespec ts { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-			DOLOG(warning, "clock_gettime failed: %s", strerror(errno));
+			DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
 
 		stats_inc_counter(phys_recv_frame);
 		stats_inc_counter(phys_ifInUcastPkts);
@@ -148,7 +148,7 @@ void phys_promiscuous::operator()()
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
-			DOLOG(info, "phys_promiscuous: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
+			DOLOG(ll_info, "phys_promiscuous: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
 			stats_inc_counter(phys_ign_frame);
 			continue;
 		}
@@ -157,12 +157,12 @@ void phys_promiscuous::operator()()
 
 		any_addr src_mac(&buffer[6], 6);
 
-		DOLOG(debug, "phys_promiscuous: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
+		DOLOG(ll_debug, "phys_promiscuous: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
 		packet *p = new packet(ts, src_mac, src_mac, dst_mac, &buffer[14], size - 14, &buffer[0], 14);
 
 		it->second->queue_packet(this, p);
 	}
 
-	DOLOG(info, "phys_promiscuous: thread stopped\n");
+	DOLOG(ll_info, "phys_promiscuous: thread stopped\n");
 }

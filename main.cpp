@@ -53,20 +53,20 @@ void free_handler(const port_handler_t & tph)
 log_level_t parse_ll(const std::string & ll)
 {
 	if (ll == "debug")
-		return debug;
+		return ll_debug;
 
 	if (ll == "info")
-		return info;
+		return ll_info;
 
 	if (ll == "warning")
-		return warning;
+		return ll_warning;
 
 	if (ll == "error")
 		return ll_error;
 
 	fprintf(stderr, "Log-level \"%s\" not understood\n", ll.c_str());
 
-	return debug;
+	return ll_debug;
 }
 
 void ss(int s)
@@ -83,7 +83,7 @@ std::string cfg_str(const libconfig::Setting & cfg, const std::string & key, con
 			error_exit(false, "\"%s\" not found (%s)", key.c_str(), descr);
 	}
 
-	DOLOG(info, "\"%s\" not found (%s), assuming default (%s)\n", key.c_str(), descr, def.c_str());
+	DOLOG(ll_info, "\"%s\" not found (%s), assuming default (%s)\n", key.c_str(), descr, def.c_str());
 
 	return def; // field is optional
 }
@@ -99,7 +99,7 @@ int cfg_int(const libconfig::Setting & cfg, const std::string & key, const char 
 		if (!optional)
 			error_exit(false, "\"%s\" not found (%s)", key.c_str(), descr);
 
-		DOLOG(info, "\"%s\" not found (%s), assuming default (%d)\n", key.c_str(), descr, def);
+		DOLOG(ll_info, "\"%s\" not found (%s), assuming default (%d)\n", key.c_str(), descr, def);
 	}
 
 	catch(const libconfig::SettingTypeException & ste) {
@@ -120,7 +120,7 @@ int cfg_bool(const libconfig::Setting & cfg, const char *const key, const char *
 		if (!optional)
 			error_exit(false, "\"%s\" not found (%s)", key, descr);
 
-		DOLOG(info, "\"%s\" not found (%s), assuming default (%d)\n", key, descr, def);
+		DOLOG(ll_info, "\"%s\" not found (%s), assuming default (%d)\n", key, descr, def);
 	}
 	catch(const libconfig::SettingTypeException & ste) {
 		error_exit(false, "Expected a boolean value for \"%s\" (%s) but got something else", key, descr);
@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
 		setlog(log_file.c_str(), parse_ll(llf), parse_ll(lls));
 	}
 
-	DOLOG(info, "*** START ***\n");
+	DOLOG(ll_info, "*** START ***\n");
 
 	signal(SIGINT, ss);
 
@@ -419,7 +419,7 @@ int main(int argc, char *argv[])
 
 			bool use_sctp = cfg_bool(ipv4_, "use-sctp", "wether to enable sctp", true, true);
 			if (use_sctp) {
-				DOLOG(debug, "Adding SCTP to IPv4\n");
+				DOLOG(ll_debug, "Adding SCTP to IPv4\n");
 
 				sctp *stcp_ = new sctp(&s, icmp_);
 				ipv4_instance->register_protocol(0x84, stcp_);
@@ -787,13 +787,13 @@ int main(int argc, char *argv[])
 		// just fine
 	}
 
-	DOLOG(debug, "*** STARTED ***\n");
+	DOLOG(ll_debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
 
 	getchar();
 
-	DOLOG(info, " *** TERMINATING ***\n");
+	DOLOG(ll_info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating fase 1\n");
 
 	for(auto & s : socks_proxies)
@@ -824,7 +824,7 @@ int main(int argc, char *argv[])
 	for(auto & d : devs)
 		delete d;
 
-	DOLOG(info, "THIS IS THE END\n");
+	DOLOG(ll_info, "THIS IS THE END\n");
 
 	closelog();
 

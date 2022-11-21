@@ -39,7 +39,7 @@ phys_sctp_udp::~phys_sctp_udp()
 
 bool phys_sctp_udp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	DOLOG(debug, "phys_sctp_udp: transmit packet (%zu bytes) %s -> %s\n", pl_size, src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	DOLOG(ll_debug, "phys_sctp_udp: transmit packet (%zu bytes) %s -> %s\n", pl_size, src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	stats_add_counter(phys_ifOutOctets, pl_size);
 	stats_add_counter(phys_ifHCOutOctets, pl_size);
@@ -78,7 +78,7 @@ bool phys_sctp_udp::transmit_packet(const any_addr & dst_mac, const any_addr & s
 
 void phys_sctp_udp::operator()()
 {
-	DOLOG(debug, "phys_sctp_udp: thread started\n");
+	DOLOG(ll_debug, "phys_sctp_udp: thread started\n");
 
 	set_thread_name("myip-phys_sctp_udp");
 
@@ -107,7 +107,7 @@ void phys_sctp_udp::operator()()
 
 	        struct timespec ts { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-			DOLOG(warning, "clock_gettime failed: %s", strerror(errno));
+			DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
 
 		auto    host = get_host_as_text(reinterpret_cast<sockaddr *>(&addr));
 
@@ -128,7 +128,7 @@ void phys_sctp_udp::operator()()
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
-			DOLOG(info, "phys_sctp_udp: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
+			DOLOG(ll_info, "phys_sctp_udp: dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
 			stats_inc_counter(phys_ign_frame);
 			continue;
 		}
@@ -136,7 +136,7 @@ void phys_sctp_udp::operator()()
 		uint8_t dummy_src_mac[6] { 0, 0, 0, 0, uint8_t(addr.sin_port >> 8), uint8_t(addr.sin_port) };
 		any_addr src_mac(dummy_src_mac, 6);
 
-		DOLOG(debug, "phys_sctp_udp: queing packet from %s (%s) to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), host.value().c_str(), my_mac.to_str().c_str(), ether_type, size);
+		DOLOG(ll_debug, "phys_sctp_udp: queing packet from %s (%s) to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), host.value().c_str(), my_mac.to_str().c_str(), ether_type, size);
 
 		uint8_t ip_buffer[1620] { 0 };
 
@@ -162,5 +162,5 @@ void phys_sctp_udp::operator()()
 		it->second->queue_packet(this, p);
 	}
 
-	DOLOG(info, "phys_sctp_udp: thread stopped\n");
+	DOLOG(ll_info, "phys_sctp_udp: thread stopped\n");
 }

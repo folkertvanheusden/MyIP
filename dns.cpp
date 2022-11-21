@@ -71,7 +71,7 @@ std::pair<std::string, int> get_name(const uint8_t *const base, const uint8_t *c
 void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, void *const pd)
 {
 	if (src_ip != dns_ip) {
-		DOLOG(info, "DNS response from unexpected address (%s)\n", src_ip.to_str().c_str());
+		DOLOG(ll_info, "DNS response from unexpected address (%s)\n", src_ip.to_str().c_str());
 		stats_inc_counter(dns_queries_alien_reply);
 		return;
 	}
@@ -79,7 +79,7 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 	const uint16_t *const header = (const uint16_t *)p->get_data();
 
 	if (ntohs(header[1]) == 0x8400) {  // standard query response, no error
-		DOLOG(debug, "DNS query response: %04x\n", ntohs(header[1]));
+		DOLOG(ll_debug, "DNS query response: %04x\n", ntohs(header[1]));
 		return;
 	}
 
@@ -90,7 +90,7 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 	const uint8_t *work_p = (const uint8_t *)&header[6];
 
-	DOLOG(debug, "DNS QDCOUNT: %d\n", qdcount);
+	DOLOG(ll_debug, "DNS QDCOUNT: %d\n", qdcount);
 
 	for(int i=0; i<qdcount; i++) {
 		auto name_len = get_name(p->get_data(), work_p, true);
@@ -102,10 +102,10 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		uint16_t class_ = (work_p[0] << 8) | work_p[1];
 		work_p += 2;
 
-		DOLOG(debug, "DNS QD name: %s / qtype: %04x / class: %04x\n", name_len.first.c_str(), type, class_);
+		DOLOG(ll_debug, "DNS QD name: %s / qtype: %04x / class: %04x\n", name_len.first.c_str(), type, class_);
 	}
 
-	DOLOG(debug, "DNS ANCOUNT: %d\n", ancount);
+	DOLOG(ll_debug, "DNS ANCOUNT: %d\n", ancount);
 
 	for(int i=0; i<ancount; i++) {
 		auto name_len = get_name(p->get_data(), work_p, true);
@@ -129,14 +129,14 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 			std::string name = name_len.first.substr(0, name_len.first.size() - 1);  // remove '.'
 
-			DOLOG(debug, "DNS: Mapping %s to %s\n", name.c_str(), a.to_str().c_str());
+			DOLOG(ll_debug, "DNS: Mapping %s to %s\n", name.c_str(), a.to_str().c_str());
 
 			std::unique_lock lck(lock);
 
 			cache.insert_or_assign(name, dr);
 		}
 		else {
-			DOLOG(debug, "DNS: type: %04x, class: %04x, len: %d for %s\n", type, class_, len, name_len.first.c_str());
+			DOLOG(ll_debug, "DNS: type: %04x, class: %04x, len: %d for %s\n", type, class_, len, name_len.first.c_str());
 		}
 	}
 

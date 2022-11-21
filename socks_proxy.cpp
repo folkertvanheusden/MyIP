@@ -26,7 +26,7 @@ ssize_t READ(int fd, uint8_t *whereto, size_t len)
 		if (rc == -1)
 		{
 			if (errno == EINTR || errno == EAGAIN) {
-				DOLOG(debug, "EINTR/EAGAIN %d", errno);
+				DOLOG(ll_debug, "EINTR/EAGAIN %d", errno);
 				continue;
 			}
 
@@ -56,7 +56,7 @@ ssize_t WRITE(int fd, const uint8_t *whereto, size_t len)
 		if (rc == -1)
 		{
 			if (errno == EINTR || errno == EAGAIN) {
-				DOLOG(debug, "EINTR/EAGAIN %d", errno);
+				DOLOG(ll_debug, "EINTR/EAGAIN %d", errno);
 				continue;
 			}
 
@@ -157,7 +157,7 @@ bool socks_new_data(pstream *const ps, session *const s, buffer_in data)
 {
 	int fd = static_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
 
-	DOLOG(debug, "socks_new_data for fd %d\n", fd);
+	DOLOG(ll_debug, "socks_new_data for fd %d\n", fd);
 
 	int data_len = data.get_n_bytes_left();
 
@@ -168,7 +168,7 @@ bool socks_session_closed_2(pstream *const ps, session *const s)
 {
 	int fd = static_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
 
-	DOLOG(debug, "socks_session_closed_2 for fd %d\n", fd);
+	DOLOG(ll_debug, "socks_session_closed_2 for fd %d\n", fd);
 
 	close(fd);
 
@@ -184,7 +184,7 @@ static std::string get_0x00_terminated_string(const int fd)
 		uint8_t buffer = 0;
 
 		if (READ(fd, &buffer, 1) != 1) {
-			DOLOG(debug, "socks_handler: problem receiving string\n");
+			DOLOG(ll_debug, "socks_handler: problem receiving string\n");
 			break;
 		}
 
@@ -199,25 +199,25 @@ static std::string get_0x00_terminated_string(const int fd)
 
 static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 {
-	DOLOG(debug, "socks_handler: handler started\n");
+	DOLOG(ll_debug, "socks_handler: handler started\n");
 
 	// get client request
 	uint8_t header[8];
 	if (READ(fd, header, sizeof header) != sizeof header) {
 		close(fd);
-		DOLOG(debug, "socks_handler: short read\n");
+		DOLOG(ll_debug, "socks_handler: short read\n");
 		return;
 	}
 
 	if (header[0] != 4) {  // must be socks 4
 		close(fd);
-		DOLOG(debug, "socks_handler: not version 4\n");
+		DOLOG(ll_debug, "socks_handler: not version 4\n");
 		return;
 	}
 
 	if (header[1] != 1) {  // connect
 		close(fd);
-		DOLOG(debug, "socks_handler: not \"connect\"\n");
+		DOLOG(ll_debug, "socks_handler: not \"connect\"\n");
 		return;
 	}
 
@@ -229,38 +229,38 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 	if (dest[0] == 0 && dest[1] == 0 && dest[2] == 0 && dest[3] != 0) {  // socks4a
 		std::string host = get_0x00_terminated_string(fd);
 
-		DOLOG(info, "socks_handler: resolving \"%s\" for fd %d\n", host.c_str(), fd);
+		DOLOG(ll_info, "socks_handler: resolving \"%s\" for fd %d\n", host.c_str(), fd);
 
 		// resolve host
 		auto a = dns_->query(host, 2500);  // time-out of 2.5s
 
 		if (a.has_value() == false) {
 			close(fd);
-			DOLOG(debug, "socks_handler: cannot resolve\n");
+			DOLOG(ll_debug, "socks_handler: cannot resolve\n");
 			return;
 		}
 
 		dest = a.value();
 	}
 
-	DOLOG(info, "socks_handler: connect to [%s]:%d (%s)\n", dest.to_str().c_str(), port, id.c_str());
+	DOLOG(ll_info, "socks_handler: connect to [%s]:%d (%s)\n", dest.to_str().c_str(), port, id.c_str());
 
 	socks_private_data spd(fd);
 
-	DOLOG(debug, "socks_handler: allocate client session\n");
+	DOLOG(ll_debug, "socks_handler: allocate client session\n");
 	int src_port = t->allocate_client_session(socks_new_data, socks_session_closed_2, dest, port, &spd);
 
-	DOLOG(debug, "socks_handler: waiting for session started\n");
+	DOLOG(ll_debug, "socks_handler: waiting for session started\n");
 
 	t->wait_for_client_connected_state(src_port);
 
-	DOLOG(debug, "socks_handler: client session allocated, local port: %d, fd: %d\n", src_port, fd);
+	DOLOG(ll_debug, "socks_handler: client session allocated, local port: %d, fd: %d\n", src_port, fd);
 
 	// send response
 	uint8_t response[8] { 0, 0x5a, uint8_t(port >> 8), uint8_t(port), 0 };
 	if (WRITE(fd, response, sizeof response) != sizeof response) {
 		close(fd);
-		DOLOG(debug, "socks_handler: problem sending response\n");
+		DOLOG(ll_debug, "socks_handler: problem sending response\n");
 		return;
 	}
 
@@ -269,12 +269,12 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 		int n = read(fd, buffer, sizeof buffer);
 
 		if (n == 0) {
-			DOLOG(debug, "socks_handler: closed (port %d, fd %)\n", port, fd);
+			DOLOG(ll_debug, "socks_handler: closed (port %d, fd %)\n", port, fd);
 			break;
 		}
 
 		if (n == -1) {
-			DOLOG(debug, "socks_handler: error (%s)\n", strerror(errno));
+			DOLOG(ll_debug, "socks_handler: error (%s)\n", strerror(errno));
 			break;
 		}
 
@@ -285,7 +285,7 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 
 	close(fd);
 
-	DOLOG(debug, "socks_handler: end (port %d, fd %)\n", port, fd);
+	DOLOG(ll_debug, "socks_handler: end (port %d, fd %)\n", port, fd);
 }
 
 void socks_proxy::operator()()
@@ -298,7 +298,7 @@ void socks_proxy::operator()()
 
                 int cfd = accept(fd, nullptr, nullptr);
 		if (cfd == -1) {
-			DOLOG(info, "accept for socks-proxy failed\n");
+			DOLOG(ll_info, "accept for socks-proxy failed\n");
 			continue;
 		}
 

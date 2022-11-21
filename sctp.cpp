@@ -18,7 +18,7 @@
 // - session cleaner
 
 // debug level
-constexpr log_level_t dl = info;
+constexpr log_level_t dl = ll_info;
 
 sctp::sctp(stats *const s, icmp *const icmp_) : ip_protocol(s, "sctp"), icmp_(icmp_)
 {
@@ -506,7 +506,7 @@ void sctp::operator()()
 
 				// transmit 'reply' (0x84 is SCTP protocol number)
 				if (transmit_packet(their_addr, pkt->get_dst_addr(), reply.get_content(), reply.get_size()) == false)
-					DOLOG(info, "SCTP[%lx]: failed to transmit reply packet\n", hash);
+					DOLOG(ll_info, "SCTP[%lx]: failed to transmit reply packet\n", hash);
 			}
 
 			if (terminate_session) {
@@ -573,7 +573,7 @@ bool sctp::send_data(session *const s_in, buffer_in & payload)
 		if (transmit_packet(s->get_their_addr(), s->get_my_addr(), out.get_content(), out.get_size()) == false) {
 			ok = false;
 
-			DOLOG(info, "SCTP[%lx]: failed to transmit send_data packet\n", s->get_hash());
+			DOLOG(ll_info, "SCTP[%lx]: failed to transmit send_data packet\n", s->get_hash());
 
 			break;
 		}
@@ -619,5 +619,5 @@ void sctp::end_session(session *const s_in)
 
 	// transmit 'reply' (0x84 is SCTP protocol number)
 	if (transmit_packet(s->get_their_addr(), s->get_my_addr(), out.get_content(), out.get_size()) == false)
-		DOLOG(info, "SCTP[%lx]: failed to transmit shutdown packet\n", s->get_hash());
+		DOLOG(ll_info, "SCTP[%lx]: failed to transmit shutdown packet\n", s->get_hash());
 }

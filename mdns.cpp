@@ -243,7 +243,7 @@ void mdns::operator()()
 	while(!stop_flag) {
 		sleep(5);
 
-		DOLOG(debug, "MDNS: transmit %zu records\n", protocols.size());
+		DOLOG(ll_debug, "MDNS: transmit %zu records\n", protocols.size());
 
 		constexpr uint8_t mc_addr[] { 224, 0, 0, 251 };
 
@@ -296,7 +296,7 @@ void mdns::operator()()
 			ro += add_a(&mdns_buffer[ro], name, src_addr);
 
 			if (!tgt.interface->transmit_packet(dst_ip, 5353, src_addr, 5353, mdns_buffer, ro))
-				DOLOG(warning, "MDNS: failed to transmit MDNS record for %s\n", src_addr.to_str().c_str());
+				DOLOG(ll_warning, "MDNS: failed to transmit MDNS record for %s\n", src_addr.to_str().c_str());
 		}
 	}
 }

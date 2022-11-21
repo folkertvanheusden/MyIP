@@ -69,7 +69,7 @@ void arp::operator()()
 			delete [] reply;
 		}
 		else {
-			DOLOG(debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(&p[24], 4).to_str().c_str());
+			DOLOG(ll_debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(&p[24], 4).to_str().c_str());
 		}
 
 		delete pkt;
