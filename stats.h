@@ -38,8 +38,6 @@ private:
 	uint8_t         *p    { nullptr };
 	int              len  { 0 };
 
-	std::map<std::string, stats_t>      lut;
-
 	std::map<std::string, fifo_stats *> fs;
 
 	mutable std::mutex lock;
