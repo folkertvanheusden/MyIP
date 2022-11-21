@@ -344,27 +344,27 @@ bool vnc_new_session(pstream *const ps, session *const s)
 	any_addr src_addr = s->get_their_addr();
 	vs->client_addr   = src_addr.to_str();
 
-	vs->buffer      = nullptr;
-	vs->buffer_size = 0;
+	vs->buffer        = nullptr;
+	vs->buffer_size   = 0;
 
-	vs->state = vs_initial_handshake_server_send;
+	vs->state         = vs_initial_handshake_server_send;
 
-	vs->depth = 32;
+	vs->depth         = 32;
 
-	vs->start = time(nullptr);
+	vs->start         = time(nullptr);
 
-	vs->vpd = static_cast<vnc_private_data *>(s->get_application_private_data());
+	vs->vpd           = static_cast<vnc_private_data *>(s->get_application_private_data());
 	stats_inc_counter(vs->vpd->vnc_requests);
 
 	s->set_callback_private_data(vs);
 
 	DOLOG(debug, "VNC: new session with %s\n", vs->client_addr.c_str());
 
-	vs->th = new std::thread(vnc_thread, s);
+	vs->th            = new std::thread(vnc_thread, s);
 
-	vs->strm.zalloc = 0;
-	vs->strm.zfree  = 0;
-	vs->strm.opaque = 0;
+	vs->strm.zalloc   = 0;
+	vs->strm.zfree    = 0;
+	vs->strm.opaque   = 0;
 	if (deflateInit(&vs->strm, Z_DEFAULT_COMPRESSION) != Z_OK)
 		DOLOG(warning, "VNC: zlib init failed\n");
 

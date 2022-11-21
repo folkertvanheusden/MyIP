@@ -59,7 +59,7 @@ bool nrpe_new_session(pstream *const t, session *t_s)
 {
 	nrpe_session_data *ts = new nrpe_session_data();
 	ts->req_data = nullptr;
-	ts->req_len = 0;
+	ts->req_len  = 0;
 
 	any_addr src_addr = t_s->get_their_addr();
 	ts->client_addr   = src_addr.to_str();
