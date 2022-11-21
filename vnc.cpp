@@ -38,6 +38,12 @@ struct frame_buffer_t
         mutable std::mutex cb_lock;
 	std::set<vnc_session_data *> callbacks;
 
+	bool has_listeners() const {
+		const std::lock_guard<std::mutex> lck(cb_lock);
+
+		return callbacks.empty() == false;
+	}
+
 	void register_callback(vnc_session_data *p) {
 		DOLOG(ll_info, "register_callback %p\n", p);
 		const std::lock_guard<std::mutex> lck(cb_lock);
@@ -172,10 +178,12 @@ void frame_buffer_thread(void *fb_in)
 
 		uint64_t now = get_us();
 
-		if (now - latest_update >= 999999) {  // 1 time per second
+		if (fb_work->has_listeners() && now - latest_update >= 999999) {  // 1 time per second
 			fb_work->fb_lock.lock();
 
 			latest_update = now;
+
+			int    subn = (rand() % 5) + 1;
 
 			time_t tnow = time(nullptr);
 
@@ -186,8 +194,8 @@ void frame_buffer_thread(void *fb_in)
 				for(int x=0; x<fb_work->w; x++) {
 					int o = y * fb_work->w * 3 + x * 3;
 
-					if (fb_work->buffer[o])
-						fb_work->buffer[o]--;
+					if (fb_work->buffer[o] >= subn)
+						fb_work->buffer[o] -= subn;
 				}
 			}
 
