@@ -326,7 +326,7 @@ codec_t select_schema(const std::vector<std::string> *const body, const int max_
 	}
 
 	if (best.id == 255) {
-		DOLOG(info, "SIP: no suitable codec found? picking sane default");
+		DOLOG(info, "SIP: no suitable codec found? picking sane default\n");
 		best.id = 8;
 		best.name = "pcma";  // safe choice
 		best.org_name = "PCMA";  // safe choice
