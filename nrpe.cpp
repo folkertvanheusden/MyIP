@@ -181,31 +181,31 @@ bool nrpe_new_data(pstream *ps, session *ts, buffer_in b)
 	return true;
 }
 
-bool nrpe_close_session_1(pstream *const ps, session *t_s)
+bool nrpe_close_session_1(pstream *const ps, session *ts)
 {
-	session_data *private_data = t_s->get_callback_private_data();
-
-	if (private_data) {
-		nrpe_session_data *ts = dynamic_cast<nrpe_session_data *>(private_data);
-
-		ts->terminate = true;
-
-		ts->th->join();
-		delete ts->th;
-		ts->th = nullptr;
-
-		free(ts->req_data);
-
-		delete ts;
-
-		t_s->set_callback_private_data(nullptr);
-	}
-
 	return true;
 }
 
 bool nrpe_close_session_2(pstream *const ps, session *ts)
 {
+	session_data *sd = ts->get_callback_private_data();
+
+	if (sd) {
+		nrpe_session_data *nsd = dynamic_cast<nrpe_session_data *>(sd);
+
+		nsd->terminate = true;
+
+		nsd->th->join();
+		delete nsd->th;
+		nsd->th = nullptr;
+
+		free(nsd->req_data);
+
+		delete nsd;
+
+		ts->set_callback_private_data(nullptr);
+	}
+
 	return true;
 }
 

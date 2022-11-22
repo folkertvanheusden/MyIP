@@ -29,9 +29,21 @@ constexpr const char *const states[] = { "closed", "listen", "syn_rcvd", "syn_se
 #define FLAG_SYN (1 << 1)
 #define FLAG_FIN (1 << 0)
 
-void free_tcp_session(tcp_session *const p)
+void tcp::free_tcp_session(tcp_session *const p)
 {
+	auto port_record = get_lock_listener(p->get_my_port(), -1);
+
+	if (port_record.has_value()) {
+		port_record.value().session_closed_1(this, p);
+
+		port_record.value().session_closed_2(this, p);
+	}
+
+	release_listener_lock();
+
 	free(p->unacked);
+
+	delete p;
 }
 
 char *flags_to_str(uint8_t flags)
@@ -96,6 +108,9 @@ tcp::~tcp()
 
 	th_cleaner->join();
 	delete th_cleaner;
+
+	for(auto & s : sessions)
+		free_tcp_session(s.second);
 }
 
 int rel_seqnr(const tcp_session *const ts, const bool mine, const uint32_t nr)

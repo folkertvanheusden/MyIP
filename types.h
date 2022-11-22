@@ -148,23 +148,23 @@ typedef enum {  vs_initial_handshake_server_send = 0,
 class vnc_session_data : public session_data
 {
 public:
-	char *buffer;
-	size_t buffer_size;
+	char  *buffer { nullptr };
+	size_t buffer_size { 0 };
 
-	vnc_state_t state;
+	vnc_state_t state { vs_initial_handshake_server_send };
 
-	uint8_t depth;  // 'bits per pixel' really
+	uint8_t depth { 8 };  // 'bits per pixel' really
 
-	std::thread *th;
+	std::thread *th { nullptr };
 
-	time_t start;
+	time_t start { 0 };
 
 	std::queue<vnc_thread_work_t *> wq;
         std::condition_variable w_cond;
         mutable std::mutex w_lock;
 
-	uint32_t prev_zsize = 0;
-	vnc_private_data *vpd;
+	uint32_t prev_zsize { 0 };
+	vnc_private_data *vpd { nullptr };
 
 	z_stream strm { 0 };
 };

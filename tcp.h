@@ -126,6 +126,8 @@ private:
 	std::optional<port_handler_t> get_lock_listener(const int dst_port, const uint64_t id);
 	void release_listener_lock();
 
+	void free_tcp_session(tcp_session *const p);
+
 public:
 	tcp(stats *const s, icmp *const icmp_);
 	virtual ~tcp();

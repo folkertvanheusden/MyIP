@@ -423,17 +423,6 @@ void mqtt_recv_thread(void *ts_in)
 
 bool mqtt_close_session_1(pstream *const ps, session *const ts)
 {
-        session_data *private_data = ts->get_callback_private_data();
-
-	if (private_data) {
-		mqtt_session_data *msd = dynamic_cast<mqtt_session_data *>(private_data);
-
-		msd->terminate = true;
-
-		const std::lock_guard<std::mutex> lck(msd->w_lock);
-		msd->w_cond.notify_one();
-	}
-
 	return true;
 }
 

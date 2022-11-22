@@ -110,14 +110,11 @@ void vnc_deinit()
 		frame_buffer.terminate = true;
 
 		frame_buffer.th->join();
-
 		delete frame_buffer.th;
 		frame_buffer.th = nullptr;
 
-		frame_buffer.fb_lock.lock();
 		delete [] frame_buffer.buffer;
 		frame_buffer.buffer = nullptr;
-		frame_buffer.fb_lock.unlock();
 	}
 }
 
@@ -435,7 +432,7 @@ void vnc_thread(session *ts)
 		{
 			std::unique_lock<std::mutex> lck(vs->w_lock);
 
-			for(;!stop;) {
+			for(;vs->state != vs_terminate && !stop;) {
 				if (vs->wq.empty() == false) {
 					work = vs->wq.front();
 					vs->wq.pop();
@@ -781,10 +778,17 @@ void vnc_thread(session *ts)
 
 bool vnc_close_session_1(pstream *const ps, session *const s)
 {
-	private_data *const pd = dynamic_cast<private_data *>(s->get_callback_private_data());
+	return true;
+}
 
-	if (pd) {
-		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(pd);
+bool vnc_close_session_2(pstream *const ps, session *const s)
+{
+	session_data *const sd = s->get_callback_private_data();
+
+	if (sd) {
+		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(sd);
+
+		vs->state = vs_terminate;
 
 		{
 			const std::lock_guard<std::mutex> lck(vs->w_lock);
@@ -796,19 +800,10 @@ bool vnc_close_session_1(pstream *const ps, session *const s)
 
 		vs->th->join();
 		delete vs->th;
-	}
-
-	return true;
-}
-
-bool vnc_close_session_2(pstream *const ps, session *const s)
-{
-	private_data *const pd = dynamic_cast<private_data *>(s->get_callback_private_data());
-
-	if (pd) {
-		vnc_session_data *vs = dynamic_cast<vnc_session_data *>(pd);
 
 		free(vs->buffer);
+
+		deflateEnd(&vs->strm);
 
 		delete vs;
 

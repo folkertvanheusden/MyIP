@@ -242,6 +242,11 @@ bool http_new_data(pstream *ps, session *ts, buffer_in b)
 
 bool http_close_session_1(pstream *const ps, session *const ts)
 {
+	return true;
+}
+
+bool http_close_session_2(pstream *const ps, session *ts)
+{
 	http_session_data *hs  = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
 
 	if (hs) {
@@ -258,11 +263,6 @@ bool http_close_session_1(pstream *const ps, session *const ts)
 		ts->set_callback_private_data(nullptr);
 	}
 
-	return true;
-}
-
-bool http_close_session_2(pstream *const ps, session *ts)
-{
 	return true;
 }
 
