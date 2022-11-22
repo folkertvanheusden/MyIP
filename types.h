@@ -180,7 +180,7 @@ private:
 
 public:
 	socks_session_data(const int fd) : fd(fd) { }
-	virtual ~socks_session_data() = default;
+	~socks_session_data() { close(fd); }
 
 	int get_fd() const { return fd; }
 };

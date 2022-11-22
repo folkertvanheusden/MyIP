@@ -245,10 +245,10 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 
 	DOLOG(ll_info, "socks_handler: connect to [%s]:%d (%s)\n", dest.to_str().c_str(), port, id.c_str());
 
-	socks_session_data ssd(fd);
+	socks_session_data *ssd = new socks_session_data(fd);
 
 	DOLOG(ll_debug, "socks_handler: allocate client session\n");
-	int src_port = t->allocate_client_session(socks_new_data, socks_session_closed_2, dest, port, &ssd);
+	int src_port = t->allocate_client_session(socks_new_data, socks_session_closed_2, dest, port, ssd);
 
 	DOLOG(ll_debug, "socks_handler: waiting for session started\n");
 
@@ -282,8 +282,6 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 	}
 
 	t->close_client_session(src_port);
-
-	close(fd);
 
 	DOLOG(ll_debug, "socks_handler: end (port %d, fd %)\n", port, fd);
 }
