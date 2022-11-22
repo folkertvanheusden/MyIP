@@ -9,7 +9,7 @@ SCTP, MDNS and SNMP.
 required
 --------
 * C++ compiler
-* A posix system that has support for 'tap' virtual network devices (e.g. Linux and BSD, see https://en.wikipedia.org/wiki/TUN/TAP ).
+* A posix system that has support for 'tap' virtual network devices (e.g. Linux and BSD, see https://en.wikipedia.org/wiki/TUN/TAP ) or "promiscuous mode".
 
 how to build
 ------------
@@ -26,7 +26,10 @@ As root:
 
 	./myip configuration-file.cfg
 
-Look at 'example.cfg' on how to configure the stack.
+Look at 'example.cfg' to see what is possible.
+
+Ideally you have a computer/virtual machine with 2 network-interfaces (or a serial port for PPP/SLIP). Then one port would be the usual LAN port, the other can be assigned to MyIP. The MyIP port can be used as a TAP-device or via "promiscuous-mode".
+
 
 After you have started `myip', a 'myip' network device has appeared.
 Of course, your "local IP address" must be configured (remote is the MyIP instance, local is the Linux system; so for the example.ini: 192.168.3.2 is the MyIP address and you could e.g. add 192.168.3.1 to the 'myip' network interface).
@@ -49,7 +52,7 @@ See http://myip.vanheusden.com/
 
 Use myip6.vanheusden.com for IPv6 access.
 
-It also runs an NTP, SIP, SNMP, MQTT and VNC server.
+It also runs an MQTT, NRPE, NTP, SIP, SNMP and VNC server.
 
 copyright
 ---------
