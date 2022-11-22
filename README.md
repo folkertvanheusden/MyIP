@@ -50,7 +50,7 @@ demo
 ----
 See http://myip.vanheusden.com/
 
-Use myip6.vanheusden.com for IPv6 access.
+It listens to both IPv4 as well as IPv6. It performs HTTP over TCP but also over SCTP.
 
 It also runs an MQTT, NRPE, NTP, SIP, SNMP and VNC server.
 
