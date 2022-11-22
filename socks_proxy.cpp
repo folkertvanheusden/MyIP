@@ -155,7 +155,7 @@ socks_proxy::~socks_proxy()
 
 bool socks_new_data(pstream *const ps, session *const s, buffer_in data)
 {
-	int fd = dynamic_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
+	int fd = dynamic_cast<socks_session_data *>(s->get_callback_private_data())->get_fd();
 
 	DOLOG(ll_debug, "socks_new_data for fd %d\n", fd);
 
@@ -166,7 +166,7 @@ bool socks_new_data(pstream *const ps, session *const s, buffer_in data)
 
 bool socks_session_closed_2(pstream *const ps, session *const s)
 {
-	int fd = dynamic_cast<socks_private_data *>(s->get_callback_private_data())->get_fd();
+	int fd = dynamic_cast<socks_session_data *>(s->get_callback_private_data())->get_fd();
 
 	DOLOG(ll_debug, "socks_session_closed_2 for fd %d\n", fd);
 
@@ -184,7 +184,7 @@ static std::string get_0x00_terminated_string(const int fd)
 		uint8_t buffer = 0;
 
 		if (READ(fd, &buffer, 1) != 1) {
-			DOLOG(ll_debug, "socks_handler: problem receiving string\n");
+			DOLOG(ll_debug, "get_0x00_terminated_string: problem receiving string\n");
 			break;
 		}
 
@@ -245,10 +245,10 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 
 	DOLOG(ll_info, "socks_handler: connect to [%s]:%d (%s)\n", dest.to_str().c_str(), port, id.c_str());
 
-	socks_private_data spd(fd);
+	socks_session_data ssd(fd);
 
 	DOLOG(ll_debug, "socks_handler: allocate client session\n");
-	int src_port = t->allocate_client_session(socks_new_data, socks_session_closed_2, dest, port, &spd);
+	int src_port = t->allocate_client_session(socks_new_data, socks_session_closed_2, dest, port, &ssd);
 
 	DOLOG(ll_debug, "socks_handler: waiting for session started\n");
 

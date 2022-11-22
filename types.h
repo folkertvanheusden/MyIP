@@ -19,18 +19,6 @@ public:
 	virtual ~private_data() = default;
 };
 
-class socks_private_data : public private_data
-{
-private:
-	const int fd { -1 };
-
-public:
-	socks_private_data(const int fd) : fd(fd) { }
-	virtual ~socks_private_data() = default;
-
-	int get_fd() const { return fd; }
-};
-
 class http_private_data : public private_data
 {
 public:
@@ -183,4 +171,16 @@ public:
 	std::string session_name;
 
 	std::atomic_bool terminate { false };
+};
+
+class socks_session_data : public session_data
+{
+private:
+	const int fd { -1 };
+
+public:
+	socks_session_data(const int fd) : fd(fd) { }
+	virtual ~socks_session_data() = default;
+
+	int get_fd() const { return fd; }
 };

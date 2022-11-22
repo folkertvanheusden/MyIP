@@ -893,11 +893,11 @@ void tcp::end_session(session *const ts_in)
 	}
 }
 
-int tcp::allocate_client_session(const std::function<bool(pstream *const ps, session *const s, buffer_in data)> & new_data, const std::function<bool(pstream *const ps, session *const s)> & session_closed_2, const any_addr & dst_addr, const int dst_port, private_data *const pd)
+int tcp::allocate_client_session(const std::function<bool(pstream *const ps, session *const s, buffer_in data)> & new_data, const std::function<bool(pstream *const ps, session *const s)> & session_closed_2, const any_addr & dst_addr, const int dst_port, session_data *const sd)
 {
 	port_handler_t handler { 0 };
 	handler.new_data         = new_data;
-	handler.pd               = pd;
+	handler.pd               = nullptr;
 	handler.session_closed_2 = session_closed_2;
 
 	// generate id/port mapping
@@ -921,7 +921,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	tcp_clients.insert({ port, id });
 
 	// generate tcp session
-	tcp_session *new_session = new tcp_session(this, dst_addr, dst_port, src, port, pd);
+	tcp_session *new_session = new tcp_session(this, dst_addr, dst_port, src, port, nullptr);
 	new_session->state       = tcp_syn_sent;
 	new_session->state_since = time(nullptr);
 
@@ -943,6 +943,8 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	new_session->seq_for_fin_when_all_received = 0;
 
 	new_session->window_size = idev->get_max_packet_size();
+
+	new_session->set_callback_private_data(sd);
 
 	stats_inc_counter(tcp_new_sessions);
 
