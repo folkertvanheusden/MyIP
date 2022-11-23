@@ -199,6 +199,12 @@ void register_sctp_service(std::vector<phys *> *const devs, port_handler_t & sph
 	}
 }
 
+void progress(const int cur, const int total)
+{
+	printf("%3.2f%% \r", cur * 100. / total);
+
+	fflush(nullptr);
+}
 
 int main(int argc, char *argv[])
 {
@@ -798,33 +804,52 @@ int main(int argc, char *argv[])
 	DOLOG(ll_info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating fase 1\n");
 
+	int n_actions = 0;
+
 	for(auto & s : socks_proxies)
-		s-> ask_to_stop();
+		s-> ask_to_stop(), n_actions++;
 
 	for(auto & a : applications)
-		a->ask_to_stop();
+		a->ask_to_stop(), n_actions++;
 
 	for(auto & d : devs)
-		d->ask_to_stop();
+		d->ask_to_stop(), n_actions++;
 
 	for(auto & p : ip_protocols)
-		p->ask_to_stop();
-
-	fprintf(stderr, "terminating fase 2\n");
-	for(auto & s : socks_proxies)
-		delete s;
-
-	for(auto & a : applications)
-		delete a;
-
-	for(auto & p : ip_protocols)
-		delete p;
+		p->ask_to_stop(), n_actions++;
 
 	for(auto & p : protocols)
-		delete p;
+		p->ask_to_stop(), n_actions++;
 
-	for(auto & d : devs)
+	fprintf(stderr, "Number of actions left: %d\n", n_actions);
+
+	fprintf(stderr, "terminating fase 2\n");
+	int n_actions_done = 0;
+
+	for(auto & s : socks_proxies) {
+		progress(n_actions_done++, n_actions);
+		delete s;
+	}
+
+	for(auto & a : applications) {
+		progress(n_actions_done++, n_actions);
+		delete a;
+	}
+
+	for(auto & p : ip_protocols) {
+		progress(n_actions_done++, n_actions);
+		delete p;
+	}
+
+	for(auto & p : protocols) {
+		progress(n_actions_done++, n_actions);
+		delete p;
+	}
+
+	for(auto & d : devs) {
+		progress(n_actions_done++, n_actions);
 		delete d;
+	}
 
 	DOLOG(ll_info, "THIS IS THE END\n");
 
