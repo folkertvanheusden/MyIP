@@ -3,7 +3,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <string.h>
+#include <vector>
 
 #include "log.h"
 #include "str.h"
@@ -14,50 +16,14 @@
 #include "stats-utils.h"
 
 
-void send_response(session *ts, char *request);
-
 using namespace std::chrono_literals;
 
-void http_thread(session *ts)
+std::vector<uint8_t> str_to_vector(const std::string & in)
 {
-        set_thread_name("myip-http");
-
-        http_session_data *hs = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
-
-        for(;hs->terminate == false;) {
-		std::unique_lock<std::mutex> lck(hs->r_lock);
-
-		if (hs->req_data) {
-			char *end_marker = strstr(hs->req_data, "\r\n\r\n");
-			if (end_marker) {
-				send_response(ts, hs->req_data);
-				break;
-			}
-		}
-
-		hs->r_cond.wait_for(lck, 500ms);
-	}
+	return std::vector<uint8_t>(reinterpret_cast<const uint8_t *>(in.c_str()), reinterpret_cast<const uint8_t *>(in.c_str() + in.size()));
 }
 
-bool http_new_session(pstream *const t, session *ts)
-{
-	http_session_data *hs = new http_session_data();
-	hs->req_data = nullptr;
-	hs->req_len  = 0;
-
-	any_addr src_addr = ts->get_their_addr();
-	hs->client_addr   = src_addr.to_str();
-
-	ts->set_callback_private_data(hs);
-
-	stats_inc_counter(dynamic_cast<http_private_data *>(ts->get_application_private_data())->http_requests);
-
-	hs->th = new std::thread(http_thread, ts);
-
-	return true;
-}
-
-void send_response(session *ts, char *request)
+std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(session *const ts, const std::string & request)
 {
 	http_session_data *hs  = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
 	http_private_data *hpd = dynamic_cast<http_private_data *>(ts->get_application_private_data());
@@ -65,94 +31,95 @@ void send_response(session *ts, char *request)
 	std::string logfile  = hpd->logfile;
 	std::string web_root = hpd->web_root;
 
-	char *endm = strstr(request, "\r\n\r\n");
-	if (endm)
-		*endm = 0x00;
+	std::size_t end_marker = request.find("\r\n\r\n");
 
-	std::vector<std::string> lines = split(request, "\r\n");
+	if (end_marker == std::string::npos) {
+		DOLOG(ll_info, "HTTP: empty request?\n");
+
+		stats_inc_counter(hpd->http_r_err);
+
+		return { };
+	}
+
+	std::vector<std::string> lines = split(request.substr(0, end_marker), "\r\n");
 
 	if (lines.size() == 0) {
 		DOLOG(ll_info, "HTTP: empty request?\n");
+
 		stats_inc_counter(hpd->http_r_err);
-		return;
+
+		return { };
 	}
 
 	auto parts = split(lines.at(0), " ");
 
 	if (parts.size() < 3) {
 		DOLOG(ll_warning, "HTTP: invalid request: %s\n", lines.at(0).c_str());
+
 		stats_inc_counter(hpd->http_r_err);
-		return;
+
+		return { };
 	}
 
-	std::string url = parts.at(1);
-	bool get = parts.at(0) == "GET";
+	std::string url  = parts.at(1);
 
-	int rc = 200;
-	uint8_t *reply = nullptr;
-	long content_len = 0;
+	int         rc   = 200;
 
-	auto host = find_header(&lines, "Host");
+	auto        host = find_header(&lines, "Host");
 
 	if (url == "" || url == "/")
 		url = "index.html";
 
-	std::string path = web_root + "/" + (host.has_value() ? host.value() : "default") + "/" + url;
+	std::string            path      = web_root + "/" + (host.has_value() ? host.value() : "default") + "/" + url;
 
-	std::string::size_type dot = url.rfind(".");
-	std::string ext = dot == std::string::npos ? "" : url.substr(dot);
-	std::string mime_type = "text/plain";
+	std::string::size_type dot       = url.rfind(".");
+	std::string            ext       = dot == std::string::npos ? "" : url.substr(dot);
+	std::string            mime_type = "text/plain";
 
 	if (ext == ".html")
 		mime_type = "text/html";
 	else if (ext == ".ico")
 		mime_type = "image/x-icon";
 
+	std::vector<uint8_t> content;
+
 	size_t file_size = 0;
 	if (url.find("..") != std::string::npos) {
-		rc = 500;
-		reply = (uint8_t *)strdup("Server error.");
-		content_len = strlen((const char *)reply);
+		rc      = 500;
+		content = str_to_vector("Server error.");
 	}
 	else if (url == "/stats.json") {
-		reply = (uint8_t *)strdup(hpd->s->to_json().c_str());
-		content_len = strlen((const char *)reply);
+		content   = str_to_vector(hpd->s->to_json());
 		mime_type = "application/json";
 	}
 	else if (file_exists(path, &file_size) == false) {
-		rc = 404;
-		reply = (uint8_t *)strdup("File does not exist.");
-		content_len = strlen((const char *)reply);
+		rc      = 404;
+		content = str_to_vector("File does not exist.");
 		DOLOG(ll_debug, "HTTP: requested file \"%s\" does not exist", path.c_str());
 	}
 	else {
-		reply = (uint8_t *)calloc(1, file_size);
-		content_len = file_size;
+		content.resize(file_size);
 
 		FILE *fh = fopen(path.c_str(), "rb");
 		if (fh) {
-			int frc = fread(reply, 1, file_size, fh);
+			int frc = fread(content.data(), 1, file_size, fh);
 			fclose(fh);
 
 			if (size_t(frc) != file_size) {
-				rc = 500;
-				free(reply);
-				reply = (uint8_t *)strdup("Short read.");
-				content_len = strlen((const char *)reply);
+				rc      = 500;
+				content = str_to_vector("Cannot read file.");
 			}
 		}
 		else {
-			rc = 500;
-			free(reply);
-			reply = (uint8_t *)strdup("File went away.");
-			content_len = strlen((const char *)reply);
+			rc      = 500;
+			content = str_to_vector("File disappeared before it could be read.");
 		}
 	}
 
 	std::string header;
 
 	if (rc == 200) {
-		header = myformat("HTTP/1.0 %d OK\r\nServer: MyIP\r\nContent-Type: %s\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n", rc, mime_type.c_str(), content_len);
+		header = myformat("HTTP/1.0 %d OK\r\nServer: MyIP\r\nContent-Type: %s\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n", rc, mime_type.c_str(), content.size());
 		stats_inc_counter(hpd->http_r_200);
 	}
 	else {
@@ -183,8 +150,8 @@ void send_response(session *ts, char *request)
 				tm.tm_mday, month[tm.tm_mon], tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec,
 				(parts.at(0) + " " + parts.at(1) + " " + parts.at(2)).c_str(),
 				rc,
-				content_len,
-				(referer.has_value() ? referer.value() : "-").c_str(),
+				content.size(),
+				(referer.has_value()    ? referer.value()    : "-").c_str(),
 				(user_agent.has_value() ? user_agent.value() : "-").c_str());
 
 		fclose(fh);
@@ -193,21 +160,56 @@ void send_response(session *ts, char *request)
 		DOLOG(ll_error, "HTTP: Cannot access log file (%s): %s\n", logfile.c_str(), strerror(errno));
 	}
 
-	if (ts->get_stream_target()->send_data(ts, (const uint8_t *)header.c_str(), header.size())) {
-		if (get) {
-			if (reply)
-				ts->get_stream_target()->send_data(ts, reply, content_len);
-			else {
-				const char err[] = "Something went wrong: you should not see this.";
+	return { { header, content } };
+}
 
-				ts->get_stream_target()->send_data(ts, (const uint8_t *)err, sizeof(err) - 1);
+void http_thread(session *ts)
+{
+        set_thread_name("myip-http");
+
+        http_session_data *hs = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
+
+        for(;hs->terminate == false;) {
+		std::unique_lock<std::mutex> lck(hs->r_lock);
+
+		if (hs->req_data) {
+			char *end_marker = strstr(hs->req_data, "\r\n\r\n");
+			if (end_marker) {
+				auto rc = generate_response(ts, hs->req_data);
+
+				if (rc.has_value()) {
+					if (ts->get_stream_target()->send_data(ts, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size())) {
+						if (rc.value().second.empty() == false)
+							ts->get_stream_target()->send_data(ts, rc.value().second.data(), rc.value().second.size());
+					}
+				}
+
+				ts->get_stream_target()->end_session(ts);
+
+				break;
 			}
 		}
+
+		hs->r_cond.wait_for(lck, 500ms);
 	}
+}
 
-	ts->get_stream_target()->end_session(ts);
+bool http_new_session(pstream *const t, session *ts)
+{
+	http_session_data *hs = new http_session_data();
+	hs->req_data = nullptr;
+	hs->req_len  = 0;
 
-	free(reply);
+	any_addr src_addr = ts->get_their_addr();
+	hs->client_addr   = src_addr.to_str();
+
+	ts->set_callback_private_data(hs);
+
+	stats_inc_counter(dynamic_cast<http_private_data *>(ts->get_application_private_data())->http_requests);
+
+	hs->th = new std::thread(http_thread, ts);
+
+	return true;
 }
 
 bool http_new_data(pstream *ps, session *ts, buffer_in b)
