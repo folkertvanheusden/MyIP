@@ -535,7 +535,7 @@ void tcp::packet_handler(const packet *const pkt)
 
 		const uint8_t *data_start = &p[header_size];
 
-		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: %s\n", id, std::string((const char *)&p[header_size], data_len).c_str());
+		// DOLOG(ll_debug, "TCP[%012" PRIx64 "]: %s\n", id, std::string((const char *)&p[header_size], data_len).c_str());
 
 		if (their_seq_nr == cur_session->their_seq_nr) {
 			// std::string content = bin_to_text(data_start, data_len);
