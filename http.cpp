@@ -6,7 +6,10 @@
 #include <string>
 #include <string.h>
 #include <vector>
+#include <bearssl/bearssl.h>
 
+#include "chain-rsa.h"  // TODO replace by files
+#include "key-rsa.h"    // TODO replace by files
 #include "log.h"
 #include "str.h"
 #include "tcp.h"
@@ -137,10 +140,10 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 	if (fh) {
 		auto      temp = ts->get_session_creation_time();
 
-		struct tm tm { 0 };
+		tm tm { 0 };
 		gmtime_r(&temp.tv_sec, &tm);
 
-		const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+		constexpr const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
 		auto referer    = find_header(&lines, "Referer");
 		auto user_agent = find_header(&lines, "User-Agent");
@@ -194,6 +197,106 @@ void http_thread(session *ts)
 	}
 }
 
+typedef struct {
+	http_session_data *hs;
+	session           *s;
+} https_ctx;
+
+int sock_read(void *ctx, unsigned char *buf, size_t len)
+{
+	https_ctx *const hc = reinterpret_cast<https_ctx *>(ctx);
+
+	for(;;) {
+		std::unique_lock<std::mutex> lck(hc->hs->r_lock);
+
+		if (hc->hs->req_len >= len) {
+			memcpy(buf, hc->hs->req_data, len);
+
+			size_t left = hc->hs->req_len - len;
+
+			if (left > 0)
+				memmove(&hc->hs->req_data[0], &hc->hs->req_data[len], left);
+
+			hc->hs->req_len -= len;
+
+			return len;
+		}
+
+		hc->hs->r_cond.wait_for(lck, 500ms);
+	}
+
+	return -1;
+}
+
+int sock_write(void *ctx, const unsigned char *buf, size_t len)
+{
+	https_ctx *const hc = reinterpret_cast<https_ctx *>(ctx);
+
+	if (hc->s->get_stream_target()->send_data(hc->s, buf, len))
+		return len;
+
+	return -1;
+}
+
+void https_thread(session *ts)
+{
+        set_thread_name("myip-https");
+
+	printf("hier001\n");
+
+        http_session_data *hs = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
+
+	https_ctx hc { hs, ts };
+
+	br_ssl_server_context sc { 0 };
+	unsigned char iobuf[BR_SSL_BUFSIZE_BIDI] { 0 };
+	br_sslio_context ioc { 0 };
+
+	br_ssl_server_init_full_rsa(&sc, CHAIN, CHAIN_LEN, &RSA);
+
+	br_ssl_engine_set_buffer(&sc.eng, iobuf, sizeof iobuf, 1);
+
+	br_ssl_server_reset(&sc);
+
+	printf("hier002\n");
+
+	br_sslio_init(&ioc, &sc.eng, sock_read, &hc, sock_write, &hc);
+
+	std::string headers;
+
+        for(;hs->terminate == false;) {
+		char x { 0 };
+
+		if (br_sslio_read(&ioc, &x, 1) < 0)
+			break;
+
+		headers += x;
+
+		if (x == 0x0a) {
+			if (headers.find("\r\n\r\n") != std::string::npos) {
+	printf("hier003\n");
+				auto rc = generate_response(ts, headers);
+
+				if (rc.has_value()) {
+					br_sslio_write_all(&ioc, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size());
+
+					if (rc.value().second.empty() == false)
+						br_sslio_write_all(&ioc, rc.value().second.data(), rc.value().second.size());
+				}
+
+				break;
+			}
+		}
+	}
+	printf("hier004\n");
+
+	br_sslio_close(&ioc);
+	printf("hier005\n");
+
+	ts->get_stream_target()->end_session(ts);
+	printf("hier006\n");
+}
+
 bool http_new_session(pstream *const t, session *ts)
 {
 	http_session_data *hs = new http_session_data();
@@ -207,7 +310,9 @@ bool http_new_session(pstream *const t, session *ts)
 
 	stats_inc_counter(dynamic_cast<http_private_data *>(ts->get_application_private_data())->http_requests);
 
-	hs->th = new std::thread(http_thread, ts);
+	http_private_data *hpd = dynamic_cast<http_private_data *>(ts->get_application_private_data());
+
+	hs->th = new std::thread(hpd->is_https ? https_thread : http_thread, ts);
 
 	return true;
 }
@@ -268,34 +373,33 @@ bool http_close_session_2(pstream *const ps, session *ts)
 	return true;
 }
 
-port_handler_t http_get_handler(stats *const s, const std::string & web_root, const std::string & logfile)
+port_handler_t http_get_handler(stats *const s, const std::string & web_root, const std::string & logfile, const bool is_https)
 {
-	port_handler_t http;
+	port_handler_t http { 0 };
 
-	http.init             = nullptr;
-	http.new_session      = http_new_session;
-	http.new_data         = http_new_data;
-	http.session_closed_1 = http_close_session_1;
-	http.session_closed_2 = http_close_session_2;
-	http.deinit           = nullptr;
+	http.init              = nullptr;
+	http.new_session       = http_new_session;
+	http.new_data          = http_new_data;
+	http.session_closed_1  = http_close_session_1;
+	http.session_closed_2  = http_close_session_2;
+	http.deinit            = nullptr;
 
 	http_private_data *hpd = new http_private_data();
-	hpd->logfile  = logfile;
-	hpd->web_root = web_root;
-	hpd->s        = s;
-
-	// waar diew hpd heen?!
+	hpd->logfile           = logfile;
+	hpd->web_root          = web_root;
+	hpd->s                 = s;
+	hpd->is_https          = is_https;
 
 	// 1.3.6.1.2.1.4.57850: vanheusden.com
 	// 1.3.6.1.2.1.4.57850.1: myip
 	// 1.3.6.1.2.1.4.57850.1.1: http
 	hpd->http_requests = s->register_stat("http_requests", "1.3.6.1.2.1.4.57850.1.1.1");
-	hpd->http_r_200 = s->register_stat("http_r_200", "1.3.6.1.2.1.4.57850.1.1.2");
-	hpd->http_r_404 = s->register_stat("http_r_404", "1.3.6.1.2.1.4.57850.1.1.3");
-	hpd->http_r_500 = s->register_stat("http_r_500", "1.3.6.1.2.1.4.57850.1.1.4");
-	hpd->http_r_err = s->register_stat("http_r_err", "1.3.6.1.2.1.4.57850.1.1.5");
+	hpd->http_r_200    = s->register_stat("http_r_200", "1.3.6.1.2.1.4.57850.1.1.2");
+	hpd->http_r_404    = s->register_stat("http_r_404", "1.3.6.1.2.1.4.57850.1.1.3");
+	hpd->http_r_500    = s->register_stat("http_r_500", "1.3.6.1.2.1.4.57850.1.1.4");
+	hpd->http_r_err    = s->register_stat("http_r_err", "1.3.6.1.2.1.4.57850.1.1.5");
 
-	http.pd = hpd;
+	http.pd       = hpd;
 
 	return http;
 }

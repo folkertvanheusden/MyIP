@@ -13,7 +13,7 @@ required
 
 how to build
 ------------
-Make sure you have "libssl-dev", "libncurses-dev", "libconfig++-dev", "libspeex-dev", "libsamplerate0-dev", "zlib1g-dev" and "libsndfile1-dev" installed. Then:
+Make sure you have "libbearssl-dev", "libssl-dev", "libncurses-dev", "libconfig++-dev", "libspeex-dev", "libsamplerate0-dev", "zlib1g-dev" and "libsndfile1-dev" installed. Then:
 
 * mkdir build
 * cd build

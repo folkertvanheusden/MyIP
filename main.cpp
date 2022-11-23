@@ -199,6 +199,18 @@ void register_sctp_service(std::vector<phys *> *const devs, port_handler_t & sph
 	}
 }
 
+std::pair<port_handler_t, int> get_http_handler(stats *const s, const libconfig::Setting & s_http)
+{
+	std::string web_root    = cfg_str(s_http,  "web-root",    "HTTP server files root", false, "");
+	std::string web_logfile = cfg_str(s_http,  "web-logfile", "HTTP server logfile", false, "");
+
+	int         port        = cfg_int(s_http,  "port",        "tcp port to listen on", true, 80);
+
+	bool        is_https    = cfg_bool(s_http, "is-https",    "Set to true if https (e.g. port 443)", true, false);
+
+	return { http_get_handler(s, web_root, web_logfile, is_https), port };
+}
+
 void progress(const int cur, const int total)
 {
 	printf("%3.2f%% \r", cur * 100. / total);
@@ -606,20 +618,33 @@ int main(int argc, char *argv[])
 	try {
 		const libconfig::Setting & s_http = root.lookup("http");
 
-		std::string web_root = cfg_str(s_http, "web-root", "HTTP server files root", false, "");
-		std::string web_logfile = cfg_str(s_http, "web-logfile", "HTTP server logfile", false, "");
+		auto rc = get_http_handler(&s, s_http);
 
-		int port = cfg_int(s_http, "port", "tcp port to listen on", true, 80);
+		register_tcp_service(&devs, rc.first, rc.second);
 
-		port_handler_t http_handler = http_get_handler(&s, web_root, web_logfile);
+		register_sctp_service(&devs, rc.first, rc.second);
 
-		register_tcp_service(&devs, http_handler, port);
-
-		register_sctp_service(&devs, http_handler, port);
-
-		register_mdns_service(mdns_, &devs, port, s_http);
+		register_mdns_service(mdns_, &devs, rc.second, s_http);
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+
+	// HTTPS
+	try {
+		const libconfig::Setting & s_http = root.lookup("https");
+
+		auto rc = get_http_handler(&s, s_http);
+
+		register_tcp_service(&devs, rc.first, rc.second);
+
+		register_sctp_service(&devs, rc.first, rc.second);
+
+		register_mdns_service(mdns_, &devs, rc.second, s_http);
+		printf("https ok\n");
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		printf("fail\n");
 		// just fine
 	}
 

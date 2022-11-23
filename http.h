@@ -4,4 +4,4 @@
 #include "stats.h"
 
 
-port_handler_t http_get_handler(stats *const s, const std::string & web_root, const std::string & log_file);
+port_handler_t http_get_handler(stats *const s, const std::string & web_root, const std::string & log_file, const bool is_https);

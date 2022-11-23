@@ -22,8 +22,10 @@ public:
 class http_private_data : public private_data
 {
 public:
-	std::string logfile, web_root;
-	stats *s;
+	std::string logfile;
+	std::string web_root;
+	bool        is_https { false };
+	stats      *s        { nullptr };
 
 	uint64_t *http_requests { nullptr };
 	uint64_t *http_r_200 { nullptr };
@@ -35,7 +37,7 @@ public:
 class nrpe_private_data : public private_data
 {
 public:
-	stats *s;
+	stats    *s             { nullptr };
 
 	uint64_t *nrpe_requests { nullptr };
 	uint64_t *nrpe_r_err    { nullptr };
@@ -45,7 +47,7 @@ class vnc_private_data : public private_data
 {
 public:
 	uint64_t *vnc_requests { nullptr };
-	uint64_t *vnc_err { nullptr };
+	uint64_t *vnc_err      { nullptr };
 	uint64_t *vnc_duration { nullptr };
 };
 

@@ -89,6 +89,8 @@ target_link_libraries(myip Threads::Threads)
 
 target_link_libraries(myip -lrt)
 
+target_link_libraries(myip -lbearssl)
+
 include(FindPkgConfig)
 
 pkg_check_modules(SNDFILE REQUIRED sndfile)
