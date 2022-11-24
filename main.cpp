@@ -639,7 +639,7 @@ int main(int argc, char *argv[])
 
 		auto rc = get_http_handler(&s, s_http);
 
-		http_private_data *hpd = dynamic_cast<http_private_data *>(rc.pd);
+		http_private_data *hpd = dynamic_cast<http_private_data *>(rc.first.pd);
 
 		hpd->private_key = cfg_str(s_http, "private-key", "Private key .pem-file", false, "");
 		hpd->certificate = cfg_str(s_http, "certificate", "Certificate .pem-file", false, "");
