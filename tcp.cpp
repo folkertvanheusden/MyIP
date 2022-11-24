@@ -506,6 +506,8 @@ void tcp::packet_handler(const packet *const pkt)
 				cur_session->seq_for_fin_when_all_received = their_seq_nr;
 				cur_session->flag_fin_when_all_received    = true;
 
+				cur_session->set_is_terminating();
+
 				set_state(cur_session, tcp_fin_wait_1);
 			}
 			else {
@@ -637,6 +639,9 @@ void tcp::packet_handler(const packet *const pkt)
 		else
 			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0);
 	}
+
+	if (delete_entry)
+		cur_session->set_is_terminating();
 
 	cur_session->tlock.unlock();
 
@@ -845,7 +850,7 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 		if (ts->unacked_size < 1024 * 1024)  // max 1MB queued
 			break;
 
-		if (ts->state != tcp_established) {
+		if (ts->state != tcp_established || ts->get_is_terminating()) {
 			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send_data interrupted by session end\n", ts->id);
 			break;
 		}

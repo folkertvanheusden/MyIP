@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <stdint.h>
 #include <time.h>
 
@@ -24,6 +25,8 @@ protected:
 
 	timespec       session_created { 0 };
 
+	std::atomic_bool is_terminating { false };
+
 	session(pstream *const t, const any_addr & my_addr, const int my_port, const any_addr & their_addr, const int their_port, private_data *const application_private_data);
 
 public:
@@ -41,6 +44,10 @@ public:
 	uint64_t get_hash() const;
 
 	static uint64_t get_hash(const any_addr & their_addr, const uint16_t their_port, const uint16_t my_port);
+
+	void set_is_terminating() { is_terminating = true; }
+
+	bool get_is_terminating() { return is_terminating; }
 
 	void set_callback_private_data(session_data *p);
 
