@@ -250,14 +250,27 @@ void https_thread(session *ts)
 	unsigned char         iobuf[BR_SSL_BUFSIZE_BIDI] { 0 };
 	br_sslio_context      ioc { 0 };
 
-	BearSSL::PrivateKey pk(hpd->private_key.c_str());
-	const br_rsa_private_key *br_pk = pk.getRSA();
-
 	BearSSL::X509List c(hpd->certificate.c_str());
 	const br_x509_certificate *br_c       = c.getX509Certs();
 	size_t                     br_c_count = c.getCount();
 
-	br_ssl_server_init_full_rsa(&sc, br_c, br_c_count, br_pk);
+	BearSSL::PrivateKey pk(hpd->private_key.c_str());
+
+	if (pk.isRSA()) {
+		DOLOG(ll_debug, "https: private key is an RSA key\n");
+		const br_rsa_private_key *br_pk = pk.getRSA();
+
+		br_ssl_server_init_full_rsa(&sc, br_c, br_c_count, br_pk);
+	}
+	else if (pk.isEC()) {
+		DOLOG(ll_debug, "https: private key is an EC key\n");
+		const br_ec_private_key *br_pk = pk.getEC();
+
+		br_ssl_server_init_full_ec(&sc, br_c, br_c_count, BR_KEYTYPE_EC, br_pk);
+	}
+	else {
+		error_exit(false, "https_thread: private key is not RSA or EC");
+	}
 
 	br_ssl_engine_set_buffer(&sc.eng, iobuf, sizeof iobuf, 1);
 

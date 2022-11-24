@@ -21,6 +21,7 @@
 */
 
 #include "BearSSLHelpers.h"
+#include "log.h"
 #include <memory>
 #include <vector>
 #include <bearssl/bearssl.h>
@@ -583,6 +584,7 @@ namespace brssl {
     size_t num;
     pos = decode_pem(buff, len, &num);
     if (pos == nullptr) {
+      ::dolog(ll_error, "read_private_key: PEM decode error\n");
       return nullptr; // PEM decode error
     }
     for (size_t u = 0; pos[u].name; u ++) {
@@ -595,6 +597,7 @@ namespace brssl {
     }
     // If we hit here, no match
     free_pem_object(pos);
+    ::dolog(ll_error, "read_private_key: no match\n");
     return nullptr;
   }
 

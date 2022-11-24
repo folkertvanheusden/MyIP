@@ -31,7 +31,7 @@
 namespace brssl {
 	class public_key;
 	class private_key;
-};
+}
 
 namespace BearSSL {
 
@@ -181,6 +181,6 @@ namespace BearSSL {
 		// Cache of the server using the _store.
 		br_ssl_session_cache_lru _cache;
 	};
-};
+}
 
 #endif

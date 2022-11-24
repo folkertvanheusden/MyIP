@@ -641,7 +641,7 @@ int main(int argc, char *argv[])
 
 		http_private_data *hpd = dynamic_cast<http_private_data *>(rc.first.pd);
 
-		std::string temppk = cfg_str(s_http, "private-key", "Private key .pem-file", false, "");
+		std::string temppk = cfg_str(s_http, "private-key", "Private key .key-file", false, "");
 
 	        auto pk_str = load_text_file(temppk);
 		if (pk_str.has_value() == false)
@@ -649,7 +649,7 @@ int main(int argc, char *argv[])
 
 		hpd->private_key = pk_str.value();
 
-		std::string tempc = cfg_str(s_http, "certificate", "Certificate .pem-file", false, "");
+		std::string tempc = cfg_str(s_http, "certificate", "Certificate .crt-file", false, "");
 
 	        auto c_str = load_text_file(tempc);
 		if (c_str.has_value() == false)
