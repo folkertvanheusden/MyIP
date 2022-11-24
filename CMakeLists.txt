@@ -16,6 +16,7 @@ add_executable(myip
 	address_cache.cpp
 	any_addr.cpp
 	arp.cpp
+	BearSSLHelpers.cpp
 	buffer_in.cpp
 	buffer_out.cpp
 	dns.cpp

@@ -634,17 +634,23 @@ int main(int argc, char *argv[])
 	try {
 		const libconfig::Setting & s_http = root.lookup("https");
 
+		std::string web_root    = cfg_str(s_http,  "web-root",    "HTTP server files root", false, "");
+		std::string web_logfile = cfg_str(s_http,  "web-logfile", "HTTP server logfile", false, "");
+
 		auto rc = get_http_handler(&s, s_http);
+
+		http_private_data *hpd = dynamic_cast<http_private_data *>(rc.pd);
+
+		hpd->private_key = cfg_str(s_http, "private-key", "Private key .pem-file", false, "");
+		hpd->certificate = cfg_str(s_http, "certificate", "Certificate .pem-file", false, "");
 
 		register_tcp_service(&devs, rc.first, rc.second);
 
 		register_sctp_service(&devs, rc.first, rc.second);
 
 		register_mdns_service(mdns_, &devs, rc.second, s_http);
-		printf("https ok\n");
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
-		printf("fail\n");
 		// just fine
 	}
 

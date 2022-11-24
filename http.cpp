@@ -8,8 +8,7 @@
 #include <vector>
 #include <bearssl/bearssl.h>
 
-#include "chain-rsa.h"  // TODO replace by files
-#include "key-rsa.h"    // TODO replace by files
+#include "BearSSLHelpers.h"
 #include "log.h"
 #include "str.h"
 #include "tcp.h"
@@ -242,23 +241,27 @@ void https_thread(session *ts)
 {
         set_thread_name("myip-https");
 
-	printf("hier001\n");
+        http_session_data *hs  = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
+	http_private_data *hpd = dynamic_cast<http_private_data *>(ts->get_application_private_data());
 
-        http_session_data *hs = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
+	https_ctx             hc  { hs, ts };
 
-	https_ctx hc { hs, ts };
+	br_ssl_server_context sc  { 0 };
+	unsigned char         iobuf[BR_SSL_BUFSIZE_BIDI] { 0 };
+	br_sslio_context      ioc { 0 };
 
-	br_ssl_server_context sc { 0 };
-	unsigned char iobuf[BR_SSL_BUFSIZE_BIDI] { 0 };
-	br_sslio_context ioc { 0 };
+	BearSSL::PrivateKey pk(load_text_file(hpd->private_key).c_str());
+	const br_rsa_private_key *br_pk = pk.getRSA();
 
-	br_ssl_server_init_full_rsa(&sc, CHAIN, CHAIN_LEN, &RSA);
+	BearSSL::X509List c(load_text_file(hpd->certificate).c_str());
+	const br_x509_certificate *br_c       = c.getX509Certs();
+	size_t                     br_c_count = c.getCount();
+
+	br_ssl_server_init_full_rsa(&sc, br_c, br_c_count, br_pk);
 
 	br_ssl_engine_set_buffer(&sc.eng, iobuf, sizeof iobuf, 1);
 
 	br_ssl_server_reset(&sc);
-
-	printf("hier002\n");
 
 	br_sslio_init(&ioc, &sc.eng, sock_read, &hc, sock_write, &hc);
 
@@ -274,7 +277,6 @@ void https_thread(session *ts)
 
 		if (x == 0x0a) {
 			if (headers.find("\r\n\r\n") != std::string::npos) {
-	printf("hier003\n");
 				auto rc = generate_response(ts, headers);
 
 				if (rc.has_value()) {
@@ -288,13 +290,10 @@ void https_thread(session *ts)
 			}
 		}
 	}
-	printf("hier004\n");
 
 	br_sslio_close(&ioc);
-	printf("hier005\n");
 
 	ts->get_stream_target()->end_session(ts);
-	printf("hier006\n");
 }
 
 bool http_new_session(pstream *const t, session *ts)
@@ -393,13 +392,13 @@ port_handler_t http_get_handler(stats *const s, const std::string & web_root, co
 	// 1.3.6.1.2.1.4.57850: vanheusden.com
 	// 1.3.6.1.2.1.4.57850.1: myip
 	// 1.3.6.1.2.1.4.57850.1.1: http
-	hpd->http_requests = s->register_stat("http_requests", "1.3.6.1.2.1.4.57850.1.1.1");
-	hpd->http_r_200    = s->register_stat("http_r_200", "1.3.6.1.2.1.4.57850.1.1.2");
-	hpd->http_r_404    = s->register_stat("http_r_404", "1.3.6.1.2.1.4.57850.1.1.3");
-	hpd->http_r_500    = s->register_stat("http_r_500", "1.3.6.1.2.1.4.57850.1.1.4");
-	hpd->http_r_err    = s->register_stat("http_r_err", "1.3.6.1.2.1.4.57850.1.1.5");
+	hpd->http_requests     = s->register_stat("http_requests", "1.3.6.1.2.1.4.57850.1.1.1");
+	hpd->http_r_200        = s->register_stat("http_r_200", "1.3.6.1.2.1.4.57850.1.1.2");
+	hpd->http_r_404        = s->register_stat("http_r_404", "1.3.6.1.2.1.4.57850.1.1.3");
+	hpd->http_r_500        = s->register_stat("http_r_500", "1.3.6.1.2.1.4.57850.1.1.4");
+	hpd->http_r_err        = s->register_stat("http_r_err", "1.3.6.1.2.1.4.57850.1.1.5");
 
-	http.pd       = hpd;
+	http.pd                = hpd;
 
 	return http;
 }

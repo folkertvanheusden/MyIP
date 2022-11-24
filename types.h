@@ -26,6 +26,8 @@ public:
 	std::string web_root;
 	bool        is_https { false };
 	stats      *s        { nullptr };
+	std::string private_key;
+	std::string certificate;
 
 	uint64_t *http_requests { nullptr };
 	uint64_t *http_r_200 { nullptr };

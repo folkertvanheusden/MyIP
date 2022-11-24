@@ -4,7 +4,9 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <fstream>
 #include <pthread.h>
+#include <sstream>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -152,4 +154,14 @@ void error_exit(const bool se, const char *format, ...)
 	free(temp);
 
 	exit(EXIT_FAILURE);
+}
+
+std::string load_text_file(const std::string & filename)
+{
+	std::ifstream t(filename);
+
+	std::stringstream buffer;
+	buffer << t.rdbuf();
+
+	return buffer.str();
 }

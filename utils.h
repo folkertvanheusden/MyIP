@@ -16,3 +16,5 @@ bool file_exists(const std::string & file, size_t *const file_size = nullptr);
 void run(const std::string & what);
 
 void error_exit(const bool se, const char *format, ...);
+
+std::string load_text_file(const std::string & filename);
