@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fstream>
+#include <optional>
 #include <pthread.h>
 #include <sstream>
 #include <stdarg.h>
@@ -156,12 +157,18 @@ void error_exit(const bool se, const char *format, ...)
 	exit(EXIT_FAILURE);
 }
 
-std::string load_text_file(const std::string & filename)
+std::optional<std::string> load_text_file(const std::string & filename)
 {
-	std::ifstream t(filename);
+	size_t size = 0;
 
-	std::stringstream buffer;
-	buffer << t.rdbuf();
+	if (file_exists(filename, &size)) {
+		std::ifstream t(filename);
 
-	return buffer.str();
+		std::stringstream buffer;
+		buffer << t.rdbuf();
+
+		return buffer.str();
+	}
+
+	return { };
 }

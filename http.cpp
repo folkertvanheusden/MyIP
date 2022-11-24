@@ -250,10 +250,10 @@ void https_thread(session *ts)
 	unsigned char         iobuf[BR_SSL_BUFSIZE_BIDI] { 0 };
 	br_sslio_context      ioc { 0 };
 
-	BearSSL::PrivateKey pk(load_text_file(hpd->private_key).c_str());
+	BearSSL::PrivateKey pk(hpd->private_key.c_str());
 	const br_rsa_private_key *br_pk = pk.getRSA();
 
-	BearSSL::X509List c(load_text_file(hpd->certificate).c_str());
+	BearSSL::X509List c(hpd->certificate.c_str());
 	const br_x509_certificate *br_c       = c.getX509Certs();
 	size_t                     br_c_count = c.getCount();
 

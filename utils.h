@@ -17,4 +17,4 @@ void run(const std::string & what);
 
 void error_exit(const bool se, const char *format, ...);
 
-std::string load_text_file(const std::string & filename);
+std::optional<std::string> load_text_file(const std::string & filename);
