@@ -129,7 +129,7 @@ private:
 	void free_tcp_session(tcp_session *const p);
 
 public:
-	tcp(stats *const s, icmp *const icmp_);
+	tcp(stats *const s, icmp *const icmp_, const int n_threads);
 	virtual ~tcp();
 
 	void add_handler(const int port, port_handler_t & tph);

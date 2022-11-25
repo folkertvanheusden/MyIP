@@ -70,7 +70,7 @@ char *flags_to_str(uint8_t flags)
 	return out;
 }
 
-tcp::tcp(stats *const s, icmp *const icmp_) : ip_protocol(s, "tcp"), icmp_(icmp_)
+tcp::tcp(stats *const s, icmp *const icmp_, const int n_threads) : ip_protocol(s, "tcp"), icmp_(icmp_)
 {
 	tcp_packets           = s->register_stat("tcp_packets");
 	tcp_errors            = s->register_stat("tcp_errors", "1.3.6.1.2.1.6.7");  // tcpAttemptFails
@@ -85,7 +85,7 @@ tcp::tcp(stats *const s, icmp *const icmp_) : ip_protocol(s, "tcp"), icmp_(icmp_
 	tcp_rst               = s->register_stat("tcp_rst");
 	tcp_cur_n_sessions    = s->register_stat("tcp_cur_n_sessions");
 
-	for(int i=0; i<4; i++)
+	for(int i=0; i<n_threads; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
 
 	th_cleaner = new std::thread(&tcp::session_cleaner, this);

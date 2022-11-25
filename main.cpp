@@ -427,7 +427,7 @@ int main(int argc, char *argv[])
 
 			bool use_tcp = cfg_bool(ipv4_, "use-tcp", "wether to enable tcp", true, true);
 			if (use_tcp) {
-				tcp *t = new tcp(&s, icmp_);
+				tcp *t = new tcp(&s, icmp_, 64);
 				ipv4_instance->register_protocol(0x06, t);
 
 				ipv4_tcp = t;
@@ -494,7 +494,7 @@ int main(int argc, char *argv[])
 
 			bool use_tcp = cfg_bool(ipv6_, "use-tcp", "wether to enable tcp", true, true);
 			if (use_tcp) {
-				tcp *t6 = new tcp(&s, icmp6_);
+				tcp *t6 = new tcp(&s, icmp6_, 64);
 				ipv6_instance->register_protocol(0x06, t6);  // TCP
 				ip_protocols.push_back(t6);
 			}
