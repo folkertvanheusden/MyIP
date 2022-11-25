@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "any_addr.h"
+#include "ax25.h"
 #include "hash.h"
 #include "str.h"
 
@@ -20,7 +21,8 @@ any_addr::any_addr(const uint8_t src[], const int src_size)
 
 any_addr::any_addr(const any_addr & other)
 {
-	assert(other.get_len() == 4 || other.get_len() == 6 || other.get_len() == 16);
+	// 7: AX.25
+	assert(other.get_len() == 4 || other.get_len() == 6 || other.get_len() == 7 || other.get_len() == 16);
 
 	other.get(addr, &addr_size);
 	set_ = true;
@@ -142,6 +144,12 @@ std::string any_addr::to_str() const
 				addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 
 		return buffer;
+	}
+
+	if (addr_size == 7) {  // assume AX.25 address
+		ax25_address aa(std::vector<uint8_t>(addr, addr + 7));
+
+		return aa.get_address();
 	}
 
 	if (addr_size == 16) {  // assume IPv6

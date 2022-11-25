@@ -16,6 +16,7 @@ add_executable(myip
 	address_cache.cpp
 	any_addr.cpp
 	arp.cpp
+	ax25.cpp
 	BearSSLHelpers.cpp
 	buffer_in.cpp
 	buffer_out.cpp
@@ -41,6 +42,7 @@ add_executable(myip
 	ntp.cpp
 	packet.cpp
 	phys.cpp
+	phys_kiss.cpp
 	phys_ppp.cpp
 	phys_promiscuous.cpp
 	phys_sctp_udp.cpp

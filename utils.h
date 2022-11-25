@@ -18,3 +18,6 @@ void run(const std::string & what);
 void error_exit(const bool se, const char *format, ...);
 
 std::optional<std::string> load_text_file(const std::string & filename);
+
+ssize_t READ(int fd, uint8_t *whereto, size_t len);
+ssize_t WRITE(int fd, const uint8_t *whereto, size_t len);
