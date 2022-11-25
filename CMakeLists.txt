@@ -94,6 +94,8 @@ target_link_libraries(myip -lrt)
 
 target_link_libraries(myip -lbearssl)
 
+target_link_libraries(myip -latomic)
+
 include(FindPkgConfig)
 
 pkg_check_modules(SNDFILE REQUIRED sndfile)
