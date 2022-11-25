@@ -6,10 +6,12 @@ requests, IP packets, ICMP(6), UDP and even NTP, VNC, SIP, MQTT and HTTP
 requests. Also LLDP, NDP, Socks, syslog, PPP, SLIP, NRPE, DNS (client),
 SCTP, MDNS and SNMP.
 
+Note that this is an experimentation vehicle.
+
 required
 --------
 * C++ compiler
-* A posix system that has support for 'tap' virtual network devices (e.g. Linux and BSD, see https://en.wikipedia.org/wiki/TUN/TAP ) or "promiscuous mode".
+* POSIX system
 
 how to build
 ------------
