@@ -141,6 +141,8 @@ void phys_kiss::operator()()
 
 	set_thread_name("myip-phys_kiss");
 
+	struct timespec ts { 0, 0 };
+
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
 	while(!stop_flag) {
@@ -199,6 +201,9 @@ void phys_kiss::operator()()
 				}
 
 				// otherwise: first FEND, ignore
+
+				if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+					DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
 			}
 			else if (buffer == FESC)
 				escape = true;
@@ -242,9 +247,17 @@ void phys_kiss::operator()()
 		}
 
 		if (ok) {
-			// TODO: strip AX.25 header
+			ax25 ax25_packet(std::vector<uint8_t>(p, p + len));
 
-			// queue
+			auto payload = ax25_packet.get_data();
+			int  pl_size = payload.get_n_bytes_left();
+
+			DOLOG(ll_info, "phys_kiss: received packet of %d bytes, payload size: %d\n", len, pl_size);
+
+			packet *p = new packet(ts, ax25_packet.get_from().get_any_addr(), ax25_packet.get_from().get_any_addr(), ax25_packet.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
+
+			auto it = prot_map.find(0x0800);  // TODO
+			it->second->queue_packet(this, p);
 		}
 
 		free(p);
