@@ -82,7 +82,27 @@ ax25_address::ax25_address(const std::string & a, const char ssid, const bool en
 {
 	this->address  = a;
 
-	this->ssid     = true;
+	this->ssid     = ssid;
+
+	this->end_mark = end_mark;
+
+	this->repeated = repeated;
+
+	this->valid    = true;
+}
+
+ax25_address::ax25_address(const std::string & a, const bool end_mark, const bool repeated)
+{
+	std::size_t dash = a.find("-");
+
+	if (dash != std::string::npos) {
+		this->address = a.substr(0, dash);
+		this->ssid    = a[dash + 1];
+	}
+	else {
+		this->address = a;
+		this->ssid    = '0';
+	}
 
 	this->end_mark = end_mark;
 
@@ -127,6 +147,17 @@ std::pair<uint8_t *, size_t> ax25_address::generate_address() const
 	out[6] = (ssid << 1) | end_mark | (repeated ? 128 : 0);
 
 	return { out, 7 };
+}
+
+any_addr ax25_address::get_any_addr() const
+{
+	auto addr = generate_address();
+
+	any_addr out(addr.first, addr.second);
+
+	free(addr.first);
+
+	return out;
 }
 
 ax25::ax25()

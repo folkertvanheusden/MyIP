@@ -97,7 +97,7 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	ax25 a;
 	a.set_from   (src_mac);
 	a.set_to     (dst_mac);
-	a.set_control(240);  // unnumbered
+	a.set_control(243);  // TODO
 	a.set_pid    (0x07);
 	a.set_data   (payload_in, pl_size_in);
 
@@ -218,7 +218,7 @@ void phys_kiss::operator()()
 		{
 			int cmd = p[0] & 0x0f;
 
-			DOLOG(ll_debug, "port: %d, cmd: %d, len: %d", (p[0] >> 4) & 0x0f, cmd, len);
+			DOLOG(ll_debug, "port: %d, cmd: %d, len: %d\n", (p[0] >> 4) & 0x0f, cmd, len);
 
 			len--;
 

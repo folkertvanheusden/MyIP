@@ -124,7 +124,7 @@ void any_addr::set(const uint8_t src[], const int src_size)
 	memcpy(addr, src, src_size);
 	addr_size = src_size;
 
-	assert(addr_size == 4 || addr_size == 6 || addr_size == 16);
+	assert(addr_size == 4 || addr_size == 6 || addr_size == 7 || addr_size == 16);
 
 	set_ = true;
 }

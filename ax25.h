@@ -29,6 +29,8 @@ public:
 
 	ax25_address(const std::string & a, const char ssid, const bool end_mark, const bool repeated);
 
+	ax25_address(const std::string & a, const bool end_mark, const bool repeated);
+
 	ax25_address & operator=(const ax25_address &);
 
 	bool get_valid()    const { return valid;    }
@@ -44,6 +46,8 @@ public:
 	void set_address(const std::string & address, const char ssid);
 
 	std::pair<uint8_t *, size_t> generate_address() const;
+
+	any_addr    get_any_addr() const;
 };
 
 class ax25

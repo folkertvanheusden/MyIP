@@ -10,6 +10,7 @@
 #include <sys/types.h>
 
 #include "any_addr.h"
+#include "ax25.h"
 #include "stats.h"
 #include "phys_kiss.h"
 #include "phys_tap.h"
@@ -318,7 +319,7 @@ int main(int argc, char *argv[])
 		std::string type = cfg_str(interface, "type", "network interface type (e.g. \"ethernet\", \"ppp\" or \"slip\")", true, "ethernet");
 
 		std::string mac = cfg_str(interface, "mac-address", "MAC address", true, "52:34:84:16:44:22");
-		any_addr my_mac = parse_address(mac.c_str(), 6, ":", 16);
+		any_addr my_mac = type == "kiss" ? ax25_address(mac.c_str(), true, false).get_any_addr() : parse_address(mac.c_str(), 6, ":", 16);
 
 		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
 
@@ -410,7 +411,7 @@ int main(int argc, char *argv[])
 			mgmt_addr = my_address;
 
 			std::string gw_str = cfg_str(ipv4_, "gateway-mac-address", "default gateway MAC address", false, "42:20:16:2b:6f:9b");
-			any_addr gw_mac = parse_address(gw_str.c_str(), 6, ":", 16);
+			any_addr gw_mac = type == "kiss" ? ax25_address(gw_str.c_str(), true, false).get_any_addr() : parse_address(gw_str.c_str(), 6, ":", 16);
 
 			printf("%zu] Will listen on IPv4 address: %s\n", i, my_address.to_str().c_str());
 
