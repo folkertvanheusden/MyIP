@@ -399,6 +399,36 @@ void mqtt_recv_thread(void *ts_in)
 
 			ts->get_stream_target()->send_data(ts, reply.data(), reply.size());
 		}
+		else if (cmsg == 10) {  // UNSUBSCRIBE
+			std::vector<uint8_t> reply;
+			reply.push_back(11 << 4);  // UNSUBACK
+
+			reply.push_back(0);  // will be length
+
+			uint16_t msg_id = (mqtt_msg[0] << 8) | mqtt_msg[1];
+			DOLOG(ll_debug, "MQTT(%s): UNSUBSCRIBE, msg id: %d\n", msd->session_name.c_str(), msg_id);
+			reply.push_back(mqtt_msg[0]);
+			reply.push_back(mqtt_msg[1]);
+
+			uint32_t o = 2;
+			while(o < len) {
+				int topic_len = (mqtt_msg[o] << 8) | mqtt_msg[o + 1];
+				topic_len = std::min(topic_len, int(len - o));
+				DOLOG(ll_debug, "MQTT(%s): topic len: %d\n", msd->session_name.c_str(), topic_len);
+				std::string topic((const char *)&mqtt_msg[o + 2], topic_len);
+				DOLOG(ll_debug, "MQTT(%s): unsubscribe from topic name: %s\n", msd->session_name.c_str(), topic.c_str());
+
+				unregister_topic(topic, msd);
+
+				o += 2 + topic_len;
+
+				reply.push_back(0);  // ACK
+			}
+
+			reply.at(1) = reply.size() - 2;
+
+			ts->get_stream_target()->send_data(ts, reply.data(), reply.size());
+		}
 		else if (cmsg == 12) {  // PINGREQ
 			DOLOG(ll_debug, "MQTT(%s): PINGREQ\n", msd->session_name.c_str());
 			std::vector<uint8_t> reply;
