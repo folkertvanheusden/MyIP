@@ -78,6 +78,13 @@ add_executable(myiptop
 	utils.cpp
 	)
 
+add_executable(myipnetstat
+	log.cpp
+	myipnetstat.cpp
+	time.cpp
+	utils.cpp
+)
+
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads)
@@ -99,6 +106,9 @@ pkg_check_modules(JANSSON REQUIRED jansson)
 target_link_libraries(myip ${JANSSON_LIBRARIES})
 target_include_directories(myip PUBLIC ${JANSSON_INCLUDE_DIRS})
 target_compile_options(myip PUBLIC ${JANSSON_CFLAGS_OTHER})
+target_link_libraries(myipnetstat ${JANSSON_LIBRARIES})
+target_include_directories(myipnetstat PUBLIC ${JANSSON_INCLUDE_DIRS})
+target_compile_options(myipnetstat PUBLIC ${JANSSON_CFLAGS_OTHER})
 
 pkg_check_modules(SNDFILE REQUIRED sndfile)
 target_link_libraries(myip ${SNDFILE_LIBRARIES})
