@@ -96,6 +96,8 @@ void ud_stats::handler(const int cfd)
 
 void ud_stats::operator()()
 {
+	set_thread_name("ud_stats");
+
 	std::vector<std::pair<std::thread *, int> > clients;
 
 	while(!stop_flag) {
