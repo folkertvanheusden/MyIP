@@ -42,7 +42,7 @@ public:
 
 	std::map<uint32_t, std::vector<uint8_t> > fragments;
 
-	std::condition_variable state_changed;
+	std::condition_variable_any state_changed;
 	uint64_t last_pkt     { 0 };
 	uint32_t my_seq_nr    { 0 };
 	uint32_t their_seq_nr { 0 };
@@ -66,6 +66,12 @@ public:
 
 	~tcp_session() {
 	}
+
+	std::string get_state_name() const {
+		const std::string state_names[] { "closed", "listen", "syn_rcvd", "syn_sent", "established", "fin_wait_1", "fin_wait_2", "close_wait", "last_ack", "closing", "time_wait", "rst_act" };
+
+		return state_names[state];
+	}
 };
 
 typedef struct {
@@ -78,7 +84,7 @@ typedef struct {
 	int port;
 } tcp_client_t;
 
-class tcp : public ip_protocol, pstream
+class tcp : public ip_protocol, public pstream
 {
 private:
 	icmp  *const icmp_          { nullptr };
@@ -86,11 +92,7 @@ private:
 	std::thread *th_unacked_sender { nullptr };
 	std::thread *th_cleaner        { nullptr };
 
-	std::mutex              sessions_lock;
-	std::condition_variable sessions_cv;
-	std::condition_variable unacked_cv;
-	// the key is an 'internal id'
-	std::map<uint64_t, tcp_session *> sessions;
+	std::condition_variable_any   unacked_cv;
 
 	// listen port -> handler
 	std::mutex listeners_lock;

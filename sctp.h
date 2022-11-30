@@ -20,7 +20,7 @@ class icmp;
 // dcb: data-call-back
 typedef enum { dcb_close, dcb_abort, dcb_continue } sctp_data_handling_result_t;
 
-class sctp : public ip_protocol, pstream
+class sctp : public ip_protocol, public pstream
 {
 public:
 	class sctp_session : public session {
@@ -67,6 +67,10 @@ public:
 
 		uint32_t get_their_verification_tag() const {
 			return their_verification_tag;
+		}
+
+		std::string get_state_name() const {
+			return "established";
 		}
 	};
 

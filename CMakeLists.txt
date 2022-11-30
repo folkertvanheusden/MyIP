@@ -63,6 +63,7 @@ add_executable(myip
 	tcp.cpp
 	tcp_udp_fw.cpp
 	time.cpp
+	ud.cpp
 	udp.cpp
 	utils.cpp
 	vnc.cpp
@@ -93,6 +94,11 @@ target_link_libraries(myip -lrt)
 target_link_libraries(myip -lbearssl)
 
 include(FindPkgConfig)
+
+pkg_check_modules(JANSSON REQUIRED jansson)
+target_link_libraries(myip ${JANSSON_LIBRARIES})
+target_include_directories(myip PUBLIC ${JANSSON_INCLUDE_DIRS})
+target_compile_options(myip PUBLIC ${JANSSON_CFLAGS_OTHER})
 
 pkg_check_modules(SNDFILE REQUIRED sndfile)
 target_link_libraries(myip ${SNDFILE_LIBRARIES})

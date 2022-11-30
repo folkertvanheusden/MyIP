@@ -43,6 +43,7 @@
 #include "socks_proxy.h"
 #include "echo.h"
 #include "lldp.h"
+#include "ud.h"
 
 
 void free_handler(const port_handler_t & tph)
@@ -276,6 +277,7 @@ int main(int argc, char *argv[])
 	/// environment
 	int uid = 1000, gid = 1000;
 	std::string run_at_started;
+	std::string unix_domain_socket;
 
 	{
 		const libconfig::Setting & environment = root.lookup("environment");
@@ -292,6 +294,8 @@ int main(int argc, char *argv[])
 		}
 
 		run_at_started = cfg_str(environment, "ifup", "program to run when network interfaces are up", true, "");
+
+		unix_domain_socket = cfg_str(environment, "stats-socket", "used by myipnetstats", true, "");
 	}
 
 	// used for clean-up
@@ -302,6 +306,8 @@ int main(int argc, char *argv[])
 
 	mdns *mdns_ = new mdns();
 	applications.push_back(mdns_);
+
+	std::vector<pstream *> stream_session_handlers;
 
 	/// network interfaces
 	const libconfig::Setting &interfaces = root["interfaces"];
@@ -433,16 +439,20 @@ int main(int argc, char *argv[])
 				ipv4_tcp = t;
 
 				ip_protocols.push_back(t);
+
+				stream_session_handlers.push_back(t);
 			}
 
 			bool use_sctp = cfg_bool(ipv4_, "use-sctp", "wether to enable sctp", true, true);
 			if (use_sctp) {
 				DOLOG(ll_debug, "Adding SCTP to IPv4\n");
 
-				sctp *stcp_ = new sctp(&s, icmp_);
-				ipv4_instance->register_protocol(0x84, stcp_);
+				sctp *sctp_ = new sctp(&s, icmp_);
+				ipv4_instance->register_protocol(0x84, sctp_);
 
-				ip_protocols.push_back(stcp_);
+				ip_protocols.push_back(sctp_);
+
+				stream_session_handlers.push_back(sctp_);
 			}
 
 			bool use_udp = cfg_bool(ipv4_, "use-udp", "wether to enable udp", true, true);
@@ -497,6 +507,8 @@ int main(int argc, char *argv[])
 				tcp *t6 = new tcp(&s, icmp6_, 64);
 				ipv6_instance->register_protocol(0x06, t6);  // TCP
 				ip_protocols.push_back(t6);
+
+				stream_session_handlers.push_back(t6);
 			}
 
 			bool use_udp = cfg_bool(ipv6_, "use-udp", "wether to enable udp", true, true);
@@ -839,6 +851,8 @@ int main(int argc, char *argv[])
 		// just fine
 	}
 
+	ud_stats *us = unix_domain_socket.empty() ? nullptr : new ud_stats(stream_session_handlers, unix_domain_socket);
+
 	DOLOG(ll_debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");
 	printf("Press enter to terminate\n");
@@ -848,7 +862,7 @@ int main(int argc, char *argv[])
 	DOLOG(ll_info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating fase 1\n");
 
-	int n_actions = 0;
+	int n_actions = 1;  // 1 for 'us'
 
 	for(auto & s : socks_proxies)
 		s-> ask_to_stop(), n_actions++;
@@ -869,6 +883,9 @@ int main(int argc, char *argv[])
 
 	fprintf(stderr, "terminating fase 2\n");
 	int n_actions_done = 0;
+
+	progress(n_actions_done++, n_actions);
+	delete us;
 
 	for(auto & s : socks_proxies) {
 		progress(n_actions_done++, n_actions);
