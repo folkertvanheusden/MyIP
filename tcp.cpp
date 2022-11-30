@@ -729,7 +729,6 @@ void tcp::session_cleaner()
 				free_tcp_session(s);
 
 				it = sessions.erase(it);
-				stats_set(tcp_cur_n_sessions, sessions.size());
 
 				stats_inc_counter(tcp_sessions_to);
 			}
@@ -745,12 +744,23 @@ void tcp::session_cleaner()
 				free_tcp_session(s);
 
 				it = sessions.erase(it);
-				stats_set(tcp_cur_n_sessions, sessions.size());
+			}
+			else if (s->state == tcp_syn_rcvd && age >= 5) {
+				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: delete session in SYN state for 5 or more seconds\n", it->first);
+
+				if (s->is_client)
+					tcp_clients.erase(s->get_their_port());
+
+				free_tcp_session(s);
+
+				it = sessions.erase(it);
 			}
 			else {
 				++it;
 			}
 		}
+
+		stats_set(tcp_cur_n_sessions, sessions.size());
 
 		lck.unlock();
 	}
