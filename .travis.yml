@@ -3,7 +3,7 @@ language: cpp
 dist: focal
 
 before_install:
-  - sudo apt-get -y install libiniparser-dev libsndfile1-dev libspeex-dev libsamplerate0-dev libconfig++-dev libjansson-dev
+  - sudo apt-get -y install libiniparser-dev libsndfile1-dev libspeex-dev libsamplerate0-dev libconfig++-dev libjansson-dev libbearssl-dev
 
 compiler:
   - clang
