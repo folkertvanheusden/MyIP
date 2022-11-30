@@ -24,7 +24,7 @@ public:
 
 	virtual void end_session(session *const ts) = 0;
 
-	auto get_sessions_locked() const { sessions_lock.lock(); return &sessions; }
+	auto get_sessions_locked() const { sessions_lock.lock_shared(); return &sessions; }
 
-	void sessions_unlock() { sessions_lock.unlock(); }
+	void sessions_unlock() { sessions_lock.unlock_shared(); }
 };
