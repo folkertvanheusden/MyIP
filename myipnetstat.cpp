@@ -21,8 +21,6 @@ int main(int argc, char *argv[])
 
 	int len = strlen(remote.sun_path) + sizeof(remote.sun_family);
 
-	printf("Connecting...\n");
-
 	if (connect(fd, reinterpret_cast<sockaddr *>(&remote), len) == -1)
 		error_exit(true, "Failed to connect");
 
