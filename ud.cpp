@@ -90,6 +90,8 @@ void ud_stats::handler(const int cfd)
 
 	if (cmd == "sessions")
 		emit_sessions(cfd);
+
+	close(cfd);
 }
 
 void ud_stats::operator()()
@@ -111,8 +113,6 @@ void ud_stats::operator()()
 				clients.at(i).first->join();
 
 				delete clients.at(i).first;
-
-				close(clients.at(i).second);
 
 				clients.erase(clients.begin() + i);
 			}
