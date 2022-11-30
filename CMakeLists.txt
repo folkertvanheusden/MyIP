@@ -90,6 +90,7 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads)
 target_link_libraries(myip Threads::Threads)
 target_link_libraries(myiptop Threads::Threads)
+target_link_libraries(myipnetstat Threads::Threads)
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
