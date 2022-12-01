@@ -179,6 +179,8 @@ void http_thread(session *ts)
 			if (end_marker) {
 				auto rc = generate_response(ts, hs->req_data);
 
+				lck.unlock();
+
 				if (rc.has_value()) {
 					if (ts->get_stream_target()->send_data(ts, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size())) {
 						if (rc.value().second.empty() == false)
