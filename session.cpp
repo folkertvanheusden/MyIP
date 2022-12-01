@@ -1,7 +1,9 @@
 #include <stdlib.h>
+#include <time.h>
 
 #include "buffer_out.h"
 #include "hash.h"
+#include "log.h"
 #include "session.h"
 
 
@@ -13,6 +15,8 @@ session::session(pstream *const t, const any_addr & my_addr, const int my_port, 
 	their_port(their_port),
 	application_private_data(application_private_data)
 {
+	if (clock_gettime(CLOCK_REALTIME, &session_created) == -1)
+		DOLOG(ll_warning, "session: clock_gettime failed\n");
 }
 
 session::~session()
