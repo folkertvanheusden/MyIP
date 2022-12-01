@@ -69,7 +69,6 @@ void udp::operator()()
 		}
 		else {
 			auto cb = it->second;
-			cb_lock.unlock_shared();
 
 			auto src_addr = pkt->get_src_addr();
 			auto dst_addr = pkt->get_dst_addr();
@@ -79,6 +78,7 @@ void udp::operator()()
 			packet *up    = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), src_addr, dst_addr, &p[8], size - 8, header.first, header.second);
 
 			cb.cb(pkt->get_src_addr(), src_port, pkt->get_dst_addr(), dst_port, up, cb.private_data);
+			cb_lock.unlock_shared();
 
 			delete up;
 		}
