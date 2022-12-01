@@ -19,7 +19,7 @@ ip_protocol::~ip_protocol()
 
 void ip_protocol::queue_packet(const packet *p)
 {
-	if (!pkts->try_put(p)) {
+	if (pkts->try_put(p) == false) {
 		DOLOG(ll_debug, "IP-Protocol: packet dropped\n");
 
 		delete p;

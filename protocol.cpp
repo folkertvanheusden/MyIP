@@ -3,7 +3,9 @@
 #include <arpa/inet.h>
 
 #include "ip_protocol.h"
+#include "log.h"
 #include "protocol.h"
+
 
 constexpr size_t pkts_max_size { 256 };
 
@@ -35,7 +37,11 @@ ip_protocol *protocol::get_ip_protocol(const uint8_t p)
 
 void protocol::queue_packet(phys *const interface, const packet *p)
 {
-	pkts->try_put({ interface, p });
+	if (pkts->try_put({ interface, p }) == false) {
+		DOLOG(ll_debug, "Protocol: packet dropped\n");
+
+		delete p;
+	}
 }
 
 uint16_t ip_checksum(const uint16_t *p, const size_t n)
