@@ -775,7 +775,7 @@ void tcp::unacked_sender()
 
 		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 		if (unacked_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
-			DOLOG(ll_debug, "tcp-unack woke-up after ack\n");
+			DOLOG(ll_debug, "TCP[] unack woke-up after ack\n");
 
 		// go through all sessions and find if any has segments to resend
 
@@ -794,7 +794,7 @@ void tcp::unacked_sender()
 			for(int i=0; i<to_send; i += packet_size) {
 				size_t send_n = std::min(packet_size, to_send - i);
 
-				DOLOG(ll_debug, "tcp-unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", send_n, rel_seqnr(s, true, s->my_seq_nr), s->window_size, s->unacked_size, s->data_since_last_ack);
+				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", it->first, send_n, rel_seqnr(s, true, s->my_seq_nr), s->window_size, s->unacked_size, s->data_since_last_ack);
 
 				if (s->is_client)
 					send_segment(s, s->id, s->get_their_addr(), s->get_their_port(), s->get_my_addr(), s->get_my_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n);
