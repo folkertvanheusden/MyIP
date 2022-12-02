@@ -186,7 +186,7 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 			(*my_seq_nr)++;
 	}
 
-	ts->last_pkt = get_us();
+	ts->e_last_pkt_ts = get_us();
 }
 
 std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const uint64_t id)
@@ -372,7 +372,7 @@ void tcp::packet_handler(const packet *const pkt)
 
 	tcp_session *const cur_session = dynamic_cast<tcp_session *>(cur_it->second);
 
-	cur_session->last_pkt = get_us();
+	cur_session->e_last_pkt_ts = get_us();
 
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: start processing TCP segment, state: %s, my seq nr %d, opponent seq nr %d\n", id, states[cur_session->state], rel_seqnr(cur_session, true, cur_session->my_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
 	cur_session->tlock.lock();
@@ -486,6 +486,9 @@ void tcp::packet_handler(const packet *const pkt)
 
 						set_state(cur_session, tcp_fin_wait_1);
 					}
+
+					if (cur_session->unacked_size > 0)
+						cur_session->r_last_pkt_ts = cur_session->e_last_pkt_ts;
 				}
 
 				unacked_cv.notify_all();
@@ -707,7 +710,7 @@ void tcp::session_cleaner()
 		for(auto it = sessions.cbegin(); it != sessions.cend();) {
 			tcp_session *const s = dynamic_cast<tcp_session *>(it->second);
 
-			uint64_t age = (now - s->last_pkt) / 1000000;
+			uint64_t age = (now - s->e_last_pkt_ts) / 1000000;
 
 			if (age >= session_timeout || s->state > tcp_established) {
 				if (s->state > tcp_established)
@@ -778,38 +781,44 @@ void tcp::unacked_sender()
 			DOLOG(ll_debug, "TCP[] unack woke-up after ack\n");
 
 		// go through all sessions and find if any has segments to resend
+		uint64_t now = get_us();
 
 		for(auto it = sessions.cbegin(); it != sessions.cend(); it++) {
 			tcp_session *const s = dynamic_cast<tcp_session *>(it->second);
 
-			s->tlock.lock();
+			// last packet >= 1s ago?
+			if (now - s->r_last_pkt_ts >= 1000000) {
+				s->tlock.lock();
 
-			bool notify = false;
+				bool notify = false;
 
-			int to_send = std::min(s->window_size - s->data_since_last_ack, s->unacked_size);
-			int packet_size = idev->get_max_packet_size() - 20;
+				int to_send = std::min(s->window_size - s->data_since_last_ack, s->unacked_size);
+				int packet_size = idev->get_max_packet_size() - 20;
 
-			uint32_t resend_nr = s->my_seq_nr;
+				uint32_t resend_nr = s->my_seq_nr;
 
-			for(int i=0; i<to_send; i += packet_size) {
-				size_t send_n = std::min(packet_size, to_send - i);
+				for(int i=0; i<to_send; i += packet_size) {
+					size_t send_n = std::min(packet_size, to_send - i);
 
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", it->first, send_n, rel_seqnr(s, true, s->my_seq_nr), s->window_size, s->unacked_size, s->data_since_last_ack);
+					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", it->first, send_n, rel_seqnr(s, true, s->my_seq_nr), s->window_size, s->unacked_size, s->data_since_last_ack);
 
-				if (s->is_client)
-					send_segment(s, s->id, s->get_their_addr(), s->get_their_port(), s->get_my_addr(), s->get_my_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n);
-				else
-					send_segment(s, s->id, s->get_my_addr(), s->get_my_port(), s->get_their_addr(), s->get_their_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n);
+					if (s->is_client)
+						send_segment(s, s->id, s->get_their_addr(), s->get_their_port(), s->get_my_addr(), s->get_my_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n);
+					else
+						send_segment(s, s->id, s->get_my_addr(), s->get_my_port(), s->get_their_addr(), s->get_their_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n);
 
-				s->data_since_last_ack += send_n;
+					s->data_since_last_ack += send_n;
 
-				notify = true;
+					notify = true;
+				}
+
+				s->tlock.unlock();
+
+				if (notify)
+					s->unacked_sent_cv.notify_one();
+
+				s->r_last_pkt_ts = 0;
 			}
-
-			s->tlock.unlock();
-
-			if (notify)
-				s->unacked_sent_cv.notify_one();
 		}
 
 		lck.unlock();

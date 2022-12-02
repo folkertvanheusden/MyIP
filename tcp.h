@@ -43,7 +43,8 @@ public:
 	std::map<uint32_t, std::vector<uint8_t> > fragments;
 
 	std::condition_variable_any state_changed;
-	uint64_t last_pkt     { 0 };
+	uint64_t e_last_pkt_ts{ 0 };  // ts of last packet (transmitted or received)
+	uint64_t r_last_pkt_ts{ 0 };  // ls of last received packet
 	uint32_t my_seq_nr    { 0 };
 	uint32_t their_seq_nr { 0 };
 	uint32_t initial_my_seq_nr    { 0 };
