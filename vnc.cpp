@@ -565,8 +565,6 @@ void vnc_thread(session *ts)
 			DOLOG(ll_debug, "VNC: server init, %zu bytes\n", sizeof message);
 			ts->get_stream_target()->send_data(ts, message, sizeof message);
 
-			cont_or_initial_upd_frame = true;
-
 			frame_buffer.register_callback(vs);
 
 			vs->state = vs_running_waiting_cmd;
@@ -578,7 +576,7 @@ void vnc_thread(session *ts)
 			size_t fb_message_len = 0;
 			calculate_fb_update(&frame_buffer, encodings, false, 0, 0, frame_buffer.w, frame_buffer.h, 24, &fb_message, &fb_message_len, vpd, vs);
 
-			DOLOG(ll_debug, "VNC: intial (full) framebuffer update\n");
+			DOLOG(ll_debug, "VNC: intial (full) framebuffer update (%zu bytes)\n", fb_message_len);
 
 			ts->get_stream_target()->send_data(ts, fb_message, fb_message_len);
 			free(fb_message);
@@ -618,7 +616,7 @@ void vnc_thread(session *ts)
 					uint16_t gmax = (data[6] << 8) | data[7];
 					uint16_t bmax = (data[8] << 8) | data[9];
 
-					DOLOG(ll_debug, "VNC: Changed 'depth'(BPP) to %d (bpp: %d, red/green/blue max: %d/%d/%d)\n", vs->depth, data[0], rmax, gmax, bmax);
+					DOLOG(ll_debug, "VNC: Changed 'depth' (BPP) to %d (bpp: %d, red/green/blue max: %d/%d/%d)\n", vs->depth, data[0], rmax, gmax, bmax);
 
 					vs->state = vs_running_waiting_cmd;
 
