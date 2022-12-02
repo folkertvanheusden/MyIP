@@ -608,7 +608,7 @@ void tcp::packet_handler(const packet *const pkt)
 				DOLOG(ll_info, "TCP[%012" PRIx64 "]: number of fragments in cache: %zu\n", id, cur_session->fragments.size());
 			}
 
-			uint32_t ack_to = cur_session->their_seq_nr >= their_seq_nr ? their_seq_nr : cur_session->their_seq_nr;
+			const uint32_t ack_to = cur_session->their_seq_nr;
 
 			if (cur_session->is_client)
 				send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0);
