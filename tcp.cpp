@@ -155,14 +155,8 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 	temp[12] = 5 << 4; // header len
 	temp[13] = flags;
 
-	if (data_len) {
-		temp[14] = data_len >> 8;
-		temp[15] = data_len & 255;
-	}
-	else {
-		temp[14] = org_len >> 8;
-		temp[15] = org_len & 255;
-	}
+	temp[14] = 255;  // window size
+	temp[15] = 255;
 
 	temp[16] = temp[17] = 0; // checksum
 	temp[18] = temp[19] = 0; // urgent pointer
