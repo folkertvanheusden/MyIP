@@ -266,7 +266,6 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 
 void snmp::gen_reply(oid_req_t & oids_req, uint8_t **const packet_out, size_t *const output_size)
 {
-	fprintf(stderr, "GEN_REPLY\n");
 	snmp_sequence *se = new snmp_sequence();
 
 	se->add(new snmp_integer(snmp_integer::si_integer, oids_req.version));  // version

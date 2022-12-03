@@ -121,8 +121,6 @@ std::pair<uint8_t *, uint8_t> snmp_sequence::get_payload() const
 
 	out[1] = o - 2;
 
-	fprintf(stderr, "-> %d\n", o);
-
 	return { out, o };
 }
 
