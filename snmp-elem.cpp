@@ -23,16 +23,16 @@ snmp_integer::snmp_integer(const snmp_integer_type type, const uint64_t v, const
 	type(type),
 	v(v)
 {
-	this->len = len;
+	this->len = len + 2;
 }
 
 snmp_integer::snmp_integer(const snmp_integer_type type, const uint64_t v) :
 	type(type)
 {
 	if (v <= 0xffffffff)
-		this->v = v, len = 4;
+		this->v = v, len = 4 + 2;
 	else
-		this->v = v, len = 8;
+		this->v = v, len = 8 + 2;
 }
 
 snmp_integer::~snmp_integer()
@@ -54,16 +54,16 @@ std::pair<uint8_t *, uint8_t> snmp_integer::get_payload() const
 	else
 		assert(0);
 
-	uint8_t size = len + 2;
-	uint8_t *out = (uint8_t *)malloc(size);
+	uint8_t pl_len = len - 2;
+	uint8_t *out = (uint8_t *)malloc(len);
 
 	out[0] = snmp_type;
-	out[1] = len;
+	out[1] = pl_len;
 
-	for(int i=0; i<len; i++)
-		out[i + 2] = v >> (len * 8 - (i + 1) * 8);
+	for(int i=0; i<pl_len; i++)
+		out[i + 2] = v >> (pl_len * 8 - (i + 1) * 8);
 
-	return { out, size };
+	return { out, len };
 }
 
 //---
@@ -87,28 +87,26 @@ void snmp_sequence::add(const snmp_elem * const e)
 
 uint8_t snmp_sequence::get_size() const
 {
-	uint8_t t = 0;
+	auto pl = get_payload();
 
-	for(auto e : sequence)
-		t += e->get_size();
+	free(pl.first);
 
-	t += sequence.size() * 2;
-
-	return t;
+	return pl.second;
 }
 
 std::pair<uint8_t *, uint8_t> snmp_sequence::get_payload() const
 {
-	uint8_t out_size = get_size() + 2;
-	uint8_t *out = (uint8_t *)malloc(out_size);
+	uint8_t *out = (uint8_t *)malloc(256);
 
 	out[0] = 0x30;
-	out[1] = out_size - 2;
 
 	uint8_t o = 2;
 
 	for(auto e : sequence) {
 		auto pl = e->get_payload();
+
+		if (o + pl.second > 256)
+			break;
 
 		memcpy(&out[o], pl.first, pl.second);
 
@@ -117,9 +115,11 @@ std::pair<uint8_t *, uint8_t> snmp_sequence::get_payload() const
 		free(pl.first);
 	}
 
-	assert(o == out_size);
+	out[1] = o - 2;
 
-	return { out, out_size };
+	fprintf(stderr, "-> %d\n", o);
+
+	return { out, o };
 }
 
 //---
@@ -149,7 +149,7 @@ snmp_octet_string::snmp_octet_string(const uint8_t *const v, const int len)
 {
 	this->v = (uint8_t *)malloc(len);
 	memcpy(this->v, v, len);
-	this->len = len;
+	this->len = len + 2;
 }
 
 snmp_octet_string::~snmp_octet_string()
@@ -159,12 +159,14 @@ snmp_octet_string::~snmp_octet_string()
 
 std::pair<uint8_t *, uint8_t> snmp_octet_string::get_payload() const
 {
-	uint8_t out_len = len + 2;
+	uint8_t out_len = len;
+	uint8_t pl_len = len - 2;
 	uint8_t *out = (uint8_t *)malloc(out_len);
-	memcpy(out + 2, v, len);
+
+	memcpy(out + 2, v, pl_len);
 
 	out[0] = 0x04;
-	out[1] = len;
+	out[1] = pl_len;
 
 	return { out, out_len };
 }
@@ -214,7 +216,7 @@ snmp_oid::snmp_oid(const std::string & oid)
 		work = work.substr(dot + 1);
 	}
 
-	len = p - v;
+	len = p - v + 2;
 }
 
 snmp_oid::~snmp_oid()
@@ -224,12 +226,15 @@ snmp_oid::~snmp_oid()
 
 std::pair<uint8_t *, uint8_t> snmp_oid::get_payload() const
 {
-	uint8_t out_len = len + 2;
+	uint8_t out_len = len;
+	uint8_t pl_len = len - 2;
 	uint8_t *out = (uint8_t *)malloc(out_len);
-	memcpy(out + 2, v, len);
+
+	if (pl_len)
+		memcpy(out + 2, v, pl_len);
 
 	out[0] = 0x06;
-	out[1] = len;
+	out[1] = pl_len;
 
 	return { out, out_len };
 }
