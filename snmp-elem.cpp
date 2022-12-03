@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cstring>
 
+#include "log.h"
 #include "snmp-elem.h"
 
 snmp_elem::snmp_elem()
@@ -14,6 +15,7 @@ snmp_elem::~snmp_elem()
 
 std::pair<uint8_t *, uint8_t> snmp_elem::get_payload() const
 {
+	DOLOG(ll_info, "SNMP_elem::get_payload invoked\n");
 	return { nullptr, 0 };
 }
 
@@ -105,8 +107,10 @@ std::pair<uint8_t *, uint8_t> snmp_sequence::get_payload() const
 	for(auto e : sequence) {
 		auto pl = e->get_payload();
 
-		if (o + pl.second > 256)
+		if (o + pl.second > 256) {
+			DOLOG(ll_info, "SNMP_sequence::get_payload type %02x won't fit\n", pl.first);
 			break;
+		}
 
 		memcpy(&out[o], pl.first, pl.second);
 

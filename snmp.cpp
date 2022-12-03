@@ -1,4 +1,4 @@
-// (C) 2022-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <stdint.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -45,8 +45,10 @@ uint64_t snmp::get_INTEGER(const uint8_t *p, const size_t length)
 
 bool snmp::get_type_length(const uint8_t *p, const size_t len, uint8_t *const type, uint8_t *const length)
 {
-	if (len < 2)
+	if (len < 2) {
+		DOLOG(ll_info, "snmp::get_type_length: length < 2\n");
 		return false;
+	}
 
 	*type = *p++;
 
@@ -95,8 +97,10 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 	if (!get_type_length(p, len, &pdu_type, &pdu_length))
 		return false;
 
-	if (pdu_type != 0x02) // expecting an integer here)
+	if (pdu_type != 0x02) { // expecting an integer here)
+		DOLOG(ll_info, "SNMP::process_PDU: ID-type is not integer\n");
 		return false;
+	}
 
 	p += 2;
 
@@ -107,8 +111,10 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 	if (!get_type_length(p, len, &pdu_type, &pdu_length))
 		return false;
 
-	if (pdu_type != 0x02) // expecting an integer here)
+	if (pdu_type != 0x02) { // expecting an integer here)
+		DOLOG(ll_info, "SNMP::process_PDU: error-type is not integer\n");
 		return false;
+	}
 
 	p += 2;
 
@@ -120,8 +126,10 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 	if (!get_type_length(p, len, &pdu_type, &pdu_length))
 		return false;
 
-	if (pdu_type != 0x02) // expecting an integer here)
+	if (pdu_type != 0x02) { // expecting an integer here)
+		DOLOG(ll_info, "SNMP::process_PDU: error-index is not integer\n");
 		return false;
+	}
 
 	p += 2;
 
@@ -131,8 +139,10 @@ bool snmp::process_PDU(const uint8_t *p, const size_t len, oid_req_t *const oids
 
 	// varbind list sequence
 	uint8_t type_vb_list = *p++;
-	if (type_vb_list != 0x30)
+	if (type_vb_list != 0x30) {
+		DOLOG(ll_info, "SNMP::process_PDU: expecting varbind list sequence, got %02x\n", type_vb_list);
 		return false;
+	}
 	uint8_t len_vb_list = *p++;
 
 	const uint8_t *pnt = p;
