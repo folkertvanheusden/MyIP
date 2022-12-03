@@ -108,7 +108,7 @@ std::pair<uint8_t *, uint8_t> snmp_sequence::get_payload() const
 		auto pl = e->get_payload();
 
 		if (o + pl.second > 256) {
-			DOLOG(ll_info, "SNMP_sequence::get_payload type %02x won't fit\n", pl.first);
+			DOLOG(ll_info, "SNMP_sequence::get_payload type %02x (%d bytes) won't fit\n", pl.first[0], pl.second);
 			break;
 		}
 
