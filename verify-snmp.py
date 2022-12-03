@@ -92,6 +92,12 @@ assert make_snmp_message(1, 'public', make_snmp_null()) == [48, 13, 2, 1, 1, 4, 
 assert make_snmp_oid('1.3.6.1.4.1.2680.1.2.7.3.2.0') == [6, 13, 43, 6, 1, 4, 1, 148, 120, 1, 2, 7, 3, 2, 0]
 assert make_snmp_get_request(0, 'private', ['1.3.6.1.4.1.2680.1.2.7.3.2.0']) == [48, 44, 2, 1, 0, 4, 7, 112, 114, 105, 118, 97, 116, 101, 160, 30, 2, 1, 1, 2, 1, 0, 2, 1, 0, 48, 19, 48, 17, 6, 13, 43, 6, 1, 4, 1, 148, 120, 1, 2, 7, 3, 2, 0, 5, 0]
 
+def get_snmp_BER(data, offset):
+    if data[offset + 1] + 2 > len(data):
+        print(f'Field length wrong: {data[offset + 1] + 2} does not fit in {len(data)} at offset {offset}')
+
+    return ((data[offset + 0], data[offset + 2:offset + 2 + data[offset + 1]]), data[offset + 1] + 2)
+
 def get_snmp_integer(data, offset):
     if data[offset] != 0x02:
         print(f'Expected integer at {offset}, got type 0x{data[offset]:02x}')
@@ -107,11 +113,76 @@ def get_snmp_integer(data, offset):
 
     return (v, data[offset + 1] + 2)
 
+def get_snmp_octetstring(data, offset):
+    if data[offset] != 0x04:
+        print(f'Expected octetstring at {offset}, got type 0x{data[offset]:02x}')
+
+    if data[offset + 1] + 2 > len(data):
+        print(f'Field length wrong: {data[offset + 1] + 2} does not fit in {len(data)} at offset {offset}')
+
+    return (data[offset + 2:offset + 2 + data[offset + 1]], data[offset + 1] + 2)
+
+def get_sequence(data, offset):
+    if data[offset] != 0x30:
+        print(f'Expected sequence at {offset}, got type 0x{data[offset]:02x}')
+
+    if data[offset + 1] + 2 > len(data):
+        print(f'Field length wrong: {data[offset + 1] + 2} does not fit in {len(data)} at offset {offset}')
+
+    return (data[offset + 2:offset + 2 + data[offset + 1]], data[offset + 1] + 2)
+
+def get_pdu(data, offset):
+    if data[offset] != 0xa0 and data[offset] != 0xa2:
+        print(f'Expected pdu(0xa0/0xa2) at {offset}, got type 0x{data[offset]:02x}')
+
+    pdu_payload_len = data[offset + 1];
+
+    if pdu_payload_len + 2 > len(data):
+        print(f'Field length wrong: {data[offset + 1] + 2} does not fit in {len(data)} at offset {offset}')
+
+    offset += 2
+
+    request_id = get_snmp_integer(data, offset)
+    offset += request_id[1]
+
+    error = get_snmp_integer(data, offset)
+    offset += error[1]
+
+    error_index = get_snmp_integer(data, offset)
+    offset += error_index[1]
+
+    varbind_list = get_sequence(data, offset)
+    offset += varbind_list[1]
+
+    oids = []
+
+    # retrieve oid/value pairs from varbind_list
+    work = varbind_list[0]
+    work_len = varbind_list[1] - 2
+    work_offset = 0
+
+    while work_len > 0:
+        varbind = get_sequence(work, work_offset)
+
+        work_offset += varbind[1]
+        work_len -= varbind[1]
+
+        oid = get_snmp_BER(varbind[0], 0)
+
+        value = get_snmp_BER(varbind[0], oid[1])
+
+        oids.append((oid[0], value[0]))
+
+    if work_len < 0:
+        print(f'Varbind inner size incorrect: {work_len} short')
+
+    return ((request_id[0], error[0], error_index[0], oids), pdu_payload_len + 2)
+
 target = sys.argv[1]
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-request = bytearray(make_snmp_get_request(0, 'public', ['1.3.6.1.4.1.2680.1.2.7.3.2.0', '1.3.6.1.2.1.1.1.0', '1.3.6.1.2.1.4.57850.1.11.1']))
+request = bytearray(make_snmp_get_request(0, 'public', ['1.3.6.1.2.1.1.4.0', '1.3.6.1.2.1.1.5.0', '1.3.6.1.2.1.1.6.0']))
 
 s.sendto(request, (target, 161))
 
@@ -138,5 +209,9 @@ offset += rc[1]
 c = rc[0].decode('ascii')
 if c != 'public':
     print(f'Community unexpected ({c})')
+
+rc = get_pdu(payload, offset)
+offset += rc[1]
+print(rc)
 
 s.close()
