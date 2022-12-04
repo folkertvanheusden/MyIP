@@ -207,7 +207,7 @@ int sock_read(void *ctx, unsigned char *buf, size_t len)
 {
 	https_ctx *const hc = reinterpret_cast<https_ctx *>(ctx);
 
-	for(;!hc->s->get_is_terminating();) {
+	for(;!hc->s->get_is_terminating() && !hc->hs->terminate;) {
 		std::unique_lock<std::mutex> lck(hc->hs->r_lock);
 
 		if (hc->hs->req_len >= len) {
@@ -313,8 +313,12 @@ void https_thread(session *ts)
 		}
 	}
 
-	if (ok && hs->terminate == false)
-		br_sslio_close(&ioc);
+	if (ok && hs->terminate == false) {
+		ts->set_is_terminating();
+
+// this often ends in a busy loop in bearssl
+//		br_sslio_close(&ioc);
+	}
 
 	ts->get_stream_target()->end_session(ts);
 }
