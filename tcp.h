@@ -10,7 +10,7 @@
 
 #include "any_addr.h"
 #include "application.h"
-#include "ip_protocol.h"
+#include "transport_layer.h"
 #include "packet.h"
 #include "pstream.h"
 #include "session.h"
@@ -42,8 +42,9 @@ public:
 
 	std::map<uint32_t, std::vector<uint8_t> > fragments;
 
-	std::condition_variable state_changed;
-	uint64_t last_pkt     { 0 };
+	std::condition_variable_any state_changed;
+	uint64_t e_last_pkt_ts{ 0 };  // ts of last packet (transmitted or received)
+	uint64_t r_last_pkt_ts{ 0 };  // ls of last received packet
 	uint32_t my_seq_nr    { 0 };
 	uint32_t their_seq_nr { 0 };
 	uint32_t initial_my_seq_nr    { 0 };
@@ -66,6 +67,12 @@ public:
 
 	~tcp_session() {
 	}
+
+	std::string get_state_name() const {
+		const std::string state_names[] { "closed", "listen", "syn_rcvd", "syn_sent", "established", "fin_wait_1", "fin_wait_2", "close_wait", "last_ack", "closing", "time_wait", "rst_act" };
+
+		return state_names[state];
+	}
 };
 
 typedef struct {
@@ -78,7 +85,7 @@ typedef struct {
 	int port;
 } tcp_client_t;
 
-class tcp : public ip_protocol, pstream
+class tcp : public transport_layer, public pstream
 {
 private:
 	icmp  *const icmp_          { nullptr };
@@ -86,11 +93,7 @@ private:
 	std::thread *th_unacked_sender { nullptr };
 	std::thread *th_cleaner        { nullptr };
 
-	std::mutex              sessions_lock;
-	std::condition_variable sessions_cv;
-	std::condition_variable unacked_cv;
-	// the key is an 'internal id'
-	std::map<uint64_t, tcp_session *> sessions;
+	std::condition_variable_any   unacked_cv;
 
 	// listen port -> handler
 	std::mutex listeners_lock;
@@ -114,7 +117,7 @@ private:
 
 	void send_rst_for_port(const packet *const pkt, const int dst_port, const int src_port);
 
-	void send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len);
+	void send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len, const uint32_t TSencr);
 
 	void packet_handler(const packet *const pkt);
 	void cleanup_session_helper(std::map<uint64_t, tcp_session *>::iterator *it);

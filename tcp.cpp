@@ -70,7 +70,7 @@ char *flags_to_str(uint8_t flags)
 	return out;
 }
 
-tcp::tcp(stats *const s, icmp *const icmp_, const int n_threads) : ip_protocol(s, "tcp"), icmp_(icmp_)
+tcp::tcp(stats *const s, icmp *const icmp_, const int n_threads) : transport_layer(s, "tcp"), icmp_(icmp_)
 {
 	tcp_packets           = s->register_stat("tcp_packets");
 	tcp_errors            = s->register_stat("tcp_errors", "1.3.6.1.2.1.6.7");  // tcpAttemptFails
@@ -110,7 +110,7 @@ tcp::~tcp()
 	delete th_cleaner;
 
 	for(auto & s : sessions)
-		free_tcp_session(s.second);
+		free_tcp_session(dynamic_cast<tcp_session *>(s.second));
 }
 
 int rel_seqnr(const tcp_session *const ts, const bool mine, const uint32_t nr)
@@ -118,7 +118,7 @@ int rel_seqnr(const tcp_session *const ts, const bool mine, const uint32_t nr)
 	return mine ? nr - ts->initial_my_seq_nr : nr - ts->initial_their_seq_nr;
 }
 
-void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len)
+void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len, const uint32_t TSecr)
 {
 	char *flag_str = flags_to_str(flags);
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str, rel_seqnr(ts, false, ack_to), my_seq_nr ? rel_seqnr(ts, true, *my_seq_nr) : -1, data_len);
@@ -129,7 +129,7 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 		return;
 	}
 
-	size_t temp_len = 20 + data_len;
+	size_t temp_len = 20 + 12 + data_len;
 	uint8_t *temp = new uint8_t[temp_len];
 
 	temp[0] = my_port >> 8;
@@ -152,23 +152,34 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 	temp[10] = ack_to >> 8;
 	temp[11] = ack_to;
 
-	temp[12] = 5 << 4; // header len
+	temp[12] = 8 << 4; // header len
 	temp[13] = flags;
 
-	if (data_len) {
-		temp[14] = data_len >> 8;
-		temp[15] = data_len & 255;
-	}
-	else {
-		temp[14] = org_len >> 8;
-		temp[15] = org_len & 255;
-	}
+	temp[14] = 255;  // window size
+	temp[15] = 255;
 
 	temp[16] = temp[17] = 0; // checksum
 	temp[18] = temp[19] = 0; // urgent pointer
 
+	// timestamp option
+	temp[20] = 8;  // code for timestamp
+	temp[21] = 10;  // length of option
+	uint64_t us = get_us();
+	temp[22] = us >> 24;
+	temp[23] = us >> 16;
+	temp[24] = us >>  8;
+	temp[25] = us;
+	temp[26] = TSecr >> 24;
+	temp[27] = TSecr >> 16;
+	temp[28] = TSecr >>  8;
+	temp[29] = TSecr;
+
+	// padding
+	temp[30] = 1;
+	temp[31] = 0;
+
 	if (data_len)
-		memcpy(&temp[20], data, data_len);
+		memcpy(&temp[32], data, data_len);
 
 	uint16_t checksum = tcp_udp_checksum(peer_addr, my_addr, true, temp, temp_len);
 
@@ -186,7 +197,7 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 			(*my_seq_nr)++;
 	}
 
-	ts->last_pkt = get_us();
+	ts->e_last_pkt_ts = get_us();
 }
 
 std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const uint64_t id)
@@ -313,7 +324,7 @@ void tcp::packet_handler(const packet *const pkt)
 		return;
 	}
 
-	std::unique_lock<std::mutex> lck(sessions_lock);
+	std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 	// check concuncurrent session count
 	if (sessions.size() >= 128) {
@@ -370,14 +381,33 @@ void tcp::packet_handler(const packet *const pkt)
 		}
 	}
 
-	tcp_session *const cur_session = cur_it->second;
+	// process extra headers
+	const uint8_t *cur_extra_headers_p = &p[20];
+	const uint8_t *const extra_headers_end = &p[header_size];
 
-	cur_session->last_pkt = get_us();
+	uint32_t TSecr = 0;  // TSecr that will be returned if ACK flag is set
+
+	while(extra_headers_end - cur_extra_headers_p >= 2) {
+		if (cur_extra_headers_p[0] == 8 && flag_ack) {
+			TSecr = (cur_extra_headers_p[2] << 24) | (cur_extra_headers_p[3] << 16) | (cur_extra_headers_p[4] << 8) | cur_extra_headers_p[5];
+
+			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: will set TSecr to %08x\n", TSecr);
+		}
+
+		if (cur_extra_headers_p[0] == 0 || cur_extra_headers_p[0] == 1) // 1-byte?
+			cur_extra_headers_p++;
+		else
+			cur_extra_headers_p += cur_extra_headers_p[1];
+	}
+
+	tcp_session *const cur_session = dynamic_cast<tcp_session *>(cur_it->second);
+
+	cur_session->e_last_pkt_ts = get_us();
 
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: start processing TCP segment, state: %s, my seq nr %d, opponent seq nr %d\n", id, states[cur_session->state], rel_seqnr(cur_session, true, cur_session->my_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
 	cur_session->tlock.lock();
 
-	cur_it->second->window_size = std::max(1, win_size);
+	cur_session->window_size = std::max(1, win_size);
 
 	bool fail         = false;
 	bool delete_entry = false;
@@ -406,7 +436,7 @@ void tcp::packet_handler(const packet *const pkt)
 			if (cur_session->state == tcp_listen || cur_session->state == tcp_syn_rcvd) {
 				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: received SYN, send SYN + ACK\n", id);
 				// send SYN + ACK
-				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_SYN | FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_SYN | FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 
 				set_state(cur_session, tcp_syn_rcvd);
 			}
@@ -422,7 +452,7 @@ void tcp::packet_handler(const packet *const pkt)
 
 				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: received ACK%s: session established, their seq: %u, my seq: %u\n", id, flag_syn ? " and SYN" : "", cur_session->their_seq_nr, cur_session->my_seq_nr);
 
-				send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+				send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 
 //				cur_session->my_seq_nr += 1;
 
@@ -482,10 +512,13 @@ void tcp::packet_handler(const packet *const pkt)
 					if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
 						DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n", id);
 
-						send_segment(cur_session, cur_session->id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+						send_segment(cur_session, cur_session->id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 
 						set_state(cur_session, tcp_fin_wait_1);
 					}
+
+					if (cur_session->unacked_size > 0)
+						cur_session->r_last_pkt_ts = cur_session->e_last_pkt_ts;
 				}
 
 				unacked_cv.notify_all();
@@ -520,9 +553,9 @@ void tcp::packet_handler(const packet *const pkt)
 
 			// send ACK + FIN
 			if (cur_session->is_client)
-				send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0);
+				send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 			else
-				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0);
+				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 
 			set_state(cur_session, tcp_fin_wait_2);
 
@@ -591,9 +624,9 @@ void tcp::packet_handler(const packet *const pkt)
 					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: acknowledging received content\n", id);
 
 					if (cur_session->is_client)
-						send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+						send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 					else
-						send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+						send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 				}
 			}
 		}
@@ -608,12 +641,12 @@ void tcp::packet_handler(const packet *const pkt)
 				DOLOG(ll_info, "TCP[%012" PRIx64 "]: number of fragments in cache: %zu\n", id, cur_session->fragments.size());
 			}
 
-			uint32_t ack_to = cur_session->their_seq_nr >= their_seq_nr ? their_seq_nr : cur_session->their_seq_nr;
+			const uint32_t ack_to = cur_session->their_seq_nr;
 
 			if (cur_session->is_client)
-				send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0);
+				send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 			else
-				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0);
+				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 		}
 
 		unacked_cv.notify_all();
@@ -635,9 +668,9 @@ void tcp::packet_handler(const packet *const pkt)
 
 		DOLOG(ll_info, "TCP[%012" PRIx64 "]: sending fail packet [IC]\n", id);
 		if (cur_session->is_client)
-			send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0);
+			send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0, TSecr);
 		else
-			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0);
+			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0, TSecr);
 	}
 
 	if (delete_entry)
@@ -655,7 +688,7 @@ void tcp::packet_handler(const packet *const pkt)
 		cur_it = sessions.find(id);
 
 		if (cur_it != sessions.end()) {
-			tcp_session *pointer = cur_it->second;
+			tcp_session *pointer = dynamic_cast<tcp_session *>(cur_it->second);
 
 			sessions.erase(cur_it);
 			stats_set(tcp_cur_n_sessions, sessions.size());
@@ -697,7 +730,7 @@ void tcp::session_cleaner()
 		using namespace std::chrono_literals;
 
 		// TODO: langere wachttijd en wakker maken elders als state != established gezet wordt
-		std::unique_lock<std::mutex> lck(sessions_lock);
+		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 		if (sessions_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
 			DOLOG(ll_debug, "tcp-clnr woke-up after ack\n");
 
@@ -705,50 +738,62 @@ void tcp::session_cleaner()
 		uint64_t now = get_us();
 
 		for(auto it = sessions.cbegin(); it != sessions.cend();) {
-			uint64_t age = (now - it->second->last_pkt) / 1000000;
+			tcp_session *const s = dynamic_cast<tcp_session *>(it->second);
 
-			if (age >= session_timeout || it->second->state > tcp_established) {
-				if (it->second->state > tcp_established)
-					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: session closed (state: %s)\n", it->first, states[it->second->state]);
+			uint64_t age = (now - s->e_last_pkt_ts) / 1000000;
+
+			if (age >= session_timeout || s->state > tcp_established) {
+				if (s->state > tcp_established)
+					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: session closed (state: %s)\n", it->first, states[s->state]);
 				else
 					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: session timed out\n", it->first);
 
 				// call session_closed
-				auto cb = get_lock_listener(it->second->get_my_port(), it->first);
+				auto cb = get_lock_listener(s->get_my_port(), it->first);
 
 				if (cb.has_value()) {  // session not initiated here?
-					cb.value().session_closed_1(this, it->second);
-					cb.value().session_closed_2(this, it->second);
+					cb.value().session_closed_1(this, s);
+					cb.value().session_closed_2(this, s);
 				}
 
 				release_listener_lock();
 
 				// clean-up
-				free_tcp_session(it->second);
+				free_tcp_session(s);
 
 				it = sessions.erase(it);
-				stats_set(tcp_cur_n_sessions, sessions.size());
 
 				stats_inc_counter(tcp_sessions_to);
 			}
-			else if (it->second->state == tcp_time_wait && age >= 2) {
+			else if (s->state == tcp_time_wait && age >= 2) {
 				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: session clean-up after tcp_time_wait state\n", it->first);
 
-				if (it->second->is_client) {
+				if (s->is_client) {
 					// forget client session
-					tcp_clients.erase(it->second->get_their_port());
+					tcp_clients.erase(s->get_their_port());
 				}
 
 				// clean-up
-				free_tcp_session(it->second);
+				free_tcp_session(s);
 
 				it = sessions.erase(it);
-				stats_set(tcp_cur_n_sessions, sessions.size());
+			}
+			else if (s->state == tcp_syn_rcvd && age >= 5) {
+				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: delete session in SYN state for 5 or more seconds\n", it->first);
+
+				if (s->is_client)
+					tcp_clients.erase(s->get_their_port());
+
+				free_tcp_session(s);
+
+				it = sessions.erase(it);
 			}
 			else {
 				++it;
 			}
 		}
+
+		stats_set(tcp_cur_n_sessions, sessions.size());
 
 		lck.unlock();
 	}
@@ -761,41 +806,49 @@ void tcp::unacked_sender()
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
-		std::unique_lock<std::mutex> lck(sessions_lock);
+		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 		if (unacked_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
-			DOLOG(ll_debug, "tcp-unack woke-up after ack\n");
+			DOLOG(ll_debug, "TCP[] unack woke-up after ack\n");
 
 		// go through all sessions and find if any has segments to resend
+		uint64_t now = get_us();
 
 		for(auto it = sessions.cbegin(); it != sessions.cend(); it++) {
-			it->second->tlock.lock();
+			tcp_session *const s = dynamic_cast<tcp_session *>(it->second);
 
-			bool notify = false;
+			// last packet >= 1s ago?
+			if (now - s->r_last_pkt_ts >= 1000000) {
+				s->tlock.lock();
 
-			int to_send = std::min(it->second->window_size - it->second->data_since_last_ack, it->second->unacked_size);
-			int packet_size = idev->get_max_packet_size() - 20;
+				bool notify = false;
 
-			uint32_t resend_nr = it->second->my_seq_nr;
+				int to_send = std::min(s->window_size - s->data_since_last_ack, s->unacked_size);
+				int packet_size = idev->get_max_packet_size() - (20 + 12 /* timestamp option + padding */);
 
-			for(int i=0; i<to_send; i += packet_size) {
-				size_t send_n = std::min(packet_size, to_send - i);
+				uint32_t resend_nr = s->my_seq_nr;
 
-				DOLOG(ll_debug, "tcp-unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", send_n, rel_seqnr(it->second, true, it->second->my_seq_nr), it->second->window_size, it->second->unacked_size, it->second->data_since_last_ack);
+				for(int i=0; i<to_send; i += packet_size) {
+					size_t send_n = std::min(packet_size, to_send - i);
 
-				if (it->second->is_client)
-					send_segment(it->second, it->second->id, it->second->get_their_addr(), it->second->get_their_port(), it->second->get_my_addr(), it->second->get_my_port(), 0, FLAG_ACK, it->second->their_seq_nr, &resend_nr, &it->second->unacked[i], send_n);
-				else
-					send_segment(it->second, it->second->id, it->second->get_my_addr(), it->second->get_my_port(), it->second->get_their_addr(), it->second->get_their_port(), 0, FLAG_ACK, it->second->their_seq_nr, &resend_nr, &it->second->unacked[i], send_n);
+					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", it->first, send_n, rel_seqnr(s, true, s->my_seq_nr), s->window_size, s->unacked_size, s->data_since_last_ack);
 
-				it->second->data_since_last_ack += send_n;
+					if (s->is_client)
+						send_segment(s, s->id, s->get_their_addr(), s->get_their_port(), s->get_my_addr(), s->get_my_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n, 0);
+					else
+						send_segment(s, s->id, s->get_my_addr(), s->get_my_port(), s->get_their_addr(), s->get_their_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n, 0);
 
-				notify = true;
+					s->data_since_last_ack += send_n;
+
+					notify = true;
+				}
+
+				s->tlock.unlock();
+
+				if (notify)
+					s->unacked_sent_cv.notify_one();
+
+				s->r_last_pkt_ts = 0;
 			}
-
-			it->second->tlock.unlock();
-
-			if (notify)
-				it->second->unacked_sent_cv.notify_one();
 		}
 
 		lck.unlock();
@@ -885,9 +938,9 @@ void tcp::end_session(session *const ts_in)
 		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, rel_seqnr(ts, true, ts->my_seq_nr));
 
 		if (ts->is_client)
-			send_segment(ts, ts->id, ts->get_their_addr(), ts->get_their_port(), ts->get_my_addr(), ts->get_my_port(), 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
+			send_segment(ts, ts->id, ts->get_their_addr(), ts->get_their_port(), ts->get_my_addr(), ts->get_my_port(), 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0, 0);
 		else
-			send_segment(ts, ts->id, ts->get_my_addr(), ts->get_my_port(), ts->get_their_addr(), ts->get_their_port(), 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0);
+			send_segment(ts, ts->id, ts->get_my_addr(), ts->get_my_port(), ts->get_their_addr(), ts->get_their_port(), 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0, 0);
 
 		set_state(ts, tcp_fin_wait_1);
 	}
@@ -909,7 +962,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	uint16_t port = 0;
 
 	// lock all sesions
-	std::unique_lock<std::mutex> lck(sessions_lock);
+	std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 	// allocate free port
 	for(;;) {
@@ -966,7 +1019,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	// start session
 	new_session->tlock.lock();
 
-	send_segment(new_session, id, new_session->get_their_addr(), new_session->get_their_port(), new_session->get_my_addr(), new_session->get_my_port(), 512, FLAG_SYN, new_session->their_seq_nr, &new_session->my_seq_nr, nullptr, 0);
+	send_segment(new_session, id, new_session->get_their_addr(), new_session->get_their_port(), new_session->get_my_addr(), new_session->get_my_port(), 512, FLAG_SYN, new_session->their_seq_nr, &new_session->my_seq_nr, nullptr, 0, 0);
 
 	new_session->tlock.unlock();
 
@@ -976,7 +1029,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 void tcp::close_client_session(const int port)
 {
 	// lock all sessions
-	std::unique_lock<std::mutex> lck(sessions_lock);
+	std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 	// find id of the session
 	auto it_id = tcp_clients.find(port);
@@ -989,9 +1042,11 @@ void tcp::close_client_session(const int port)
 		return;
 
 	// send FIN
-	sd_it->second->tlock.lock();
-	end_session(sd_it->second);
-	sd_it->second->tlock.unlock();
+	tcp_session *const s = dynamic_cast<tcp_session *>(sd_it->second);
+
+	s->tlock.lock();
+	end_session(s);
+	s->tlock.unlock();
 }
 
 void tcp::wait_for_client_connected_state(const int local_port)
@@ -1002,7 +1057,7 @@ void tcp::wait_for_client_connected_state(const int local_port)
 		DOLOG(ll_debug, "wait_for_client_connected_state: lock all sessions\n");
 
 		// lock all sessions
-		std::unique_lock<std::mutex> lck(sessions_lock);
+		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 		DOLOG(ll_debug, "wait_for_client_connected_state: find session id for %d\n", local_port);
 
@@ -1021,7 +1076,7 @@ void tcp::wait_for_client_connected_state(const int local_port)
 
 		DOLOG(ll_debug, "wait_for_client_connected_state: found session-data, send_data\n");
 
-		tcp_session *const cur_session = sd_it->second;
+		tcp_session *const cur_session = dynamic_cast<tcp_session *>(sd_it->second);
 
 		if (cur_session->state >= tcp_established) {
 			DOLOG(ll_debug, "wait_for_client_connected_state: found session-data, data sent\n");
@@ -1040,12 +1095,12 @@ void tcp::wait_for_client_connected_state(const int local_port)
 
 			cur_session->tlock.lock();
 
-			send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), 512, FLAG_SYN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0);
+			send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), 512, FLAG_SYN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, 0);
 
 			cur_session->tlock.unlock();
 		}
 
-		DOLOG(ll_debug, "client waiting for 'established': STATE NOW IS %s\n", states[sd_it->second->state]);
+		DOLOG(ll_debug, "client waiting for 'established': STATE NOW IS %s\n", states[cur_session->state]);
 
 		cur_session->state_changed.wait_for(lck, 500ms);
 		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid as
@@ -1058,7 +1113,7 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 	DOLOG(ll_debug, "client_session_send_data: lock all sessions\n");
 
 	// lock all sessions
-	std::unique_lock<std::mutex> lck(sessions_lock);
+	std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 	DOLOG(ll_debug, "client_session_send_data: find session id for %d\n", local_port);
 
@@ -1077,7 +1132,7 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 
 	DOLOG(ll_debug, "client_session_send_data: found session-data, send_data\n");
 
-	tcp_session *const cur_session = sd_it->second;
+	tcp_session *const cur_session = dynamic_cast<tcp_session *>(sd_it->second);
 
 	send_data(cur_session, data, len);
 

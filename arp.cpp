@@ -10,7 +10,7 @@
 #include "utils.h"
 
 
-arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) : protocol(s, "arp"), address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
+arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) : network_layer(s, "arp"), address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
 	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
@@ -69,7 +69,7 @@ void arp::operator()()
 			delete [] reply;
 		}
 		else {
-			DOLOG(ll_debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(&p[24], 4).to_str().c_str());
+			// DOLOG(ll_debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(&p[24], 4).to_str().c_str());
 		}
 
 		delete pkt;
@@ -95,7 +95,7 @@ std::pair<phys *, any_addr *> arp::query_cache(const any_addr & ip)
 	return { default_pdev, new any_addr(gw_mac) };
 }
 
-bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	// for requests
 	assert(0);
@@ -103,7 +103,7 @@ bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, con
 	return false;
 }
 
-bool arp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool arp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	// for requests
 	assert(0);

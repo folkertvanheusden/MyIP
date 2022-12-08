@@ -8,7 +8,7 @@
 #include "utils.h"
 
 
-ndp::ndp(stats *const s) : protocol(s, "ndp"), address_cache(s)
+ndp::ndp(stats *const s) : network_layer(s, "ndp"), address_cache(s)
 {
 	// 1.3.6.1.2.1.4.57850.1.9: ndp
         ndp_cache_req = s->register_stat("ndp_cache_req", "1.3.6.1.2.1.4.57850.1.9.1");
@@ -47,12 +47,12 @@ void ndp::operator()()
 	}
 }
 
-bool ndp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ndp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	return false;
 }
 
-bool ndp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ndp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	return false;
 }

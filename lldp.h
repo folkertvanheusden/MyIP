@@ -6,11 +6,11 @@
 #include <string>
 
 #include "phys.h"
-#include "protocol.h"
+#include "network_layer.h"
 #include "stats.h"
 
 
-class lldp : public protocol
+class lldp : public network_layer
 {
 private:
 	std::thread   *th { nullptr };
@@ -28,8 +28,8 @@ public:
 
 	any_addr get_addr() const override { return any_addr(); }
 
-	bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
-	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
+	bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
+	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 
 	virtual int get_max_packet_size() const override { return 1500; }
 

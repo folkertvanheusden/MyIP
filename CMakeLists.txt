@@ -28,7 +28,7 @@ add_executable(myip
 	http.cpp
 	icmp.cpp
 	icmp6.cpp
-	ip_protocol.cpp
+	transport_layer.cpp
 	ipv4.cpp
 	ipv6.cpp
 	lldp.cpp
@@ -48,7 +48,7 @@ add_executable(myip
 	phys_sctp_udp.cpp
 	phys_slip.cpp
 	phys_tap.cpp
-	protocol.cpp
+	network_layer.cpp
 	sctp.cpp
 	sctp_crc32c.cpp
 	session.cpp
@@ -65,6 +65,7 @@ add_executable(myip
 	tcp.cpp
 	tcp_udp_fw.cpp
 	time.cpp
+	ud.cpp
 	udp.cpp
 	utils.cpp
 	vnc.cpp
@@ -79,11 +80,19 @@ add_executable(myiptop
 	utils.cpp
 	)
 
+add_executable(myipnetstat
+	log.cpp
+	myipnetstat.cpp
+	time.cpp
+	utils.cpp
+)
+
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads)
 target_link_libraries(myip Threads::Threads)
 target_link_libraries(myiptop Threads::Threads)
+target_link_libraries(myipnetstat Threads::Threads)
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
@@ -97,6 +106,14 @@ target_link_libraries(myip -lbearssl)
 target_link_libraries(myip -latomic)
 
 include(FindPkgConfig)
+
+pkg_check_modules(JANSSON REQUIRED jansson)
+target_link_libraries(myip ${JANSSON_LIBRARIES})
+target_include_directories(myip PUBLIC ${JANSSON_INCLUDE_DIRS})
+target_compile_options(myip PUBLIC ${JANSSON_CFLAGS_OTHER})
+target_link_libraries(myipnetstat ${JANSSON_LIBRARIES})
+target_include_directories(myipnetstat PUBLIC ${JANSSON_INCLUDE_DIRS})
+target_compile_options(myipnetstat PUBLIC ${JANSSON_CFLAGS_OTHER})
 
 pkg_check_modules(SNDFILE REQUIRED sndfile)
 target_link_libraries(myip ${SNDFILE_LIBRARIES})

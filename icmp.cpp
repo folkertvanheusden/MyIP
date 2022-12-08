@@ -7,7 +7,7 @@
 #include "utils.h"
 
 
-icmp::icmp(stats *const s) : ip_protocol(s, "icmp(4/6)")
+icmp::icmp(stats *const s) : transport_layer(s, "icmp(4/6)")
 {
 	icmp_requests = s->register_stat("icmp_requests");
 	icmp_req_ping = s->register_stat("icmp_req_ping");

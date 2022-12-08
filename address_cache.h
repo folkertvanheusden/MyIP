@@ -5,13 +5,13 @@
 #include <shared_mutex>
 
 #include "phys.h"
-#include "protocol.h"
+#include "network_layer.h"
 #include "stats.h"
 
 typedef struct {
 	uint64_t ts;
 	any_addr addr;
-	phys *interface;
+	phys    *interface;
 } address_entry_t;
 
 class address_cache
@@ -20,12 +20,12 @@ protected:
 	std::shared_mutex cache_lock;
 	std::map<any_addr, address_entry_t> cache;
 
-	std::atomic_bool cleaner_stop_flag { false };
-	std::thread *cleaner_th { nullptr };
+	std::atomic_bool cleaner_stop_flag { false   };
+	std::thread     *cleaner_th        { nullptr };
 
 	uint64_t *address_cache_requests { nullptr }, *address_cache_for_me { nullptr };
-	uint64_t *address_cache_req { nullptr }, *address_cache_hit { nullptr };
-        uint64_t *address_cache_store { nullptr }, *address_cache_update { nullptr };
+	uint64_t *address_cache_req      { nullptr }, *address_cache_hit    { nullptr };
+        uint64_t *address_cache_store    { nullptr }, *address_cache_update { nullptr };
 
 	void cache_cleaner();
 

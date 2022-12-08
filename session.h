@@ -58,4 +58,6 @@ public:
 	timespec get_session_creation_time() { return session_created; }
 
 	private_data *get_application_private_data() { return application_private_data; }
+
+	virtual std::string get_state_name() const = 0;
 };

@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <assert.h>
 
+#include "log.h"
 #include "snmp-data.h"
 #include "str.h"
 #include "time.h"
@@ -14,6 +15,8 @@ static ssize_t find_oid_in_vector(std::vector<snmp_data_type *> *vec, const std:
 		if (vec->at(i)->get_oid() == oid)
 			return i;
 	}
+
+	DOLOG(ll_info, "SNMP:find_oid_in_vector: OID \"%s\" not found\n", oid.c_str());
 
 	return -1;
 }
