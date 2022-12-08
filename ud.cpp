@@ -64,6 +64,10 @@ void ud_stats::emit_sessions(const int cfd)
 
 			json_object_set(record, "state-name", json_string(session.second->get_state_name().c_str()));
 
+			auto ts = session.second->get_session_creation_time();
+
+			json_object_set(record, "created-at", json_integer(ts.tv_sec * 1000000ll + ts.tv_nsec / 1000));
+
 			json_array_append(out, record);
 		}
 
