@@ -1,23 +1,23 @@
 // (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <chrono>
 
-#include "ip_protocol.h"
+#include "transport_layer.h"
 #include "log.h"
 
 
 constexpr size_t pkts_max_size { 256 };
 
-ip_protocol::ip_protocol(stats *const s, const std::string & stats_name)
+transport_layer::transport_layer(stats *const s, const std::string & stats_name)
 {
 	pkts = new fifo<const packet *>(s, stats_name, pkts_max_size);
 }
 
-ip_protocol::~ip_protocol()
+transport_layer::~transport_layer()
 {
 	delete pkts;
 }
 
-void ip_protocol::queue_packet(const packet *p)
+void transport_layer::queue_packet(const packet *p)
 {
 	if (pkts->try_put(p) == false) {
 		DOLOG(ll_debug, "IP-Protocol: packet dropped\n");

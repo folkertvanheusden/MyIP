@@ -9,7 +9,7 @@
 
 #include "any_addr.h"
 #include "phys.h"
-#include "protocol.h"
+#include "network_layer.h"
 #include "stats.h"
 
 

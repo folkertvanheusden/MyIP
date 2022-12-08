@@ -10,7 +10,7 @@
 
 #include "any_addr.h"
 #include "application.h"
-#include "ip_protocol.h"
+#include "transport_layer.h"
 #include "packet.h"
 #include "pstream.h"
 #include "session.h"
@@ -85,7 +85,7 @@ typedef struct {
 	int port;
 } tcp_client_t;
 
-class tcp : public ip_protocol, public pstream
+class tcp : public transport_layer, public pstream
 {
 private:
 	icmp  *const icmp_          { nullptr };

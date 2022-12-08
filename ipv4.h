@@ -6,13 +6,13 @@
 #include <string>
 
 #include "phys.h"
-#include "protocol.h"
-#include "ip_protocol.h"
+#include "network_layer.h"
+#include "transport_layer.h"
 #include "stats.h"
 
 class arp;
 
-class ipv4 : public protocol
+class ipv4 : public network_layer
 {
 private:
 	std::vector<std::thread *> ths;
@@ -41,8 +41,8 @@ public:
 
 	any_addr get_addr() const override { return myip; }
 
-	bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
-	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
+	bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
+	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 
 	virtual int get_max_packet_size() const override { return default_pdev->get_max_packet_size() - 20 /* 20 = size of IPv4 header (without options, as MyIP does) */; }
 

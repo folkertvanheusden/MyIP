@@ -13,7 +13,7 @@
 
 
 class icmp;
-class ip_protocol;
+class transport_layer;
 class phys;
 
 typedef struct {
@@ -22,22 +22,22 @@ typedef struct {
 } fifo_element_t;
 
 
-class protocol
+class network_layer
 {
 protected:
 	fifo<fifo_element_t> *pkts         { nullptr };
 
 	phys                 *default_pdev { nullptr };
 
-	std::map<uint8_t, ip_protocol *> prot_map;
+	std::map<uint8_t, transport_layer *> prot_map;
 
 	icmp                 *icmp_        { nullptr };
 
 	std::atomic_bool      stop_flag    { false   };
 
 public:
-	protocol(stats *const s, const std::string & stats_name);
-	virtual ~protocol();
+	network_layer(stats *const s, const std::string & stats_name);
+	virtual ~network_layer();
 
 	void ask_to_stop() { stop_flag = true; }
 
@@ -45,15 +45,15 @@ public:
 
 	void register_default_phys(phys *const p) { default_pdev = p; }
 
-	void register_protocol(const uint8_t protocol, ip_protocol *const p);
-	ip_protocol *get_ip_protocol(const uint8_t p);
+	void register_protocol(const uint8_t network_layer, transport_layer *const p);
+	transport_layer *get_transport_layer(const uint8_t p);
 
 	void register_icmp(icmp *const icmp_) { this->icmp_ = icmp_; }
 
 	virtual void queue_packet(phys *const interface, const packet *p);
 
-	virtual bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
-	virtual bool transmit_packet(const any_addr & dst_ip,  const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
+	virtual bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
+	virtual bool transmit_packet(const any_addr & dst_ip,  const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
 
 	virtual int get_max_packet_size() const = 0;
 

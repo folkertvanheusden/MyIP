@@ -8,7 +8,7 @@
 
 #include "any_addr.h"
 #include "phys_slip.h"
-#include "protocol.h"
+#include "network_layer.h"
 #include "stats.h"
 
 class phys_ppp : public phys_slip
@@ -33,12 +33,12 @@ private:
 	void handle_ipcp(const std::vector<uint8_t> & data);
 	void handle_ipv6cp(const std::vector<uint8_t> & data);
 
-	void send_Xcp(const uint8_t code, const uint8_t identifier, const uint16_t protocol, const std::vector<uint8_t> & data);
-	void send_rej(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);
-	void send_ack(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);
-	void send_nak(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options);
+	void send_Xcp(const uint8_t code, const uint8_t identifier, const uint16_t network_layer, const std::vector<uint8_t> & data);
+	void send_rej(const uint16_t network_layer, const uint8_t identifier, const std::vector<uint8_t> & options);
+	void send_ack(const uint16_t network_layer, const uint8_t identifier, const std::vector<uint8_t> & options);
+	void send_nak(const uint16_t network_layer, const uint8_t identifier, const std::vector<uint8_t> & options);
 
-	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> & ACCM, const bool not_ppp_meta);
+	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t network_layer, const std::vector<uint8_t> & ACCM, const bool not_ppp_meta);
 
 public:
 	phys_ppp(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp, const any_addr & opponent_address);

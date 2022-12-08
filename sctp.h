@@ -9,7 +9,7 @@
 #include "buffer_in.h"
 #include "buffer_out.h"
 #include "hash.h"
-#include "ip_protocol.h"
+#include "transport_layer.h"
 #include "packet.h"
 #include "pstream.h"
 #include "session.h"
@@ -20,7 +20,7 @@ class icmp;
 // dcb: data-call-back
 typedef enum { dcb_close, dcb_abort, dcb_continue } sctp_data_handling_result_t;
 
-class sctp : public ip_protocol, public pstream
+class sctp : public transport_layer, public pstream
 {
 public:
 	class sctp_session : public session {

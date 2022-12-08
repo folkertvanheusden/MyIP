@@ -27,7 +27,7 @@ add_executable(myip
 	http.cpp
 	icmp.cpp
 	icmp6.cpp
-	ip_protocol.cpp
+	transport_layer.cpp
 	ipv4.cpp
 	ipv6.cpp
 	lldp.cpp
@@ -46,7 +46,7 @@ add_executable(myip
 	phys_sctp_udp.cpp
 	phys_slip.cpp
 	phys_tap.cpp
-	protocol.cpp
+	network_layer.cpp
 	sctp.cpp
 	sctp_crc32c.cpp
 	session.cpp

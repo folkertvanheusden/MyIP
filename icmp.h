@@ -2,10 +2,10 @@
 #pragma once
 
 #include "any_addr.h"
-#include "ip_protocol.h"
+#include "transport_layer.h"
 #include "stats.h"
 
-class icmp : public ip_protocol
+class icmp : public transport_layer
 {
 private:
 	uint64_t *icmp_requests { nullptr }, *icmp_req_ping { nullptr };

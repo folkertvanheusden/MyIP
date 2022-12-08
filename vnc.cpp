@@ -481,12 +481,12 @@ void vnc_thread(session *ts)
 				std::string handshake_str = std::string(handshake, 12);
 
 				if (memcmp(handshake, "RFB", 3) == 0) {  // let's not be too picky
-					DOLOG(ll_debug, "VNC: Client responded with protocol version: %s\n", handshake_str.c_str());
+					DOLOG(ll_debug, "VNC: Client responded with network_layer version: %s\n", handshake_str.c_str());
 					vs->state = vs_security_handshake_server;
 				}
 				else {
 					rc = false;
-					DOLOG(ll_info, "VNC: Unexpected/invalid protocol version: %s\n", handshake_str.c_str());
+					DOLOG(ll_info, "VNC: Unexpected/invalid network_layer version: %s\n", handshake_str.c_str());
 					stats_inc_counter(vpd->vnc_err);
 				}
 

@@ -5,7 +5,7 @@
 #include <shared_mutex>
 
 #include "phys.h"
-#include "protocol.h"
+#include "network_layer.h"
 #include "address_cache.h"
 #include "stats.h"
 
@@ -14,7 +14,7 @@ typedef struct {
 	any_addr addr;
 } ndp_entry_t;
 
-class ndp : public protocol, public address_cache
+class ndp : public network_layer, public address_cache
 {
 private:
         uint64_t *ndp_cache_req { nullptr }, *ndp_cache_hit { nullptr };
@@ -30,8 +30,8 @@ public:
 
 	void add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip);
 
-	bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
-	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
+	bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
+	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 
 	// using this for ARP packets does not make sense
 	virtual int get_max_packet_size() const override { return -1; }

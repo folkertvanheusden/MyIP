@@ -14,7 +14,7 @@
 #include "utils.h"
 
 
-ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : protocol(s, "ipv4"), iarp(iarp), myip(myip)
+ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : network_layer(s, "ipv4"), iarp(iarp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
@@ -45,7 +45,7 @@ ipv4::~ipv4()
 	}
 }
 
-bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv4_n_tx);
 	stats_inc_counter(ip_n_out_req);
@@ -65,7 +65,7 @@ bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	out[6] = 0x40;
 	out[7] = 0; // flags (DF) & fragment offset
 	out[8] = 64; // time to live
-	out[9] = protocol;
+	out[9] = network_layer;
 	out[10] = out[11] = 0; // checksum
 
 	bool override_ip = !src_ip.is_set();
@@ -106,7 +106,7 @@ bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	return rc;
 }
 
-bool ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	auto arp_result = iarp->query_cache(dst_ip);
 	const any_addr *dst_mac = arp_result.second;
@@ -118,7 +118,7 @@ bool ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
 		return false;
 	}
 
-	bool rc = transmit_packet(*dst_mac, dst_ip, src_ip, protocol, payload, pl_size, header_template);
+	bool rc = transmit_packet(*dst_mac, dst_ip, src_ip, network_layer, payload, pl_size, header_template);
 
 	delete dst_mac;
 
@@ -202,12 +202,12 @@ void ipv4::operator()()
 
 		const uint8_t *payload_data = &payload_header[header_size];
 
-		const uint8_t protocol = payload_header[9];
+		const uint8_t network_layer = payload_header[9];
 
-		auto it = prot_map.find(protocol);
+		auto it = prot_map.find(network_layer);
 		if (it == prot_map.end()) {
 			delete pkt;
-			DOLOG(ll_debug, "IPv4[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", id, protocol, size);
+			DOLOG(ll_debug, "IPv4[%04x]: dropping packet %02x (= unknown network_layer) and size %d\n", id, network_layer, size);
 			stats_inc_counter(ipv4_unk_prot);
 			stats_inc_counter(ip_n_disc);
 			continue;
@@ -227,7 +227,7 @@ void ipv4::operator()()
 			continue;
 		}
 
-		DOLOG(ll_debug, "IPv4[%04x]: queing packet protocol %02x and size %d\n", id, protocol, payload_size);
+		DOLOG(ll_debug, "IPv4[%04x]: queing packet network_layer %02x and size %d\n", id, network_layer, payload_size);
 
 		it->second->queue_packet(ip_p);
 

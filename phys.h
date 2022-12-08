@@ -6,7 +6,7 @@
 #include <thread>
 
 #include "any_addr.h"
-#include "protocol.h"
+#include "network_layer.h"
 #include "stats.h"
 
 class phys
@@ -28,7 +28,7 @@ protected:
 
 	int       mtu_size         { 0 };
 
-	std::map<uint16_t, protocol *> prot_map;
+	std::map<uint16_t, network_layer *> prot_map;
 
 	const size_t dev_index     { 0 };
 
@@ -42,9 +42,9 @@ public:
 	virtual void start();
 	void stop();
 
-	void register_protocol(const uint16_t ether_type, protocol *const p);
+	void register_protocol(const uint16_t ether_type, network_layer *const p);
 
-	protocol *get_protocol(const uint16_t p);
+	network_layer *get_protocol(const uint16_t p);
 
 	virtual bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size) = 0;
 

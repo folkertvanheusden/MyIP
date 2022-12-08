@@ -2,31 +2,31 @@
 #include <chrono>
 #include <arpa/inet.h>
 
-#include "ip_protocol.h"
+#include "transport_layer.h"
 #include "log.h"
-#include "protocol.h"
+#include "network_layer.h"
 
 
 constexpr size_t pkts_max_size { 256 };
 
-protocol::protocol(stats *const s, const std::string & stats_name)
+network_layer::network_layer(stats *const s, const std::string & stats_name)
 {
 	pkts = new fifo<fifo_element_t>(s, stats_name, pkts_max_size);
 }
 
-protocol::~protocol()
+network_layer::~network_layer()
 {
 	delete pkts;
 }
 
-void protocol::register_protocol(const uint8_t protocol, ip_protocol *const p)
+void network_layer::register_protocol(const uint8_t network_layer, transport_layer *const p)
 {
-	prot_map.insert({ protocol, p });
+	prot_map.insert({ network_layer, p });
 
 	p->register_ip(this);
 }
 
-ip_protocol *protocol::get_ip_protocol(const uint8_t p)
+transport_layer *network_layer::get_transport_layer(const uint8_t p)
 {
 	auto it = prot_map.find(p);
 	if (it == prot_map.end())
@@ -35,7 +35,7 @@ ip_protocol *protocol::get_ip_protocol(const uint8_t p)
 	return it->second;
 }
 
-void protocol::queue_packet(phys *const interface, const packet *p)
+void network_layer::queue_packet(phys *const interface, const packet *p)
 {
 	if (pkts->try_put({ interface, p }) == false) {
 		DOLOG(ll_debug, "Protocol: packet dropped\n");

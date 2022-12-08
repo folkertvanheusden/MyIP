@@ -9,11 +9,11 @@
 
 #include "fifo.h"
 #include "packet.h"
-#include "protocol.h"
+#include "network_layer.h"
 
 class ipv4;
 
-class ip_protocol
+class transport_layer
 {
 protected:
 	std::vector<std::thread *> ths;
@@ -21,15 +21,15 @@ protected:
 
 	fifo<const packet *>      *pkts      { nullptr };
 
-	protocol                  *idev      { nullptr };
+	network_layer                  *idev      { nullptr };
 
 public:
-	ip_protocol(stats *const s, const std::string & stats_name);
-	virtual ~ip_protocol();
+	transport_layer(stats *const s, const std::string & stats_name);
+	virtual ~transport_layer();
 
 	void ask_to_stop() { stop_flag = true; }
 
-	void register_ip(protocol *const p) { idev = p; }
+	void register_ip(network_layer *const p) { idev = p; }
 
 	any_addr get_ip_address() const { return idev->get_addr(); }
 

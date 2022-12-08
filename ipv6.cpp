@@ -13,7 +13,7 @@
 #include "utils.h"
 
 
-ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : protocol(s, "ipv6"), indp(indp), myip(myip)
+ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : network_layer(s, "ipv6"), indp(indp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
@@ -44,7 +44,7 @@ ipv6::~ipv6()
 	}
 }
 
-bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv6_n_tx);
 	stats_inc_counter(ip_n_out_req);
@@ -64,7 +64,7 @@ bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	out[4] = pl_size >> 8;
 	out[5] = pl_size;
 
-	out[6] = protocol;
+	out[6] = network_layer;
 	out[7] = 255;  // basically ignored according to wikipedia?
 
 	src_ip.get(&out[8], 16);
@@ -93,7 +93,7 @@ bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	return rc;
 }
 
-bool ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	bool rc = false;
 
@@ -101,7 +101,7 @@ bool ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, con
         const any_addr *dst_mac = ndp_result.second;
 
         if (dst_mac) {
-		rc = transmit_packet(*dst_mac, dst_ip, src_ip, protocol, payload, pl_size, header_template);
+		rc = transmit_packet(*dst_mac, dst_ip, src_ip, network_layer, payload, pl_size, header_template);
 		delete dst_mac;
 	}
 	else {
@@ -174,11 +174,11 @@ void ipv6::operator()()
 			ip_size = size;
 		}
 
-		uint8_t protocol = payload_header[6];
+		uint8_t network_layer = payload_header[6];
 		const uint8_t *nh = &payload_header[40], *const eh = &payload_header[size - ip_size];
 		
 		while(eh - nh >= 8) {
-			protocol = nh[0];
+			network_layer = nh[0];
 			nh += (nh[1] + 1) * 8;
 		}
 
@@ -200,16 +200,16 @@ void ipv6::operator()()
 
 		int payload_size = size;
 
-		auto it = prot_map.find(protocol);
+		auto it = prot_map.find(network_layer);
 		if (it == prot_map.end()) {
-			DOLOG(ll_debug, "IPv6[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", flow_label, protocol, size);
+			DOLOG(ll_debug, "IPv6[%04x]: dropping packet %02x (= unknown network_layer) and size %d\n", flow_label, network_layer, size);
 			delete pkt;
 			stats_inc_counter(ipv6_unk_prot);
 			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
-		DOLOG(ll_debug, "IPv6[%04x]: queing packet protocol %02x and size %d\n", flow_label, protocol, payload_size);
+		DOLOG(ll_debug, "IPv6[%04x]: queing packet network_layer %02x and size %d\n", flow_label, network_layer, payload_size);
 
 		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
 

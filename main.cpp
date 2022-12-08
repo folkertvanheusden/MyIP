@@ -135,7 +135,7 @@ void register_tcp_service(std::vector<phys *> *const devs, port_handler_t & tph,
 	for(auto & dev : *devs) {
 		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
 		if (i4) {
-			tcp *const t4 = dynamic_cast<tcp *>(i4->get_ip_protocol(0x06));
+			tcp *const t4 = dynamic_cast<tcp *>(i4->get_transport_layer(0x06));
 
 			if (t4)
 				t4->add_handler(port, tph);
@@ -143,7 +143,7 @@ void register_tcp_service(std::vector<phys *> *const devs, port_handler_t & tph,
 
 		ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
 		if (i6) {
-			tcp *const t6 = dynamic_cast<tcp *>(i6->get_ip_protocol(0x06));
+			tcp *const t6 = dynamic_cast<tcp *>(i6->get_transport_layer(0x06));
 
 			if (t6)
 				t6->add_handler(port, tph);
@@ -159,7 +159,7 @@ void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const
 		for(auto & dev : *devs) {
 			ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
 			if (i4) {
-				udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+				udp *const u4 = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
 
 				if (u4)
 					m->add_protocol(u4, port, hostname);
@@ -167,7 +167,7 @@ void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const
 
 			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
 			if (i6) {
-				udp *const u6 = dynamic_cast<udp *>(i6->get_ip_protocol(0x11));
+				udp *const u6 = dynamic_cast<udp *>(i6->get_transport_layer(0x11));
 
 				if (u6)
 					m->add_protocol(u6, port, hostname);
@@ -184,7 +184,7 @@ void register_sctp_service(std::vector<phys *> *const devs, port_handler_t & sph
 	for(auto & dev : *devs) {
 		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
 		if (i4) {
-			sctp *const s4 = dynamic_cast<sctp *>(i4->get_ip_protocol(0x84));
+			sctp *const s4 = dynamic_cast<sctp *>(i4->get_transport_layer(0x84));
 
 			if (s4)
 				s4->add_handler(port, sph);
@@ -192,7 +192,7 @@ void register_sctp_service(std::vector<phys *> *const devs, port_handler_t & sph
 
 		ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
 		if (i6) {
-			sctp *const s6 = dynamic_cast<sctp *>(i6->get_ip_protocol(0x84));
+			sctp *const s6 = dynamic_cast<sctp *>(i6->get_transport_layer(0x84));
 
 			if (s6)
 				s6->add_handler(port, sph);
@@ -299,8 +299,8 @@ int main(int argc, char *argv[])
 	}
 
 	// used for clean-up
-	std::vector<protocol *>    protocols;
-	std::vector<ip_protocol *> ip_protocols;
+	std::vector<network_layer *>    protocols;
+	std::vector<transport_layer *> transport_layers;
 	std::vector<application *> applications;
 	std::vector<socks_proxy *> socks_proxies;
 
@@ -428,7 +428,7 @@ int main(int argc, char *argv[])
 				// rather ugly but that's how IP works
 				ipv4_instance->register_icmp(icmp_);
 
-				ip_protocols.push_back(icmp_);
+				transport_layers.push_back(icmp_);
 			}
 
 			bool use_tcp = cfg_bool(ipv4_, "use-tcp", "wether to enable tcp", true, true);
@@ -438,7 +438,7 @@ int main(int argc, char *argv[])
 
 				ipv4_tcp = t;
 
-				ip_protocols.push_back(t);
+				transport_layers.push_back(t);
 
 				stream_session_handlers.push_back(t);
 			}
@@ -450,7 +450,7 @@ int main(int argc, char *argv[])
 				sctp *sctp_ = new sctp(&s, icmp_);
 				ipv4_instance->register_protocol(0x84, sctp_);
 
-				ip_protocols.push_back(sctp_);
+				transport_layers.push_back(sctp_);
 
 				stream_session_handlers.push_back(sctp_);
 			}
@@ -460,7 +460,7 @@ int main(int argc, char *argv[])
 				udp *u = new udp(&s, icmp_);
 				ipv4_instance->register_protocol(0x11, u);
 
-				ip_protocols.push_back(u);
+				transport_layers.push_back(u);
 			}
 
 			dev->register_protocol(0x0800, ipv4_instance);
@@ -496,7 +496,7 @@ int main(int argc, char *argv[])
 			icmp6 *icmp6_ = nullptr;
 			if (use_icmp) {
 				icmp6_ = new icmp6(&s, my_mac, my_ip6);
-				ip_protocols.push_back(icmp6_);
+				transport_layers.push_back(icmp6_);
 
 				ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
 				ipv6_instance->register_icmp(icmp6_);
@@ -506,7 +506,7 @@ int main(int argc, char *argv[])
 			if (use_tcp) {
 				tcp *t6 = new tcp(&s, icmp6_, 64);
 				ipv6_instance->register_protocol(0x06, t6);  // TCP
-				ip_protocols.push_back(t6);
+				transport_layers.push_back(t6);
 
 				stream_session_handlers.push_back(t6);
 			}
@@ -516,7 +516,7 @@ int main(int argc, char *argv[])
 				udp *u = new udp(&s, icmp6_);
 				ipv6_instance->register_protocol(0x11, u);
 
-				ip_protocols.push_back(u);
+				transport_layers.push_back(u);
 			}
 		}
 		catch(const libconfig::SettingNotFoundException &nfex) {
@@ -557,7 +557,7 @@ int main(int argc, char *argv[])
 					if (!i4)
 						continue;
 
-					udp *const u = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+					udp *const u = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
 					if (!u)
 						continue;
 
@@ -611,7 +611,7 @@ int main(int argc, char *argv[])
 			if (!i4)
 				continue;
 
-			udp *const u = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+			udp *const u = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
 			if (!u)
 				continue;
 
@@ -750,7 +750,7 @@ int main(int argc, char *argv[])
 		for(auto & dev : devs) {
 			ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
 			if (i4) {
-				udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+				udp *const u4 = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
 
 				if (u4) {
 					sip *sip_ = new sip(&s, u4, sample, mb_path, mb_recv_script, upstream_sip_server, upstream_sip_user, upstream_sip_password, i4->get_addr(), port, sip_register_interval);
@@ -781,7 +781,7 @@ int main(int argc, char *argv[])
 			if (!i4)
 				continue;
 
-			udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+			udp *const u4 = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
 			if (!u4)
 				continue;
 
@@ -792,7 +792,7 @@ int main(int argc, char *argv[])
 			if (!i6)
 				continue;
 
-			udp *const u6 = dynamic_cast<udp *>(i6->get_ip_protocol(0x11));
+			udp *const u6 = dynamic_cast<udp *>(i6->get_transport_layer(0x11));
 			if (!u6)
 				continue;
 
@@ -825,7 +825,7 @@ int main(int argc, char *argv[])
 			if (!i4)
 				continue;
 
-			udp *const u4 = dynamic_cast<udp *>(i4->get_ip_protocol(0x11));
+			udp *const u4 = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
 			if (!u4)
 				continue;
 
@@ -836,7 +836,7 @@ int main(int argc, char *argv[])
 			if (!i6)
 				continue;
 
-			udp *const u6 = dynamic_cast<udp *>(i6->get_ip_protocol(0x11));
+			udp *const u6 = dynamic_cast<udp *>(i6->get_transport_layer(0x11));
 			if (!u6)
 				continue;
 
@@ -873,7 +873,7 @@ int main(int argc, char *argv[])
 	for(auto & d : devs)
 		d->ask_to_stop(), n_actions++;
 
-	for(auto & p : ip_protocols)
+	for(auto & p : transport_layers)
 		p->ask_to_stop(), n_actions++;
 
 	for(auto & p : protocols)
@@ -897,7 +897,7 @@ int main(int argc, char *argv[])
 		delete a;
 	}
 
-	for(auto & p : ip_protocols) {
+	for(auto & p : transport_layers) {
 		progress(n_actions_done++, n_actions);
 		delete p;
 	}

@@ -13,7 +13,7 @@
 #include "utils.h"
 
 
-lldp::lldp(stats *const s, const any_addr & my_mac, const any_addr & mgmt_addr, const int interface_idx) : protocol(s, "lldp"), my_mac(my_mac), mgmt_addr(mgmt_addr), interface_idx(interface_idx)
+lldp::lldp(stats *const s, const any_addr & my_mac, const any_addr & mgmt_addr, const int interface_idx) : network_layer(s, "lldp"), my_mac(my_mac), mgmt_addr(mgmt_addr), interface_idx(interface_idx)
 {
 	th = new std::thread(std::ref(*this));
 }
@@ -26,12 +26,12 @@ lldp::~lldp()
 	delete th;
 }
 
-bool lldp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool lldp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	return false;
 }
 
-bool lldp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool lldp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	return false;
 }

@@ -52,14 +52,14 @@ void phys::ask_to_stop()
 	stop_flag = true;
 }
 
-void phys::register_protocol(const uint16_t ether_type, protocol *const p)
+void phys::register_protocol(const uint16_t ether_type, network_layer *const p)
 {
 	prot_map.insert({ ether_type, p });
 
 	p->register_default_phys(this);
 }
 
-protocol *phys::get_protocol(const uint16_t p)
+network_layer *phys::get_protocol(const uint16_t p)
 {
 	auto it = prot_map.find(p);
 	if (it == prot_map.end())

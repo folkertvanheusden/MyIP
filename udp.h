@@ -5,7 +5,7 @@
 #include <map>
 #include <shared_mutex>
 
-#include "ip_protocol.h"
+#include "transport_layer.h"
 #include "packet.h"
 #include "stats.h"
 #include "types.h"
@@ -18,7 +18,7 @@ typedef struct {
 	session_data *private_data;
 } cb_t;
 
-class udp : public ip_protocol
+class udp : public transport_layer
 {
 private:
 	icmp *const icmp_;

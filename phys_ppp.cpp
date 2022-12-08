@@ -62,7 +62,7 @@ void phys_ppp::start()
 	th = new std::thread(std::ref(*this));
 }
 
-std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> & ACCM, const bool not_ppp_meta)
+std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t network_layer, const std::vector<uint8_t> & ACCM, const bool not_ppp_meta)
 {
 	std::vector<uint8_t> temp;
 
@@ -71,11 +71,11 @@ std::vector<uint8_t> phys_ppp::wrap_in_ppp_frame(const std::vector<uint8_t> & pa
 		temp.push_back(0x03);  // unnumbered data
 	}
 
-	if (protocol_compression && protocol < 0x0100 && not_ppp_meta)
-		temp.push_back(protocol);
+	if (protocol_compression && network_layer < 0x0100 && not_ppp_meta)
+		temp.push_back(network_layer);
 	else {
-		temp.push_back(protocol >> 8);
-		temp.push_back(protocol);
+		temp.push_back(network_layer >> 8);
+		temp.push_back(network_layer);
 	}
 
 	std::copy(payload.begin(), payload.end(), std::back_inserter(temp));	
@@ -137,7 +137,7 @@ std::vector<uint8_t> unwrap_ppp_frame(const std::vector<uint8_t> & payload, cons
 	return out;
 }
 
-void phys_ppp::send_Xcp(const uint8_t code, const uint8_t identifier, const uint16_t protocol, const std::vector<uint8_t> & data)
+void phys_ppp::send_Xcp(const uint8_t code, const uint8_t identifier, const uint16_t network_layer, const std::vector<uint8_t> & data)
 {
 	DOLOG(ll_debug, "ppp send code %d\n", code);
 
@@ -155,7 +155,7 @@ void phys_ppp::send_Xcp(const uint8_t code, const uint8_t identifier, const uint
 	out.at(len_offset) = out.size() >> 8;
 	out.at(len_offset + 1) = out.size() & 255;
 
-	std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, protocol, ACCM_tx, false);
+	std::vector<uint8_t> out_wrapped = wrap_in_ppp_frame(out, network_layer, ACCM_tx, false);
 
 	send_lock.lock();
 	if (write(fd, out_wrapped.data(), out_wrapped.size()) != out_wrapped.size())
@@ -163,25 +163,25 @@ void phys_ppp::send_Xcp(const uint8_t code, const uint8_t identifier, const uint
 	send_lock.unlock();
 }
 
-void phys_ppp::send_rej(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options)
+void phys_ppp::send_rej(const uint16_t network_layer, const uint8_t identifier, const std::vector<uint8_t> & options)
 {
-	DOLOG(ll_debug, "ppp send rej for protocol %04x, identifier %02x\n", protocol, identifier);
+	DOLOG(ll_debug, "ppp send rej for network_layer %04x, identifier %02x\n", network_layer, identifier);
 
-	send_Xcp(4, identifier, protocol, options);
+	send_Xcp(4, identifier, network_layer, options);
 }
 
-void phys_ppp::send_ack(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options)
+void phys_ppp::send_ack(const uint16_t network_layer, const uint8_t identifier, const std::vector<uint8_t> & options)
 {
-	DOLOG(ll_debug, "ppp send ack for protocol %04x, identifier %02x\n", protocol, identifier);
+	DOLOG(ll_debug, "ppp send ack for network_layer %04x, identifier %02x\n", network_layer, identifier);
 
-	send_Xcp(2, identifier, protocol, options);
+	send_Xcp(2, identifier, network_layer, options);
 }
 
-void phys_ppp::send_nak(const uint16_t protocol, const uint8_t identifier, const std::vector<uint8_t> & options)
+void phys_ppp::send_nak(const uint16_t network_layer, const uint8_t identifier, const std::vector<uint8_t> & options)
 {
-	DOLOG(ll_debug, "ppp send nak for protocol %04x, identifier %02x\n", protocol, identifier);
+	DOLOG(ll_debug, "ppp send nak for network_layer %04x, identifier %02x\n", network_layer, identifier);
 
-	send_Xcp(3, identifier, protocol, options);
+	send_Xcp(3, identifier, network_layer, options);
 }
 
 bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
@@ -510,7 +510,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 				// magic = (data.at(options_offset + 0) << 24) | (data.at(options_offset + 1) << 16) | (data.at(options_offset + 2) << 8) | data.at(options_offset + 3);
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
-			else if (type == 7) {  // protocol field
+			else if (type == 7) {  // network_layer field
 				protocol_compression = true;
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(ack));	
 			}
@@ -568,7 +568,7 @@ void phys_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			out.push_back(magic >>  8);
 			out.push_back(magic);
 
-			// protocol compression
+			// network_layer compression
 			out.push_back(7);
 			out.push_back(2);
 
@@ -688,15 +688,15 @@ void phys_ppp::operator()()
 				if ((packet_buffer.at(2) & 1) == 1 && protocol_compression)
 					packet_buffer.insert(packet_buffer.begin()+2, 0x00);
 
-				uint16_t protocol = (packet_buffer.at(2) << 8) | packet_buffer.at(3);
+				uint16_t network_layer = (packet_buffer.at(2) << 8) | packet_buffer.at(3);
 
 				DOLOG(ll_debug, "address: %02x\n", packet_buffer.at(0));
 				DOLOG(ll_debug, "control: %02x\n", packet_buffer.at(1));
-				DOLOG(ll_debug, "protocol: %04x\n", protocol);
+				DOLOG(ll_debug, "network_layer: %04x\n", network_layer);
 
 				DOLOG(ll_debug, "size: %zu\n", packet_buffer.size());
 
-				if (protocol == 0x0021) {  // IP
+				if (network_layer == 0x0021) {  // IP
 					stats_inc_counter(phys_recv_frame);
 
 					any_addr src_mac((const uint8_t *)"\0\0\0\0\0\1", 6);
@@ -713,20 +713,20 @@ void phys_ppp::operator()()
 						it->second->queue_packet(this, p);
 					}
 				}
-				else if (protocol == 0xc021) {  // LCP
+				else if (network_layer == 0xc021) {  // LCP
 					handle_lcp(packet_buffer);
 				}
-				else if (protocol == 0x8021) {  // IPCP
+				else if (network_layer == 0x8021) {  // IPCP
 					handle_ipcp(packet_buffer);
 				}
-				else if (protocol == 0x8057) {  // IPV6CP
+				else if (network_layer == 0x8057) {  // IPV6CP
 					handle_ipv6cp(packet_buffer);
 				}
-				else if (protocol == 0x80fd) {  // CCP
+				else if (network_layer == 0x80fd) {  // CCP
 					handle_ccp(packet_buffer);
 				}
 				else {
-					DOLOG(ll_info, "phys_ppp: protocol %04x not supported\n", protocol);
+					DOLOG(ll_info, "phys_ppp: network_layer %04x not supported\n", network_layer);
 				}
 
 				packet_buffer.clear();
