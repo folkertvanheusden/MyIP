@@ -45,6 +45,8 @@ ipv4::~ipv4()
 	}
 }
 
+// TODO: rename to prepare_packet dus niet transmitten
+// een prepared packet moet met 'dst_ip' de router instance ingeschoten worden
 bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv4_n_tx);

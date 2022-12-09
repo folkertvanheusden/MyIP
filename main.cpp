@@ -419,7 +419,7 @@ int main(int argc, char *argv[])
 			ipv4 *ipv4_instance = new ipv4(&s, a, my_address);
 			protocols.push_back(ipv4_instance);
 
-			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "if to enable icmp", true, true);
+			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "wether to enable icmp", true, true);
 			icmp *icmp_ = nullptr;
 			if (use_icmp) {
 				icmp_ = new icmp(&s);

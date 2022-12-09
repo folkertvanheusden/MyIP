@@ -10,6 +10,7 @@
 
 #include "fifo.h"
 #include "packet.h"
+#include "router.h"
 
 
 class icmp;
@@ -35,8 +36,10 @@ protected:
 
 	std::atomic_bool      stop_flag    { false   };
 
+	router               *r            { nullptr };
+
 public:
-	network_layer(stats *const s, const std::string & stats_name);
+	network_layer(stats *const s, const std::string & stats_name, router *const r);
 	virtual ~network_layer();
 
 	void ask_to_stop() { stop_flag = true; }
@@ -50,9 +53,11 @@ public:
 
 	void register_icmp(icmp *const icmp_) { this->icmp_ = icmp_; }
 
-	virtual void queue_packet(phys *const interface, const packet *p);
+	virtual void queue_incoming_packet(phys *const interface, const packet *p);
 
-	virtual bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
+	void queue_outgoing_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size);
+
+	virtual bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
 	virtual bool transmit_packet(const any_addr & dst_ip,  const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
 
 	virtual int get_max_packet_size() const = 0;
