@@ -300,10 +300,10 @@ int main(int argc, char *argv[])
 	}
 
 	// used for clean-up
-	std::vector<network_layer *>    protocols;
+	std::vector<network_layer *>   protocols;
 	std::vector<transport_layer *> transport_layers;
-	std::vector<application *> applications;
-	std::vector<socks_proxy *> socks_proxies;
+	std::vector<application *>     applications;
+	std::vector<socks_proxy *>     socks_proxies;
 
 	router r();
 
