@@ -26,9 +26,9 @@ void network_layer::register_protocol(const uint8_t protocol, transport_layer *c
 	p->register_ip(this);
 }
 
-transport_layer *network_layer::get_transport_layer(const uint8_t p)
+transport_layer *network_layer::get_transport_layer(const uint8_t protocol)
 {
-	auto it = prot_map.find(p);
+	auto it = prot_map.find(protocol);
 	if (it == prot_map.end())
 		return nullptr;
 
