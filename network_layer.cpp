@@ -19,16 +19,16 @@ network_layer::~network_layer()
 	delete pkts;
 }
 
-void network_layer::register_protocol(const uint8_t network_layer, transport_layer *const p)
+void network_layer::register_protocol(const uint8_t protocol, transport_layer *const p)
 {
-	prot_map.insert({ network_layer, p });
+	prot_map.insert({ protocol, p });
 
 	p->register_ip(this);
 }
 
-transport_layer *network_layer::get_transport_layer(const uint8_t p)
+transport_layer *network_layer::get_transport_layer(const uint8_t protocol)
 {
-	auto it = prot_map.find(p);
+	auto it = prot_map.find(protocol);
 	if (it == prot_map.end())
 		return nullptr;
 
