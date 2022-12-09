@@ -59,9 +59,9 @@ void phys::register_protocol(const uint16_t ether_type, network_layer *const p)
 	p->register_default_phys(this);
 }
 
-network_layer *phys::get_protocol(const uint16_t p)
+network_layer *phys::get_protocol(const uint16_t protocol)
 {
-	auto it = prot_map.find(p);
+	auto it = prot_map.find(protocol);
 	if (it == prot_map.end())
 		return nullptr;
 

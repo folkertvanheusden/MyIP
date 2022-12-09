@@ -11,7 +11,7 @@
 #include "utils.h"
 
 // This code uses the 'buffer_in' object: it is a test for how well it is usable when
-// implementing something like a network_layer stack.
+// implementing something like a protocol stack.
 // Methods can be quite large as they're written *while* reading the RFC (4960).
 
 // TODO:
@@ -507,7 +507,7 @@ void sctp::operator()()
 
 				DOLOG(dl, "SCTP[%lx]: CRC32c over %zu bytes: %08lx\n", hash, reply.get_size(), crc32c);
 
-				// transmit 'reply' (0x84 is SCTP network_layer number)
+				// transmit 'reply' (0x84 is SCTP protocol number)
 				if (transmit_packet(their_addr, pkt->get_dst_addr(), reply.get_content(), reply.get_size()) == false)
 					DOLOG(ll_info, "SCTP[%lx]: failed to transmit reply packet\n", hash);
 			}
@@ -528,7 +528,7 @@ void sctp::operator()()
 
 bool sctp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size)
 {
-	// 0x84 is SCTP network_layer number
+	// 0x84 is SCTP protocol number
 	return idev->transmit_packet(dst_ip, src_ip, 0x84, payload, pl_size, nullptr);
 }
 
@@ -561,7 +561,7 @@ bool sctp::send_data(session *const s_in, buffer_in & payload)
 		out.add_net_short(0);  // stream identifier s
 		out.add_net_short(s->get_my_stream_sequence_nr());  // stream sequence number
 		s->inc_my_stream_sequence_nr();
-		out.add_net_long(0);  // payload network_layer identifier
+		out.add_net_long(0);  // payload protocol identifier
 		// payload:
 		buffer_in temp_payload = payload.get_segment(n_bytes_to_add);
 		out.add_buffer_in(temp_payload);
@@ -620,7 +620,7 @@ void sctp::end_session(session *const s_in)
 	uint32_t crc32c = generate_crc32c(out.get_content(), out.get_size());
 	out.add_net_long(crc32c, crc_offset);
 
-	// transmit 'reply' (0x84 is SCTP network_layer number)
+	// transmit 'reply' (0x84 is SCTP protocol number)
 	if (transmit_packet(s->get_their_addr(), s->get_my_addr(), out.get_content(), out.get_size()) == false)
 		DOLOG(ll_info, "SCTP[%lx]: failed to transmit shutdown packet\n", s->get_hash());
 }

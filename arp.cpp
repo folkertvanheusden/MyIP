@@ -95,7 +95,7 @@ std::pair<phys *, any_addr *> arp::query_cache(const any_addr & ip)
 	return { default_pdev, new any_addr(gw_mac) };
 }
 
-bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	// for requests
 	assert(0);
@@ -103,7 +103,7 @@ bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, con
 	return false;
 }
 
-bool arp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool arp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	// for requests
 	assert(0);

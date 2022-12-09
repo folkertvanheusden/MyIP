@@ -1,5 +1,6 @@
 // (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
+
 #include <atomic>
 #include <map>
 #include <shared_mutex>
@@ -7,6 +8,7 @@
 #include "phys.h"
 #include "network_layer.h"
 #include "stats.h"
+
 
 typedef struct {
 	uint64_t ts;
