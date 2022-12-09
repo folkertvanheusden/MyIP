@@ -20,40 +20,9 @@ ndp::ndp(stats *const s, router *const r) : network_layer(s, "ndp", r), address_
 
 ndp::~ndp()
 {
-	ndp_stop_flag = true;
-
-	ndp_th->join();
-	delete ndp_th;
 }
 
 void ndp::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
 {
 	update_cache(mac, ip, interface, true);
-}
-
-void ndp::operator()()
-{
-	set_thread_name("myip-ndp");
-
-	while(!ndp_stop_flag) {
-		auto po = pkts->get(500);
-		if (!po.has_value())
-			continue;
-
-		const packet *pkt = po.value().p;
-
-		// NDP packets are not processed here
-
-		delete pkt;
-	}
-}
-
-bool ndp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
-{
-	return false;
-}
-
-bool ndp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
-{
-	return false;
 }

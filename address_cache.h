@@ -36,5 +36,6 @@ public:
 	virtual ~address_cache();
 
 	void update_cache(const any_addr & mac, const any_addr & ip, phys *const interface, const bool static_entry = false);
+
 	virtual std::pair<phys *, any_addr *> query_cache(const any_addr & ip);
 };

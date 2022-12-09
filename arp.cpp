@@ -11,11 +11,15 @@
 #include "utils.h"
 
 
-arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac, router *const r) : network_layer(s, "arp", r), address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
+constexpr size_t pkts_max_size { 256 };
+
+arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac, router *const r) : address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
 	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
-	arp_for_me       = s->register_stat("arp_for_me", "1.3.6.1.2.1.4.57850.1.11.2");
+	arp_for_me       = s->register_stat("arp_for_me",   "1.3.6.1.2.1.4.57850.1.11.2");
+
+	pkts = new fifo<fifo_element_t>(s, "arp", pkts_max_size);
 
 	arp_th = new std::thread(std::ref(*this));
 }
@@ -86,6 +90,7 @@ std::pair<phys *, any_addr *> arp::query_cache(const any_addr & ip)
 		stats_inc_counter(address_cache_hit);
 
 		constexpr uint8_t multicast_mac[] { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
 		return { default_pdev, new any_addr(multicast_mac, 6) };
 	}
 
@@ -94,20 +99,4 @@ std::pair<phys *, any_addr *> arp::query_cache(const any_addr & ip)
 		return rc;
 
 	return { default_pdev, new any_addr(gw_mac) };
-}
-
-bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
-{
-	// for requests
-	assert(0);
-
-	return false;
-}
-
-bool arp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
-{
-	// for requests
-	assert(0);
-
-	return false;
 }
