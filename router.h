@@ -1,3 +1,5 @@
+#pragma once
+
 #include <optional>
 #include <shared_mutex>
 #include <stdint.h>
@@ -12,6 +14,7 @@ class router
 {
 private:
 	class router_entry {
+	public:
 		any_addr network_address;
 
 		union mask {
@@ -29,6 +32,7 @@ private:
 	std::vector<router_entry> table;
 
 	class queued_packet {
+	public:
 		std::optional<any_addr> dst_mac;
 		std::optional<any_addr> src_mac;
 

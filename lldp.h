@@ -6,8 +6,9 @@
 #include <stdint.h>
 #include <string>
 
-#include "phys.h"
 #include "network_layer.h"
+#include "phys.h"
+#include "router.h"
 #include "stats.h"
 
 
@@ -24,7 +25,7 @@ private:
 	std::vector<uint8_t> generate_lldp_packet();
 
 public:
-	lldp(stats *const s, const any_addr & my_mac, const any_addr & mgmt_addr, const int interface_idx);
+	lldp(stats *const s, const any_addr & my_mac, const any_addr & mgmt_addr, const int interface_idx, router *const r);
 	virtual ~lldp();
 
 	any_addr get_addr() const override { return any_addr(); }

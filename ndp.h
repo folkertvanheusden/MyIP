@@ -5,9 +5,10 @@
 #include <map>
 #include <shared_mutex>
 
-#include "phys.h"
-#include "network_layer.h"
 #include "address_cache.h"
+#include "network_layer.h"
+#include "phys.h"
+#include "router.h"
 #include "stats.h"
 
 
@@ -25,7 +26,7 @@ private:
 	std::atomic_bool ndp_stop_flag { false };
 
 public:
-	ndp(stats *const s);
+	ndp(stats *const s, router *const r);
 	virtual ~ndp();
 
 	any_addr get_addr() const override { assert(false); return any_addr(); }

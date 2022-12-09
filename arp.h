@@ -4,9 +4,10 @@
 #include <map>
 #include <shared_mutex>
 
-#include "phys.h"
-#include "network_layer.h"
 #include "address_cache.h"
+#include "network_layer.h"
+#include "phys.h"
+#include "router.h"
 #include "stats.h"
 
 
@@ -26,7 +27,7 @@ private:
 	std::atomic_bool arp_stop_flag { false };
 
 public:
-	arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac);
+	arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac, router *const r);
 	virtual ~arp();
 
 	any_addr get_addr() const override { return my_mac; }

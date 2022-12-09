@@ -305,7 +305,7 @@ int main(int argc, char *argv[])
 	std::vector<application *>     applications;
 	std::vector<socks_proxy *>     socks_proxies;
 
-	router r();
+	router r;
 
 	mdns *mdns_ = new mdns();
 	applications.push_back(mdns_);
@@ -415,7 +415,7 @@ int main(int argc, char *argv[])
 
 			printf("%zu] Will listen on IPv4 address: %s\n", i, my_address.to_str().c_str());
 
-			arp *a = new arp(&s, my_mac, my_address, gw_mac);
+			arp *a = new arp(&s, my_mac, my_address, gw_mac, &r);
 			a->add_static_entry(dev, my_mac, my_address);
 			dev->register_protocol(0x0806, a);
 
@@ -486,7 +486,7 @@ int main(int argc, char *argv[])
 
 			printf("%zu] Will listen on IPv6 address: %s\n", i, my_ip6.to_str().c_str());
 
-			ndp *ndp_ = new ndp(&s);
+			ndp *ndp_ = new ndp(&s, &r);
 			ndp_->add_static_entry(dev, my_mac, my_ip6);
 			protocols.push_back(ndp_);
 
@@ -527,7 +527,7 @@ int main(int argc, char *argv[])
 		}
 
 		// LLDP
-		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1);
+		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, &r);
 		protocols.push_back(lldp_);
 		dev->register_protocol(0x0806, lldp_);
 

@@ -7,10 +7,11 @@
 #include "log.h"
 #include "net.h"
 #include "phys.h"
+#include "router.h"
 #include "utils.h"
 
 
-arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) : network_layer(s, "arp"), address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
+arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac, router *const r) : network_layer(s, "arp", r), address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
 	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");

@@ -9,11 +9,12 @@
 #include "lldp.h"
 #include "log.h"
 #include "phys.h"
+#include "router.h"
 #include "time.h"
 #include "utils.h"
 
 
-lldp::lldp(stats *const s, const any_addr & my_mac, const any_addr & mgmt_addr, const int interface_idx) : network_layer(s, "lldp"), my_mac(my_mac), mgmt_addr(mgmt_addr), interface_idx(interface_idx)
+lldp::lldp(stats *const s, const any_addr & my_mac, const any_addr & mgmt_addr, const int interface_idx, router *const r) : network_layer(s, "lldp", r), my_mac(my_mac), mgmt_addr(mgmt_addr), interface_idx(interface_idx)
 {
 	th = new std::thread(std::ref(*this));
 }

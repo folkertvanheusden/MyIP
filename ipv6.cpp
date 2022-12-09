@@ -7,10 +7,11 @@
 #include <string.h>
 #include <arpa/inet.h>
 
+#include "icmp.h"
 #include "ipv6.h"
 #include "log.h"
 #include "phys.h"
-#include "icmp.h"
+#include "router.h"
 #include "utils.h"
 
 
