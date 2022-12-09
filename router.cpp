@@ -30,10 +30,6 @@ void router::operator()()
 		if (!po.has_value())
 			continue;
 
-		if (po.value()->dst_mac.has_value() == false) {
-			// TODO arp
-		}
-
 		std::shared_lock<std::shared_mutex> lck(table_lock);
 
 		for(auto & entry : table) {
@@ -53,10 +49,7 @@ void router::operator()()
 				if (match) {
 					// TODO route through this interface:
 
-					if (po.value()->src_mac.has_value() == false) {
-						// TODO lookup src MAC address
-						// TODO arp - should be statically stored -> depending on outgoing interface
-					}
+					break;
 				}
 			}
 			else if (entry.network_address.get_len() == 6) {
@@ -66,5 +59,13 @@ void router::operator()()
 			}
 		}
 
+		if (po.value()->src_mac.has_value() == false) {
+			// TODO lookup src MAC address
+			// TODO arp - should be statically stored -> depending on outgoing interface
+		}
+
+		if (po.value()->dst_mac.has_value() == false) {
+			// TODO arp
+		}
 	}
 }
