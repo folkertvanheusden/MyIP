@@ -14,7 +14,7 @@
 #include "utils.h"
 
 
-ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip) : network_layer(s, "ipv4"), iarp(iarp), myip(myip)
+ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r) : network_layer(s, "ipv4", r), iarp(iarp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
@@ -47,7 +47,7 @@ ipv4::~ipv4()
 
 // TODO: rename to prepare_packet dus niet transmitten
 // een prepared packet moet met 'dst_ip' de router instance ingeschoten worden
-bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv4_n_tx);
 	stats_inc_counter(ip_n_out_req);
@@ -99,7 +99,7 @@ bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 		return false;
 	}
 
-	bool rc = arp_result.first->transmit_packet(dst_mac, *src_mac, 0x0800, out, out_size);
+	rc = r->route_packet(dst_mac, 0x0800, dst_ip, src_ip, out, out_size);
 
 	delete src_mac;
 
@@ -110,21 +110,7 @@ bool ipv4::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 
 bool ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
-	auto arp_result = iarp->query_cache(dst_ip);
-	const any_addr *dst_mac = arp_result.second;
-
-	if (!dst_mac) {
-		DOLOG(ll_warning, "IPv4: cannot find dst IP (%s) in ARP table\n", dst_ip.to_str().c_str());
-		stats_inc_counter(ipv4_tx_err);
-		stats_inc_counter(ip_n_out_disc);
-		return false;
-	}
-
-	bool rc = transmit_packet(*dst_mac, dst_ip, src_ip, network_layer, payload, pl_size, header_template);
-
-	delete dst_mac;
-
-	return rc;
+	return transmit_packet({ }, dst_ip, src_ip, network_layer, payload, pl_size, header_template);
 }
 
 void ipv4::operator()()

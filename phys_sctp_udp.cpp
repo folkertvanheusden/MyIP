@@ -157,7 +157,7 @@ void phys_sctp_udp::operator()()
 
 		packet *p = new packet(ts, src_mac, src_mac, my_mac, ip_buffer, total_length, nullptr, 0);
 
-		it->second->queue_packet(this, p);
+		it->second->queue_incoming_packet(this, p);
 	}
 
 	DOLOG(ll_info, "phys_sctp_udp: thread stopped\n");

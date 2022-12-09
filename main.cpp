@@ -29,6 +29,7 @@
 #include "sip.h"
 #include "udp.h"
 #include "ntp.h"
+#include "router.h"
 #include "syslog.h"
 #include "snmp.h"
 #include "sctp.h"
@@ -304,6 +305,8 @@ int main(int argc, char *argv[])
 	std::vector<application *> applications;
 	std::vector<socks_proxy *> socks_proxies;
 
+	router r();
+
 	mdns *mdns_ = new mdns();
 	applications.push_back(mdns_);
 
@@ -416,7 +419,7 @@ int main(int argc, char *argv[])
 			a->add_static_entry(dev, my_mac, my_address);
 			dev->register_protocol(0x0806, a);
 
-			ipv4 *ipv4_instance = new ipv4(&s, a, my_address);
+			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, &r);
 			protocols.push_back(ipv4_instance);
 
 			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "wether to enable icmp", true, true);
@@ -487,7 +490,7 @@ int main(int argc, char *argv[])
 			ndp_->add_static_entry(dev, my_mac, my_ip6);
 			protocols.push_back(ndp_);
 
-			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6);
+			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6, &r);
 			protocols.push_back(ipv6_instance);
 
 			dev->register_protocol(0x86dd, ipv6_instance);

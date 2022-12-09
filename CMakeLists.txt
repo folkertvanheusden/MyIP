@@ -27,7 +27,6 @@ add_executable(myip
 	http.cpp
 	icmp.cpp
 	icmp6.cpp
-	transport_layer.cpp
 	ipv4.cpp
 	ipv6.cpp
 	lldp.cpp
@@ -37,6 +36,7 @@ add_executable(myip
 	mqtt.cpp
 	ndp.cpp
 	net.cpp
+	network_layer.cpp
 	nrpe.cpp
 	ntp.cpp
 	packet.cpp
@@ -46,7 +46,7 @@ add_executable(myip
 	phys_sctp_udp.cpp
 	phys_slip.cpp
 	phys_tap.cpp
-	network_layer.cpp
+	router.cpp
 	sctp.cpp
 	sctp_crc32c.cpp
 	session.cpp
@@ -63,6 +63,7 @@ add_executable(myip
 	tcp.cpp
 	tcp_udp_fw.cpp
 	time.cpp
+	transport_layer.cpp
 	ud.cpp
 	udp.cpp
 	utils.cpp

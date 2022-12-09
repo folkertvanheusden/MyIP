@@ -710,7 +710,7 @@ void phys_ppp::operator()()
 						// 4 ppp header, 2 fcs (=crc)
 						packet *p = new packet(src_mac, my_mac, packet_buffer.data() + 4, packet_buffer.size() - (4 + 2), NULL, 0);
 
-						it->second->queue_packet(this, p);
+						it->second->queue_incoming_packet(this, p);
 					}
 				}
 				else if (network_layer == 0xc021) {  // LCP

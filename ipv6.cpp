@@ -1,6 +1,7 @@
 // (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <chrono>
+#include <optional>
 #include <stdint.h>
 #include <string>
 #include <string.h>
@@ -13,7 +14,7 @@
 #include "utils.h"
 
 
-ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip) : network_layer(s, "ipv6"), indp(indp), myip(myip)
+ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip, router *const r) : network_layer(s, "ipv6", r), indp(indp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
@@ -44,7 +45,7 @@ ipv6::~ipv6()
 	}
 }
 
-bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ipv6::transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
 	stats_inc_counter(ipv6_n_tx);
 	stats_inc_counter(ip_n_out_req);
@@ -74,43 +75,16 @@ bool ipv6::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, co
 	if (pl_size)
 		memcpy(&out[40], payload, pl_size);
 
-	auto ndp_result = indp->query_cache(src_ip);
-        const any_addr *src_mac = ndp_result.second;
-        if (!src_mac) {
-                DOLOG(ll_warning, "IPv6: cannot find src IP (%s) in MAC lookup table\n", src_ip.to_str().c_str());
-                delete [] out;
-                stats_inc_counter(ipv6_tx_err);
-		stats_inc_counter(ip_n_out_disc);
-                return false;
-        }
-
-	bool rc = ndp_result.first->transmit_packet(dst_mac, *src_mac, 0x86dd, out, out_size);
-
-	delete src_mac;
+	rc = r->route_packet(dst_mac, 0x86dd, dst_ip, src_ip, out, out_size);
 
 	delete [] out;
 
 	return rc;
 }
 
-bool ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t network_layer, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool ipv6::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
-	bool rc = false;
-
-	auto ndp_result = indp->query_cache(dst_ip);
-        const any_addr *dst_mac = ndp_result.second;
-
-        if (dst_mac) {
-		rc = transmit_packet(*dst_mac, dst_ip, src_ip, network_layer, payload, pl_size, header_template);
-		delete dst_mac;
-	}
-	else {
-                DOLOG(ll_warning, "IPv6: cannot find dst IP (%s) in MAC lookup table\n", dst_ip.to_str().c_str());
-		stats_inc_counter(ip_n_out_disc);
-                stats_inc_counter(ipv6_tx_err);
-        }
-
-	return rc;
+	return transmit_packet({ }, dst_ip, src_ip, protocol, payload, pl_size, header_template);
 }
 
 void ipv6::operator()()

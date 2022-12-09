@@ -186,7 +186,7 @@ void phys_slip::operator()()
 			else {
 				packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
 
-				it->second->queue_packet(this, p);
+				it->second->queue_incoming_packet(this, p);
 			}
 
 			packet_buffer.clear();

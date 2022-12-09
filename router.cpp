@@ -9,9 +9,11 @@ router::~router()
 {
 }
 
-bool router::route_packet(const std::optional<any_addr> & override_dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size)
+bool router::route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size)
 {
 	queued_packet *qp = new queued_packet(payload, pl_size);
+
+	qp->ether_type = ether_type;
 
 	qp->dst_mac = override_dst_mac;
 
@@ -32,10 +34,6 @@ void router::operator()()
 			// TODO arp
 		}
 
-		if (po.value()->src_mac.has_value() == false) {
-			// TODO arp - should be statically stored -> depending on outgoing interface
-		}
-
 		std::shared_lock<std::shared_mutex> lck(table_lock);
 
 		for(auto & entry : table) {
@@ -43,6 +41,23 @@ void router::operator()()
 				continue;
 
 			if (entry.network_address.get_len() == 4) {  // TODO: ^
+				bool match = true;
+
+				for(int i=0; i<4; i++) {
+					if ((po.value()->dst_ip[i] & entry.network_address[i]) != po.value()->dst_ip[i]) {
+						match = false;
+						break;
+					}
+				}
+
+				if (match) {
+					// TODO route through this interface:
+
+					if (po.value()->src_mac.has_value() == false) {
+						// TODO lookup src MAC address
+						// TODO arp - should be statically stored -> depending on outgoing interface
+					}
+				}
 			}
 			else if (entry.network_address.get_len() == 6) {
 			}

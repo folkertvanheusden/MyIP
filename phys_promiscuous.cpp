@@ -161,7 +161,7 @@ void phys_promiscuous::operator()()
 
 		packet *p = new packet(ts, src_mac, src_mac, dst_mac, &buffer[14], size - 14, &buffer[0], 14);
 
-		it->second->queue_packet(this, p);
+		it->second->queue_incoming_packet(this, p);
 	}
 
 	DOLOG(ll_info, "phys_promiscuous: thread stopped\n");
