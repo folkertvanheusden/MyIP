@@ -6,7 +6,7 @@
 #include "router.h"
 
 
-router::router(const std::map<phys *, arp *> & adapters)
+router::router(const std::map<phys *, arp *> & adapters) : adapters(adapters)
 {
 }
 

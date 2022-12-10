@@ -35,8 +35,6 @@ public:
 	arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac);
 	virtual ~arp();
 
-	void add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip);
-
 	any_addr get_mac(const any_addr & ip) override;
 
 	void operator()();

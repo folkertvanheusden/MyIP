@@ -31,11 +31,6 @@ arp::~arp()
 	delete arp_th;
 }
 
-void arp::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
-{
-	update_cache(mac, ip, interface, true);
-}
-
 void arp::operator()()
 {
 	set_thread_name("myip-arp");

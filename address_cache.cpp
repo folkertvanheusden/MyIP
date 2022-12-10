@@ -46,6 +46,11 @@ void address_cache::update_cache(const any_addr & mac, const any_addr & ip, phys
 	}
 }
 
+void address_cache::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
+{
+        update_cache(mac, ip, interface, true);
+}
+
 std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip)
 {
 	const std::shared_lock<std::shared_mutex> lock(cache_lock);
