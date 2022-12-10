@@ -4,6 +4,7 @@
 #include <optional>
 #include <shared_mutex>
 #include <stdint.h>
+#include <thread>
 #include <vector>
 
 #include "log.h"
@@ -21,13 +22,17 @@ private:
 	public:
 		any_addr network_address;
 
-		union mask {
+		union {
 			uint8_t ipv4_netmask[4];
 
 			int ipv6_prefix_length;
-		};
+		} mask;
 
 		phys *interface;
+
+		union {
+			arp *iarp;
+		} mac_lookup;
 	};
 
 	phys                     *default_interface { nullptr };
@@ -60,15 +65,14 @@ private:
 
 	fifo<queued_packet *>  *pkts     { nullptr };
 
-	std::map<phys *, arp *> adapters;
-
-	std::atomic_bool stop_flag { false };
+	std::thread     *router_th { nullptr };
+	std::atomic_bool stop_flag { false   };
 
 public:
 	router(stats *const s);
 	virtual ~router();
 
-	void register_adapter(phys *const p, arp *const a);
+	void add_router_ipv4(const any_addr & network, const uint8_t netmask[4], phys *const interface, arp *const iarp);
 
 	void set_default_interface(phys *const default_interface) { this->default_interface = default_interface; }
 

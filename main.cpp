@@ -469,6 +469,14 @@ int main(int argc, char *argv[])
 			dev->register_protocol(0x0800, ipv4_instance);
 
 			protocols.push_back(a);
+
+			// TODO: netmask etc
+			uint8_t network_bytes[] = { 0, 0, 0, 0 };
+			any_addr network(network_bytes, sizeof network_bytes);
+
+			uint8_t netmask[] = { 0, 0, 0, 0 };
+
+			r.add_router_ipv4(network, netmask, dev, a);
 		}
 		catch(const libconfig::SettingNotFoundException &nfex) {
 			// just fine
@@ -521,6 +529,9 @@ int main(int argc, char *argv[])
 
 				transport_layers.push_back(u);
 			}
+
+			// TODO: netmask etc
+			// r->add_router_ipv6(const any_addr & network, const uint8_t netmask[4], phys *const interface, arp *const iarp);
 		}
 		catch(const libconfig::SettingNotFoundException &nfex) {
 			// just fine
