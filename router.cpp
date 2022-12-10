@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <map>
 #include <thread>
 
@@ -28,6 +29,8 @@ router::~router()
 
 void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4], phys *const interface, arp *const iarp)
 {
+	assert(network.get_family() == any_addr::ipv4);
+
 	router_entry re;
 
 	re.network_address      = network;
@@ -48,10 +51,14 @@ bool router::route_packet(const std::optional<any_addr> & override_dst_mac, cons
 
 	qp->ether_type = ether_type;
 
-	qp->dst_mac = override_dst_mac;
+	assert(override_dst_mac.has_value() == false || override_dst_mac.value().get_family() == any_addr::mac);
+	qp->dst_mac    = override_dst_mac;
 
-	qp->dst_ip  = dst_ip;
-	qp->src_ip  = src_ip;
+	assert(dst_ip.get_family() == any_addr::ipv4 || dst_ip.get_family() == any_addr::ipv6);
+	qp->dst_ip     = dst_ip;
+
+	assert(src_ip.get_family() == any_addr::ipv4 || src_ip.get_family() == any_addr::ipv6);
+	qp->src_ip     = src_ip;
 
 	return pkts->try_put(qp);
 }
@@ -68,10 +75,10 @@ void router::operator()()
 		std::shared_lock<std::shared_mutex> lck(table_lock);
 
 		for(auto & entry : table) {
-			if (entry.network_address.get_len() != po.value()->src_ip.get_len())  // TODO: replace by check for type
+			if (entry.network_address.get_family() != po.value()->src_ip.get_family())
 				continue;
 
-			if (entry.network_address.get_len() == 4) {  // TODO: ^
+			if (entry.network_address.get_family() == any_addr::ipv4) {
 				bool match = true;
 
 				for(int i=0; i<4; i++) {
@@ -87,15 +94,15 @@ void router::operator()()
 					break;
 				}
 			}
-			else if (entry.network_address.get_len() == 6) {
+			else if (entry.network_address.get_family() == any_addr::ipv6) {
 			}
 			else {
-				DOLOG(ll_warning, "Unknown address type in queued packet\n");
+				DOLOG(ll_warning, "Unknown address family in queued packet (%d)\n", entry.network_address.get_family());
 			}
 		}
 
 		if (!re) {
-			DOLOG(ll_debug, "No route for for packet\n");
+			DOLOG(ll_debug, "No route for packet\n");
 			continue;
 		}
 
@@ -103,7 +110,7 @@ void router::operator()()
 			// TODO lookup src MAC address
 			// TODO arp - should be statically stored -> depending on outgoing interface
 
-			if (re->network_address.get_len() == 4) {
+			if (re->network_address.get_family() == any_addr::ipv4) {
 				po.value()->src_mac = re->mac_lookup.iarp->get_mac(po.value()->src_ip);
 			}
 			else {
@@ -112,7 +119,7 @@ void router::operator()()
 		}
 
 		if (po.value()->dst_mac.has_value() == false) {
-			if (re->network_address.get_len() == 4) {
+			if (re->network_address.get_family() == any_addr::ipv4) {
 				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(po.value()->dst_ip);
 			}
 			else {

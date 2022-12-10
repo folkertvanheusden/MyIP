@@ -48,6 +48,9 @@ ipv4::~ipv4()
 
 bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
+	assert(dst_ip.get_family() == any_addr::ipv4);
+	assert(src_ip.get_family() == any_addr::ipv4);
+
 	stats_inc_counter(ipv4_n_tx);
 	stats_inc_counter(ip_n_out_req);
 
@@ -85,7 +88,7 @@ bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 
 	any_addr q_addr = override_ip ? myip : src_ip;
 
-	bool rc = r->route_packet({ }, 0x0800, dst_ip, q_addr, out, out_size);
+	bool rc = r->route_packet(dst_mac, 0x0800, dst_ip, q_addr, out, out_size);
 
 	delete [] out;
 

@@ -7,6 +7,7 @@
 #include "any_addr.h"
 #include "hash.h"
 #include "str.h"
+#include "utils.h"
 
 
 any_addr::any_addr()
@@ -188,6 +189,8 @@ any_addr & any_addr::operator =(const any_addr && other)
 {
 	other.get(addr, &addr_size);
 
+	af = other.get_family();
+
 	set_ = true;
 
 	return *this;
@@ -196,6 +199,8 @@ any_addr & any_addr::operator =(const any_addr && other)
 any_addr & any_addr::operator =(const any_addr & other)
 {
 	other.get(addr, &addr_size);
+
+	af = other.get_family();
 
 	set_ = true;
 
@@ -206,14 +211,12 @@ any_addr parse_address(const std::string & str, const size_t exp_size, const std
 {
 	std::vector<std::string> parts = split(str, seperator);
 
-	if (parts.size() != exp_size && !(exp_size == 16 && parts.size() == 8 /* ipv6 */)) {
-		fprintf(stderr, "An address consists of %zu numbers\n", exp_size);
-		exit(1);
-	}
+	if (parts.size() != exp_size && !(exp_size == 16 && parts.size() == 8 /* ipv6 */))
+		error_exit(false, "An address consists of %zu numbers", exp_size);
 
 	any_addr::addr_family af { any_addr::mac };
 
-	uint8_t *temp = new uint8_t[exp_size];
+	uint8_t *temp = new uint8_t[exp_size]();
 
 	if (exp_size == 16) { // IPv6
 		for(size_t i=0; i<exp_size; i += 2) {

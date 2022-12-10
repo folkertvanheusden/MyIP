@@ -127,6 +127,8 @@ bool arp::send_request(const any_addr & ip)
 
 std::optional<any_addr> arp::get_mac(const any_addr & ip)
 {
+	assert(ip.get_family() == any_addr::ipv4 || ip.get_family() == any_addr::ipv6);
+
 	auto cache_result = query_cache(ip);
 
 	if (cache_result.first == interface) {
