@@ -92,11 +92,6 @@ bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 	return rc;
 }
 
-bool ipv4::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
-{
-	return transmit_packet({ }, dst_ip, src_ip, protocol, payload, pl_size, header_template);
-}
-
 void ipv4::operator()()
 {
 	set_thread_name("myip-ipv4");

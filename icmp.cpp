@@ -74,7 +74,7 @@ void icmp::operator()()
 
 		if (idev)
 			// this is the correct order! sending a reply!
-			idev->transmit_packet(src_ip, pkt->get_dst_addr(), 0x01, reply, size, header_copy);
+			idev->transmit_packet({ }, src_ip, pkt->get_dst_addr(), 0x01, reply, size, header_copy);
 
 		delete [] header_copy;
 
@@ -113,7 +113,7 @@ void icmp::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const u
 	out[3] = checksum;
 
 	if (idev)
-		idev->transmit_packet(dst_ip, src_ip, 0x01, out, out_size, nullptr);
+		idev->transmit_packet({ }, dst_ip, src_ip, 0x01, out, out_size, nullptr);
 
 	delete [] out;
 }

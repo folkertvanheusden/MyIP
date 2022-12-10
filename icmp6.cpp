@@ -124,7 +124,7 @@ void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, 
 		if (dst_mac)
 			dynamic_cast<ipv6 *>(idev)->transmit_packet(*dst_mac, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
 		else
-			idev->transmit_packet(dst_ip, src_ip, 0x3a, out, out_size, nullptr);
+			idev->transmit_packet({ }, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
 	}
 
 	delete [] out;
