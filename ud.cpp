@@ -1,5 +1,6 @@
 #include <atomic>
 #include <jansson.h>
+#include <poll.h>
 #include <thread>
 #include <vector>
 #include <sys/socket.h>
@@ -104,9 +105,20 @@ void ud_stats::operator()()
 
 	std::vector<std::pair<std::thread *, int> > clients;
 
+	pollfd fds[] = { { fd, POLLIN, 0 } };
+
 	while(!stop_flag) {
 		sockaddr_un remote { 0 };
 		socklen_t   sl     { 0 };
+
+		int rc = poll(fds, 1, 100);
+		if (rc == 0)
+			continue;
+
+		if (rc == -1) {
+			DOLOG(ll_info, "poll on unix domain socket failed: %s\n", strerror(errno));
+			break;
+		}
 
 		int cfd = accept(fd, reinterpret_cast<sockaddr *>(&remote), &sl);
 		if (cfd == -1)
