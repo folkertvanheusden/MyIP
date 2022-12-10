@@ -13,7 +13,7 @@
 
 constexpr size_t pkts_max_size { 256 };
 
-arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac, router *const r) : address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
+arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) : address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
 	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
@@ -79,24 +79,4 @@ void arp::operator()()
 
 		delete pkt;
 	}
-}
-
-std::pair<phys *, any_addr *> arp::query_cache(const any_addr & ip)
-{
-	assert(ip.get_len() == 4);
-
-	// multicast
-	if (ip[0] >= 224 && ip[0] <= 239) {
-		stats_inc_counter(address_cache_hit);
-
-		constexpr uint8_t multicast_mac[] { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-
-		return { default_pdev, new any_addr(multicast_mac, 6) };
-	}
-
-	auto rc = address_cache::query_cache(ip);
-	if (rc.second)
-		return rc;
-
-	return { default_pdev, new any_addr(gw_mac) };
 }

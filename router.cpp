@@ -1,8 +1,12 @@
+#include <map>
+
 #include "any_addr.h"
+#include "arp.h"
+#include "phys.h"
 #include "router.h"
 
 
-router::router()
+router::router(const std::map<phys *, arp *> & adapters)
 {
 }
 

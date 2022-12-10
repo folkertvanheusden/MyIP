@@ -85,7 +85,7 @@ bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 
 	any_addr q_addr = override_ip ? myip : src_ip;
 
-	rc = r->route_packet({ }, 0x0800, dst_ip, q_addr, out, out_size);
+	bool rc = r->route_packet({ }, 0x0800, dst_ip, q_addr, out, out_size);
 
 	delete [] out;
 

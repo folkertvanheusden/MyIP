@@ -31,6 +31,7 @@ add_executable(myip
 	ipv6.cpp
 	lldp.cpp
 	log.cpp
+	mac_resolver.cpp
 	main.cpp
 	mdns.cpp
 	mqtt.cpp

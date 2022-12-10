@@ -5,9 +5,9 @@
 #include <shared_mutex>
 
 #include "address_cache.h"
+#include "mac_resolver.h"
 #include "network_layer.h"
 #include "phys.h"
-#include "router.h"
 #include "stats.h"
 
 
@@ -16,7 +16,7 @@ typedef struct {
 	any_addr addr;
 } arp_entry_t;
 
-class arp : public address_cache
+class arp : public address_cache, public mac_resolver
 {
 private:
 	const any_addr gw_mac;
@@ -32,12 +32,12 @@ private:
 	std::atomic_bool arp_stop_flag { false   };
 
 public:
-	arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac, router *const r);
+	arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac);
 	virtual ~arp();
 
 	void add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip);
 
-	std::pair<phys *, any_addr *> query_cache(const any_addr & ip) override;
+	any_addr get_mac(const any_addr & ip) override;
 
 	void operator()();
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <optional>
 #include <shared_mutex>
 #include <stdint.h>
@@ -8,6 +9,7 @@
 #include "utils.h"
 
 
+class arp;
 class phys;
 
 class router
@@ -55,6 +57,8 @@ private:
 	};
 
 	fifo<queued_packet *> pkts;
+
+	const std::map<phys *, arp *> adapters;
 
 public:
 	router();

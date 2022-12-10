@@ -6,9 +6,9 @@
 #include <shared_mutex>
 
 #include "address_cache.h"
+#include "mac_resolver.h"
 #include "network_layer.h"
 #include "phys.h"
-#include "router.h"
 #include "stats.h"
 
 
@@ -17,15 +17,15 @@ typedef struct {
 	any_addr addr;
 } ndp_entry_t;
 
-class ndp : public address_cache
+class ndp : public address_cache, public mac_resolver
 {
 private:
         uint64_t *ndp_cache_req { nullptr };
 	uint64_t *ndp_cache_hit { nullptr };
 
 public:
-	ndp(stats *const s, router *const r);
+	ndp(stats *const s);
 	virtual ~ndp();
 
-	void add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip);
+	any_addr get_mac(const any_addr & ip) override;
 };

@@ -76,7 +76,7 @@ bool ipv6::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 	if (pl_size)
 		memcpy(&out[40], payload, pl_size);
 
-	rc = r->route_packet(dst_mac, 0x86dd, dst_ip, src_ip, out, out_size);
+	bool rc = r->route_packet(dst_mac, 0x86dd, dst_ip, src_ip, out, out_size);
 
 	delete [] out;
 
