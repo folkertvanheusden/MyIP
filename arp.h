@@ -29,11 +29,15 @@ private:
 	std::thread     *arp_th        { nullptr };
 	std::atomic_bool arp_stop_flag { false   };
 
+	phys *const interface  { nullptr };
+
+	bool send_request(const any_addr & ip);
+
 public:
-	arp(stats *const s, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac);
+	arp(stats *const s, phys *const interface, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac);
 	virtual ~arp();
 
-	any_addr get_mac(const any_addr & ip) override;
+	std::optional<any_addr> get_mac(const any_addr & ip) override;
 
 	void operator()() override;
 };

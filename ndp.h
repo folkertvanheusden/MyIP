@@ -1,14 +1,11 @@
 // (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
-#include <assert.h>
-#include <map>
-#include <shared_mutex>
+#include <optional>
 
 #include "address_cache.h"
+#include "any_addr.h"
 #include "mac_resolver.h"
-#include "network_layer.h"
-#include "phys.h"
 #include "stats.h"
 
 
@@ -27,5 +24,5 @@ public:
 	ndp(stats *const s);
 	virtual ~ndp();
 
-	any_addr get_mac(const any_addr & ip) override;
+	std::optional<any_addr> get_mac(const any_addr & ip) override;
 };

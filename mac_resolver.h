@@ -1,6 +1,11 @@
 #pragma once
+#include <condition_variable>
+#include <map>
+#include <mutex>
+#include <optional>
 
 #include "any_addr.h"
+#include "fifo.h"
 #include "network_layer.h"
 #include "router.h"
 #include "stats.h"
@@ -9,13 +14,22 @@
 class mac_resolver : public network_layer
 {
 protected:
+	class mac_resolver_result {
+	public:
+		std::optional<any_addr> mac;
+	};
+
+	std::map<any_addr, std::optional<mac_resolver_result> > work;
+	std::mutex work_lock;
+	std::condition_variable work_cv;
+
 	fifo<fifo_element_t> *pkts { nullptr };
 
 public:
 	mac_resolver(stats *const s, router *const r);
 	virtual ~mac_resolver();
 
-	virtual any_addr get_mac(const any_addr & ip) = 0;
+	virtual std::optional<any_addr> get_mac(const any_addr & ip) = 0;
 
 	void queue_incoming_packet(phys *const interface, const packet *p) override;
 
@@ -23,5 +37,5 @@ public:
 
 	int get_max_packet_size() const override;
 
-	void operator()() override;
+	virtual void operator()() override = 0;
 };

@@ -11,12 +11,15 @@
 #include "utils.h"
 
 
+using namespace std::chrono_literals;
+
 constexpr size_t pkts_max_size { 256 };
 
-arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) :
+arp::arp(stats *const s, phys *const interface, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) :
 	address_cache(s),
 	mac_resolver(s, nullptr),
-	gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
+	gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip),
+	interface(interface)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
 	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
@@ -49,9 +52,9 @@ void arp::operator()()
 		const uint8_t *const p = pkt->get_data();
 		const int size = pkt->get_size();
 
-		if (p[6] == 0x00 && p[7] == 0x01 && // request
-		    p[2] == 0x08 && p[3] == 0x00 && // ethertype IPv4
-		    any_addr(&p[24], 4) == my_ip) // I am the target?
+		if (p[6] == 0x00 && p[7] == 0x01 &&  // request
+		    p[2] == 0x08 && p[3] == 0x00 &&  // ethertype IPv4
+		    any_addr(&p[24], 4) == my_ip)  // am I the target?
 		{
 			stats_inc_counter(arp_for_me);
 
@@ -70,10 +73,91 @@ void arp::operator()()
 
 			delete [] reply;
 		}
+		else if (p[6] == 0x00 && p[7] == 0x02 &&  // reply
+			any_addr(&p[8], 6) == my_mac) {  // check sender
+
+			std::unique_lock lck(work_lock);
+
+			auto it = work.find(any_addr(&p[24], 4));  // IP to resolve
+
+			if (it != work.end())
+				it->second = mac_resolver_result({ any_addr(&p[18], 4) });
+
+			work_cv.notify_all();
+		}
 		else {
 			// DOLOG(ll_debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(&p[24], 4).to_str().c_str());
 		}
 
 		delete pkt;
 	}
+}
+
+bool arp::send_request(const any_addr & ip)
+{
+	uint8_t request[26] { 0 };
+
+	request[1] = 1;  // HTYPE (Ethernet)
+
+	// PTYPE
+	if (ip.get_len() == 4)
+		request[2] = 0x08, request[3] = 0x00;
+	else {
+		DOLOG(ll_warning, "ARP::send_request: don't know how to resolve \"%s\" with ARP", ip.to_str().c_str());
+		return false;
+	}
+
+	request[4] = 6;  // HLEN
+	request[5] = ip.get_len();  // PLEN
+
+	request[6] = 0x00;  // OPER
+	request[7] = 1;
+
+	my_mac.get(&request[8], 6);  // SHA
+
+	ip.get(&request[14], 4);  // SPA
+
+	constexpr const uint8_t broadcast_mac[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
+	any_addr dest_mac(broadcast_mac, sizeof broadcast_mac);
+
+	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
+}
+
+std::optional<any_addr> arp::get_mac(const any_addr & ip)
+{
+	auto cache_result = query_cache(ip);
+
+	if (cache_result.first == interface)
+		return *cache_result.second;
+
+	if (!send_request(ip))
+		return { };
+
+	std::unique_lock lck(work_lock);
+
+	for(;!stop_flag;) {
+		auto it = work.find(ip);
+
+		if (it == work.end()) {  // should not happen
+			DOLOG(ll_warning, "ARP: nothing queued for %s", ip.to_str().c_str());
+
+			return { };
+		}
+
+		if (it->second.has_value()) {
+			auto result = it->second.value().mac;
+
+			work.erase(it);
+
+			if (result.has_value())
+				update_cache(result.value(), ip, interface);
+
+			return result;
+		}
+
+		work_cv.wait_for(lck, 500ms);
+	}
+
+	return { };
 }
