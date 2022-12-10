@@ -247,7 +247,7 @@ void mdns::operator()()
 
 		constexpr uint8_t mc_addr[] { 224, 0, 0, 251 };
 
-		any_addr dst_ip(mc_addr, sizeof mc_addr);
+		any_addr dst_ip(any_addr::ipv4, mc_addr, sizeof mc_addr);
 
 		std::unique_lock<std::mutex> lck(lock);
 

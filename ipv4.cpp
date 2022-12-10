@@ -130,8 +130,8 @@ void ipv4::operator()()
 			continue;
 		}
 
-		any_addr pkt_dst(&payload_header[16], 4);
-		any_addr pkt_src(&payload_header[12], 4);
+		any_addr pkt_dst(any_addr::ipv4, &payload_header[16], 4);
+		any_addr pkt_src(any_addr::ipv4, &payload_header[12], 4);
 
 		// update arp cache
 		iarp->update_cache(pkt->get_dst_addr(), pkt_dst, po.value().interface);  // TODO: replace for forwarding

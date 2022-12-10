@@ -162,7 +162,7 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 	}
 
 	int port = (header[2] << 8) | header[3];
-	any_addr dest(&header[4], 4);
+	any_addr dest(any_addr::ipv4, &header[4], 4);
 
 	std::string id = get_0x00_terminated_string(fd);
 

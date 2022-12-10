@@ -55,7 +55,7 @@ void arp::operator()()
 
 		if (p[6] == 0x00 && p[7] == 0x01 &&  // request
 		    p[2] == 0x08 && p[3] == 0x00 &&  // ethertype IPv4
-		    any_addr(&p[24], 4) == my_ip)  // am I the target?
+		    any_addr(any_addr::ipv4, &p[24], 4) == my_ip)  // am I the target?
 		{
 			stats_inc_counter(arp_for_me);
 
@@ -75,14 +75,14 @@ void arp::operator()()
 			delete [] reply;
 		}
 		else if (p[6] == 0x00 && p[7] == 0x02 &&  // reply
-			any_addr(&p[8], 6) == my_mac) {  // check sender
+			any_addr(any_addr::mac, &p[8], 6) == my_mac) {  // check sender
 
 			std::unique_lock lck(work_lock);
 
-			auto it = work.find(any_addr(&p[24], 4));  // IP to resolve
+			auto it = work.find(any_addr(any_addr::ipv4, &p[24], 4));  // IP to resolve
 
 			if (it != work.end())
-				it->second = mac_resolver_result({ any_addr(&p[18], 4) });
+				it->second = mac_resolver_result({ any_addr(any_addr::ipv4, &p[18], 4) });
 
 			work_cv.notify_all();
 		}
@@ -120,7 +120,7 @@ bool arp::send_request(const any_addr & ip)
 
 	constexpr const uint8_t broadcast_mac[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-	any_addr dest_mac(broadcast_mac, sizeof broadcast_mac);
+	any_addr dest_mac(any_addr::mac, broadcast_mac, sizeof broadcast_mac);
 
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
 }

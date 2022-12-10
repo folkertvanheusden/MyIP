@@ -162,9 +162,9 @@ void phys_tap::operator()()
 			continue;
 		}
 
-		any_addr dst_mac(&buffer[0], 6);
+		any_addr dst_mac(any_addr::mac, &buffer[0], 6);
 
-		any_addr src_mac(&buffer[6], 6);
+		any_addr src_mac(any_addr::mac, &buffer[6], 6);
 
 		DOLOG(ll_debug, "phys_tap: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
