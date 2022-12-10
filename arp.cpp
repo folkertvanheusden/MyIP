@@ -8,6 +8,7 @@
 #include "net.h"
 #include "phys.h"
 #include "router.h"
+#include "time.h"
 #include "utils.h"
 
 
@@ -134,9 +135,11 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 	if (!send_request(ip))
 		return { };
 
+	uint32_t start_ts = get_ms();
+
 	std::unique_lock lck(work_lock);
 
-	for(;!stop_flag;) {
+	for(;!stop_flag && get_ms() - start_ts < 1000;) {
 		auto it = work.find(ip);
 
 		if (it == work.end()) {  // should not happen
@@ -156,8 +159,10 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 			return result;
 		}
 
-		work_cv.wait_for(lck, 500ms);
+		work_cv.wait_for(lck, 100ms);
 	}
+
+	DOLOG(ll_debug, "ARP: resolve for %s timeout", ip.to_str().c_str());
 
 	return { };
 }
