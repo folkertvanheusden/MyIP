@@ -59,7 +59,7 @@ private:
 		}
 
 		~queued_packet() {
-			free(data);
+			delete [] data;
 		}
 	};
 

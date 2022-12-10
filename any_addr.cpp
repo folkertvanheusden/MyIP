@@ -199,7 +199,7 @@ any_addr & any_addr::operator =(const any_addr & other)
 	return *this;
 }
 
-any_addr parse_address(const char *str, const size_t exp_size, const std::string & seperator, const int base)
+any_addr parse_address(const std::string & str, const size_t exp_size, const std::string & seperator, const int base)
 {
 	std::vector<std::string> parts = split(str, seperator);
 

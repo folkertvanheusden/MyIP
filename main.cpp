@@ -405,15 +405,22 @@ int main(int argc, char *argv[])
 		try {
 			const libconfig::Setting & ipv4_ = interface.lookup("ipv4");
 
-			std::string ma_str = cfg_str(ipv4_, "my-address", "IPv4 address", false, "192.168.3.2");
-			any_addr my_address = parse_address(ma_str.c_str(), 4, ".", 10);
+			std::string ma_str = cfg_str(ipv4_, "my-address", "IPv4 address/netmask", false, "192.168.3.2/255.255.255.0");
+
+			auto slash = ma_str.find('/');
+			if (slash == std::string::npos)
+				error_exit(false, "my-address: netmask missing");
+
+			any_addr my_address = parse_address(ma_str.substr(0, slash), 4, ".", 10);
+
+			any_addr netmask_aa = parse_address(ma_str.substr(slash + 1), 4, ".", 10);
 
 			mgmt_addr = my_address;
 
 			std::string gw_str = cfg_str(ipv4_, "gateway-mac-address", "default gateway MAC address", false, "42:20:16:2b:6f:9b");
 			any_addr gw_mac = parse_address(gw_str.c_str(), 6, ":", 16);
 
-			printf("%zu] Will listen on IPv4 address: %s\n", i, my_address.to_str().c_str());
+			printf("%zu] Will listen on IPv4 address: %s / %s\n", i, my_address.to_str().c_str(), netmask_aa.to_str().c_str());
 
 			arp *a = new arp(&s, dev, my_mac, my_address, gw_mac);
 			a->add_static_entry(dev, my_mac, my_address);
@@ -470,13 +477,24 @@ int main(int argc, char *argv[])
 
 			protocols.push_back(a);
 
-			// TODO: netmask etc
+			// ** set route
+			// determine network address
 			uint8_t network_bytes[] = { 0, 0, 0, 0 };
+			my_address.get(network_bytes, sizeof network_bytes);
+
+			network_bytes[0] &= netmask_aa[0];
+			network_bytes[1] &= netmask_aa[1];
+			network_bytes[2] &= netmask_aa[2];
+			network_bytes[3] &= netmask_aa[3];
+
 			any_addr network(network_bytes, sizeof network_bytes);
 
-			uint8_t netmask[] = { 0, 0, 0, 0 };
+			// retrieve netmask
+			uint8_t netmask_bytes[] = { 0, 0, 0, 0 };
+			netmask_aa.get(netmask_bytes, sizeof netmask_bytes);
 
-			r.add_router_ipv4(network, netmask, dev, a);
+			// set route
+			r.add_router_ipv4(network, netmask_bytes, dev, a);
 		}
 		catch(const libconfig::SettingNotFoundException &nfex) {
 			// just fine
