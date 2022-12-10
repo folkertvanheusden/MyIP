@@ -16,6 +16,11 @@ mac_resolver::~mac_resolver()
 	delete pkts;
 }
 
+any_addr mac_resolver::get_addr() const
+{
+	assert(0);
+}
+
 void mac_resolver::queue_incoming_packet(phys *const interface, const packet *p)
 {
 	if (pkts->try_put({ interface, p }) == false) {

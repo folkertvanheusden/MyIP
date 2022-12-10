@@ -31,6 +31,8 @@ public:
 
 	virtual std::optional<any_addr> get_mac(const any_addr & ip) = 0;
 
+	any_addr get_addr() const override;
+
 	void queue_incoming_packet(phys *const interface, const packet *p) override;
 
 	bool transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;

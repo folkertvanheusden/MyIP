@@ -25,4 +25,6 @@ public:
 	virtual ~ndp();
 
 	std::optional<any_addr> get_mac(const any_addr & ip) override;
+
+	void operator()() override;
 };

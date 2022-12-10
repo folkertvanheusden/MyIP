@@ -44,14 +44,9 @@ void network_layer::queue_incoming_packet(phys *const interface, const packet *p
 	}
 }
 
-void network_layer::queue_outgoing_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size)
+void network_layer::queue_outgoing_packet(const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size)
 {
-	r->route_packet({ }, dst_ip, src_ip, payload, pl_size);
-}
-
-void network_layer::queue_outgoing_packet(const any_addr & override_dest_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size)
-{
-	r->route_packet(override_dest_mac, dst_ip, src_ip, payload, pl_size);
+	r->route_packet({ }, ether_type, dst_ip, src_ip, payload, pl_size);
 }
 
 uint16_t ip_checksum(const uint16_t *p, const size_t n)

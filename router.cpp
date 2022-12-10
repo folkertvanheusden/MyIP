@@ -6,12 +6,23 @@
 #include "router.h"
 
 
-router::router(const std::map<phys *, arp *> & adapters) : adapters(adapters)
+constexpr size_t pkts_max_size { 256 };
+
+router::router(stats *const s)
 {
+	pkts = new fifo<queued_packet *>(s, "router", pkts_max_size);
 }
 
 router::~router()
 {
+	stop_flag = true;
+
+	delete pkts;
+}
+
+void router::register_adapter(phys *const p, arp *const a)
+{
+	adapters.insert({ p, a });
 }
 
 bool router::route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size)
@@ -25,13 +36,13 @@ bool router::route_packet(const std::optional<any_addr> & override_dst_mac, cons
 	qp->dst_ip  = dst_ip;
 	qp->src_ip  = src_ip;
 
-	return pkts.try_put(qp);
+	return pkts->try_put(qp);
 }
 
 void router::operator()()
 {
-	while(!terminate) {
-		auto po = pkts.get(500);
+	while(!stop_flag) {
+		auto po = pkts->get(500);
 		if (!po.has_value())
 			continue;
 

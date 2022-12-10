@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <vector>
 
+#include "log.h"
+#include "stats.h"
 #include "utils.h"
 
 
@@ -56,13 +58,17 @@ private:
 		}
 	};
 
-	fifo<queued_packet *> pkts;
+	fifo<queued_packet *>  *pkts     { nullptr };
 
-	const std::map<phys *, arp *> adapters;
+	std::map<phys *, arp *> adapters;
+
+	std::atomic_bool stop_flag { false };
 
 public:
-	router();
+	router(stats *const s);
 	virtual ~router();
+
+	void register_adapter(phys *const p, arp *const a);
 
 	void set_default_interface(phys *const default_interface) { this->default_interface = default_interface; }
 
