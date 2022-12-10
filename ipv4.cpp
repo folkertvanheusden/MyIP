@@ -84,23 +84,8 @@ bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 	out[11] = checksum;
 
 	any_addr q_addr = override_ip ? myip : src_ip;
-	auto arp_result = iarp->query_cache(q_addr);
-	const any_addr *src_mac = arp_result.second;
-	if (!src_mac || !arp_result.first) {
-		if (!src_mac)
-			DOLOG(ll_warning, "IPv4: cannot find src IP (%s) in ARP table\n", q_addr.to_str().c_str());
-		else
-			DOLOG(ll_warning, "IPv4: no interface set yet\n");
 
-		delete [] out;
-		stats_inc_counter(ipv4_tx_err);
-		stats_inc_counter(ip_n_out_disc);
-		return false;
-	}
-
-	rc = r->route_packet(dst_mac, 0x0800, dst_ip, src_ip, out, out_size);
-
-	delete src_mac;
+	rc = r->route_packet({ }, 0x0800, dst_ip, q_addr, out, out_size);
 
 	delete [] out;
 
