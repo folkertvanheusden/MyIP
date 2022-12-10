@@ -135,7 +135,7 @@ void icmp6::send_packet_router_soliciation() const
 	DOLOG(ll_debug, "ICMP6: send router sollicitation (%s)\n", my_ip.to_str().c_str());
 
 	uint8_t dst_mac[6] = { 0x33, 0x33, all_router_multicast_addr[12], all_router_multicast_addr[13], all_router_multicast_addr[14], all_router_multicast_addr[15] };
-	any_addr adst_mac(any_addr::mac, dst_mac, 6);
+	any_addr adst_mac(any_addr::mac, dst_mac);
 
 	uint8_t source_link_layer_address[8] = { 0x01, 0x01 };
 	my_mac.get(&source_link_layer_address[2], 6);

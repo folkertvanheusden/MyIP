@@ -176,7 +176,7 @@ void phys_slip::operator()()
 				continue;
 			}
 
-			any_addr src_mac(any_addr::mac, (const uint8_t *)"\0\0\0\0\0\1", 6);
+			any_addr src_mac(any_addr::mac, (const uint8_t *)"\0\0\0\0\0\1");
 
 			DOLOG(ll_debug, "phys_slip: queing packet, size %zu\n", packet_buffer.size());
 

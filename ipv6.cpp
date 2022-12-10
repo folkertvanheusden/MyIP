@@ -120,8 +120,8 @@ void ipv6::operator()()
 
 		stats_inc_counter(ipv6_n_pkt);
 
-		any_addr pkt_dst(any_addr::ipv6, &payload_header[24], 16);
-		any_addr pkt_src(any_addr::ipv6, &payload_header[8], 16);
+		any_addr pkt_dst(any_addr::ipv6, &payload_header[24]);
+		any_addr pkt_src(any_addr::ipv6, &payload_header[8]);
 
 		DOLOG(ll_debug, "IPv6[%04x]: packet %s => %s\n", flow_label, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 

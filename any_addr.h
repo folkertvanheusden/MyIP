@@ -22,7 +22,7 @@ private:
 
 public:
 	any_addr();
-	any_addr(const addr_family af, const uint8_t src[], const int src_size);
+	any_addr(const addr_family af, const uint8_t src[]);
 	any_addr(const any_addr & org);
 	virtual ~any_addr();
 
@@ -46,7 +46,7 @@ public:
 
 	uint64_t get_hash() const;
 
-	void set(const addr_family af, const uint8_t src[], const int src_size);
+	void set(const addr_family af, const uint8_t src[]);
 
 	std::string to_str() const;
 };

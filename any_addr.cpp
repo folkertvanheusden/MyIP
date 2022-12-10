@@ -13,9 +13,9 @@ any_addr::any_addr()
 {
 }
 
-any_addr::any_addr(const addr_family af, const uint8_t src[], const int src_size)
+any_addr::any_addr(const addr_family af, const uint8_t src[])
 {
-	set(af, src, src_size);
+	set(af, src);
 }
 
 any_addr::any_addr(const any_addr & other)
@@ -89,8 +89,7 @@ bool any_addr::operator <(const any_addr & rhs) const
 {
 	assert(set_);
 
-	if (get_family() < rhs.get_family())
-		return true;
+	assert(get_family() == rhs.get_family());
 
 	uint8_t rhs_bytes[ANY_ADDR_SIZE] { 0 };
 	int rhs_size { 0 };
@@ -117,9 +116,16 @@ void any_addr::get(uint8_t *const tgt, int exp_size) const
 	memcpy(tgt, addr, exp_size);
 }
 
-void any_addr::set(const addr_family af_in, const uint8_t src[], const int src_size)
+void any_addr::set(const addr_family af_in, const uint8_t src[])
 {
-	assert((src_size == 4 && af_in == ipv4) || (src_size == 6 && af_in == mac) || (src_size == 16 && af_in == ipv6));
+	int src_size = -1;
+
+	if (af_in == mac)
+		src_size = 6;
+	else if (af_in == ipv4)
+		src_size = 4;
+	else if (af_in == ipv6)
+		src_size = 16;
 
 	memcpy(addr, src, src_size);
 	addr_size = src_size;
@@ -226,7 +232,7 @@ any_addr parse_address(const std::string & str, const size_t exp_size, const std
 		af = exp_size == 4 ? any_addr::ipv4 : any_addr::mac;
 	}
 
-	any_addr rc = any_addr(af, temp, exp_size);
+	any_addr rc = any_addr(af, temp);
 
 	delete [] temp;
 
