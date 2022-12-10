@@ -27,17 +27,14 @@ lldp::~lldp()
 	delete th;
 }
 
-bool lldp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+bool lldp::transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
+	assert(0);
+
 	return false;
 }
 
-bool lldp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
-{
-	return false;
-}
-
-void lldp::queue_packet(phys *const interface, const packet *p)
+void lldp::queue_incoming_packet(phys *const interface, const packet *p)
 {
 	delete p;
 }
@@ -55,7 +52,7 @@ std::vector<uint8_t> str_to_uvec(const std::string & in)
 {
 	std::vector<uint8_t> out;
 
-	for(int i=0; i<in.size(); i++)
+	for(size_t i=0; i<in.size(); i++)
 		out.push_back(in[i]);
 
 	return out;

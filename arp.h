@@ -26,8 +26,6 @@ private:
 	uint64_t *arp_requests { nullptr };
 	uint64_t *arp_for_me   { nullptr };
 
-	fifo<fifo_element_t> *pkts     { nullptr };
-
 	std::thread     *arp_th        { nullptr };
 	std::atomic_bool arp_stop_flag { false   };
 
@@ -37,5 +35,5 @@ public:
 
 	any_addr get_mac(const any_addr & ip) override;
 
-	void operator()();
+	void operator()() override;
 };
