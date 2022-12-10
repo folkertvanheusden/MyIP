@@ -89,11 +89,12 @@ bool any_addr::operator <(const any_addr & rhs) const
 {
 	assert(set_);
 
+	if (get_family() < rhs.get_family())
+		return true;
+
 	uint8_t rhs_bytes[ANY_ADDR_SIZE] { 0 };
 	int rhs_size { 0 };
 	rhs.get(rhs_bytes, &rhs_size);
-
-	assert(get_family() == rhs.get_family());
 
 	return memcmp(addr, rhs_bytes, rhs_size) < 0;
 }
@@ -116,13 +117,13 @@ void any_addr::get(uint8_t *const tgt, int exp_size) const
 	memcpy(tgt, addr, exp_size);
 }
 
-void any_addr::set(const addr_family af, const uint8_t src[], const int src_size)
+void any_addr::set(const addr_family af_in, const uint8_t src[], const int src_size)
 {
-	assert((addr_size == 4 && af == ipv4) || (addr_size == 6 && af == mac) || (addr_size == 16 && af == ipv6));
+	assert((src_size == 4 && af_in == ipv4) || (src_size == 6 && af_in == mac) || (src_size == 16 && af_in == ipv6));
 
 	memcpy(addr, src, src_size);
 	addr_size = src_size;
-	this->af = af;
+	this->af = af_in;
 
 	set_ = true;
 }
