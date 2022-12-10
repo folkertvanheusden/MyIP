@@ -129,8 +129,13 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 {
 	auto cache_result = query_cache(ip);
 
-	if (cache_result.first == interface)
-		return *cache_result.second;
+	if (cache_result.first == interface) {
+		any_addr rc = *cache_result.second;
+
+		delete cache_result.second;
+
+		return rc;
+	}
 
 	if (!send_request(ip))
 		return { };
