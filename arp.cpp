@@ -167,7 +167,7 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 		work_cv.wait_for(lck, 100ms);
 	}
 
-	DOLOG(ll_debug, "ARP: resolve for %s timeout", ip.to_str().c_str());
+	DOLOG(ll_debug, "ARP: resolve for %s timeout\n", ip.to_str().c_str());
 
 	return { };
 }
