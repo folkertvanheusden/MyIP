@@ -12,7 +12,7 @@ private:
 	uint64_t *icmp_transmit { nullptr };
 
 public:
-	explicit icmp(stats *const s);
+	explicit icmp(stats *const s, const int n_threads);
 	virtual ~icmp();
 
 	void send_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const packet *const p) const;

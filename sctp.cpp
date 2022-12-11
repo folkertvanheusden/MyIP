@@ -20,7 +20,7 @@
 // debug level
 constexpr log_level_t dl = ll_info;
 
-sctp::sctp(stats *const s, icmp *const icmp_) : transport_layer(s, "sctp"), icmp_(icmp_)
+sctp::sctp(stats *const s, icmp *const icmp_, const int n_threads) : transport_layer(s, "sctp"), icmp_(icmp_)
 {
 	sctp_msgs        = s->register_stat("sctp_msgs");
 	sctp_failed_msgs = s->register_stat("sctp_failed_msgs");
@@ -28,7 +28,7 @@ sctp::sctp(stats *const s, icmp *const icmp_) : transport_layer(s, "sctp"), icmp
 	get_random(state_cookie_key, sizeof state_cookie_key);
 	state_cookie_key_timestamp = time(nullptr);
 
-	for(int i=0; i<4; i++)
+	for(int i=0; i<n_threads; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
 }
 

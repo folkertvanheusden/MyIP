@@ -8,13 +8,13 @@
 #include "utils.h"
 
 
-icmp::icmp(stats *const s) : transport_layer(s, "icmp(4/6)")
+icmp::icmp(stats *const s, const int n_threads) : transport_layer(s, "icmp(4/6)")
 {
 	icmp_requests = s->register_stat("icmp_requests");
 	icmp_req_ping = s->register_stat("icmp_req_ping");
 	icmp_transmit = s->register_stat("icmp_transmit");
 
-	for(int i=0; i<4; i++)
+	for(int i=0; i<n_threads; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
 }
 

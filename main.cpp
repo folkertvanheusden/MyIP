@@ -423,13 +423,17 @@ int main(int argc, char *argv[])
 			a->add_static_entry(dev, my_mac, my_address);
 			dev->register_protocol(0x0806, a);
 
-			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, &r);
+			int n_ipv4_threads = cfg_int(ipv4_, "n-ipv4-threads", "number of ipv4 threads", true, 4);
+
+			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, &r, n_ipv4_threads);
 			protocols.push_back(ipv4_instance);
 
 			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "wether to enable icmp", true, true);
 			icmp *icmp_ = nullptr;
 			if (use_icmp) {
-				icmp_ = new icmp(&s);
+				int n_threads = cfg_int(ipv4_, "n-icmp-threads", "number of icmp threads", true, 8);
+
+				icmp_ = new icmp(&s, n_threads);
 
 				ipv4_instance->register_protocol(0x01, icmp_);
 				// rather ugly but that's how IP works
@@ -440,7 +444,9 @@ int main(int argc, char *argv[])
 
 			bool use_tcp = cfg_bool(ipv4_, "use-tcp", "wether to enable tcp", true, true);
 			if (use_tcp) {
-				tcp *t = new tcp(&s, icmp_, 64);
+				int n_threads = cfg_int(ipv4_, "n-tcp-threads", "number of tcp threads", true, 8);
+
+				tcp *t = new tcp(&s, icmp_, n_threads);
 				ipv4_instance->register_protocol(0x06, t);
 
 				ipv4_tcp = t;
@@ -454,7 +460,9 @@ int main(int argc, char *argv[])
 			if (use_sctp) {
 				DOLOG(ll_debug, "Adding SCTP to IPv4\n");
 
-				sctp *sctp_ = new sctp(&s, icmp_);
+				int n_threads = cfg_int(ipv4_, "n-sctp-threads", "number of sctp threads", true, 8);
+
+				sctp *sctp_ = new sctp(&s, icmp_, n_threads);
 				ipv4_instance->register_protocol(0x84, sctp_);
 
 				transport_layers.push_back(sctp_);
@@ -464,7 +472,9 @@ int main(int argc, char *argv[])
 
 			bool use_udp = cfg_bool(ipv4_, "use-udp", "wether to enable udp", true, true);
 			if (use_udp) {
-				udp *u = new udp(&s, icmp_);
+				int n_threads = cfg_int(ipv4_, "n-udp-threads", "number of udp threads", true, 8);
+
+				udp *u = new udp(&s, icmp_, n_threads);
 				ipv4_instance->register_protocol(0x11, u);
 
 				transport_layers.push_back(u);
@@ -494,7 +504,9 @@ int main(int argc, char *argv[])
 			ndp_->add_static_entry(dev, my_mac, my_ip6);
 			protocols.push_back(ndp_);
 
-			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6, &r);
+			int n_ipv6_threads = cfg_int(ipv6_, "n-ipv6-threads", "number of ipv6 threads", true, 4);
+
+			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6, &r, n_ipv6_threads);
 			protocols.push_back(ipv6_instance);
 
 			dev->register_protocol(0x86dd, ipv6_instance);
@@ -502,7 +514,9 @@ int main(int argc, char *argv[])
 			bool use_icmp = cfg_bool(ipv6_, "use-icmp", "wether to enable icmp", true, true);
 			icmp6 *icmp6_ = nullptr;
 			if (use_icmp) {
-				icmp6_ = new icmp6(&s, my_mac, my_ip6);
+				int n_threads = cfg_int(ipv6_, "n-icmp-threads", "number of icmp threads", true, 8);
+
+				icmp6_ = new icmp6(&s, my_mac, my_ip6, n_threads);
 				transport_layers.push_back(icmp6_);
 
 				ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
@@ -511,7 +525,9 @@ int main(int argc, char *argv[])
 
 			bool use_tcp = cfg_bool(ipv6_, "use-tcp", "wether to enable tcp", true, true);
 			if (use_tcp) {
-				tcp *t6 = new tcp(&s, icmp6_, 64);
+				int n_threads = cfg_int(ipv6_, "n-tcp-threads", "number of tcp threads", true, 8);
+
+				tcp *t6 = new tcp(&s, icmp6_, n_threads);
 				ipv6_instance->register_protocol(0x06, t6);  // TCP
 				transport_layers.push_back(t6);
 
@@ -520,7 +536,9 @@ int main(int argc, char *argv[])
 
 			bool use_udp = cfg_bool(ipv6_, "use-udp", "wether to enable udp", true, true);
 			if (use_udp) {
-				udp *u = new udp(&s, icmp6_);
+				int n_threads = cfg_int(ipv6_, "n-udp-threads", "number of udp threads", true, 8);
+
+				udp *u = new udp(&s, icmp6_, n_threads);
 				ipv6_instance->register_protocol(0x11, u);
 
 				transport_layers.push_back(u);

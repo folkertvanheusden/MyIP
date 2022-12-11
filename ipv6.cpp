@@ -15,7 +15,7 @@
 #include "utils.h"
 
 
-ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip, router *const r) : network_layer(s, "ipv6", r), indp(indp), myip(myip)
+ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip, router *const r, const int n_threads) : network_layer(s, "ipv6", r), indp(indp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
@@ -29,9 +29,9 @@ ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip, router *const
 	ipv6_n_tx     = s->register_stat("ipv6_n_tx");
 	ipv6_tx_err   = s->register_stat("ipv6_tx_err");
 
-	assert(myip.get_len() == 16);
+	assert(myip.get_family() == any_addr::ipv6);
 
-	for(int i=0; i<4; i++)
+	for(int i=0; i<n_threads; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
 }
 

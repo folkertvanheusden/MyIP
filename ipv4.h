@@ -40,7 +40,7 @@ private:
 	void send_ttl_exceeded(const packet *const pkt) const;
 
 public:
-	ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r);
+	ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r, const int n_threads);
 	virtual ~ipv4();
 
 	any_addr get_addr() const override { return myip; }

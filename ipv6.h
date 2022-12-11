@@ -38,7 +38,7 @@ private:
 	uint64_t *ipv6_tx_err   { nullptr };
 
 public:
-	ipv6(stats *const s, ndp *const indp, const any_addr & myip, router *const r);
+	ipv6(stats *const s, ndp *const indp, const any_addr & myip, router *const r, const int n_threads);
 	virtual ~ipv6();
 
 	any_addr get_addr() const override { return myip; }
