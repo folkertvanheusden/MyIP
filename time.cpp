@@ -1,3 +1,4 @@
+#include <chrono>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -23,6 +24,24 @@ uint64_t get_ms()
 		fprintf(stderr, "clock_gettime failed: %s\n", strerror(errno));
 
 	return uint64_t(ts.tv_sec) * uint64_t(1000) + uint64_t(ts.tv_nsec / 1000000);
+}
+
+uint32_t ms_since_midnight()
+{
+	auto   now  = std::chrono::system_clock::now();
+
+	time_t tnow = std::chrono::system_clock::to_time_t(now);
+
+	tm *date = std::localtime(&tnow);
+	date->tm_hour = 0;
+	date->tm_min  = 0;
+	date->tm_sec  = 0;
+
+	auto midnight = std::chrono::system_clock::from_time_t(std::mktime(date));
+
+	auto difference = now - midnight;
+
+	return std::chrono::duration_cast<std::chrono::milliseconds>(difference).count();
 }
 
 void myusleep(uint64_t us)

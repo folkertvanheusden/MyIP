@@ -38,6 +38,7 @@ public:
 	void send_ping_reply(const packet *const pkt) const;
 
 	// TODO: send_neighbor_request ofzoiets
+	// iets doen met send_packet_neighbor_solicitation
 
 	void send_destination_port_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const p) const override;
 
