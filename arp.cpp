@@ -149,9 +149,11 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 
 	uint64_t start_ts = get_ms();
 
-	std::unique_lock lck(work_lock);
+	std::unique_lock<std::mutex> lck(work_lock);
 
 	work.insert({ ip, { } });
+
+	bool repeated = false;
 
 	while(!stop_flag && get_ms() - start_ts < 1000) {
 		auto it = work.find(ip);
@@ -173,6 +175,12 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 				DOLOG(ll_debug, "ARP: no MAC found for %s\n", ip.to_str().c_str());
 
 			return result;
+		}
+
+		if (repeated == false && get_ms() - start_ts >= 500) {
+			repeated = true;
+
+			send_request(ip);
 		}
 
 		work_cv.wait_for(lck, 100ms);
