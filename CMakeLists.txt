@@ -21,7 +21,7 @@ add_executable(myip
 	buffer_out.cpp
 	dns.cpp
 	echo.cpp
-	fifo-stats.cpp
+	fifo_stats.cpp
 	font.cpp
 	hash.cpp
 	http.cpp
@@ -53,12 +53,12 @@ add_executable(myip
 	session.cpp
 	sip.cpp
 	snmp.cpp
-	snmp-data.cpp
-	snmp-elem.cpp
+	snmp_data.cpp
+	snmp_elem.cpp
 	socks_proxy.cpp
 	stats.cpp
 	stats_tracker.cpp
-	stats-utils.cpp
+	stats_utils.cpp
 	str.cpp
 	syslog.cpp
 	tcp.cpp
@@ -74,7 +74,7 @@ add_executable(myip
 add_executable(myiptop
 	log.cpp
 	myiptop.cpp
-	stats-utils.cpp
+	stats_utils.cpp
 	str.cpp
 	time.cpp
 	utils.cpp

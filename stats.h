@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "fifo-stats.h"
-#include "snmp-data.h"
+#include "fifo_stats.h"
+#include "snmp_data.h"
 
 
 void stats_inc_counter(uint64_t *const p);
