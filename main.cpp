@@ -423,12 +423,9 @@ int main(int argc, char *argv[])
 
 			mgmt_addr = my_address;
 
-			std::string gw_str = cfg_str(ipv4_, "gateway-mac-address", "default gateway MAC address", false, "42:20:16:2b:6f:9b");
-			any_addr gw_mac = type == "kiss" ? ax25_address(gw_str.c_str(), true, false).get_any_addr() : parse_address(gw_str, 6, ":", 16);
-
 			printf("%zu] Will listen on IPv4 address: %s\n", i, my_address.to_str().c_str());
 
-			a = new arp(&s, dev, my_mac, my_address, gw_mac);
+			a = new arp(&s, dev, my_mac, my_address);
 			a->add_static_entry(dev, my_mac, my_address);
 			dev->register_protocol(0x0806, a);
 
@@ -575,7 +572,12 @@ int main(int argc, char *argv[])
 					uint8_t netmask_bytes[4] { 0 };
 					netmask.get(netmask_bytes, sizeof netmask_bytes);
 
-					r.add_router_ipv4(network, netmask_bytes, dev, a);
+					std::string gateway_str = cfg_str(route, "gateway", "default-gateway address", true, "");
+					std::optional<any_addr> gateway;
+					if (gateway_str.empty() == false)
+						gateway = parse_address(gateway_str, 4, ".", 10);
+
+					r.add_router_ipv4(network, netmask_bytes, gateway, dev, a);
 				}
 				else if (ip_family == "ipv6") {
 					std::string network_str = cfg_str(route, "network", "network address", false, "");

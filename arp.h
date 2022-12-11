@@ -19,7 +19,6 @@ typedef struct {
 class arp : public address_cache, public mac_resolver
 {
 private:
-	const any_addr gw_mac;
 	const any_addr my_mac;
 	const any_addr my_ip;
 
@@ -34,7 +33,7 @@ private:
 	bool send_request(const any_addr & ip);
 
 public:
-	arp(stats *const s, phys *const interface, const any_addr & mymac, const any_addr & myip, const any_addr & gw_mac);
+	arp(stats *const s, phys *const interface, const any_addr & mymac, const any_addr & myip);
 	virtual ~arp();
 
 	std::optional<any_addr> get_mac(const any_addr & ip) override;
