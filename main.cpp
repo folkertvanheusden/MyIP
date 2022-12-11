@@ -282,6 +282,8 @@ int main(int argc, char *argv[])
 	std::string run_at_started;
 	std::string unix_domain_socket;
 
+	int n_router_threads = 0;
+
 	{
 		const libconfig::Setting & environment = root.lookup("environment");
 
@@ -299,6 +301,8 @@ int main(int argc, char *argv[])
 		run_at_started = cfg_str(environment, "ifup", "program to run when network interfaces are up", true, "");
 
 		unix_domain_socket = cfg_str(environment, "stats-socket", "used by myipnetstats", true, "");
+
+		n_router_threads = cfg_int(environment, "n-router-threads", "number of router threads", true, 8);
 	}
 
 	// used for clean-up
@@ -307,7 +311,7 @@ int main(int argc, char *argv[])
 	std::vector<application *>     applications;
 	std::vector<socks_proxy *>     socks_proxies;
 
-	router r(&s);
+	router r(&s, n_router_threads);
 
 	mdns *mdns_ = new mdns();
 	applications.push_back(mdns_);

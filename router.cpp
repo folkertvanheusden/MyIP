@@ -10,20 +10,23 @@
 
 constexpr size_t pkts_max_size { 256 };
 
-router::router(stats *const s)
+router::router(stats *const s, const int n_threads)
 {
 	pkts = new fifo<queued_packet *>(s, "router", pkts_max_size);
 
-	// TODO: # threads
-	router_th = new std::thread(std::ref(*this));
+	for(int i=0; i<n_threads; i++)
+		router_ths.push_back(new std::thread(std::ref(*this)));
 }
 
 router::~router()
 {
 	stop_flag = true;
 
-	router_th->join();
-	delete router_th;
+	for(auto th : router_ths) {
+		th->join();
+
+		delete th;
+	}
 
 	delete pkts;
 }
