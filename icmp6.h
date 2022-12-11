@@ -30,6 +30,7 @@ public:
 
 	void send_packet_router_soliciation() const;
 	void send_packet_neighbor_advertisement(const any_addr & peer_mac, const any_addr & peer_ip) const;
+	void send_packet_neighbor_solicitation(const any_addr & peer_ip) const;
 	void send_ping_reply(const packet *const pkt) const;
 
 	void send_destination_port_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const p) const override;
