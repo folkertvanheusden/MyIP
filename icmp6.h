@@ -27,7 +27,7 @@ private:
 	ndp      *indp           { nullptr };
 
 public:
-	explicit icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip);
+	explicit icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const int n_threads);
 	virtual ~icmp6();
 
 	void send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const uint32_t reserved, const uint8_t *const payload, const int payload_size) const;

@@ -15,7 +15,7 @@
 #include "utils.h"
 
 
-ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r) : network_layer(s, "ipv4", r), iarp(iarp), myip(myip)
+ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r, const int n_threads) : network_layer(s, "ipv4", r), iarp(iarp), myip(myip)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
@@ -29,9 +29,9 @@ ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const
 	ipv4_n_tx     = s->register_stat("ipv4_n_tx");
 	ipv4_tx_err   = s->register_stat("ipv4_tx_err");
 
-	assert(myip.get_len() == 4);
+	assert(myip.get_family() == any_addr::ipv4);
 
-	for(int i=0; i<4; i++)
+	for(int i=0; i<n_threads; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
 }
 

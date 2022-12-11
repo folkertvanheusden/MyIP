@@ -36,7 +36,7 @@ private:
 	std::thread *th2 { nullptr };
 
 public:
-	udp(stats *const s, icmp *const icmp_);
+	udp(stats *const s, icmp *const icmp_, const int n_threads);
 	virtual ~udp();
 
 	void add_handler(const int port, std::function<void(const any_addr &, int, const any_addr &, int, packet *, session_data *const pd)> h, session_data *const pd);
