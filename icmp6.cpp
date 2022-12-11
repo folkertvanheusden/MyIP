@@ -155,6 +155,20 @@ void icmp6::send_packet_neighbor_advertisement(const any_addr & peer_mac, const 
 	send_packet(&peer_mac, peer_ip, my_ip, 136, 0, 0x60000000, payload, 24);
 }
 
+void icmp6::send_packet_neighbor_solicitation(const any_addr & check_ip) const
+{
+	uint8_t dst_mac[6] = { 0x33, 0x33, all_router_multicast_addr[12], all_router_multicast_addr[13], all_router_multicast_addr[14], all_router_multicast_addr[15] };
+	any_addr adst_mac(any_addr::mac, dst_mac);
+
+	uint8_t payload[16] { 0x00 };
+	check_ip.get(&payload[0], 16);
+
+	constexpr const char d_addr[] = "FF02:0000:0000:0000:000:0001:ffa5:b9c6";
+	any_addr peer_ip { parse_address(d_addr, 16, ":", 16) };
+
+	send_packet(&adst_mac, peer_ip, my_ip, 135, 0, 0x00000000, payload, sizeof payload);
+}
+
 void icmp6::send_ping_reply(const packet *const pkt) const
 {
 	auto request = pkt->get_payload();
