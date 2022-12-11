@@ -34,6 +34,9 @@ void address_cache::update_cache(const any_addr & mac, const any_addr & ip, phys
 {
 	const std::lock_guard<std::shared_mutex> lock(cache_lock);
 
+	assert(mac.get_family() == any_addr::mac);
+	assert(ip.get_family()  == any_addr::ipv4 || ip.get_family()  == any_addr::ipv6);
+
 	auto it = cache.find(ip);
 
 	if (it == cache.end()) {
@@ -44,6 +47,11 @@ void address_cache::update_cache(const any_addr & mac, const any_addr & ip, phys
 		it->second = { static_entry ? 0 : get_us(), mac, interface };
 		stats_inc_counter(address_cache_update);
 	}
+}
+
+void address_cache::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
+{
+        update_cache(mac, ip, interface, true);
 }
 
 std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip)

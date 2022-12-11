@@ -1,5 +1,6 @@
 // (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
+#include <assert.h>
 #include <math.h>
 #include <optional>
 #include <samplerate.h>
@@ -85,11 +86,13 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 	myip(myip), myport(myport),
 	interval(interval)
 {
+	assert(myip.get_family() == any_addr::ipv4 || myip.get_family() == any_addr::ipv6);
+
 	// 1.3.6.1.2.1.4.57850.1.3: sip
-	sip_requests	= s->register_stat("sip_requests", "1.3.6.1.2.1.4.57850.1.3.1");
+	sip_requests	= s->register_stat("sip_requests",     "1.3.6.1.2.1.4.57850.1.3.1");
 	sip_requests_unk= s->register_stat("sip_requests_unk", "1.3.6.1.2.1.4.57850.1.3.2");
 	sip_rtp_sessions= s->register_stat("sip_rtp_sessions", "1.3.6.1.2.1.4.57850.1.3.3");
-	sip_rtp_codec_8	= s->register_stat("sip_rtp_codec_8", "1.3.6.1.2.1.4.57850.1.3.4");
+	sip_rtp_codec_8	= s->register_stat("sip_rtp_codec_8",  "1.3.6.1.2.1.4.57850.1.3.4");
 	sip_rtp_codec_11= s->register_stat("sip_rtp_codec_11", "1.3.6.1.2.1.4.57850.1.3.5");
 	sip_rtp_codec_97= s->register_stat("sip_rtp_codec_97", "1.3.6.1.2.1.4.57850.1.3.6");
 	sip_rtp_duration= s->register_stat("sip_rtp_duration", "1.3.6.1.2.1.4.57850.1.3.7");
@@ -847,7 +850,8 @@ bool sip::send_REGISTER(const std::string & call_id, const std::string & authori
 		work = work.substr(0, colon);
 	}
 
-	tgt_addr = parse_address(work.c_str(), 4, ".", 10);
+	tgt_addr = parse_address(work, 4, ".", 10);
+	assert(tgt_addr.get_family() == any_addr::ipv4 || tgt_addr.get_family() == any_addr::ipv6);
 
 	std::string out;
 	out += "REGISTER sip:" + tgt_addr.to_str() + " SIP/2.0\r\n";

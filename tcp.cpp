@@ -186,7 +186,7 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 	temp[16] = checksum >> 8;
 	temp[17] = checksum;
 
-	idev->transmit_packet(peer_addr, my_addr, 0x06, temp, temp_len, nullptr);
+	idev->transmit_packet({ }, peer_addr, my_addr, 0x06, temp, temp_len, nullptr);
 
 	delete [] temp;
 
@@ -270,7 +270,7 @@ void tcp::send_rst_for_port(const packet *const pkt, const int dst_port, const i
 	temp[16] = checksum >> 8;
 	temp[17] = checksum;
 
-	idev->transmit_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 0x06, temp, temp_len, nullptr);
+	idev->transmit_packet({ }, pkt->get_src_addr(), pkt->get_dst_addr(), 0x06, temp, temp_len, nullptr);
 
 	delete [] temp;
 }

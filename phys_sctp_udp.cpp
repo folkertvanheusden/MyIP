@@ -132,7 +132,7 @@ void phys_sctp_udp::operator()()
 		}
 
 		uint8_t dummy_src_mac[6] { 0, 0, 0, 0, uint8_t(addr.sin_port >> 8), uint8_t(addr.sin_port) };
-		any_addr src_mac(dummy_src_mac, 6);
+		any_addr src_mac(any_addr::mac, dummy_src_mac);
 
 		DOLOG(ll_debug, "phys_sctp_udp: queing packet from %s (%s) to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), host.value().c_str(), my_mac.to_str().c_str(), ether_type, size);
 
@@ -157,7 +157,7 @@ void phys_sctp_udp::operator()()
 
 		packet *p = new packet(ts, src_mac, src_mac, my_mac, ip_buffer, total_length, nullptr, 0);
 
-		it->second->queue_packet(this, p);
+		it->second->queue_incoming_packet(this, p);
 	}
 
 	DOLOG(ll_info, "phys_sctp_udp: thread stopped\n");

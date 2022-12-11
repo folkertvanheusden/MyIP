@@ -105,6 +105,12 @@ bool udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 {
 	DOLOG(ll_debug, "UDP: transmit packet %d -> %d\n", src_port, dst_port);
 
+	if (dst_ip.get_len() != src_ip.get_len()) {
+		DOLOG(ll_debug, "UDP: source IP family different from destination\n");
+
+		return false;
+	}
+
 	int out_size = 8 + pl_size;
 
 	uint8_t *out = new uint8_t[out_size + 1]();
@@ -125,7 +131,7 @@ bool udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 
 	bool rc = false;
 	if (idev)
-		rc = idev->transmit_packet(dst_ip, src_ip, 0x11, out, out_size, nullptr);
+		rc = idev->transmit_packet({ }, dst_ip, src_ip, 0x11, out, out_size, nullptr);
 
 	delete [] out;
 

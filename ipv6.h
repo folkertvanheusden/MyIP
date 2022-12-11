@@ -2,14 +2,16 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <stdint.h>
 #include <string>
 
 #include "ndp.h"
-#include "phys.h"
 #include "network_layer.h"
-#include "transport_layer.h"
+#include "phys.h"
+#include "router.h"
 #include "stats.h"
+#include "transport_layer.h"
 
 
 class arp;
@@ -36,13 +38,12 @@ private:
 	uint64_t *ipv6_tx_err   { nullptr };
 
 public:
-	ipv6(stats *const s, ndp *const indp, const any_addr & myip);
+	ipv6(stats *const s, ndp *const indp, const any_addr & myip, router *const r);
 	virtual ~ipv6();
 
 	any_addr get_addr() const override { return myip; }
 
-	bool transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
-	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
+	bool transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
 
 	virtual int get_max_packet_size() const override { return default_pdev->get_max_packet_size() - 40 /* 40 = size of IPv6 header */; }
 

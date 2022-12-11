@@ -31,6 +31,7 @@
 #include "sip.h"
 #include "udp.h"
 #include "ntp.h"
+#include "router.h"
 #include "syslog.h"
 #include "snmp.h"
 #include "sctp.h"
@@ -306,6 +307,8 @@ int main(int argc, char *argv[])
 	std::vector<application *>     applications;
 	std::vector<socks_proxy *>     socks_proxies;
 
+	router r(&s);
+
 	mdns *mdns_ = new mdns();
 	applications.push_back(mdns_);
 
@@ -325,7 +328,7 @@ int main(int argc, char *argv[])
 		std::string type = cfg_str(interface, "type", "network interface type (e.g. \"ethernet\", \"ppp\" or \"slip\")", true, "ethernet");
 
 		std::string mac = cfg_str(interface, "mac-address", "MAC address", true, "52:34:84:16:44:22");
-		any_addr my_mac = type == "kiss" ? ax25_address(mac.c_str(), true, false).get_any_addr() : parse_address(mac.c_str(), 6, ":", 16);
+		any_addr my_mac = type == "kiss" ? ax25_address(mac.c_str(), true, false).get_any_addr() : parse_address(mac, 6, ":", 16);
 
 		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
 
@@ -377,7 +380,7 @@ int main(int argc, char *argv[])
 				bool emulate_modem_xp = cfg_bool(interface, "emulate-modem-xp", "emulate AT-set modem / XP direct link", true, false);
 
 				std::string oa_str = cfg_str(interface, "opponent-address", "opponent IPv4 address", false, "192.168.3.2");
-				any_addr opponent_address = parse_address(oa_str.c_str(), 4, ".", 10);
+				any_addr opponent_address = parse_address(oa_str, 4, ".", 10);
 
 				dev = new phys_ppp(i + 1, &s, dev_name, bps_setting, my_mac, emulate_modem_xp, opponent_address);
 			}
@@ -387,7 +390,7 @@ int main(int argc, char *argv[])
 		}
 		else if (type == "udp") {
 			std::string addr_str = cfg_str(interface, "ip-address", "local IP address", false, "192.168.3.1");
-			any_addr local_addr = parse_address(addr_str.c_str(), 4, ".", 10);
+			any_addr local_addr = parse_address(addr_str, 4, ".", 10);
 
 			int port = cfg_int(interface, "port", "UDP port number", true, 9899);
 
@@ -408,27 +411,29 @@ int main(int argc, char *argv[])
 		any_addr mgmt_addr;
 
 		// ipv4
+		arp *a = nullptr;
 		try {
 			const libconfig::Setting & ipv4_ = interface.lookup("ipv4");
 
 			std::string ma_str = cfg_str(ipv4_, "my-address", "IPv4 address", false, "192.168.3.2");
-			any_addr my_address = parse_address(ma_str.c_str(), 4, ".", 10);
+
+			any_addr my_address = parse_address(ma_str, 4, ".", 10);
 
 			mgmt_addr = my_address;
 
 			std::string gw_str = cfg_str(ipv4_, "gateway-mac-address", "default gateway MAC address", false, "42:20:16:2b:6f:9b");
-			any_addr gw_mac = type == "kiss" ? ax25_address(gw_str.c_str(), true, false).get_any_addr() : parse_address(gw_str.c_str(), 6, ":", 16);
+			any_addr gw_mac = type == "kiss" ? ax25_address(gw_str.c_str(), true, false).get_any_addr() : parse_address(gw_str, 6, ":", 16);
 
 			printf("%zu] Will listen on IPv4 address: %s\n", i, my_address.to_str().c_str());
 
-			arp *a = new arp(&s, my_mac, my_address, gw_mac);
+			a = new arp(&s, dev, my_mac, my_address, gw_mac);
 			a->add_static_entry(dev, my_mac, my_address);
 			dev->register_protocol(0x0806, a);
 
-			ipv4 *ipv4_instance = new ipv4(&s, a, my_address);
+			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, &r);
 			protocols.push_back(ipv4_instance);
 
-			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "if to enable icmp", true, true);
+			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "wether to enable icmp", true, true);
 			icmp *icmp_ = nullptr;
 			if (use_icmp) {
 				icmp_ = new icmp(&s);
@@ -485,7 +490,7 @@ int main(int argc, char *argv[])
 			const libconfig::Setting & ipv6_ = interface.lookup("ipv6");
 
 			std::string ma_str = cfg_str(ipv6_, "my-address", "IPv6 address", false, "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
-			any_addr my_ip6 = parse_address(ma_str.c_str(), 16, ":", 16);
+			any_addr my_ip6 = parse_address(ma_str, 16, ":", 16);
 
 			if (mgmt_addr.is_set() == false)
 				mgmt_addr = my_ip6;
@@ -496,7 +501,7 @@ int main(int argc, char *argv[])
 			ndp_->add_static_entry(dev, my_mac, my_ip6);
 			protocols.push_back(ndp_);
 
-			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6);
+			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6, &r);
 			protocols.push_back(ipv6_instance);
 
 			dev->register_protocol(0x86dd, ipv6_instance);
@@ -532,8 +537,42 @@ int main(int argc, char *argv[])
 			// just fine
 		}
 
+		try {
+			const libconfig::Setting & routes = interface.lookup("routes");
+			size_t n_routes = routes.getLength();
+
+			for(size_t i=0; i<n_routes; i++) {
+				const libconfig::Setting & route = routes[i];
+
+				std::string ip_family = str_tolower(cfg_str(route, "ip-family", "IP family: ipv4 or ipv6", false, "ipv4"));
+
+				if (ip_family == "ipv4") {
+					std::string network_str = cfg_str(route, "network", "network address", false, "");
+					any_addr network = parse_address(network_str, 4, ".", 10);
+
+					std::string netmask_str = cfg_str(route, "netmask", "netmask", false, "");
+					any_addr netmask = parse_address(netmask_str, 4, ".", 10);
+					uint8_t netmask_bytes[4] { 0 };
+					netmask.get(netmask_bytes, sizeof netmask_bytes);
+
+					r.add_router_ipv4(network, netmask_bytes, dev, a);
+				}
+				else if (ip_family == "ipv6") {
+					// TODO
+				}
+				else {
+					error_exit(false, "ip-family must be either ipv4 or ipv6");
+				}
+
+				// r->add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, arp *const iarp);
+			}
+		}
+		catch(const libconfig::SettingNotFoundException &nfex) {
+			// just fine
+		}
+
 		// LLDP
-		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1);
+		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, &r);
 		protocols.push_back(lldp_);
 		dev->register_protocol(0x0806, lldp_);
 
@@ -557,7 +596,7 @@ int main(int argc, char *argv[])
 				const libconfig::Setting & s_dns = socks.lookup("dns");
 
 				std::string dns_u_ip_str = cfg_str(s_dns, "host", "upstream DNS server", false, "");
-				any_addr upstream_dns_server = parse_address(dns_u_ip_str.c_str(), 4, ".", 10);
+				any_addr upstream_dns_server = parse_address(dns_u_ip_str, 4, ".", 10);
 
 				dns *dns_ = nullptr;
 
@@ -611,7 +650,7 @@ int main(int argc, char *argv[])
 		const libconfig::Setting & s_ntp = root.lookup("ntp");
 
 		std::string ntp_u_ip_str = cfg_str(s_ntp, "upstream-ip-address", "upstream NTP server", false, "");
-		any_addr upstream_ntp_server = parse_address(ntp_u_ip_str.c_str(), 4, ".", 10);
+		any_addr upstream_ntp_server = parse_address(ntp_u_ip_str, 4, ".", 10);
 
 		int port = cfg_int(s_ntp, "port", "udp port to listen on", true, 123);
 

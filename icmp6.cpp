@@ -124,7 +124,7 @@ void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, 
 		if (dst_mac)
 			dynamic_cast<ipv6 *>(idev)->transmit_packet(*dst_mac, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
 		else
-			idev->transmit_packet(dst_ip, src_ip, 0x3a, out, out_size, nullptr);
+			idev->transmit_packet({ }, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
 	}
 
 	delete [] out;
@@ -135,7 +135,7 @@ void icmp6::send_packet_router_soliciation() const
 	DOLOG(ll_debug, "ICMP6: send router sollicitation (%s)\n", my_ip.to_str().c_str());
 
 	uint8_t dst_mac[6] = { 0x33, 0x33, all_router_multicast_addr[12], all_router_multicast_addr[13], all_router_multicast_addr[14], all_router_multicast_addr[15] };
-	any_addr adst_mac(dst_mac, 6);
+	any_addr adst_mac(any_addr::mac, dst_mac);
 
 	uint8_t source_link_layer_address[8] = { 0x01, 0x01 };
 	my_mac.get(&source_link_layer_address[2], 6);

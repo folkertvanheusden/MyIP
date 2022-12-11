@@ -30,7 +30,7 @@ uint16_t tcp_udp_checksum(const any_addr & src_addr, const any_addr & dst_addr, 
 {
 	uint16_t checksum { 0 };
 
-	if (dst_addr.get_len() == 16) {  // IPv6
+	if (dst_addr.get_len() == 16 && src_addr.get_len() == 16) {  // IPv6
 		size_t temp_len = 40 + len + (len & 1);
 		uint8_t *temp = new uint8_t[temp_len]();
 
@@ -51,7 +51,7 @@ uint16_t tcp_udp_checksum(const any_addr & src_addr, const any_addr & dst_addr, 
 
 		delete [] temp;
 	}
-	else {  // IPv4
+	else if (dst_addr.get_len() == 4 && src_addr.get_len() == 4) {  // IPv4
 		size_t temp_len = 12 + len + (len & 1);
 		uint8_t *temp = new uint8_t[temp_len]();
 
@@ -69,6 +69,9 @@ uint16_t tcp_udp_checksum(const any_addr & src_addr, const any_addr & dst_addr, 
 		checksum = ip_checksum((const uint16_t *)temp, temp_len / 2);
 
 		delete [] temp;
+	}
+	else {
+		DOLOG(ll_debug, "tcp_udp_checksum: cannot handle \"%s\" to \"%s\"\n", src_addr.to_str().c_str(), dst_addr.to_str().c_str());
 	}
 
 	return checksum;

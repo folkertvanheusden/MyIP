@@ -529,7 +529,7 @@ void sctp::operator()()
 bool sctp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size)
 {
 	// 0x84 is SCTP protocol number
-	return idev->transmit_packet(dst_ip, src_ip, 0x84, payload, pl_size, nullptr);
+	return idev->transmit_packet({ }, dst_ip, src_ip, 0x84, payload, pl_size, nullptr);
 }
 
 bool sctp::send_data(session *const s_in, buffer_in & payload)
