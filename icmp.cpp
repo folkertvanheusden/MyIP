@@ -4,6 +4,7 @@
 #include "icmp.h"
 #include "ipv4.h"
 #include "log.h"
+#include "time.h"
 #include "utils.h"
 
 
@@ -42,41 +43,59 @@ void icmp::operator()()
 		const uint8_t *const p = pkt->get_data();
 		const int size = pkt->get_size();
 
-		stats_inc_counter(icmp_requests);
-	
-		if (p[0] != 8) { // not an echo request?
-			DOLOG(ll_debug, "ICMP: dropping packet (type %d code %d)\n", p[0], p[1]);
+		if (size < 8) {
+			DOLOG(ll_debug, "ICMP: not a valid packet (too small (%d bytes))\n", size);
 			delete pkt;
 			continue;
 		}
 
-		stats_inc_counter(icmp_req_ping);
+		stats_inc_counter(icmp_requests);
 
 		const any_addr src_ip = pkt->get_src_addr();
 		DOLOG(ll_debug, "ICMP: request by %s\n", src_ip.to_str().c_str());
 
 		uint8_t *reply = duplicate(p, size);
 
-		reply[0] = 0; // echo reply
+		if (p[0] == 8) {  // echo request
+			stats_inc_counter(icmp_req_ping);
 
-		reply[2] = reply[3] = 0;
-		uint16_t checksum = ip_checksum((const uint16_t *)reply, size / 2);
-		reply[2] = checksum >> 8;
-		reply[3] = checksum;
+			reply[0] = 0; // echo reply
+		}
+		else if (p[0] == 13 && size >= 20) {  // timestamp request
+			reply[0] = 14; // timestamp reply
 
-		auto header = pkt->get_header();
-		uint8_t *header_copy = duplicate(header.first, header.second);
+			uint32_t reply_ts = ms_since_midnight();
 
-		uint16_t identification = (header_copy[4] << 8) | header_copy[5];
-		identification++;
-		header_copy[4] = identification >> 8;
-		header_copy[5] = identification;
+			reply[12] = reply[16] = reply_ts >> 24;
+			reply[13] = reply[17] = reply_ts >> 16;
+			reply[14] = reply[18] = reply_ts >>  8;
+			reply[15] = reply[19] = reply_ts;
+		}
+		else {
+			DOLOG(ll_debug, "ICMP: dropping packet (type %d code %d)\n", p[0], p[1]);
+			delete pkt;
+			continue;
+		}
 
-		if (idev)
+		if (idev) {
+			auto     header      = pkt->get_header();
+			uint8_t *header_copy = duplicate(header.first, header.second);
+
+			uint16_t identification = ((header_copy[4] << 8) | header_copy[5]) + 1;
+
+			header_copy[4] = identification >> 8;
+			header_copy[5] = identification;
+
+			reply[2] = reply[3] = 0;
+			uint16_t checksum = ip_checksum(reinterpret_cast<const uint16_t *>(reply), size / 2);
+			reply[2] = checksum >> 8;
+			reply[3] = checksum;
+
 			// this is the correct order! sending a reply!
 			idev->transmit_packet({ }, src_ip, pkt->get_dst_addr(), 0x01, reply, size, header_copy);
 
-		delete [] header_copy;
+			delete [] header_copy;
+		}
 
 		delete [] reply;
 
