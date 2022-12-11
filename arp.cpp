@@ -16,10 +16,10 @@ using namespace std::chrono_literals;
 
 constexpr size_t pkts_max_size { 256 };
 
-arp::arp(stats *const s, phys *const interface, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) :
+arp::arp(stats *const s, phys *const interface, const any_addr & my_mac, const any_addr & my_ip) :
 	address_cache(s),
 	mac_resolver(s, nullptr),
-	gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip),
+	my_mac(my_mac), my_ip(my_ip),
 	interface(interface)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
@@ -169,10 +169,14 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 
 			work.erase(it);
 
-			if (result.has_value())
+			if (result.has_value()) {
+				DOLOG(ll_debug, "ARP: resolved %s in %dms\n", ip.to_str().c_str(), get_ms() - start_ts);
+
 				update_cache(result.value(), ip, interface);
-			else
+			}
+			else {
 				DOLOG(ll_debug, "ARP: no MAC found for %s\n", ip.to_str().c_str());
+			}
 
 			return result;
 		}

@@ -14,6 +14,7 @@ router::router(stats *const s)
 {
 	pkts = new fifo<queued_packet *>(s, "router", pkts_max_size);
 
+	// TODO: # threads
 	router_th = new std::thread(std::ref(*this));
 }
 
@@ -52,7 +53,7 @@ bool check_subnet(const any_addr & addr, const any_addr & network, const int cid
 	return true;
 }
 
-void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4], phys *const interface, arp *const iarp)
+void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, phys *const interface, arp *const iarp)
 {
 	assert(network.get_family() == any_addr::ipv4);
 
@@ -65,6 +66,7 @@ void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4],
 	re.mask.ipv4_netmask[3] = netmask[3];
 	re.interface            = interface;
 	re.mac_lookup.iarp      = iarp;
+	re.default_gateway      = gateway;
 
 	std::unique_lock<std::shared_mutex> lck(table_lock);
 	table.push_back(re);
@@ -150,6 +152,7 @@ void router::operator()()
 
 		if (po.value()->src_mac.has_value() == false) {
 			if (re->network_address.get_family() == any_addr::ipv4) {
+				// must always succeed, see main where a static rarp is setup
 				po.value()->src_mac = re->mac_lookup.iarp->get_mac(po.value()->src_ip);
 			}
 			else {
@@ -163,6 +166,11 @@ void router::operator()()
 			}
 			else {
 				// TODO: ipv6
+			}
+
+			// not found? try the default gateway
+			if (po.value()->dst_mac.has_value() == false && re->default_gateway.has_value()) {
+				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->default_gateway.value());
 			}
 		}
 
