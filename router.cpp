@@ -27,6 +27,31 @@ router::~router()
 	delete pkts;
 }
 
+bool check_subnet(const any_addr & addr, const any_addr & network, const int cidr)
+{
+	uint8_t addr_bytes[16] { 0 };
+	addr.get(addr_bytes, sizeof addr_bytes);
+
+	uint8_t network_bytes[16] { 0 };
+	network.get(network_bytes, sizeof network_bytes);
+
+	int n_bytes = cidr / 8;
+
+	if (std::equal(addr_bytes, addr_bytes + n_bytes, network_bytes) == false)
+		return false;
+
+	int n_bits = cidr & 7;
+
+	if (n_bits) {
+		int mask = 0xff << (8 - n_bits);
+
+		if ((addr_bytes[n_bytes] & mask) != (network_bytes[n_bytes] & mask))
+			return false;
+	}
+
+	return true;
+}
+
 void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4], phys *const interface, arp *const iarp)
 {
 	assert(network.get_family() == any_addr::ipv4);
@@ -40,6 +65,21 @@ void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4],
 	re.mask.ipv4_netmask[3] = netmask[3];
 	re.interface            = interface;
 	re.mac_lookup.iarp      = iarp;
+
+	std::unique_lock<std::shared_mutex> lck(table_lock);
+	table.push_back(re);
+}
+
+void router::add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, arp *const iarp)  // TODO
+{
+	assert(network.get_family() == any_addr::ipv6);
+
+	router_entry re;
+
+	re.network_address         = network;
+	re.mask.ipv6_prefix_length = cidr;
+	re.interface               = interface;
+	// TODO re.mac_lookup.iarp         = iarp;
 
 	std::unique_lock<std::shared_mutex> lck(table_lock);
 	table.push_back(re);
@@ -95,21 +135,20 @@ void router::operator()()
 				}
 			}
 			else if (entry.network_address.get_family() == any_addr::ipv6) {
+				if (check_subnet(po.value()->src_ip, entry.network_address, entry.mask.ipv6_prefix_length))
+					re = &entry;
 			}
 			else {
-				DOLOG(ll_warning, "Unknown address family in queued packet (%d)\n", entry.network_address.get_family());
+				DOLOG(ll_warning, "router::operator: unknown address family in queued packet (%d)\n", entry.network_address.get_family());
 			}
 		}
 
 		if (!re) {
-			DOLOG(ll_debug, "No route for packet\n");
+			DOLOG(ll_debug, "router::operator: no route for packet\n");
 			continue;
 		}
 
 		if (po.value()->src_mac.has_value() == false) {
-			// TODO lookup src MAC address
-			// TODO arp - should be statically stored -> depending on outgoing interface
-
 			if (re->network_address.get_family() == any_addr::ipv4) {
 				po.value()->src_mac = re->mac_lookup.iarp->get_mac(po.value()->src_ip);
 			}
@@ -129,11 +168,11 @@ void router::operator()()
 
 		if (po.value()->src_mac.has_value() && po.value()->dst_mac.has_value()) {
 			if (!re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len)) {
-				DOLOG(ll_debug, "Cannot transmit_packet\n");
+				DOLOG(ll_debug, "router::operator: cannot transmit_packet\n");
 			}
 		}
 		else {
-			// TODO log
+			DOLOG(ll_warning, "router::operator: no src or dst MAC address\n");
 		}
 
 		delete po.value();

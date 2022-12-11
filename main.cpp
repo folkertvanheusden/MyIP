@@ -558,7 +558,12 @@ int main(int argc, char *argv[])
 					r.add_router_ipv4(network, netmask_bytes, dev, a);
 				}
 				else if (ip_family == "ipv6") {
-					// TODO
+					std::string network_str = cfg_str(route, "network", "network address", false, "");
+					any_addr network = parse_address(network_str, 16, ":", 16);
+
+					int cidr = cfg_int(route, "cidr", "cidr", false, 0);
+
+					r.add_router_ipv6(network, cidr, dev, a);  // TODO
 				}
 				else {
 					error_exit(false, "ip-family must be either ipv4 or ipv6");

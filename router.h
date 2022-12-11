@@ -73,6 +73,7 @@ public:
 	virtual ~router();
 
 	void add_router_ipv4(const any_addr & network, const uint8_t netmask[4], phys *const interface, arp *const iarp);
+	void add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, arp *const iarp);
 
 	void set_default_interface(phys *const default_interface) { this->default_interface = default_interface; }
 

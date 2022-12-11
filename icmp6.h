@@ -6,6 +6,8 @@
 #include "any_addr.h"
 #include "transport_layer.h"
 #include "icmp.h"
+#include "mac_resolver.h"
+#include "ndp.h"
 #include "stats.h"
 
 class icmp6 : public icmp
@@ -22,6 +24,8 @@ private:
 
 	any_addr all_router_multicast_addr;
 
+	ndp      *indp           { nullptr };
+
 public:
 	explicit icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip);
 	virtual ~icmp6();
@@ -32,6 +36,8 @@ public:
 	void send_packet_neighbor_advertisement(const any_addr & peer_mac, const any_addr & peer_ip) const;
 	void send_packet_neighbor_solicitation(const any_addr & peer_ip) const;
 	void send_ping_reply(const packet *const pkt) const;
+
+	// TODO: send_neighbor_request ofzoiets
 
 	void send_destination_port_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const p) const override;
 

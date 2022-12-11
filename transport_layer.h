@@ -22,7 +22,7 @@ protected:
 
 	fifo<const packet *>      *pkts      { nullptr };
 
-	network_layer                  *idev      { nullptr };
+	network_layer             *idev      { nullptr };
 
 public:
 	transport_layer(stats *const s, const std::string & stats_name);
