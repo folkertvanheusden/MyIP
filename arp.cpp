@@ -96,12 +96,12 @@ void arp::operator()()
 
 bool arp::send_request(const any_addr & ip)
 {
-	uint8_t request[26] { 0 };
+	uint8_t request[28] { 0 };
 
 	request[1] = 1;  // HTYPE (Ethernet)
 
 	// PTYPE
-	if (ip.get_len() == 4)
+	if (ip.get_family() == any_addr::ipv4)
 		request[2] = 0x08, request[3] = 0x00;
 	else {
 		DOLOG(ll_warning, "ARP::send_request: don't know how to resolve \"%s\" with ARP", ip.to_str().c_str());
@@ -116,7 +116,9 @@ bool arp::send_request(const any_addr & ip)
 
 	my_mac.get(&request[8], 6);  // SHA
 
-	ip.get(&request[14], 4);  // SPA
+	my_ip.get(&request[14], 4);  // SPA
+
+	ip.get(&request[24], 4);  // TPA
 
 	any_addr dest_mac(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
 
@@ -127,8 +129,8 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 {
 	assert(ip.get_family() == any_addr::ipv4);
 
-	if ((ip[0] & 0x0f) == 224)  // multicast
-		return any_addr(any_addr::ipv4, std::initializer_list<uint8_t>({ 0x01, 0x00, 0x5e, ip[1], ip[2], ip[3] }).begin());
+	if ((ip[0] & 0xf0) == 224)  // multicast
+		return any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0x01, 0x00, 0x5e, ip[1], ip[2], ip[3] }).begin());
 
 	auto cache_result = query_cache(ip);
 
@@ -155,7 +157,7 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 		auto it = work.find(ip);
 
 		if (it == work.end()) {  // should not happen
-			DOLOG(ll_warning, "ARP: nothing queued for %s\n", ip.to_str().c_str());
+			DOLOG(ll_error, "ARP: nothing queued for %s\n", ip.to_str().c_str());
 
 			return { };
 		}
@@ -167,6 +169,8 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 
 			if (result.has_value())
 				update_cache(result.value(), ip, interface);
+			else
+				DOLOG(ll_debug, "ARP: no MAC found for %s\n", ip.to_str().c_str());
 
 			return result;
 		}
