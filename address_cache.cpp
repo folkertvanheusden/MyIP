@@ -76,7 +76,7 @@ void address_cache::cache_cleaner()
 	uint64_t prev = get_us();
 
 	while(!cleaner_stop_flag) {
-		myusleep(500000); // to allow quickly termination
+		myusleep(500000); // to allow quick termination
 
 		uint64_t now = get_us();
 		if (now - prev < 30000000)
