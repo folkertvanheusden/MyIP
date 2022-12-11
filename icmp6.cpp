@@ -163,8 +163,10 @@ void icmp6::send_packet_neighbor_solicitation(const any_addr & check_ip) const
 	uint8_t payload[16] { 0x00 };
 	check_ip.get(&payload[0], 16);
 
-	constexpr const char d_addr[] = "FF02:0000:0000:0000:000:0001:ffa5:b9c6";
-	any_addr peer_ip { parse_address(d_addr, 16, ":", 16) };
+	char buffer[128] { 0 };
+	snprintf(buffer, sizeof buffer, "FF02:0000:0000:0000:000:0001:%02x%02x:%02x%02x",
+			check_ip[12], check_ip[13], check_ip[14], check_ip[15]);
+	any_addr peer_ip { parse_address(buffer, 16, ":", 16) };
 
 	send_packet(&adst_mac, peer_ip, my_ip, 135, 0, 0x00000000, payload, sizeof payload);
 }
