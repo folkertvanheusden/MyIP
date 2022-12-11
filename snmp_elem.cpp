@@ -3,7 +3,7 @@
 #include <cstring>
 
 #include "log.h"
-#include "snmp-elem.h"
+#include "snmp_elem.h"
 
 snmp_elem::snmp_elem()
 {

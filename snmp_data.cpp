@@ -2,7 +2,7 @@
 #include <assert.h>
 
 #include "log.h"
-#include "snmp-data.h"
+#include "snmp_data.h"
 #include "str.h"
 #include "time.h"
 

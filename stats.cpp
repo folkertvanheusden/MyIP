@@ -10,7 +10,7 @@
 
 #include "log.h"
 #include "stats.h"
-#include "stats-utils.h"
+#include "stats_utils.h"
 
 
 constexpr char shm_name[] = "/myip";

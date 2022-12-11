@@ -1,5 +1,5 @@
 // (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
-#include "fifo-stats.h"
+#include "fifo_stats.h"
 
 fifo_stats::fifo_stats(const int range_max)
 {

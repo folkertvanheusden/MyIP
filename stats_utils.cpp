@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <string>
 
-#include "fifo-stats.h"
+#include "fifo_stats.h"
 #include "str.h"
 
 
