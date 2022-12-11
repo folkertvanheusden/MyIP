@@ -114,9 +114,7 @@ void lldp::operator()()
 
 	int      sleep_cnt = 0;
 
-	uint8_t  target_mac[] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e };
-
-	any_addr dest_mac(any_addr::mac, target_mac);
+	any_addr dest_mac(any_addr::mac, std::initializer_list<uint8_t>({ 0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e }).begin());
 
 	auto     payload      = generate_lldp_packet();
 
