@@ -23,8 +23,8 @@ arp::arp(stats *const s, phys *const interface, const any_addr & my_mac, const a
 	interface(interface)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
-	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
-	arp_for_me       = s->register_stat("arp_for_me",   "1.3.6.1.2.1.4.57850.1.11.2");
+	arp_requests = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
+	arp_for_me   = s->register_stat("arp_for_me",   "1.3.6.1.2.1.4.57850.1.11.2");
 
 	arp_th = new std::thread(std::ref(*this));
 }
@@ -118,16 +118,17 @@ bool arp::send_request(const any_addr & ip)
 
 	ip.get(&request[14], 4);  // SPA
 
-	constexpr const uint8_t broadcast_mac[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-
-	any_addr dest_mac(any_addr::mac, broadcast_mac);
+	any_addr dest_mac(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
 
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
 }
 
 std::optional<any_addr> arp::get_mac(const any_addr & ip)
 {
-	assert(ip.get_family() == any_addr::ipv4 || ip.get_family() == any_addr::ipv6);
+	assert(ip.get_family() == any_addr::ipv4);
+
+	if ((ip[0] & 0x0f) == 224)  // multicast
+		return any_addr(any_addr::ipv4, std::initializer_list<uint8_t>({ 0x01, 0x00, 0x5e, ip[1], ip[2], ip[3] }).begin());
 
 	auto cache_result = query_cache(ip);
 
@@ -142,15 +143,19 @@ std::optional<any_addr> arp::get_mac(const any_addr & ip)
 	if (!send_request(ip))
 		return { };
 
-	uint32_t start_ts = get_ms();
+	DOLOG(ll_debug, "ARP::get_mac waiting for %s\n", ip.to_str().c_str());
+
+	uint64_t start_ts = get_ms();
 
 	std::unique_lock lck(work_lock);
 
-	for(;!stop_flag && get_ms() - start_ts < 1000;) {
+	work.insert({ ip, { } });
+
+	while(!stop_flag && get_ms() - start_ts < 1000) {
 		auto it = work.find(ip);
 
 		if (it == work.end()) {  // should not happen
-			DOLOG(ll_warning, "ARP: nothing queued for %s", ip.to_str().c_str());
+			DOLOG(ll_warning, "ARP: nothing queued for %s\n", ip.to_str().c_str());
 
 			return { };
 		}

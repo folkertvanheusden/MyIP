@@ -166,6 +166,7 @@ void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const
 					m->add_protocol(u4, port, hostname);
 			}
 
+#if 0  // TODO: mdns class does not support ipv6 yet
 			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
 			if (i6) {
 				udp *const u6 = dynamic_cast<udp *>(i6->get_transport_layer(0x11));
@@ -173,6 +174,7 @@ void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const
 				if (u6)
 					m->add_protocol(u6, port, hostname);
 			}
+#endif
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
