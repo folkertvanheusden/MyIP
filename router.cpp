@@ -14,8 +14,11 @@ router::router(stats *const s, const int n_threads)
 {
 	pkts = new fifo<queued_packet *>(s, "router", pkts_max_size);
 
-	for(int i=0; i<n_threads; i++)
-		router_ths.push_back(new std::thread(std::ref(*this)));
+	for(int i=0; i<n_threads; i++) {
+		std::thread *th = new std::thread(std::ref(*this));
+		assert(th);
+		router_ths.push_back(th);
+	}
 }
 
 router::~router()

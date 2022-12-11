@@ -311,7 +311,7 @@ int main(int argc, char *argv[])
 	std::vector<application *>     applications;
 	std::vector<socks_proxy *>     socks_proxies;
 
-	router r(&s, n_router_threads);
+	router *r = new router(&s, n_router_threads);
 
 	mdns *mdns_ = new mdns();
 	applications.push_back(mdns_);
@@ -426,7 +426,7 @@ int main(int argc, char *argv[])
 
 			int n_ipv4_threads = cfg_int(ipv4_, "n-ipv4-threads", "number of ipv4 threads", true, 4);
 
-			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, &r, n_ipv4_threads);
+			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, r, n_ipv4_threads);
 			protocols.push_back(ipv4_instance);
 
 			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "wether to enable icmp", true, true);
@@ -507,7 +507,7 @@ int main(int argc, char *argv[])
 
 			int n_ipv6_threads = cfg_int(ipv6_, "n-ipv6-threads", "number of ipv6 threads", true, 4);
 
-			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6, &r, n_ipv6_threads);
+			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6, r, n_ipv6_threads);
 			protocols.push_back(ipv6_instance);
 
 			dev->register_protocol(0x86dd, ipv6_instance);
@@ -572,7 +572,7 @@ int main(int argc, char *argv[])
 					if (gateway_str.empty() == false)
 						gateway = parse_address(gateway_str, 4, ".", 10);
 
-					r.add_router_ipv4(network, netmask_bytes, gateway, dev, a);
+					r->add_router_ipv4(network, netmask_bytes, gateway, dev, a);
 				}
 				else if (ip_family == "ipv6") {
 					std::string network_str = cfg_str(route, "network", "network address", false, "");
@@ -580,7 +580,7 @@ int main(int argc, char *argv[])
 
 					int cidr = cfg_int(route, "cidr", "cidr", false, 0);
 
-					r.add_router_ipv6(network, cidr, dev, a);  // TODO
+					r->add_router_ipv6(network, cidr, dev, a);  // TODO
 				}
 				else {
 					error_exit(false, "ip-family must be either ipv4 or ipv6");
@@ -594,7 +594,7 @@ int main(int argc, char *argv[])
 		}
 
 		// LLDP
-		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, &r);
+		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, r);
 		protocols.push_back(lldp_);
 		dev->register_protocol(0x0806, lldp_);
 
@@ -932,7 +932,7 @@ int main(int argc, char *argv[])
 	DOLOG(ll_info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating fase 1\n");
 
-	int n_actions = 1;  // 1 for 'us'
+	int n_actions = 2;  // 1 for 'us' & router
 
 	for(auto & s : socks_proxies)
 		s-> ask_to_stop(), n_actions++;
@@ -956,6 +956,9 @@ int main(int argc, char *argv[])
 
 	progress(n_actions_done++, n_actions);
 	delete us;
+
+	progress(n_actions_done++, n_actions);
+	delete r;
 
 	for(auto & s : socks_proxies) {
 		progress(n_actions_done++, n_actions);
