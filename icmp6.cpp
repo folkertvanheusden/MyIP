@@ -54,6 +54,7 @@ void icmp6::operator()()
 		else if (type == 133) {  // router soliciation
 			// can be ignored
 		}
+		// TODO: neighbor advertisement -> indp
 		else if (type == 135) {  // neighbor soliciation
 			send_packet_neighbor_advertisement(pkt->get_src_mac_addr(), pkt->get_src_addr());
 		}
@@ -65,6 +66,7 @@ void icmp6::operator()()
 	}
 }
 
+// TODO: std::optional for dst_mac
 void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const uint32_t reserved, const uint8_t *const payload, const int payload_size) const
 {
 	stats_inc_counter(icmp6_transmit);
@@ -122,7 +124,7 @@ void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, 
 
 	if (idev) {
 		if (dst_mac)
-			dynamic_cast<ipv6 *>(idev)->transmit_packet(*dst_mac, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
+			idev->transmit_packet(*dst_mac, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
 		else
 			idev->transmit_packet({ }, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
 	}
