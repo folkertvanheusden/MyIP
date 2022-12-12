@@ -943,14 +943,16 @@ int main(int argc, char *argv[])
 
 	int n_actions = 2;  // 1 for 'us' & router
 
-	for(auto & s : socks_proxies)
-		s-> ask_to_stop(), n_actions++;
-
-	for(auto & a : applications)
-		a->ask_to_stop(), n_actions++;
+	r->stop();
 
 	for(auto & d : devs)
 		d->ask_to_stop(), n_actions++;
+
+	for(auto & s : socks_proxies)
+		s->ask_to_stop(), n_actions++;
+
+	for(auto & a : applications)
+		a->ask_to_stop(), n_actions++;
 
 	for(auto & p : transport_layers)
 		p->ask_to_stop(), n_actions++;

@@ -34,6 +34,11 @@ router::~router()
 	delete pkts;
 }
 
+void router::stop()
+{
+	stop_flag = true;
+}
+
 bool check_subnet(const any_addr & addr, const any_addr & network, const int cidr)
 {
 	uint8_t addr_bytes[16] { 0 };

@@ -67,13 +67,15 @@ private:
 
 	fifo<queued_packet *>  *pkts { nullptr };
 
-	std::vector<std::thread *> router_ths { nullptr };
+	std::vector<std::thread *> router_ths;
 
 	std::atomic_bool stop_flag { false };
 
 public:
 	router(stats *const s, const int n_threads);
 	virtual ~router();
+
+	void stop();
 
 	void add_router_ipv4(const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, phys *const interface, arp *const iarp);
 	void add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, arp *const iarp);
