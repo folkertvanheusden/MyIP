@@ -48,6 +48,8 @@ void icmp6::operator()()
 
 		stats_inc_counter(icmp6_requests);
 
+		DOLOG(ll_debug, "ICMP6: request by %s\n", pkt->get_src_addr().to_str().c_str());
+
 		const uint8_t type = p[0];
 
 		if (type == 128) {  // echo request (PING)
@@ -56,7 +58,6 @@ void icmp6::operator()()
 		else if (type == 133) {  // router soliciation
 			// can be ignored
 		}
-		// TODO: neighbor advertisement -> indp
 		else if (type == 135) {  // neighbor soliciation
 			send_packet_neighbor_advertisement(pkt->get_src_mac_addr(), pkt->get_src_addr());
 		}
