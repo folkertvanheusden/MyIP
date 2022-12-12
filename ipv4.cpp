@@ -210,5 +210,5 @@ void ipv4::operator()()
 void ipv4::send_ttl_exceeded(const packet *const pkt) const
 {
 	if (icmp_)
-		icmp_->send_packet(pkt->get_src_addr(), pkt->get_dst_addr(), 11, 0, pkt);
+		icmp_->send_ttl_exceeded(pkt);
 }

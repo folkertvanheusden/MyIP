@@ -5,19 +5,16 @@
 #include "transport_layer.h"
 #include "stats.h"
 
+
 class icmp : public transport_layer
 {
-private:
-	uint64_t *icmp_requests { nullptr }, *icmp_req_ping { nullptr };
-	uint64_t *icmp_transmit { nullptr };
-
 public:
-	icmp(stats *const s, const int n_threads);
+	icmp(stats *const s);
 	virtual ~icmp();
 
-	void send_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const packet *const p) const;
+	virtual void send_destination_port_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const p) const = 0;
 
-	virtual void send_destination_port_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const p) const;
+	virtual void operator()() override = 0;
 
-	virtual void operator()() override;
+	virtual void send_ttl_exceeded(const packet *const pkt) const = 0;
 };
