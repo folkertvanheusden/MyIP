@@ -99,7 +99,7 @@ void router::add_router_ipv6(const any_addr & network, const int cidr, phys *con
 	table.push_back(re);
 }
 
-bool router::route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size)
+bool router::route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_mac, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size)
 {
 	queued_packet *qp = new queued_packet(payload, pl_size);
 
@@ -107,6 +107,8 @@ bool router::route_packet(const std::optional<any_addr> & override_dst_mac, cons
 
 	assert(override_dst_mac.has_value() == false || override_dst_mac.value().get_family() == any_addr::mac);
 	qp->dst_mac    = override_dst_mac;
+
+	qp->src_mac    = src_mac;
 
 	assert(dst_ip.get_family() == any_addr::ipv4 || dst_ip.get_family() == any_addr::ipv6);
 	qp->dst_ip     = dst_ip;
@@ -174,13 +176,21 @@ void router::operator()()
 		}
 
 		if (po.value()->dst_mac.has_value() == false) {
-			if (re->network_address.get_family() == any_addr::ipv4)
+			if (re->network_address.get_family() == any_addr::ipv4) {
+				DOLOG(ll_debug, "router::operator: ARPing MAC for %s\n", po.value()->dst_ip.to_str().c_str());
+
 				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->dst_ip);
-			else
+			}
+			else {
+				DOLOG(ll_debug, "router::operator: NDPing MAC for %s\n", po.value()->dst_ip.to_str().c_str());
+
 				po.value()->dst_mac = re->mac_lookup.indp->get_mac(re->interface, po.value()->dst_ip);
+			}
 
 			// not found? try the default gateway
 			if (po.value()->dst_mac.has_value() == false && re->default_gateway.has_value()) {
+				DOLOG(ll_debug, "router::operator: MAC for %s not found, resolving default gateway (%s)\n", po.value()->dst_ip.to_str().c_str(), re->default_gateway.value().to_str().c_str());
+
 				if (re->network_address.get_family() == any_addr::ipv4)
 					po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, re->default_gateway.value());
 				else
@@ -188,14 +198,12 @@ void router::operator()()
 			}
 		}
 
-		if (po.value()->src_mac.has_value() && po.value()->dst_mac.has_value()) {
-			if (re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
-				DOLOG(ll_debug, "router::operator: cannot transmit_packet\n");
-			}
-		}
-		else {
-			DOLOG(ll_warning, "router::operator: no src or dst MAC address\n");
-		}
+		if (po.value()->src_mac.has_value() == false)
+			DOLOG(ll_warning, "router::operator: no src MAC address\n");
+		else if (po.value()->dst_mac.has_value() == false)
+			DOLOG(ll_warning, "router::operator: no dst MAC address\n");
+		else if (re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false)
+			DOLOG(ll_debug, "router::operator: cannot transmit_packet\n");
 
 		delete po.value();
 	}
