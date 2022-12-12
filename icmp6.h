@@ -16,8 +16,6 @@ private:
 	const any_addr my_mac;
 	const any_addr my_ip;
 
-	std::thread *th2 { nullptr };
-
 	uint64_t *icmp6_requests { nullptr };
 	uint64_t *icmp6_transmit { nullptr };
 	uint64_t *icmp6_error    { nullptr };

@@ -516,7 +516,7 @@ int main(int argc, char *argv[])
 			bool use_icmp = cfg_bool(ipv6_, "use-icmp", "wether to enable icmp", true, true);
 			icmp6 *icmp6_ = nullptr;
 			if (use_icmp) {
-				int n_threads = cfg_int(ipv6_, "n-icmp-threads", "number of icmp threads", true, 8);
+				int n_threads = cfg_int(ipv6_, "n-icmp-threads", "number of icmp6 threads", true, 8);
 
 				icmp6_ = new icmp6(&s, my_mac, my_ip6, n_threads);
 				transport_layers.push_back(icmp6_);
