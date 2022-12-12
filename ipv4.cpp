@@ -17,11 +17,11 @@
 
 ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r, const int n_threads) : network_layer(s, "ipv4", r), iarp(iarp), myip(myip)
 {
-	ip_n_pkt      = s->register_stat("ip_n_pkt", "1.3.6.1.2.1.4.3");
+	ip_n_pkt      = s->register_stat("ip_n_pkt",      "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
 	ip_n_del      = s->register_stat("ip_n_delivers", "1.3.6.1.2.1.4.9");
-	ip_n_out_req  = s->register_stat("ip_n_out_req", "1.3.6.1.2.1.4.10");
-	ip_n_out_disc = s->register_stat("ip_n_out_req", "1.3.6.1.2.1.4.11");
+	ip_n_out_req  = s->register_stat("ip_n_out_req",  "1.3.6.1.2.1.4.10");
+	ip_n_out_disc = s->register_stat("ip_n_out_req",  "1.3.6.1.2.1.4.11");
 	ipv4_n_pkt    = s->register_stat("ipv4_n_pkt");
 	ipv4_not_me   = s->register_stat("ipv4_not_me");
 	ipv4_ttl_ex   = s->register_stat("ipv4_ttl_ex");

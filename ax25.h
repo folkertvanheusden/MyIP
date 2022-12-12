@@ -16,6 +16,8 @@
 #include "stats.h"
 
 
+class ipv4;
+
 class ax25_address
 {
 private:
@@ -96,13 +98,18 @@ public:
 class ax25 : public network_layer
 {
 private:
-	std::thread   *th { nullptr };
+	std::thread   *th           { nullptr };
+
+	ipv4          *ip4          { nullptr };
+
+	uint64_t      *ax25_total   { nullptr };
+	uint64_t      *ax25_invalid { nullptr };
 
 	// AX.25 callsign is mapped to a MAC
 	const any_addr my_mac;
 
 public:
-	ax25(stats *const s, const any_addr & my_mac, router *const r);
+	ax25(stats *const s, const any_addr & my_mac, const any_addr & my_ip, router *const r);
 	virtual ~ax25();
 
 	any_addr get_addr() const override { return any_addr(); }
