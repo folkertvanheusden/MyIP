@@ -153,7 +153,7 @@ any_addr ax25_address::get_any_addr() const
 {
 	auto addr = generate_address();
 
-	any_addr out(addr.first, addr.second);
+	any_addr out(any_addr::ax25, addr.first);
 
 	free(addr.first);
 

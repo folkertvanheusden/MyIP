@@ -257,7 +257,7 @@ void phys_kiss::operator()()
 			packet *p = new packet(ts, ax25_packet.get_from().get_any_addr(), ax25_packet.get_from().get_any_addr(), ax25_packet.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
 
 			auto it = prot_map.find(0x0800);  // TODO
-			it->second->queue_packet(this, p);
+			it->second->queue_incoming_packet(this, p);
 		}
 
 		free(p);
