@@ -54,7 +54,7 @@ void address_cache::add_static_entry(phys *const interface, const any_addr & mac
         update_cache(mac, ip, interface, true);
 }
 
-std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip)
+std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip, const bool static_entry)
 {
 	const std::shared_lock<std::shared_mutex> lock(cache_lock);
 
@@ -63,6 +63,11 @@ std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip)
 	auto it = cache.find(ip);
 	if (it == cache.end()) {
 		DOLOG(ll_warning, "address_cache: %s is not in the cache\n", ip.to_str().c_str());
+		return { nullptr, nullptr };
+	}
+
+	if (static_entry && it.second.ts != 0) {
+		DOLOG(ll_warning, "address_cache: %s is not a static entry\n", ip.to_str().c_str());
 		return { nullptr, nullptr };
 	}
 
