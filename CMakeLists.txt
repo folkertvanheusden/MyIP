@@ -27,6 +27,7 @@ add_executable(myip
 	hash.cpp
 	http.cpp
 	icmp.cpp
+	icmp4.cpp
 	icmp6.cpp
 	ipv4.cpp
 	ipv6.cpp

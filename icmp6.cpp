@@ -11,7 +11,7 @@
 #include "utils.h"
 
 
-icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const int n_threads) : icmp(s, n_threads), my_mac(my_mac), my_ip(my_ip)
+icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const int n_threads) : icmp(s), my_mac(my_mac), my_ip(my_ip)
 {
 	icmp6_requests = s->register_stat("icmp6_requests");
 	icmp6_transmit = s->register_stat("icmp6_transmit");
@@ -211,4 +211,11 @@ void icmp6::router_solicitation()
 void icmp6::send_destination_port_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const pkt) const
 {
 	send_packet(&pkt->get_src_mac_addr(), pkt->get_src_addr(), my_ip, 1, 4, 0, nullptr, 0);
+}
+
+void icmp6::send_ttl_exceeded(const packet *const pkt) const
+{
+	auto pl = pkt->get_payload();
+
+	send_packet(&pkt->get_src_mac_addr(), pkt->get_src_addr(), my_ip, 11, 0, 0, pl.first, pl.second);
 }

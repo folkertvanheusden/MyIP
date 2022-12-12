@@ -22,7 +22,7 @@
 #include "dns.h"
 #include "ipv4.h"
 #include "ipv6.h"
-#include "icmp.h"
+#include "icmp4.h"
 #include "icmp6.h"
 #include "log.h"
 #include "arp.h"
@@ -443,7 +443,7 @@ int main(int argc, char *argv[])
 			if (use_icmp) {
 				int n_threads = cfg_int(ipv4_, "n-icmp-threads", "number of icmp threads", true, 8);
 
-				icmp_ = new icmp(&s, n_threads);
+				icmp_ = new icmp4(&s, n_threads);
 
 				ipv4_instance->register_protocol(0x01, icmp_);
 				// rather ugly but that's how IP works
