@@ -8,6 +8,8 @@
 #include "stats.h"
 
 
+class icmp6;
+
 typedef struct {
 	uint64_t ts;
 	any_addr addr;
@@ -16,6 +18,8 @@ typedef struct {
 class ndp : public mac_resolver
 {
 private:
+	icmp6    *icmp6_        { nullptr };
+
         uint64_t *ndp_cache_req { nullptr };
 	uint64_t *ndp_cache_hit { nullptr };
 
@@ -26,6 +30,8 @@ private:
 public:
 	ndp(stats *const s);
 	virtual ~ndp();
+
+	void register_icmp6(icmp6 *const icmp6_) { this->icmp6_ = icmp6_; }
 
 	void operator()() override;
 };
