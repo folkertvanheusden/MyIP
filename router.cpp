@@ -4,6 +4,7 @@
 
 #include "any_addr.h"
 #include "arp.h"
+#include "ndp.h"
 #include "phys.h"
 #include "router.h"
 
@@ -83,7 +84,7 @@ void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4],
 	table.push_back(re);
 }
 
-void router::add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, arp *const iarp)  // TODO
+void router::add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, ndp *const indp)
 {
 	assert(network.get_family() == any_addr::ipv6);
 
@@ -92,7 +93,7 @@ void router::add_router_ipv6(const any_addr & network, const int cidr, phys *con
 	re.network_address         = network;
 	re.mask.ipv6_prefix_length = cidr;
 	re.interface               = interface;
-	// TODO re.mac_lookup.iarp         = iarp;
+	re.mac_lookup.indp         = indp;
 
 	std::unique_lock<std::shared_mutex> lck(table_lock);
 	table.push_back(re);
@@ -167,21 +168,22 @@ void router::operator()()
 				po.value()->src_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->src_ip);
 			}
 			else {
-				// TODO: ipv6
+				po.value()->src_mac = re->mac_lookup.indp->get_mac(re->interface, po.value()->src_ip);
 			}
 		}
 
 		if (po.value()->dst_mac.has_value() == false) {
-			if (re->network_address.get_family() == any_addr::ipv4) {
+			if (re->network_address.get_family() == any_addr::ipv4)
 				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->dst_ip);
-			}
-			else {
-				// TODO: ipv6
-			}
+			else
+				po.value()->dst_mac = re->mac_lookup.indp->get_mac(re->interface, po.value()->dst_ip);
 
 			// not found? try the default gateway
 			if (po.value()->dst_mac.has_value() == false && re->default_gateway.has_value()) {
-				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, re->default_gateway.value());
+				if (re->network_address.get_family() == any_addr::ipv4)
+					po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, re->default_gateway.value());
+				else
+					po.value()->dst_mac = re->mac_lookup.indp->get_mac(re->interface, re->default_gateway.value());
 			}
 		}
 

@@ -499,6 +499,7 @@ int main(int argc, char *argv[])
 		}
 
 		// ipv6
+		ndp *ndp_ = nullptr;
 		try {
 			const libconfig::Setting & ipv6_ = interface.lookup("ipv6");
 
@@ -510,7 +511,7 @@ int main(int argc, char *argv[])
 
 			printf("%zu] Will listen on IPv6 address: %s\n", i, my_ip6.to_str().c_str());
 
-			ndp *ndp_ = new ndp(&s);
+			ndp_ = new ndp(&s);
 			ndp_->add_static_entry(dev, my_mac, my_ip6);
 			protocols.push_back(ndp_);
 
@@ -531,6 +532,8 @@ int main(int argc, char *argv[])
 
 				ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
 				ipv6_instance->register_icmp(icmp6_);
+
+				ndp_->register_icmp6(icmp6_);
 			}
 
 			bool use_tcp = cfg_bool(ipv6_, "use-tcp", "wether to enable tcp", true, true);
@@ -589,7 +592,7 @@ int main(int argc, char *argv[])
 
 					int cidr = cfg_int(route, "cidr", "cidr", false, 0);
 
-					r->add_router_ipv6(network, cidr, dev, a);  // TODO
+					r->add_router_ipv6(network, cidr, dev, ndp_);
 				}
 				else {
 					error_exit(false, "ip-family must be either ipv4 or ipv6");

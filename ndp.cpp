@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "any_addr.h"
+#include "icmp6.h"
 #include "ndp.h"
 #include "phys.h"
 
@@ -25,8 +26,13 @@ void ndp::operator()()
 
 bool ndp::send_request(const any_addr & ip)
 {
+	if (icmp6_)
+		icmp6_->send_packet_neighbor_solicitation(ip);
+	else
+		DOLOG(ll_error, "ndp::send_request: no icmp6 instance available\n");
 }
 
 std::optional<any_addr> ndp::check_special_ip_addresses(const any_addr & ip)
 {
+	return { };
 }
