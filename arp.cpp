@@ -1,20 +1,26 @@
 // (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
-#include <chrono>
 #include <string.h>
 
 #include "arp.h"
 #include "log.h"
 #include "net.h"
 #include "phys.h"
+#include "router.h"
+#include "time.h"
 #include "utils.h"
 
 
-arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const any_addr & gw_mac) : network_layer(s, "arp"), address_cache(s), gw_mac(gw_mac), my_mac(my_mac), my_ip(my_ip)
+constexpr size_t pkts_max_size { 256 };
+
+arp::arp(stats *const s, phys *const interface, const any_addr & my_mac, const any_addr & my_ip) :
+	mac_resolver(s, nullptr),
+	my_mac(my_mac), my_ip(my_ip),
+	interface(interface)
 {
 	// 1.3.6.1.2.1.4.57850.1.11: arp
-	arp_requests     = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
-	arp_for_me       = s->register_stat("arp_for_me", "1.3.6.1.2.1.4.57850.1.11.2");
+	arp_requests = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
+	arp_for_me   = s->register_stat("arp_for_me",   "1.3.6.1.2.1.4.57850.1.11.2");
 
 	arp_th = new std::thread(std::ref(*this));
 }
@@ -22,13 +28,9 @@ arp::arp(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const 
 arp::~arp()
 {
 	arp_stop_flag = true;
+
 	arp_th->join();
 	delete arp_th;
-}
-
-void arp::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
-{
-	update_cache(mac, ip, interface, true);
 }
 
 void arp::operator()()
@@ -47,9 +49,9 @@ void arp::operator()()
 		const uint8_t *const p = pkt->get_data();
 		const int size = pkt->get_size();
 
-		if (p[6] == 0x00 && p[7] == 0x01 && // request
-		    p[2] == 0x08 && p[3] == 0x00 && // ethertype IPv4
-		    any_addr(&p[24], 4) == my_ip) // I am the target?
+		if (p[6] == 0x00 && p[7] == 0x01 &&  // request
+		    p[2] == 0x08 && p[3] == 0x00 &&  // ethertype IPv4
+		    any_addr(any_addr::ipv4, &p[24]) == my_ip)  // am I the target?
 		{
 			stats_inc_counter(arp_for_me);
 
@@ -68,6 +70,18 @@ void arp::operator()()
 
 			delete [] reply;
 		}
+		else if (p[6] == 0x00 && p[7] == 0x02 &&  // reply
+			any_addr(any_addr::mac, &p[8]) == my_mac) {  // check sender
+
+			std::unique_lock lck(work_lock);
+
+			auto it = work.find(any_addr(any_addr::ipv4, &p[24]));  // IP to resolve
+
+			if (it != work.end())
+				it->second = mac_resolver_result({ any_addr(any_addr::ipv4, &p[18]) });
+
+			work_cv.notify_all();
+		}
 		else {
 			// DOLOG(ll_debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(&p[24], 4).to_str().c_str());
 		}
@@ -76,37 +90,41 @@ void arp::operator()()
 	}
 }
 
-std::pair<phys *, any_addr *> arp::query_cache(const any_addr & ip)
+bool arp::send_request(const any_addr & ip)
 {
-	assert(ip.get_len() == 4);
+	uint8_t request[28] { 0 };
 
-	// multicast
-	if (ip[0] >= 224 && ip[0] <= 239) {
-		stats_inc_counter(address_cache_hit);
+	request[1] = 1;  // HTYPE (Ethernet)
 
-		constexpr uint8_t multicast_mac[] { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-		return { default_pdev, new any_addr(multicast_mac, 6) };
+	// PTYPE
+	if (ip.get_family() == any_addr::ipv4)
+		request[2] = 0x08, request[3] = 0x00;
+	else {
+		DOLOG(ll_warning, "ARP::send_request: don't know how to resolve \"%s\" with ARP", ip.to_str().c_str());
+		return false;
 	}
 
-	auto rc = address_cache::query_cache(ip);
-	if (rc.second)
-		return rc;
+	request[4] = 6;  // HLEN
+	request[5] = ip.get_len();  // PLEN
 
-	return { default_pdev, new any_addr(gw_mac) };
+	request[6] = 0x00;  // OPER
+	request[7] = 1;
+
+	my_mac.get(&request[8], 6);  // SHA
+
+	my_ip.get(&request[14], 4);  // SPA
+
+	ip.get(&request[24], 4);  // TPA
+
+	any_addr dest_mac(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
+
+	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
 }
 
-bool arp::transmit_packet(const any_addr & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+std::optional<any_addr> arp::check_special_ip_addresses(const any_addr & ip)
 {
-	// for requests
-	assert(0);
+	if ((ip[0] & 0xf0) == 224)  // multicast
+		return any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0x01, 0x00, 0x5e, ip[1], ip[2], ip[3] }).begin());
 
-	return false;
-}
-
-bool arp::transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
-{
-	// for requests
-	assert(0);
-
-	return false;
+	return { };
 }

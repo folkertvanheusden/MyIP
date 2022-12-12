@@ -12,7 +12,7 @@
 #include "ipv4.h"
 #include "log.h"
 #include "stats_tracker.h"
-#include "stats-utils.h"
+#include "stats_utils.h"
 #include "str.h"
 #include "tcp.h"
 #include "types.h"

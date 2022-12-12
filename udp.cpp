@@ -9,12 +9,12 @@
 #include "utils.h"
 
 
-udp::udp(stats *const s, icmp *const icmp_) : transport_layer(s, "udp"), icmp_(icmp_)
+udp::udp(stats *const s, icmp *const icmp_, const int n_threads) : transport_layer(s, "udp"), icmp_(icmp_)
 {
 	udp_requests = s->register_stat("udp_requests");
 	udp_refused  = s->register_stat("udp_refused");
 
-	for(int i=0; i<4; i++)
+	for(int i=0; i<n_threads; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
 }
 
@@ -131,7 +131,7 @@ bool udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 
 	bool rc = false;
 	if (idev)
-		rc = idev->transmit_packet(dst_ip, src_ip, 0x11, out, out_size, nullptr);
+		rc = idev->transmit_packet({ }, dst_ip, src_ip, 0x11, out, out_size, nullptr);
 
 	delete [] out;
 

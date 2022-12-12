@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#include "fifo-stats.h"
+#include "fifo_stats.h"
 #include "stats.h"
 
 template <typename T>

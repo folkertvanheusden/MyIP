@@ -20,7 +20,7 @@
 #include "dns.h"
 #include "ipv4.h"
 #include "ipv6.h"
-#include "icmp.h"
+#include "icmp4.h"
 #include "icmp6.h"
 #include "log.h"
 #include "arp.h"
@@ -29,6 +29,7 @@
 #include "sip.h"
 #include "udp.h"
 #include "ntp.h"
+#include "router.h"
 #include "syslog.h"
 #include "snmp.h"
 #include "sctp.h"
@@ -165,6 +166,7 @@ void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const
 					m->add_protocol(u4, port, hostname);
 			}
 
+#if 0  // TODO: mdns class does not support ipv6 yet
 			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
 			if (i6) {
 				udp *const u6 = dynamic_cast<udp *>(i6->get_transport_layer(0x11));
@@ -172,6 +174,7 @@ void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const
 				if (u6)
 					m->add_protocol(u6, port, hostname);
 			}
+#endif
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
@@ -279,6 +282,8 @@ int main(int argc, char *argv[])
 	std::string run_at_started;
 	std::string unix_domain_socket;
 
+	int n_router_threads = 0;
+
 	{
 		const libconfig::Setting & environment = root.lookup("environment");
 
@@ -296,6 +301,8 @@ int main(int argc, char *argv[])
 		run_at_started = cfg_str(environment, "ifup", "program to run when network interfaces are up", true, "");
 
 		unix_domain_socket = cfg_str(environment, "stats-socket", "used by myipnetstats", true, "");
+
+		n_router_threads = cfg_int(environment, "n-router-threads", "number of router threads", true, 8);
 	}
 
 	// used for clean-up
@@ -303,6 +310,8 @@ int main(int argc, char *argv[])
 	std::vector<transport_layer *> transport_layers;
 	std::vector<application *>     applications;
 	std::vector<socks_proxy *>     socks_proxies;
+
+	router *r = new router(&s, n_router_threads);
 
 	mdns *mdns_ = new mdns();
 	applications.push_back(mdns_);
@@ -323,7 +332,7 @@ int main(int argc, char *argv[])
 		std::string type = cfg_str(interface, "type", "network interface type (e.g. \"ethernet\", \"ppp\" or \"slip\")", true, "ethernet");
 
 		std::string mac = cfg_str(interface, "mac-address", "MAC address", true, "52:34:84:16:44:22");
-		any_addr my_mac = parse_address(mac.c_str(), 6, ":", 16);
+		any_addr my_mac = parse_address(mac, 6, ":", 16);
 
 		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
 
@@ -368,7 +377,7 @@ int main(int argc, char *argv[])
 				bool emulate_modem_xp = cfg_bool(interface, "emulate-modem-xp", "emulate AT-set modem / XP direct link", true, false);
 
 				std::string oa_str = cfg_str(interface, "opponent-address", "opponent IPv4 address", false, "192.168.3.2");
-				any_addr opponent_address = parse_address(oa_str.c_str(), 4, ".", 10);
+				any_addr opponent_address = parse_address(oa_str, 4, ".", 10);
 
 				dev = new phys_ppp(i + 1, &s, dev_name, bps_setting, my_mac, emulate_modem_xp, opponent_address);
 			}
@@ -378,7 +387,7 @@ int main(int argc, char *argv[])
 		}
 		else if (type == "udp") {
 			std::string addr_str = cfg_str(interface, "ip-address", "local IP address", false, "192.168.3.1");
-			any_addr local_addr = parse_address(addr_str.c_str(), 4, ".", 10);
+			any_addr local_addr = parse_address(addr_str, 4, ".", 10);
 
 			int port = cfg_int(interface, "port", "UDP port number", true, 9899);
 
@@ -399,30 +408,33 @@ int main(int argc, char *argv[])
 		any_addr mgmt_addr;
 
 		// ipv4
+		arp *a = nullptr;
 		try {
 			const libconfig::Setting & ipv4_ = interface.lookup("ipv4");
 
 			std::string ma_str = cfg_str(ipv4_, "my-address", "IPv4 address", false, "192.168.3.2");
-			any_addr my_address = parse_address(ma_str.c_str(), 4, ".", 10);
+
+			any_addr my_address = parse_address(ma_str, 4, ".", 10);
 
 			mgmt_addr = my_address;
 
-			std::string gw_str = cfg_str(ipv4_, "gateway-mac-address", "default gateway MAC address", false, "42:20:16:2b:6f:9b");
-			any_addr gw_mac = parse_address(gw_str.c_str(), 6, ":", 16);
-
 			printf("%zu] Will listen on IPv4 address: %s\n", i, my_address.to_str().c_str());
 
-			arp *a = new arp(&s, my_mac, my_address, gw_mac);
+			a = new arp(&s, dev, my_mac, my_address);
 			a->add_static_entry(dev, my_mac, my_address);
 			dev->register_protocol(0x0806, a);
 
-			ipv4 *ipv4_instance = new ipv4(&s, a, my_address);
+			int n_ipv4_threads = cfg_int(ipv4_, "n-ipv4-threads", "number of ipv4 threads", true, 4);
+
+			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, r, n_ipv4_threads);
 			protocols.push_back(ipv4_instance);
 
-			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "if to enable icmp", true, true);
+			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "wether to enable icmp", true, true);
 			icmp *icmp_ = nullptr;
 			if (use_icmp) {
-				icmp_ = new icmp(&s);
+				int n_threads = cfg_int(ipv4_, "n-icmp-threads", "number of icmp threads", true, 8);
+
+				icmp_ = new icmp4(&s, n_threads);
 
 				ipv4_instance->register_protocol(0x01, icmp_);
 				// rather ugly but that's how IP works
@@ -433,7 +445,9 @@ int main(int argc, char *argv[])
 
 			bool use_tcp = cfg_bool(ipv4_, "use-tcp", "wether to enable tcp", true, true);
 			if (use_tcp) {
-				tcp *t = new tcp(&s, icmp_, 64);
+				int n_threads = cfg_int(ipv4_, "n-tcp-threads", "number of tcp threads", true, 8);
+
+				tcp *t = new tcp(&s, icmp_, n_threads);
 				ipv4_instance->register_protocol(0x06, t);
 
 				ipv4_tcp = t;
@@ -447,7 +461,9 @@ int main(int argc, char *argv[])
 			if (use_sctp) {
 				DOLOG(ll_debug, "Adding SCTP to IPv4\n");
 
-				sctp *sctp_ = new sctp(&s, icmp_);
+				int n_threads = cfg_int(ipv4_, "n-sctp-threads", "number of sctp threads", true, 8);
+
+				sctp *sctp_ = new sctp(&s, icmp_, n_threads);
 				ipv4_instance->register_protocol(0x84, sctp_);
 
 				transport_layers.push_back(sctp_);
@@ -457,7 +473,9 @@ int main(int argc, char *argv[])
 
 			bool use_udp = cfg_bool(ipv4_, "use-udp", "wether to enable udp", true, true);
 			if (use_udp) {
-				udp *u = new udp(&s, icmp_);
+				int n_threads = cfg_int(ipv4_, "n-udp-threads", "number of udp threads", true, 8);
+
+				udp *u = new udp(&s, icmp_, n_threads);
 				ipv4_instance->register_protocol(0x11, u);
 
 				transport_layers.push_back(u);
@@ -472,22 +490,25 @@ int main(int argc, char *argv[])
 		}
 
 		// ipv6
+		ndp *ndp_ = nullptr;
 		try {
 			const libconfig::Setting & ipv6_ = interface.lookup("ipv6");
 
 			std::string ma_str = cfg_str(ipv6_, "my-address", "IPv6 address", false, "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
-			any_addr my_ip6 = parse_address(ma_str.c_str(), 16, ":", 16);
+			any_addr my_ip6 = parse_address(ma_str, 16, ":", 16);
 
 			if (mgmt_addr.is_set() == false)
 				mgmt_addr = my_ip6;
 
 			printf("%zu] Will listen on IPv6 address: %s\n", i, my_ip6.to_str().c_str());
 
-			ndp *ndp_ = new ndp(&s);
+			ndp_ = new ndp(&s);
 			ndp_->add_static_entry(dev, my_mac, my_ip6);
 			protocols.push_back(ndp_);
 
-			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6);
+			int n_ipv6_threads = cfg_int(ipv6_, "n-ipv6-threads", "number of ipv6 threads", true, 4);
+
+			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6, r, n_ipv6_threads);
 			protocols.push_back(ipv6_instance);
 
 			dev->register_protocol(0x86dd, ipv6_instance);
@@ -495,16 +516,22 @@ int main(int argc, char *argv[])
 			bool use_icmp = cfg_bool(ipv6_, "use-icmp", "wether to enable icmp", true, true);
 			icmp6 *icmp6_ = nullptr;
 			if (use_icmp) {
-				icmp6_ = new icmp6(&s, my_mac, my_ip6);
+				int n_threads = cfg_int(ipv6_, "n-icmp-threads", "number of icmp6 threads", true, 8);
+
+				icmp6_ = new icmp6(&s, my_mac, my_ip6, n_threads);
 				transport_layers.push_back(icmp6_);
 
 				ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
 				ipv6_instance->register_icmp(icmp6_);
+
+				ndp_->register_icmp6(icmp6_);
 			}
 
 			bool use_tcp = cfg_bool(ipv6_, "use-tcp", "wether to enable tcp", true, true);
 			if (use_tcp) {
-				tcp *t6 = new tcp(&s, icmp6_, 64);
+				int n_threads = cfg_int(ipv6_, "n-tcp-threads", "number of tcp threads", true, 8);
+
+				tcp *t6 = new tcp(&s, icmp6_, n_threads);
 				ipv6_instance->register_protocol(0x06, t6);  // TCP
 				transport_layers.push_back(t6);
 
@@ -513,7 +540,9 @@ int main(int argc, char *argv[])
 
 			bool use_udp = cfg_bool(ipv6_, "use-udp", "wether to enable udp", true, true);
 			if (use_udp) {
-				udp *u = new udp(&s, icmp6_);
+				int n_threads = cfg_int(ipv6_, "n-udp-threads", "number of udp threads", true, 8);
+
+				udp *u = new udp(&s, icmp6_, n_threads);
 				ipv6_instance->register_protocol(0x11, u);
 
 				transport_layers.push_back(u);
@@ -523,8 +552,52 @@ int main(int argc, char *argv[])
 			// just fine
 		}
 
+		try {
+			const libconfig::Setting & routes = interface.lookup("routes");
+			size_t n_routes = routes.getLength();
+
+			for(size_t i=0; i<n_routes; i++) {
+				const libconfig::Setting & route = routes[i];
+
+				std::string ip_family = str_tolower(cfg_str(route, "ip-family", "IP family: ipv4 or ipv6", false, "ipv4"));
+
+				if (ip_family == "ipv4") {
+					std::string network_str = cfg_str(route, "network", "network address", false, "");
+					any_addr network = parse_address(network_str, 4, ".", 10);
+
+					std::string netmask_str = cfg_str(route, "netmask", "netmask", false, "");
+					any_addr netmask = parse_address(netmask_str, 4, ".", 10);
+					uint8_t netmask_bytes[4] { 0 };
+					netmask.get(netmask_bytes, sizeof netmask_bytes);
+
+					std::string gateway_str = cfg_str(route, "gateway", "default-gateway address", true, "");
+					std::optional<any_addr> gateway;
+					if (gateway_str.empty() == false)
+						gateway = parse_address(gateway_str, 4, ".", 10);
+
+					r->add_router_ipv4(network, netmask_bytes, gateway, dev, a);
+				}
+				else if (ip_family == "ipv6") {
+					std::string network_str = cfg_str(route, "network", "network address", false, "");
+					any_addr network = parse_address(network_str, 16, ":", 16);
+
+					int cidr = cfg_int(route, "cidr", "cidr", false, 0);
+
+					r->add_router_ipv6(network, cidr, dev, ndp_);
+				}
+				else {
+					error_exit(false, "ip-family must be either ipv4 or ipv6");
+				}
+
+				// r->add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, arp *const iarp);
+			}
+		}
+		catch(const libconfig::SettingNotFoundException &nfex) {
+			// just fine
+		}
+
 		// LLDP
-		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1);
+		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, r);
 		protocols.push_back(lldp_);
 		dev->register_protocol(0x0806, lldp_);
 
@@ -548,7 +621,7 @@ int main(int argc, char *argv[])
 				const libconfig::Setting & s_dns = socks.lookup("dns");
 
 				std::string dns_u_ip_str = cfg_str(s_dns, "host", "upstream DNS server", false, "");
-				any_addr upstream_dns_server = parse_address(dns_u_ip_str.c_str(), 4, ".", 10);
+				any_addr upstream_dns_server = parse_address(dns_u_ip_str, 4, ".", 10);
 
 				dns *dns_ = nullptr;
 
@@ -602,7 +675,7 @@ int main(int argc, char *argv[])
 		const libconfig::Setting & s_ntp = root.lookup("ntp");
 
 		std::string ntp_u_ip_str = cfg_str(s_ntp, "upstream-ip-address", "upstream NTP server", false, "");
-		any_addr upstream_ntp_server = parse_address(ntp_u_ip_str.c_str(), 4, ".", 10);
+		any_addr upstream_ntp_server = parse_address(ntp_u_ip_str, 4, ".", 10);
 
 		int port = cfg_int(s_ntp, "port", "udp port to listen on", true, 123);
 
@@ -862,16 +935,18 @@ int main(int argc, char *argv[])
 	DOLOG(ll_info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating fase 1\n");
 
-	int n_actions = 1;  // 1 for 'us'
+	int n_actions = 2;  // 1 for 'us' & router
 
-	for(auto & s : socks_proxies)
-		s-> ask_to_stop(), n_actions++;
-
-	for(auto & a : applications)
-		a->ask_to_stop(), n_actions++;
+	r->stop();
 
 	for(auto & d : devs)
 		d->ask_to_stop(), n_actions++;
+
+	for(auto & s : socks_proxies)
+		s->ask_to_stop(), n_actions++;
+
+	for(auto & a : applications)
+		a->ask_to_stop(), n_actions++;
 
 	for(auto & p : transport_layers)
 		p->ask_to_stop(), n_actions++;
@@ -886,6 +961,9 @@ int main(int argc, char *argv[])
 
 	progress(n_actions_done++, n_actions);
 	delete us;
+
+	progress(n_actions_done++, n_actions);
+	delete r;
 
 	for(auto & s : socks_proxies) {
 		progress(n_actions_done++, n_actions);

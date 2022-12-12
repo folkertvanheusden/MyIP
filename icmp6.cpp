@@ -11,7 +11,7 @@
 #include "utils.h"
 
 
-icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip) : icmp(s), my_mac(my_mac), my_ip(my_ip)
+icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const int n_threads) : icmp(s), my_mac(my_mac), my_ip(my_ip)
 {
 	icmp6_requests = s->register_stat("icmp6_requests");
 	icmp6_transmit = s->register_stat("icmp6_transmit");
@@ -20,15 +20,19 @@ icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip) : 
 	constexpr const char rs_addr[] = "FF02:0000:0000:0000:000:0000:0000:0002";
 	all_router_multicast_addr = parse_address(rs_addr, 16, ":", 16);
 
-	th2 = new std::thread(&icmp6::router_solicitation, this);
+	for(int i=0; i<n_threads; i++)
+		ths.push_back(new std::thread(std::ref(*this)));
 }
 
 icmp6::~icmp6()
 {
 	stop_flag = true;
 
-	th2->join();
-	delete th2;
+	for(auto & th : ths) {
+		th->join();
+
+		delete th;
+	}
 }
 
 void icmp6::operator()()
@@ -45,6 +49,8 @@ void icmp6::operator()()
 		const uint8_t *const p = pkt->get_data();
 
 		stats_inc_counter(icmp6_requests);
+
+		DOLOG(ll_debug, "ICMP6: request by %s\n", pkt->get_src_addr().to_str().c_str());
 
 		const uint8_t type = p[0];
 
@@ -65,6 +71,7 @@ void icmp6::operator()()
 	}
 }
 
+// TODO: std::optional for dst_mac
 void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const uint32_t reserved, const uint8_t *const payload, const int payload_size) const
 {
 	stats_inc_counter(icmp6_transmit);
@@ -122,9 +129,9 @@ void icmp6::send_packet(const any_addr *const dst_mac, const any_addr & dst_ip, 
 
 	if (idev) {
 		if (dst_mac)
-			dynamic_cast<ipv6 *>(idev)->transmit_packet(*dst_mac, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
+			idev->transmit_packet(*dst_mac, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
 		else
-			idev->transmit_packet(dst_ip, src_ip, 0x3a, out, out_size, nullptr);
+			idev->transmit_packet({ }, dst_ip, src_ip, 0x3a, out, out_size, nullptr);
 	}
 
 	delete [] out;
@@ -135,7 +142,7 @@ void icmp6::send_packet_router_soliciation() const
 	DOLOG(ll_debug, "ICMP6: send router sollicitation (%s)\n", my_ip.to_str().c_str());
 
 	uint8_t dst_mac[6] = { 0x33, 0x33, all_router_multicast_addr[12], all_router_multicast_addr[13], all_router_multicast_addr[14], all_router_multicast_addr[15] };
-	any_addr adst_mac(dst_mac, 6);
+	any_addr adst_mac(any_addr::mac, dst_mac);
 
 	uint8_t source_link_layer_address[8] = { 0x01, 0x01 };
 	my_mac.get(&source_link_layer_address[2], 6);
@@ -153,6 +160,24 @@ void icmp6::send_packet_neighbor_advertisement(const any_addr & peer_mac, const 
 	memcpy(&payload[16], target_link_layer_address, 8);
 
 	send_packet(&peer_mac, peer_ip, my_ip, 136, 0, 0x60000000, payload, 24);
+}
+
+void icmp6::send_packet_neighbor_solicitation(const any_addr & check_ip) const
+{
+	DOLOG(ll_debug, "icmp6::send_packet_neighbor_solicitation(%s)\n", check_ip.to_str().c_str());
+
+	uint8_t dst_mac[6] = { 0x33, 0x33, all_router_multicast_addr[12], all_router_multicast_addr[13], all_router_multicast_addr[14], all_router_multicast_addr[15] };
+	any_addr adst_mac(any_addr::mac, dst_mac);
+
+	uint8_t payload[16] { 0x00 };
+	check_ip.get(&payload[0], 16);
+
+	char buffer[128] { 0 };
+	snprintf(buffer, sizeof buffer, "FF02:0000:0000:0000:000:0001:%02x%02x:%02x%02x",
+			check_ip[12], check_ip[13], check_ip[14], check_ip[15]);
+	any_addr peer_ip { parse_address(buffer, 16, ":", 16) };
+
+	send_packet(&adst_mac, peer_ip, my_ip, 135, 0, 0x00000000, payload, sizeof payload);
 }
 
 void icmp6::send_ping_reply(const packet *const pkt) const
@@ -186,4 +211,11 @@ void icmp6::router_solicitation()
 void icmp6::send_destination_port_unreachable(const any_addr & dst_ip, const any_addr & src_ip, const packet *const pkt) const
 {
 	send_packet(&pkt->get_src_mac_addr(), pkt->get_src_addr(), my_ip, 1, 4, 0, nullptr, 0);
+}
+
+void icmp6::send_ttl_exceeded(const packet *const pkt) const
+{
+	auto pl = pkt->get_payload();
+
+	send_packet(&pkt->get_src_mac_addr(), pkt->get_src_addr(), my_ip, 11, 0, 0, pl.first, pl.second);
 }

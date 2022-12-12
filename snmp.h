@@ -8,7 +8,7 @@
 
 #include "any_addr.h"
 #include "application.h"
-#include "snmp-data.h"
+#include "snmp_data.h"
 #include "stats.h"
 
 class packet;

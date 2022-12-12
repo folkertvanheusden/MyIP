@@ -6,6 +6,7 @@
 #include "log.h"
 #include "mdns.h"
 #include "str.h"
+#include "time.h"
 
 
 constexpr int ttl = 5;
@@ -240,14 +241,23 @@ void mdns::add_protocol(udp *const interface, const int port, const std::string 
 
 void mdns::operator()()
 {
+	uint64_t prev_ts = 0;
+
 	while(!stop_flag) {
-		sleep(5);
+		uint64_t now = get_ms();
+
+		if (now - prev_ts < 5000) {
+			myusleep(100000);
+			continue;
+		}
+
+		prev_ts = now;
 
 		DOLOG(ll_debug, "MDNS: transmit %zu records\n", protocols.size());
 
 		constexpr uint8_t mc_addr[] { 224, 0, 0, 251 };
 
-		any_addr dst_ip(mc_addr, sizeof mc_addr);
+		any_addr dst_ip(any_addr::ipv4, mc_addr);
 
 		std::unique_lock<std::mutex> lck(lock);
 

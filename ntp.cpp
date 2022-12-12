@@ -176,6 +176,6 @@ void ntp::operator()()
 
 		constexpr uint8_t ip_tgt[] = { 224, 0, 1, 1 };
 
-		u->transmit_packet(any_addr(ip_tgt, 4), 123, my_ip, 123, (const uint8_t *)&msgout, sizeof msgout);
+		u->transmit_packet(any_addr(any_addr::ipv4, ip_tgt), 123, my_ip, 123, (const uint8_t *)&msgout, sizeof msgout);
 	}
 }

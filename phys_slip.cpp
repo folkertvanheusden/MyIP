@@ -176,7 +176,7 @@ void phys_slip::operator()()
 				continue;
 			}
 
-			any_addr src_mac((const uint8_t *)"\0\0\0\0\0\1", 6);
+			any_addr src_mac(any_addr::mac, (const uint8_t *)"\0\0\0\0\0\1");
 
 			DOLOG(ll_debug, "phys_slip: queing packet, size %zu\n", packet_buffer.size());
 
@@ -186,7 +186,7 @@ void phys_slip::operator()()
 			else {
 				packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
 
-				it->second->queue_packet(this, p);
+				it->second->queue_incoming_packet(this, p);
 			}
 
 			packet_buffer.clear();

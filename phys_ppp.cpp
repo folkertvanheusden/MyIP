@@ -294,7 +294,7 @@ void phys_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 			}
 
 			if (type == 0x03) {  // IP address
-				any_addr theirs(data.data() + options_offset, 4);
+				any_addr theirs(any_addr::ipv4, data.data() + options_offset);
 
 				if (theirs == opponent_address) {
 					DOLOG(ll_debug, "phys_ppp: IPCP acking IP address %s\n", theirs.to_str().c_str());
@@ -699,7 +699,7 @@ void phys_ppp::operator()()
 				if (protocol == 0x0021) {  // IP
 					stats_inc_counter(phys_recv_frame);
 
-					any_addr src_mac((const uint8_t *)"\0\0\0\0\0\1", 6);
+					any_addr src_mac(any_addr::mac, reinterpret_cast<const uint8_t *>("\0\0\0\0\0\1"));
 
 					DOLOG(ll_debug, "phys_ppp: queing packet, size %zu\n", packet_buffer.size());
 
@@ -710,7 +710,7 @@ void phys_ppp::operator()()
 						// 4 ppp header, 2 fcs (=crc)
 						packet *p = new packet(src_mac, my_mac, packet_buffer.data() + 4, packet_buffer.size() - (4 + 2), NULL, 0);
 
-						it->second->queue_packet(this, p);
+						it->second->queue_incoming_packet(this, p);
 					}
 				}
 				else if (protocol == 0xc021) {  // LCP

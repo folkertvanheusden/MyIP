@@ -104,7 +104,7 @@ private:
 	bool transmit_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size);
 
 public:
-	sctp(stats *const s, icmp *const icmp_);
+	sctp(stats *const s, icmp *const icmp_, const int n_threads);
 	virtual ~sctp();
 
 	void add_handler(const int port, port_handler_t & sph);
