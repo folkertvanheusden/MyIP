@@ -4,6 +4,7 @@
 #include <mutex>
 #include <optional>
 
+#include "address_cache.h"
 #include "any_addr.h"
 #include "fifo.h"
 #include "network_layer.h"
@@ -11,7 +12,7 @@
 #include "stats.h"
 
 
-class mac_resolver : public network_layer
+class mac_resolver : public address_cache, public network_layer
 {
 protected:
 	class mac_resolver_result {
@@ -25,11 +26,15 @@ protected:
 
 	fifo<fifo_element_t> *pkts { nullptr };
 
+	virtual bool send_request(const any_addr & ip) = 0;
+
+	virtual std::optional<any_addr> check_special_ip_addresses(const any_addr & ip) = 0;
+
 public:
 	mac_resolver(stats *const s, router *const r);
 	virtual ~mac_resolver();
 
-	virtual std::optional<any_addr> get_mac(const any_addr & ip) = 0;
+	std::optional<any_addr> get_mac(phys *const interface, const any_addr & ip);
 
 	any_addr get_addr() const override;
 

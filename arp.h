@@ -4,7 +4,6 @@
 #include <map>
 #include <shared_mutex>
 
-#include "address_cache.h"
 #include "mac_resolver.h"
 #include "network_layer.h"
 #include "phys.h"
@@ -16,7 +15,7 @@ typedef struct {
 	any_addr addr;
 } arp_entry_t;
 
-class arp : public address_cache, public mac_resolver
+class arp : public mac_resolver
 {
 private:
 	const any_addr my_mac;
@@ -30,13 +29,13 @@ private:
 
 	phys *const interface  { nullptr };
 
-	bool send_request(const any_addr & ip);
+	bool send_request(const any_addr & ip) override;
+
+	std::optional<any_addr> check_special_ip_addresses(const any_addr & ip) override;
 
 public:
 	arp(stats *const s, phys *const interface, const any_addr & mymac, const any_addr & myip);
 	virtual ~arp();
-
-	std::optional<any_addr> get_mac(const any_addr & ip) override;
 
 	void operator()() override;
 };

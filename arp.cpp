@@ -1,6 +1,5 @@
 // (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
-#include <chrono>
 #include <string.h>
 
 #include "arp.h"
@@ -12,12 +11,9 @@
 #include "utils.h"
 
 
-using namespace std::chrono_literals;
-
 constexpr size_t pkts_max_size { 256 };
 
 arp::arp(stats *const s, phys *const interface, const any_addr & my_mac, const any_addr & my_ip) :
-	address_cache(s),
 	mac_resolver(s, nullptr),
 	my_mac(my_mac), my_ip(my_ip),
 	interface(interface)
@@ -125,72 +121,10 @@ bool arp::send_request(const any_addr & ip)
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
 }
 
-std::optional<any_addr> arp::get_mac(const any_addr & ip)
+std::optional<any_addr> arp::check_special_ip_addresses(const any_addr & ip)
 {
-	assert(ip.get_family() == any_addr::ipv4);
-
 	if ((ip[0] & 0xf0) == 224)  // multicast
 		return any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0x01, 0x00, 0x5e, ip[1], ip[2], ip[3] }).begin());
-
-	auto cache_result = query_cache(ip);
-
-	if (cache_result.first == interface) {
-		any_addr rc = *cache_result.second;
-
-		delete cache_result.second;
-
-		return rc;
-	}
-
-	if (!send_request(ip))
-		return { };
-
-	DOLOG(ll_debug, "ARP::get_mac waiting for %s\n", ip.to_str().c_str());
-
-	uint64_t start_ts = get_ms();
-
-	std::unique_lock<std::mutex> lck(work_lock);
-
-	work.insert({ ip, { } });
-
-	bool repeated = false;
-
-	while(!stop_flag && get_ms() - start_ts < 1000) {
-		auto it = work.find(ip);
-
-		if (it == work.end()) {  // should not happen
-			DOLOG(ll_error, "ARP: nothing queued for %s\n", ip.to_str().c_str());
-
-			return { };
-		}
-
-		if (it->second.has_value()) {
-			auto result = it->second.value().mac;
-
-			work.erase(it);
-
-			if (result.has_value()) {
-				DOLOG(ll_debug, "ARP: resolved %s in %dms\n", ip.to_str().c_str(), get_ms() - start_ts);
-
-				update_cache(result.value(), ip, interface);
-			}
-			else {
-				DOLOG(ll_debug, "ARP: no MAC found for %s\n", ip.to_str().c_str());
-			}
-
-			return result;
-		}
-
-		if (repeated == false && get_ms() - start_ts >= 500) {
-			repeated = true;
-
-			send_request(ip);
-		}
-
-		work_cv.wait_for(lck, 100ms);
-	}
-
-	DOLOG(ll_debug, "ARP: resolve for %s timeout\n", ip.to_str().c_str());
 
 	return { };
 }
