@@ -66,7 +66,7 @@ std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip, co
 		return { nullptr, nullptr };
 	}
 
-	if (static_entry && it.second.ts != 0) {
+	if (static_entry && it->second.ts != 0) {
 		DOLOG(ll_warning, "address_cache: %s is not a static entry\n", ip.to_str().c_str());
 		return { nullptr, nullptr };
 	}
