@@ -73,6 +73,8 @@ std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip)
 
 void address_cache::cache_cleaner()
 {
+	set_thread_name("myip-acc");
+
 	uint64_t prev = get_us();
 
 	while(!cleaner_stop_flag) {
