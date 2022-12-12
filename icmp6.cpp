@@ -20,17 +20,19 @@ icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip, co
 	constexpr const char rs_addr[] = "FF02:0000:0000:0000:000:0000:0000:0002";
 	all_router_multicast_addr = parse_address(rs_addr, 16, ":", 16);
 
-	// TODO: n_threads
-
-	th2 = new std::thread(&icmp6::router_solicitation, this);
+	for(int i=0; i<n_threads; i++)
+		ths.push_back(new std::thread(std::ref(*this)));
 }
 
 icmp6::~icmp6()
 {
 	stop_flag = true;
 
-	th2->join();
-	delete th2;
+	for(auto & th : ths) {
+		th->join();
+
+		delete th;
+	}
 }
 
 void icmp6::operator()()
