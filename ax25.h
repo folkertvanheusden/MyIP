@@ -1,5 +1,8 @@
+// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
+#include <atomic>
+#include <map>
 #include <optional>
 #include <stdint.h>
 #include <string>
@@ -7,6 +10,10 @@
 
 #include "any_addr.h"
 #include "buffer_in.h"
+#include "network_layer.h"
+#include "phys.h"
+#include "router.h"
+#include "stats.h"
 
 
 class ax25_address
@@ -50,7 +57,7 @@ public:
 	any_addr    get_any_addr() const;
 };
 
-class ax25
+class ax25_packet
 {
 private:
 	bool                      valid    { false };
@@ -63,9 +70,9 @@ private:
 	buffer_in                 data;
 
 public:
-	ax25();
-	ax25(const std::vector<uint8_t> & in);
-	~ax25();
+	ax25_packet();
+	ax25_packet(const std::vector<uint8_t> & in);
+	~ax25_packet();
 
 	void set_from   (const std::string & callsign, const char ssid, const bool end_mark, const bool repeated);
 	void set_from   (const any_addr & callsign);
@@ -83,4 +90,26 @@ public:
 	bool         get_valid() const { return valid; }
 
 	std::pair<uint8_t *, size_t> generate_packet() const;
+};
+
+
+class ax25 : public network_layer
+{
+private:
+	std::thread   *th { nullptr };
+
+	// AX.25 callsign is mapped to a MAC
+	const any_addr my_mac;
+
+public:
+	ax25(stats *const s, const any_addr & my_mac, router *const r);
+	virtual ~ax25();
+
+	any_addr get_addr() const override { return any_addr(); }
+
+	bool transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
+
+	virtual int get_max_packet_size() const override { return 256; }
+
+	void operator()() override;
 };

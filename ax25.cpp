@@ -1,6 +1,16 @@
+// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+#include <assert.h>
+#include <chrono>
+#include <stdint.h>
+#include <string>
 #include <string.h>
+#include <arpa/inet.h>
 
 #include "ax25.h"
+#include "log.h"
+#include "phys.h"
+#include "router.h"
+#include "time.h"
 #include "utils.h"
 
 
@@ -160,11 +170,11 @@ any_addr ax25_address::get_any_addr() const
 	return out;
 }
 
-ax25::ax25()
+ax25_packet::ax25_packet()
 {
 }
 
-ax25::ax25(const std::vector<uint8_t> & in)
+ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 {
 	if (in.size() < 14)
 		return;
@@ -211,71 +221,71 @@ ax25::ax25(const std::vector<uint8_t> & in)
 	valid = true;
 }
 
-ax25::~ax25()
+ax25_packet::~ax25_packet()
 {
 }
 
-ax25_address ax25::get_from() const
+ax25_address ax25_packet::get_from() const
 {
 	return from;
 }
 
-ax25_address ax25::get_to() const
+ax25_address ax25_packet::get_to() const
 {
 	return to;
 }
 
-std::vector<ax25_address> ax25::get_seen_by() const
+std::vector<ax25_address> ax25_packet::get_seen_by() const
 {
 	return seen_by;
 }
 
-buffer_in ax25::get_data() const
+buffer_in ax25_packet::get_data() const
 {
 	return data;
 }
 
-void ax25::set_from(const std::string & callsign, const char ssid, const bool end_mark, const bool repeated)
+void ax25_packet::set_from(const std::string & callsign, const char ssid, const bool end_mark, const bool repeated)
 {
 	from = ax25_address(callsign, ssid, end_mark, repeated);
 }
 
-void ax25::set_from(const any_addr & callsign)
+void ax25_packet::set_from(const any_addr & callsign)
 {
 	from = ax25_address(callsign);
 }
 
-void ax25::set_to(const std::string & callsign, const char ssid, const bool end_mark, const bool repeated)
+void ax25_packet::set_to(const std::string & callsign, const char ssid, const bool end_mark, const bool repeated)
 {
 	to   = ax25_address(callsign, ssid, end_mark, repeated);
 }
 
-void ax25::set_to(const any_addr & callsign)
+void ax25_packet::set_to(const any_addr & callsign)
 {
 	to   = ax25_address(callsign);
 }
 
-void ax25::set_data(const uint8_t *const p, const size_t size)
+void ax25_packet::set_data(const uint8_t *const p, const size_t size)
 {
 	data = buffer_in(p, size);
 }
 
-void ax25::set_control(const uint8_t control)
+void ax25_packet::set_control(const uint8_t control)
 {
 	this->control = control;
 }
 
-void ax25::set_pid(const uint8_t pid)
+void ax25_packet::set_pid(const uint8_t pid)
 {
 	this->pid = pid;
 }
 
-std::optional<uint8_t> ax25::get_pid() const
+std::optional<uint8_t> ax25_packet::get_pid() const
 {
 	return pid;
 }
 
-std::pair<uint8_t *, size_t> ax25::generate_packet() const
+std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 {
 	int      data_size = data.get_size();
 
@@ -304,4 +314,32 @@ std::pair<uint8_t *, size_t> ax25::generate_packet() const
 	memcpy(&out[offset], data.get_bytes(data_size), data_size);
 
 	return { out, data_size + offset };
+}
+
+// protocol handler
+
+ax25::ax25(stats *const s, const any_addr & my_mac, router *const r) : network_layer(s, "AX.25", r), my_mac(my_mac)
+{
+	th = new std::thread(std::ref(*this));
+}
+
+ax25::~ax25()
+{
+	stop_flag = true;
+
+	th->join();
+	delete th;
+}
+
+bool ax25::transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
+{
+	return false;
+}
+
+void ax25::operator()()
+{
+	set_thread_name("myip-ax.25");
+
+	while(!stop_flag) {
+	}
 }

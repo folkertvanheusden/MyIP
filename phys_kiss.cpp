@@ -93,7 +93,7 @@ phys_kiss::~phys_kiss()
 
 bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload_in, const size_t pl_size_in)
 {
-	ax25 a;
+	ax25_packet a;
 	a.set_from   (src_mac);
 	a.set_to     (dst_mac);
 	a.set_control(243);  // TODO
@@ -246,14 +246,14 @@ void phys_kiss::operator()()
 		}
 
 		if (ok) {
-			ax25 ax25_packet(std::vector<uint8_t>(p, p + len));
+			ax25_packet ap(std::vector<uint8_t>(p, p + len));
 
-			auto payload = ax25_packet.get_data();
+			auto payload = ap.get_data();
 			int  pl_size = payload.get_n_bytes_left();
 
 			DOLOG(ll_info, "phys_kiss: received packet of %d bytes, payload size: %d\n", len, pl_size);
 
-			packet *p = new packet(ts, ax25_packet.get_from().get_any_addr(), ax25_packet.get_from().get_any_addr(), ax25_packet.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
+			packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
 
 			auto it = prot_map.find(0x08ff);  // from linux kernel with the comment that 0x08ff is not officially registered
 			it->second->queue_incoming_packet(this, p);
