@@ -164,7 +164,7 @@ void router::operator()()
 		if (po.value()->src_mac.has_value() == false) {
 			if (re->network_address.get_family() == any_addr::ipv4) {
 				// must always succeed, see main where a static rarp is setup
-				po.value()->src_mac = re->mac_lookup.iarp->get_mac(po.value()->src_ip);
+				po.value()->src_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->src_ip);
 			}
 			else {
 				// TODO: ipv6
@@ -173,7 +173,7 @@ void router::operator()()
 
 		if (po.value()->dst_mac.has_value() == false) {
 			if (re->network_address.get_family() == any_addr::ipv4) {
-				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(po.value()->dst_ip);
+				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->dst_ip);
 			}
 			else {
 				// TODO: ipv6
@@ -181,7 +181,7 @@ void router::operator()()
 
 			// not found? try the default gateway
 			if (po.value()->dst_mac.has_value() == false && re->default_gateway.has_value()) {
-				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->default_gateway.value());
+				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, re->default_gateway.value());
 			}
 		}
 
