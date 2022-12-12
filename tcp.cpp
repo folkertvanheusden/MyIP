@@ -46,26 +46,29 @@ void tcp::free_tcp_session(tcp_session *const p)
 	delete p;
 }
 
-char *flags_to_str(uint8_t flags)
+std::string flags_to_str(const uint8_t flags)
 {
-	char *out = (char *)calloc(1, 128);
+	std::string out;
 
 	if (flags & FLAG_CWR)
-		strcat(out, "CWR,");
+		out += "CWR,";
 	if (flags & FLAG_ECE)
-		strcat(out, "ECE,");
+		out += "ECE,";
 	if (flags & FLAG_URG)
-		strcat(out, "URG,");
+		out += "URG,";
 	if (flags & FLAG_ACK)
-		strcat(out, "ACK,");
+		out += "ACK,";
 	if (flags & FLAG_PSH)
-		strcat(out, "PSH,");
+		out += "PSH,";
 	if (flags & FLAG_RST)
-		strcat(out, "RST,");
+		out += "RST,";
 	if (flags & FLAG_SYN)
-		strcat(out, "SYN,");
+		out += "SYN,";
 	if (flags & FLAG_FIN)
-		strcat(out, "FIN,");
+		out += "FIN,";
+
+	if (!out.empty())
+		out.erase(out.size() - 1);
 
 	return out;
 }
@@ -120,9 +123,8 @@ int rel_seqnr(const tcp_session *const ts, const bool mine, const uint32_t nr)
 
 void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len, const uint32_t TSecr)
 {
-	char *flag_str = flags_to_str(flags);
-	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str, rel_seqnr(ts, false, ack_to), my_seq_nr ? rel_seqnr(ts, true, *my_seq_nr) : -1, data_len);
-	free(flag_str);
+	std::string flag_str = flags_to_str(flags);
+	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str.c_str(), rel_seqnr(ts, false, ack_to), my_seq_nr ? rel_seqnr(ts, true, *my_seq_nr) : -1, data_len);
 
 	if (!idev) {
 		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: Dropping packet, no physical device assigned (yet)\n", session_id);
@@ -310,9 +312,8 @@ void tcp::packet_handler(const packet *const pkt)
 	auto     src = pkt->get_src_addr();
 	uint64_t id  = hash_address(src, dst_port, src_port);
 
-	char    *flag_str = flags_to_str(p[13]);
-	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str, their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
-	free(flag_str);
+	std::string flag_str = flags_to_str(p[13]);
+	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str.c_str(), their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
 
 	auto port_record  = get_lock_listener(dst_port, id);
 	bool has_listener = port_record.has_value();
