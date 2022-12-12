@@ -25,6 +25,8 @@ private:
 
 	const any_addr myip;
 
+	const bool     forward  { false   };
+
 	uint64_t *ip_n_pkt      { nullptr };
 	uint64_t *ip_n_disc     { nullptr };
 	uint64_t *ip_n_del      { nullptr };
@@ -40,7 +42,7 @@ private:
 	void send_ttl_exceeded(const packet *const pkt) const;
 
 public:
-	ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r, const int n_threads);
+	ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r, const bool forward, const int n_threads);
 	virtual ~ipv4();
 
 	any_addr get_addr() const override { return myip; }

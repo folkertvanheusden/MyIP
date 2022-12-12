@@ -133,6 +133,7 @@ void router::operator()()
 				continue;
 
 			if (entry.network_address.get_family() == any_addr::ipv4) {
+				// TODO move into a function
 				bool match = true;
 
 				for(int i=0; i<4; i++) {
@@ -188,7 +189,7 @@ void router::operator()()
 		}
 
 		if (po.value()->src_mac.has_value() && po.value()->dst_mac.has_value()) {
-			if (!re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len)) {
+			if (re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
 				DOLOG(ll_debug, "router::operator: cannot transmit_packet\n");
 			}
 		}
