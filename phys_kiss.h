@@ -14,10 +14,12 @@
 class phys_kiss : public phys
 {
 private:
-	int fd { -1 };
+	const any_addr & my_callsign;
+
+	int              fd          { -1 };
 
 public:
-	phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps);
+	phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign);
 	phys_kiss(const phys_kiss &) = delete;
 	virtual ~phys_kiss();
 

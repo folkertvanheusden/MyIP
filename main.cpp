@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
 
 			int         baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
 
-			dev = new phys_kiss(i + 1, &s, dev_file, baudrate);
+			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");

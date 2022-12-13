@@ -42,7 +42,9 @@ void escape_put(uint8_t **p, int *len, uint8_t c)
 	}
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps) : phys(dev_index, s, "kiss-" + dev_file)
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign) :
+	phys(dev_index, s, "kiss-" + dev_file),
+	my_callsign(my_callsign)
 {
 	fd = open(dev_file.c_str(), O_RDWR | O_NOCTTY);
 
@@ -96,7 +98,7 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	ax25_packet a;
 	a.set_from   (src_mac);
 	a.set_to     (dst_mac);
-	a.set_control(243);  // TODO
+	a.set_control(0x03);  // unnumbered information/frame
 	a.set_pid    (0x07);
 	a.set_data   (payload_in, pl_size_in);
 
@@ -249,15 +251,25 @@ void phys_kiss::operator()()
 			std::vector<uint8_t> payload_v(p, p + len);
 			ax25_packet ap(payload_v);
 
-			auto payload = ap.get_data();
-			int  pl_size = payload.get_n_bytes_left();
+			int pid = ap.get_pid().has_value() ? ap.get_pid().value() : -1;
 
-			DOLOG(ll_info, "phys_kiss: received packet of %d bytes, payload size: %d\n", len, pl_size);
+			if (ap.get_valid() && pid == 0x07) {  // check for valid IPv4 payload
+				auto payload = ap.get_data();
+				int  pl_size = payload.get_n_bytes_left();
 
-			packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
+				DOLOG(ll_info, "phys_kiss(%s -> %s): received packet of %d bytes, payload size: %d\n",
+						ap.get_from().get_any_addr().to_str().c_str(),
+						ap.get_to  ().get_any_addr().to_str().c_str(),
+						len, pl_size);
 
-			auto it = prot_map.find(0x08ff);  // from linux kernel with the comment that 0x08ff is not officially registered
-			it->second->queue_incoming_packet(this, p);
+				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
+
+				auto it = prot_map.find(0x0800);
+				it->second->queue_incoming_packet(this, p);
+			}
+			else {
+				DOLOG(ll_info, "phys_kiss(): don't know how to handle pid %02x (%d bytes)\n", pid, len);
+			}
 		}
 
 		free(p);

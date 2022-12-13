@@ -93,30 +93,3 @@ public:
 
 	std::pair<uint8_t *, size_t> generate_packet() const;
 };
-
-
-class ax25 : public network_layer
-{
-private:
-	std::thread   *th           { nullptr };
-
-	ipv4          *ip4          { nullptr };
-
-	uint64_t      *ax25_total   { nullptr };
-	uint64_t      *ax25_invalid { nullptr };
-
-	// AX.25 callsign is mapped to a MAC
-	const any_addr my_mac;
-
-public:
-	ax25(stats *const s, const any_addr & my_mac, const any_addr & my_ip, router *const r);
-	virtual ~ax25();
-
-	any_addr get_addr() const override { return any_addr(); }
-
-	bool transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) override;
-
-	virtual int get_max_packet_size() const override { return 256; }
-
-	void operator()() override;
-};
