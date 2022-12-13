@@ -34,8 +34,10 @@ protected:
 
 	const size_t dev_index     { 0 };
 
+	const std::string name;
+
 public:
-	phys(const size_t dev_index, stats *const s);
+	phys(const size_t dev_index, stats *const s, const std::string & name);
 	phys(const phys &) = delete;
 	virtual ~phys();
 
@@ -52,7 +54,7 @@ public:
 
 	int get_max_packet_size() const { return mtu_size - 14 /* 14 = size of Ethernet header */; }
 
-	virtual std::string to_str() const = 0;
+	std::string to_str() const { return name; }
 
 	virtual void operator()() = 0;
 };

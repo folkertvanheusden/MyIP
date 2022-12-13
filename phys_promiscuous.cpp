@@ -23,7 +23,8 @@
 #include "utils.h"
 
 
-phys_promiscuous::phys_promiscuous(const size_t dev_index, stats *const s, const std::string & dev_name) : phys(dev_index, s)
+phys_promiscuous::phys_promiscuous(const size_t dev_index, stats *const s, const std::string & dev_name) :
+	phys(dev_index, s, "promiscuous-" + dev_name)
 {
 	fd = socket( PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (fd == -1)

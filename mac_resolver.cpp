@@ -114,7 +114,7 @@ std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_a
 		work_cv.wait_for(lck, 100ms);
 	}
 
-	DOLOG(ll_debug, "mac_resolver: resolve for %s timeout\n", ip.to_str().c_str());
+	DOLOG(ll_debug, "mac_resolver: resolve %s timeout\n", ip.to_str().c_str());
 
 	return { };
 }

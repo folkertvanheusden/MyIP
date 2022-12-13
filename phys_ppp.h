@@ -13,17 +13,24 @@
 #include "stats.h"
 
 
-class phys_ppp : public phys_slip
+class phys_ppp : public phys
 {
 private:
-	bool emulate_modem_xp { false };
+	const any_addr my_mac;
+	int   fd              { -1 };
+
+	bool emulate_modem_xp     { false };
 	bool protocol_compression { false };
 	bool ac_field_compression { false };
-	bool lcp_options_acked { false };
-	bool ipcp_options_acked { false };
+	bool lcp_options_acked    { false };
+	bool ipcp_options_acked   { false };
 	bool ipv6cp_options_acked { false };
+
 	uint32_t magic { 0x1234abcd };
-	std::vector<uint8_t> ACCM_tx, ACCM_rx;
+
+	std::vector<uint8_t> ACCM_tx;
+	std::vector<uint8_t> ACCM_rx;
+
 	const any_addr opponent_address;
 
 	uint16_t fcstab[256] { 0 };
@@ -50,8 +57,6 @@ public:
 	void start() override;
 
 	bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size) override;
-
-	std::string to_str() const { return "ppp"; }
 
 	void operator()() override;
 };

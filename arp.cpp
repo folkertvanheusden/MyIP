@@ -53,6 +53,8 @@ void arp::operator()()
 		    p[2] == 0x08 && p[3] == 0x00 &&  // ethertype IPv4
 		    any_addr(any_addr::ipv4, &p[24]) == my_ip)  // am I the target?
 		{
+			DOLOG(ll_debug, "arp::operator: received arp for %s\n", my_ip.to_str().c_str());
+
 			stats_inc_counter(arp_for_me);
 
 			uint8_t *reply = duplicate(p, size);
@@ -73,12 +75,17 @@ void arp::operator()()
 		else if (p[6] == 0x00 && p[7] == 0x02 &&  // reply
 			any_addr(any_addr::mac, &p[8]) == my_mac) {  // check sender
 
+			any_addr work_ip (any_addr::ipv4, &p[24]);
+			any_addr work_mac(any_addr::mac,  &p[18]);
+
+			DOLOG(ll_debug, "arp::operator: received arp-reply for %s (is at %s)\n", work_ip.to_str().c_str(), work_mac.to_str().c_str());
+
 			std::unique_lock lck(work_lock);
 
-			auto it = work.find(any_addr(any_addr::ipv4, &p[24]));  // IP to resolve
+			auto it = work.find(work_ip);  // IP to resolve
 
 			if (it != work.end())
-				it->second = mac_resolver_result({ any_addr(any_addr::ipv4, &p[18]) });
+				it->second = mac_resolver_result({ work_mac });
 
 			work_cv.notify_all();
 		}

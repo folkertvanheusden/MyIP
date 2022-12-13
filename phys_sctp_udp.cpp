@@ -21,11 +21,14 @@
 #include "net.h"
 #include "packet.h"
 #include "phys_sctp_udp.h"
+#include "str.h"
 #include "utils.h"
 
 
 // port is usually 9899
-phys_sctp_udp::phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const any_addr & my_addr, const int port) : phys(dev_index, s), my_mac(my_mac), my_addr(my_addr)
+phys_sctp_udp::phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const any_addr & my_addr, const int port) :
+	phys(dev_index, s, myformat("sctp(udp)-%d", port)),
+	my_mac(my_mac), my_addr(my_addr)
 {
 	fd = create_datagram_socket(port);
 
