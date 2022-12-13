@@ -97,5 +97,7 @@ public:
 
 	void dump();
 
+	void dump();
+
 	void operator()();
 };
