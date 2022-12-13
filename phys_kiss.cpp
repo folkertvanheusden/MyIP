@@ -227,7 +227,7 @@ void phys_kiss::operator()()
 			len--;
 
 			if (len)
-				memcpy(&p[0], &p[1], len);
+				memmove(&p[0], &p[1], len);
 
 			if (cmd == 1)
 				DOLOG(ll_debug, "TX delay: %d", p[1] * 10);
@@ -246,7 +246,8 @@ void phys_kiss::operator()()
 		}
 
 		if (ok) {
-			ax25_packet ap(std::vector<uint8_t>(p, p + len));
+			std::vector<uint8_t> payload_v(p, p + len);
+			ax25_packet ap(payload_v);
 
 			auto payload = ap.get_data();
 			int  pl_size = payload.get_n_bytes_left();
