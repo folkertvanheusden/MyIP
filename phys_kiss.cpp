@@ -17,6 +17,7 @@
 #include "log.h"
 #include "phys_kiss.h"
 #include "packet.h"
+#include "str.h"
 #include "utils.h"
 
 
@@ -99,7 +100,7 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	a.set_from   (src_mac);
 	a.set_to     (dst_mac);
 	a.set_control(0x03);  // unnumbered information/frame
-	a.set_pid    (0x07);
+	a.set_pid    (0xcc);  // ARPA Internet Protocol (IPv4)
 	a.set_data   (payload_in, pl_size_in);
 
 	auto     packet  = a.generate_packet();
@@ -253,7 +254,7 @@ void phys_kiss::operator()()
 
 			int pid = ap.get_pid().has_value() ? ap.get_pid().value() : -1;
 
-			if (ap.get_valid() && pid == 0x07) {  // check for valid IPv4 payload
+			if (ap.get_valid() && pid == 0xcc) {  // check for valid IPv4 payload
 				auto payload = ap.get_data();
 				int  pl_size = payload.get_n_bytes_left();
 
@@ -266,6 +267,11 @@ void phys_kiss::operator()()
 
 				auto it = prot_map.find(0x0800);
 				it->second->queue_incoming_packet(this, p);
+			}
+			else if (pid == 0xf0) {  // usually beacons etc
+				std::string payload_str = bin_to_text(p, len);
+
+				DOLOG(ll_info, "phys_kiss(): pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
 			}
 			else {
 				DOLOG(ll_info, "phys_kiss(): don't know how to handle pid %02x (%d bytes)\n", pid, len);

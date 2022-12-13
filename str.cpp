@@ -54,11 +54,12 @@ std::vector<std::string> split(std::string in, std::string splitter)
 
 std::string bin_to_text(const uint8_t *p, const size_t len)
 {
-	char *temp = (char *)calloc(1, len * 6 + 1);
+	char  *temp = (char *)calloc(1, len * 6 + 1);
+	size_t o    = 0;
 
 	for(size_t i=0; i<len; i++)
 		// snprintf(&temp[i * 6], 7, "%c[%02x] ", p[i] > 32 && p[i] < 127 ? p[i] : '.', p[i]);
-		snprintf(&temp[i * 3], 7, "%s%02x", i ? " " : "", p[i]);
+		o += snprintf(&temp[o], 7, "%s%02x", i ? " " : "", p[i]);
 
 	std::string out = temp;
 
