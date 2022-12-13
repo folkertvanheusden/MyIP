@@ -184,7 +184,7 @@ void ipv4::operator()()
 			if (forward) {
 				DOLOG(ll_debug, "IPv4[%04x]: forwarding packet to router\n", id);
 
-				r->route_packet({ }, 0x0800, pkt_dst, pkt->get_src_mac_addr(), pkt_src, payload_data, payload_size);
+				r->route_packet({ }, 0x0800, pkt_dst, pkt->get_src_mac_addr(), pkt_src, p, size);
 			}
 			else {
 				DOLOG(ll_debug, "IPv4[%04x]: dropping packet\n", id);
