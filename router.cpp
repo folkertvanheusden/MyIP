@@ -65,6 +65,16 @@ bool check_subnet(const any_addr & addr, const any_addr & network, const int cid
 	return true;
 }
 
+bool check_subnet(const any_addr & addr, const any_addr & network, const uint8_t netmask[4])
+{
+	for(int i=0; i<4; i++) {
+		if ((addr[i] & netmask[i]) != network[i])
+			return false;
+	}
+
+	return true;
+}
+
 void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, phys *const interface, arp *const iarp)
 {
 	assert(network.get_family() == any_addr::ipv4);
@@ -133,32 +143,24 @@ void router::operator()()
 				continue;
 
 			if (entry.network_address.get_family() == any_addr::ipv4) {
-				bool match = true;
-
-				for(int i=0; i<4; i++) {
-					if ((po.value()->dst_ip[i] & entry.mask.ipv4_netmask[i]) != entry.network_address[i]) {
-						match = false;
-						break;
-					}
-				}
-
-				if (match) {
-					// route through this
-					re = &entry;
+				if (check_subnet(po.value()->dst_ip, entry.network_address, entry.mask.ipv4_netmask)) {
+					re = &entry; // route through this
 					break;
 				}
 			}
 			else if (entry.network_address.get_family() == any_addr::ipv6) {
-				if (check_subnet(po.value()->src_ip, entry.network_address, entry.mask.ipv6_prefix_length))
+				if (check_subnet(po.value()->src_ip, entry.network_address, entry.mask.ipv6_prefix_length)) {
 					re = &entry;
+					break;
+				}
 			}
 			else {
-				DOLOG(ll_warning, "router::operator: unknown address family in queued packet (%d)\n", entry.network_address.get_family());
+				DOLOG(ll_warning, "router::operator: unknown address family in queued packet (%d)\n", po.value()->src_ip.get_family());
 			}
 		}
 
 		if (!re) {
-			DOLOG(ll_debug, "router::operator: no route for packet\n");
+			DOLOG(ll_debug, "router::operator: no route for packet (%s)\n", po.value()->to_str().c_str());
 			continue;
 		}
 
@@ -187,14 +189,12 @@ void router::operator()()
 			}
 		}
 
-		if (po.value()->src_mac.has_value() && po.value()->dst_mac.has_value()) {
-			if (!re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len)) {
-				DOLOG(ll_debug, "router::operator: cannot transmit_packet\n");
-			}
-		}
-		else {
-			DOLOG(ll_warning, "router::operator: no src or dst MAC address\n");
-		}
+		if (po.value()->src_mac.has_value() == false)
+			DOLOG(ll_warning, "router::operator: no src MAC address (%s)\n", po.value()->to_str().c_str());
+		else if (po.value()->dst_mac.has_value() == false)
+			DOLOG(ll_warning, "router::operator: no dst MAC address (%s)\n", po.value()->to_str().c_str());
+		else if (re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false)
+			DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s)\n", po.value()->to_str().c_str());
 
 		delete po.value();
 	}

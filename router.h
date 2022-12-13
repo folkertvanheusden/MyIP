@@ -65,6 +65,13 @@ private:
 		~queued_packet() {
 			delete [] data;
 		}
+
+		std::string to_str() {
+			std::string dst_mac_str = dst_mac.has_value() ? " (" + dst_mac.value().to_str() + ")" : "";
+			std::string src_mac_str = src_mac.has_value() ? " (" + src_mac.value().to_str() + ")" : "";
+
+			return src_ip.to_str() + src_mac_str + " -> " + dst_ip.to_str() + dst_mac_str;
+		}
 	};
 
 	fifo<queued_packet *>  *pkts { nullptr };
