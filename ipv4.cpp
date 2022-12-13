@@ -136,8 +136,6 @@ void ipv4::operator()()
 		any_addr pkt_dst(any_addr::ipv4, &payload_header[16]);
 		any_addr pkt_src(any_addr::ipv4, &payload_header[12]);
 
-		// update arp cache
-		iarp->update_cache(pkt->get_dst_addr(), pkt_dst, po.value().interface);  // TODO: replace for forwarding
 		iarp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 
 		DOLOG(ll_debug, "IPv4[%04x]: packet %s => %s\n", id, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
