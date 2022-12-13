@@ -126,6 +126,8 @@ void any_addr::set(const addr_family af_in, const uint8_t src[])
 		src_size = 6;
 	else if (af_in == ipv4)
 		src_size = 4;
+	else if (af_in == ax25)
+		src_size = 7;
 	else if (af_in == ipv6)
 		src_size = 16;
 
