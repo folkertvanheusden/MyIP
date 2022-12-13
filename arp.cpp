@@ -73,7 +73,7 @@ void arp::operator()()
 			delete [] reply;
 		}
 		else if (p[6] == 0x00 && p[7] == 0x02 &&  // reply
-			any_addr(any_addr::mac, &p[8]) == my_mac) {  // check sender
+			pkt->get_dst_addr() == my_mac) {
 
 			any_addr work_ip (any_addr::ipv4, &p[24]);
 			any_addr work_mac(any_addr::mac,  &p[18]);
@@ -90,7 +90,7 @@ void arp::operator()()
 			work_cv.notify_all();
 		}
 		else {
-			// DOLOG(ll_debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(&p[24], 4).to_str().c_str());
+			DOLOG(ll_debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(any_addr::ipv4, &p[24]).to_str().c_str());
 		}
 
 		delete pkt;
