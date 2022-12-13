@@ -34,8 +34,10 @@ protected:
 
 	const size_t dev_index     { 0 };
 
+	const std::string name;
+
 public:
-	phys(const size_t dev_index, stats *const s);
+	phys(const size_t dev_index, stats *const s, const std::string & name);
 	phys(const phys &) = delete;
 	virtual ~phys();
 
@@ -51,6 +53,8 @@ public:
 	virtual bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size) = 0;
 
 	int get_max_packet_size() const { return mtu_size - 14 /* 14 = size of Ethernet header */; }
+
+	std::string to_str() const { return name; }
 
 	virtual void operator()() = 0;
 };

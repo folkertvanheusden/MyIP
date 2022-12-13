@@ -57,8 +57,6 @@ public:
 
 	virtual void queue_incoming_packet(phys *const interface, const packet *p);
 
-	void queue_outgoing_packet(const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *payload, const size_t pl_size);
-
 	virtual bool transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
 
 	virtual int get_max_packet_size() const = 0;

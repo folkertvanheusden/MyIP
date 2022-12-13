@@ -15,7 +15,7 @@
 #include "utils.h"
 
 
-ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r, const int n_threads) : network_layer(s, "ipv4", r), iarp(iarp), myip(myip)
+ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const r, const bool forward, const int n_threads) : network_layer(s, "ipv4", r), iarp(iarp), myip(myip), forward(forward)
 {
 	ip_n_pkt      = s->register_stat("ip_n_pkt",      "1.3.6.1.2.1.4.3");
 	ip_n_disc     = s->register_stat("ip_n_discards", "1.3.6.1.2.1.4.8");
@@ -88,7 +88,11 @@ bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 
 	any_addr q_addr = override_ip ? myip : src_ip;
 
-	bool rc = r->route_packet(dst_mac, 0x0800, dst_ip, q_addr, out, out_size);
+	auto src_mac = iarp->query_cache(q_addr);
+
+	bool rc = r->route_packet(dst_mac, 0x0800, dst_ip, *src_mac.second, q_addr, out, out_size);
+
+	delete src_mac.second;
 
 	delete [] out;
 
@@ -136,18 +140,9 @@ void ipv4::operator()()
 		any_addr pkt_dst(any_addr::ipv4, &payload_header[16]);
 		any_addr pkt_src(any_addr::ipv4, &payload_header[12]);
 
-		// update arp cache
-		iarp->update_cache(pkt->get_dst_addr(), pkt_dst, po.value().interface);  // TODO: replace for forwarding
 		iarp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 
 		DOLOG(ll_debug, "IPv4[%04x]: packet %s => %s\n", id, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
-
-		if (pkt_dst != myip) {
-			delete pkt;
-			stats_inc_counter(ip_n_disc);
-			stats_inc_counter(ipv4_not_me);
-			continue;
-		}
 
 		int header_size = (payload_header[0] & 15) * 4;
 		int ip_size     = (payload_header[2] << 8) | payload_header[3];
@@ -184,6 +179,25 @@ void ipv4::operator()()
 		}
 
 		int payload_size = size - header_size;
+
+		if (pkt_dst != myip) {
+			if (forward) {
+				DOLOG(ll_debug, "IPv4[%04x]: forwarding packet to router\n", id);
+
+				r->route_packet({ }, 0x0800, pkt_dst, pkt->get_src_mac_addr(), pkt_src, p, size);
+			}
+			else {
+				DOLOG(ll_debug, "IPv4[%04x]: dropping packet\n", id);
+
+				stats_inc_counter(ip_n_disc);
+			}
+
+			stats_inc_counter(ipv4_not_me);
+
+			delete pkt;
+
+			continue;
+		}
 
 		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
 

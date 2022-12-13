@@ -20,7 +20,7 @@
 
 
 phys_ppp::phys_ppp(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, const bool emulate_modem_xp, const any_addr & opponent_address) :
-	phys_slip(dev_index, s, dev_name, bps, my_mac),
+	phys(dev_index, s, "ppp-" + dev_name),
 	emulate_modem_xp(emulate_modem_xp),
 	opponent_address(opponent_address)
 {

@@ -37,6 +37,8 @@ private:
 		} mac_lookup;
 
 		std::optional<any_addr> default_gateway;
+
+		std::string to_str();
 	};
 
 	phys                     *default_interface { nullptr };
@@ -65,6 +67,13 @@ private:
 		~queued_packet() {
 			delete [] data;
 		}
+
+		std::string to_str() {
+			std::string dst_mac_str = dst_mac.has_value() ? " (" + dst_mac.value().to_str() + ")" : "";
+			std::string src_mac_str = src_mac.has_value() ? " (" + src_mac.value().to_str() + ")" : "";
+
+			return src_ip.to_str() + src_mac_str + " -> " + dst_ip.to_str() + dst_mac_str;
+		}
 	};
 
 	fifo<queued_packet *>  *pkts { nullptr };
@@ -84,7 +93,9 @@ public:
 
 	void set_default_interface(phys *const default_interface) { this->default_interface = default_interface; }
 
-	bool route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size);
+	bool route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_mac, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size);
+
+	void dump();
 
 	void operator()();
 };

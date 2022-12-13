@@ -1,10 +1,11 @@
 what this is
 ------------
 This is an implementation of an IP-stack (IPv4/IPv6).
-It will listen on a tap-device for ethernet frames containg e.g. ARP-
-requests, IP packets, ICMP(6), UDP and even NTP, VNC, SIP, MQTT and HTTP
-requests. Also LLDP, NDP, Socks, syslog, PPP, SLIP, NRPE, DNS (client),
-SCTP, MDNS and SNMP.
+It will listen on a tap-, promiscuous, slip or ppp device for network
+frames containg e.g. ARP-requests, IP packets, ICMP(6), UDP and even
+NTP, VNC, SIP, MQTT and HTTP requests. Also LLDP, NDP, Socks, syslog,
+PPP, SLIP, NRPE, DNS (client), SCTP, MDNS and SNMP. When multiple
+interfaces are configured, it can also route between them.
 
 Note that this is an experimentation vehicle.
 
@@ -15,7 +16,19 @@ required
 
 how to build
 ------------
-Make sure you have "libbearssl-dev", "libssl-dev", "libncurses-dev", "libconfig++-dev", "libspeex-dev", "libsamplerate0-dev", "zlib1g-dev", "libjansson-dev" and "libsndfile1-dev" installed. Then:
+Make sure you have the following packages installed:
+
+* libbearssl-dev
+* libssl-dev
+* libncurses-dev
+* libconfig++-dev
+* libspeex-dev
+* libsamplerate0-dev
+* zlib1g-dev
+* libjansson-dev
+* libsndfile1-dev
+
+then invoke:
 
 * mkdir build
 * cd build
@@ -54,11 +67,11 @@ See http://myip.vanheusden.com/
 
 It listens to both IPv4 as well as IPv6. It performs HTTP over TCP but also over SCTP.
 
-It also runs an MQTT, NRPE, NTP, SIP, SNMP and VNC server.
+It also runs all other protocols supported by MyIP.
 
 copyright
 ---------
-(C) 2021-2022 by Folkert van Heusden <mail@vanheusden.com>
+(C) 2020-2022 by Folkert van Heusden <mail@vanheusden.com>
 
 Released under Apache License v2.0
 

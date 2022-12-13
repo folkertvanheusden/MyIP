@@ -435,7 +435,9 @@ int main(int argc, char *argv[])
 
 			int n_ipv4_threads = cfg_int(ipv4_, "n-ipv4-threads", "number of ipv4 threads", true, 4);
 
-			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, r, n_ipv4_threads);
+			bool forward = cfg_bool(ipv4_, "forwarder", "act as a router?", true, false);
+
+			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, r, forward, n_ipv4_threads);
 			protocols.push_back(ipv4_instance);
 
 			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "wether to enable icmp", true, true);

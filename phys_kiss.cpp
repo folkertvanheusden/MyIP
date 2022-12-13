@@ -42,7 +42,7 @@ void escape_put(uint8_t **p, int *len, uint8_t c)
 	}
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps) : phys(dev_index, s)
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps) : phys(dev_index, s, "kiss-" + dev_file)
 {
 	fd = open(dev_file.c_str(), O_RDWR | O_NOCTTY);
 
