@@ -52,5 +52,7 @@ public:
 
 	int get_max_packet_size() const { return mtu_size - 14 /* 14 = size of Ethernet header */; }
 
+	virtual std::string to_str() const = 0;
+
 	virtual void operator()() = 0;
 };

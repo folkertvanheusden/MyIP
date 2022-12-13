@@ -37,6 +37,8 @@ private:
 		} mac_lookup;
 
 		std::optional<any_addr> default_gateway;
+
+		std::string to_str();
 	};
 
 	phys                     *default_interface { nullptr };
@@ -92,6 +94,8 @@ public:
 	void set_default_interface(phys *const default_interface) { this->default_interface = default_interface; }
 
 	bool route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_mac, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size);
+
+	void dump();
 
 	void operator()();
 };
