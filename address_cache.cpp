@@ -107,3 +107,11 @@ void address_cache::cache_cleaner()
 		}
 	}
 }
+
+void address_cache::dump_cache()
+{
+	const std::shared_lock<std::shared_mutex> lock(cache_lock);
+
+	for(auto & e : cache)
+		DOLOG(ll_debug, "arp: %ld %s %s\n", e.second.ts, e.second.addr.to_str().c_str(), e.second.interface->to_str().c_str());
+}

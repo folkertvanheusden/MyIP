@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <map>
+#include <set>
 #include <thread>
 
 #include "any_addr.h"
@@ -7,9 +8,22 @@
 #include "ndp.h"
 #include "phys.h"
 #include "router.h"
+#include "str.h"
 
 
 constexpr size_t pkts_max_size { 256 };
+
+std::string router::router_entry::to_str()
+{
+	std::string mask_str = "-";
+
+	if (network_address.get_family() == any_addr::ipv4)
+		mask_str = myformat("%d.%d.%d.%d", mask.ipv4_netmask[0], mask.ipv4_netmask[1], mask.ipv4_netmask[2], mask.ipv4_netmask[3]);
+	else if (network_address.get_family() == any_addr::ipv6)
+		mask_str = myformat("%d", mask.ipv6_prefix_length);
+
+	return network_address.to_str() + "/" + mask_str + " -> " + (default_gateway.has_value() ? default_gateway.value().to_str() : "-") + " " + interface->to_str();
+}
 
 router::router(stats *const s, const int n_threads)
 {
@@ -127,6 +141,28 @@ bool router::route_packet(const std::optional<any_addr> & override_dst_mac, cons
 	return pkts->try_put(qp);
 }
 
+void router::dump()
+{
+	std::set<phys *> interfaces;
+
+	DOLOG(ll_debug, "routing table:\n");
+
+	std::shared_lock<std::shared_mutex> lck(table_lock);
+
+	for(auto & entry : table) {
+		DOLOG(ll_debug, ("| " + entry.to_str() + "\n").c_str());
+
+		interfaces.insert(entry.interface);
+	}
+
+	DOLOG(ll_debug, "arp tables:\n");
+
+	for(auto & i : interfaces)
+		DOLOG(ll_debug, ("| " + i->to_str() + "\n").c_str());
+
+	DOLOG(ll_debug, "-----\n");
+}
+
 void router::operator()()
 {
 	while(!stop_flag) {
@@ -189,12 +225,25 @@ void router::operator()()
 			}
 		}
 
-		if (po.value()->src_mac.has_value() == false)
+		bool ok = true;
+
+		if (po.value()->src_mac.has_value() == false) {
+			ok = false;
 			DOLOG(ll_warning, "router::operator: no src MAC address (%s)\n", po.value()->to_str().c_str());
-		else if (po.value()->dst_mac.has_value() == false)
+		}
+
+		if (po.value()->dst_mac.has_value() == false) {
+			ok = false;
 			DOLOG(ll_warning, "router::operator: no dst MAC address (%s)\n", po.value()->to_str().c_str());
-		else if (re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false)
-			DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s)\n", po.value()->to_str().c_str());
+		}
+
+		if (ok) {
+			if (re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false)
+				DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s)\n", po.value()->to_str().c_str());
+		}
+		else {
+			dump();
+		}
 
 		delete po.value();
 	}
