@@ -75,8 +75,8 @@ void arp::operator()()
 		else if (p[6] == 0x00 && p[7] == 0x02 &&  // reply
 			pkt->get_dst_addr() == my_mac) {
 
-			any_addr work_ip (any_addr::ipv4, &p[24]);
-			any_addr work_mac(any_addr::mac,  &p[18]);
+			any_addr work_ip (any_addr::ipv4, &p[14]);
+			any_addr work_mac(any_addr::mac,  &p[8]);
 
 			DOLOG(ll_debug, "arp::operator: received arp-reply for %s (is at %s)\n", work_ip.to_str().c_str(), work_mac.to_str().c_str());
 
