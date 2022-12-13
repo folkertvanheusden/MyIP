@@ -608,9 +608,12 @@ int main(int argc, char *argv[])
 		}
 
 		// LLDP
-		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, r);
-		protocols.push_back(lldp_);
-		dev->register_protocol(0x0806, lldp_);
+		bool enable_lldp = cfg_bool(interface, "enable-lldp", "enable LLDP announcements", true, false);
+		if (enable_lldp) {
+			lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, r);
+			protocols.push_back(lldp_);
+			dev->register_protocol(0x0806, lldp_);
+		}
 
 		// socks proxy
 		try {
