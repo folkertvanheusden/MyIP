@@ -529,7 +529,7 @@ int main(int argc, char *argv[])
 			if (use_icmp) {
 				int n_threads = cfg_int(ipv6_, "n-icmp-threads", "number of icmp6 threads", true, 8);
 
-				icmp6_ = new icmp6(&s, my_mac, my_ip6, n_threads);
+				icmp6_ = new icmp6(&s, my_mac, my_ip6, r, dev, n_threads);
 				transport_layers.push_back(icmp6_);
 
 				ipv6_instance->register_protocol(0x3a, icmp6_);  // 58

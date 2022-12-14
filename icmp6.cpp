@@ -7,11 +7,12 @@
 #include "ipv4.h"
 #include "ipv6.h"
 #include "log.h"
+#include "router.h"
 #include "time.h"
 #include "utils.h"
 
 
-icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip, const int n_threads) : icmp(s), my_mac(my_mac), my_ip(my_ip)
+icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip, router *const r, phys *const interface, const int n_threads) : icmp(s), my_mac(my_mac), my_ip(my_ip), r(r), interface(interface)
 {
 	icmp6_requests = s->register_stat("icmp6_requests");
 	icmp6_transmit = s->register_stat("icmp6_transmit");
@@ -60,6 +61,9 @@ void icmp6::operator()()
 		else if (type == 133) {  // router soliciation
 			// can be ignored
 		}
+		else if (type == 134) {  // router advertisement
+			process_router_advertisement(pkt);
+		}
 		else if (type == 135) {  // neighbor soliciation
 			send_packet_neighbor_advertisement(pkt->get_src_mac_addr(), pkt->get_src_addr());
 		}
@@ -68,6 +72,42 @@ void icmp6::operator()()
 		}
 
 		delete pkt;
+	}
+}
+
+void icmp6::process_router_advertisement(const packet *const pkt)
+{
+	auto payload = pkt->get_payload();
+
+	// TODO: route lifetime etc
+
+	if (payload.second <= 18) {  // header size + minimal header of 1 option
+		DOLOG(ll_warning, "ICMP6: type: %d truncated\n", payload.first[0]);
+		return;
+	}
+
+	const uint8_t *const packet_end = &payload.first[payload.second];
+	const uint8_t *      work_p     = &payload.first[16];
+
+	while(work_p < packet_end) {
+		uint8_t type = work_p[0];
+
+		if (type != 3) {
+			work_p += work_p[1];
+			continue;
+		}
+
+		uint8_t prefix_length = work_p[2];
+
+		// TODO lifetimes
+
+		const uint8_t *const prefix_bytes = &work_p[16];
+
+		any_addr prefix(any_addr::ipv6, prefix_bytes);
+
+		r->add_router_ipv6(prefix, prefix_length, interface, indp);
+
+		break;
 	}
 }
 

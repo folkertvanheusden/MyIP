@@ -109,6 +109,9 @@ void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4],
 	bool found = false;
 	for(auto & e: table) {
 		if (re.network_address == e.network_address && memcmp(re.mask.ipv4_netmask, e.mask.ipv4_netmask, 4) == 0) {
+			DOLOG(ll_debug, "router::add_router_ipv4: updated %s/%d.%d.%d.%d to gateway %s\n", re.network_address.to_str().c_str(),
+					netmask[0], netmask[1], netmask[2], netmask[3], gateway.has_value() ? gateway.value().to_str().c_str() : "-");
+
 			e.interface       = interface;
 			e.mac_lookup.iarp = iarp;
 			e.default_gateway = gateway;
@@ -118,8 +121,12 @@ void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4],
 		}
 	}
 
-	if (!found)
+	if (!found) {
+		DOLOG(ll_debug, "router::add_router_ipv4: added route %s/%d.%d.%d.%d via gateway %s\n", re.network_address.to_str().c_str(),
+				netmask[0], netmask[1], netmask[2], netmask[3], gateway.has_value() ? gateway.value().to_str().c_str() : "-");
+
 		table.push_back(re);
+	}
 }
 
 void router::add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, ndp *const indp)
@@ -138,6 +145,9 @@ void router::add_router_ipv6(const any_addr & network, const int cidr, phys *con
 	bool found = false;
 	for(auto & e : table) {
 		if (e.network_address == re.network_address && e.mask.ipv6_prefix_length == re.mask.ipv6_prefix_length) {
+			DOLOG(ll_debug, "router::add_router_ipv6: updated %s/%d via interface %s\n", re.network_address.to_str().c_str(),
+					cidr, interface->to_str().c_str());
+
 			e.interface       = interface;
 			e.mac_lookup.indp = re.mac_lookup.indp;
 
@@ -146,8 +156,12 @@ void router::add_router_ipv6(const any_addr & network, const int cidr, phys *con
 		}
 	}
 
-	if (!found)
+	if (!found) {
+		DOLOG(ll_debug, "router::add_router_ipv6: added route %s/%d via interface %s\n", re.network_address.to_str().c_str(),
+				cidr, interface->to_str().c_str());
+
 		table.push_back(re);
+	}
 }
 
 bool router::route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_mac, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size)
