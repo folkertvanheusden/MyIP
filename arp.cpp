@@ -49,9 +49,38 @@ void arp::operator()()
 		const uint8_t *const p = pkt->get_data();
 		const int size = pkt->get_size();
 
-		if (p[6] == 0x00 && p[7] == 0x01 &&  // request
-		    p[2] == 0x08 && p[3] == 0x00 &&  // ethertype IPv4
-		    any_addr(any_addr::ipv4, &p[24]) == my_ip)  // am I the target?
+		if (size < 6) {
+			DOLOG(ll_debug, "ARP: packet too small (%d bytes)\n", size);
+			delete pkt;
+			continue;
+		}
+
+		uint8_t hw_size = p[4];
+		uint8_t p_size  = p[5];
+
+                uint16_t sha_offset = 8;
+                uint16_t spa_offset = 8 + hw_size;
+                uint16_t tha_offset = spa_offset + p_size;
+                uint16_t tpa_offset = tha_offset + hw_size;
+                uint16_t end_offset = tpa_offset + p_size;
+
+		if (size < end_offset) {
+			DOLOG(ll_debug, "ARP: invalid packet size (%d bytes, expected %d)\n", size, end_offset);
+			delete pkt;
+			continue;
+		}
+
+		uint16_t ether_type = (p[2] << 8) + p[3];
+
+		if ((ether_type == 0x0800 && p_size != 4) || (ether_type == 0x08ff && hw_size != 7)) {
+			DOLOG(ll_debug, "ARP: ethertype p/hw-size mismatch\n");
+			delete pkt;
+			continue;
+		}
+
+		uint16_t request = (p[6] << 8) + p[7];
+
+		if (request == 0x0001 && any_addr(any_addr::ipv4, &p[tpa_offset]) == my_ip)  // am I the target?
 		{
 			DOLOG(ll_debug, "arp::operator: received arp for %s\n", my_ip.to_str().c_str());
 
@@ -59,24 +88,35 @@ void arp::operator()()
 
 			uint8_t *reply = duplicate(p, size);
 
-			swap_mac(&reply[8], &reply[18]); // arp addresses
+			swap_mac(&reply[sha_offset], &reply[tha_offset]); // arp addresses
 
 			// my MAC address
-			my_mac.get(&reply[8], 6);
+			if (ether_type == 0x0800)  // ipv4
+				my_mac.get(&reply[sha_offset], 6);
+			else if (ether_type == 0x08ff)  // AX.25
+				my_mac.get(&reply[sha_offset], 7);
+			else
+				DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
 
 			reply[7] = 0x02; // reply
 
-			swap_ipv4(&reply[14], &reply[24]);
+			swap_ipv4(&reply[spa_offset], &reply[tpa_offset]);
 
 			po.value().interface->transmit_packet(pkt->get_src_addr(), my_mac, 0x0806, reply, size);
 
 			delete [] reply;
 		}
-		else if (p[6] == 0x00 && p[7] == 0x02 &&  // reply
-			pkt->get_dst_addr() == my_mac) {
+		else if (request == 0x0002 && pkt->get_dst_addr() == my_mac) {
+			any_addr work_ip (any_addr::ipv4, &p[spa_offset]);
 
-			any_addr work_ip (any_addr::ipv4, &p[14]);
-			any_addr work_mac(any_addr::mac,  &p[8]);
+			any_addr work_mac;
+
+			if (ether_type == 0x0800)
+				work_mac = any_addr(any_addr::mac,  &p[sha_offset]);
+			else if (ether_type == 0x08ff)  // AX.25
+				work_mac = any_addr(any_addr::ax25, &p[sha_offset]);
+			else
+				DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
 
 			DOLOG(ll_debug, "arp::operator: received arp-reply for %s (is at %s)\n", work_ip.to_str().c_str(), work_mac.to_str().c_str());
 
@@ -90,7 +130,7 @@ void arp::operator()()
 			work_cv.notify_all();
 		}
 		else {
-			DOLOG(ll_debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(any_addr::ipv4, &p[24]).to_str().c_str());
+			DOLOG(ll_debug, "ARP: not for me? request %04x, ethertype %04x\n", request, ether_type);
 		}
 
 		delete pkt;
