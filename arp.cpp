@@ -182,9 +182,9 @@ bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 
 	any_addr dest_mac;
 
-	if (my_mac.get_family() == any_addr::ipv4)
+	if (af == any_addr::mac)
 		dest_mac = any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
-	else if (my_mac.get_family() == any_addr::ax25)
+	else if (af == any_addr::ax25)
 		dest_mac = ax25_address("QST", 0, false, false).get_any_addr();
 
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
