@@ -159,7 +159,7 @@ std::string any_addr::to_str() const
 	if (af == ax25) {
 		ax25_address aa(std::vector<uint8_t>(addr, addr + 7));
 
-		return aa.get_address();
+		return aa.get_address() + "-" + aa.get_ssid();
 	}
 
 	if (af == ipv6) {
