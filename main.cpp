@@ -359,7 +359,7 @@ int main(int argc, char *argv[])
 			dev = new phys_promiscuous(i + 1, &s, dev_name);
 		}
 		else if (type == "kiss") {
-			std::string dev_file = cfg_str(interface, "dev-file", "device file (/dev/tty-something usuaully)", false, "");
+			std::string dev_file = cfg_str(interface, "serial-dev", "device file (/dev/tty-something usuaully)", false, "");
 
 			int         baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
 
