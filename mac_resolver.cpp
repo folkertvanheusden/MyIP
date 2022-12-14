@@ -54,7 +54,7 @@ int mac_resolver::get_max_packet_size() const
 
 std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_addr & ip)
 {
-	auto special_ip_addresses_mac = check_special_ip_addresses(ip);
+	auto special_ip_addresses_mac = check_special_ip_addresses(ip, interface->get_phys_type());
 	if (special_ip_addresses_mac.has_value())
 		return special_ip_addresses_mac;
 

@@ -28,7 +28,7 @@ protected:
 
 	virtual bool send_request(const any_addr & ip) = 0;
 
-	virtual std::optional<any_addr> check_special_ip_addresses(const any_addr & ip) = 0;
+	virtual std::optional<any_addr> check_special_ip_addresses(const any_addr & ip, const any_addr::addr_family family) = 0;
 
 public:
 	mac_resolver(stats *const s, router *const r);

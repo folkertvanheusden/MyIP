@@ -22,9 +22,11 @@ public:
 	phys_slip(const phys_slip &) = delete;
 	virtual ~phys_slip();
 
-	virtual void start() override;
+	void start() override;
 
-	virtual bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size) override;
+	bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size) override;
 
-	virtual void operator()() override;
+	any_addr::addr_family get_phys_type() override { return any_addr::mac; }
+
+	void operator()() override;
 };

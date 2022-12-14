@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "arp.h"
+#include "ax25.h"
 #include "log.h"
 #include "net.h"
 #include "phys.h"
@@ -168,10 +169,18 @@ bool arp::send_request(const any_addr & ip)
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
 }
 
-std::optional<any_addr> arp::check_special_ip_addresses(const any_addr & ip)
+std::optional<any_addr> arp::check_special_ip_addresses(const any_addr & ip, const any_addr::addr_family family)
 {
-	if ((ip[0] & 0xf0) == 224)  // multicast
-		return any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0x01, 0x00, 0x5e, ip[1], ip[2], ip[3] }).begin());
+	if ((ip[0] & 0xf0) == 224) {  // multicast
+		if (family == any_addr::mac)
+			return any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0x01, 0x00, 0x5e, ip[1], ip[2], ip[3] }).begin());
+
+		if (family == any_addr::ax25) {
+			ax25_address bc("QST", 0, false, false);
+
+			return bc.get_any_addr();
+		}
+	}
 
 	return { };
 }

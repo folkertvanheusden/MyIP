@@ -25,5 +25,7 @@ public:
 
 	bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size) override;
 
+	virtual any_addr::addr_family get_phys_type() override { return any_addr::ax25; }
+
 	void operator()() override;
 };

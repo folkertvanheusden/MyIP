@@ -25,7 +25,7 @@ private:
 
 	bool send_request(const any_addr & ip) override;
 
-	std::optional<any_addr> check_special_ip_addresses(const any_addr & ip) override;
+	std::optional<any_addr> check_special_ip_addresses(const any_addr & ip, const any_addr::addr_family family) override;
 
 public:
 	ndp(stats *const s);

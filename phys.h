@@ -56,5 +56,7 @@ public:
 
 	std::string to_str() const { return name; }
 
+	virtual any_addr::addr_family get_phys_type() = 0;
+
 	virtual void operator()() = 0;
 };
