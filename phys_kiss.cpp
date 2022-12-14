@@ -284,7 +284,7 @@ void phys_kiss::operator()()
 				it->second->queue_incoming_packet(this, p);
 			}
 			else if (pid == 0xf0) {  // usually beacons etc
-				std::string payload_str = bin_to_text(p, len);
+				std::string payload_str = bin_to_text(p, len, true);
 
 				DOLOG(ll_info, "phys_kiss(): pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
 			}
@@ -298,7 +298,9 @@ void phys_kiss::operator()()
 				it->second->queue_incoming_packet(this, p);
 			}
 			else {
-				DOLOG(ll_info, "phys_kiss(): don't know how to handle pid %02x (%d bytes)\n", pid, len);
+				std::string payload_str = bin_to_text(p, len, true);
+
+				DOLOG(ll_info, "phys_kiss(): don't know how to handle pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
 			}
 		}
 
