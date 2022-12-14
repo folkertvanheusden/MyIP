@@ -96,12 +96,25 @@ phys_kiss::~phys_kiss()
 
 bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload_in, const size_t pl_size_in)
 {
+	DOLOG(ll_debug, "phys_kiss::transmit_packet: %s => %s, ethertype: %04x, %zu bytes\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, pl_size_in);
+
+	assert(src_mac.get_family() == any_addr::ax25);
+	assert(dst_mac.get_family() == any_addr::ax25);
+
 	ax25_packet a;
 	a.set_from   (src_mac);
 	a.set_to     (dst_mac);
 	a.set_control(0x03);  // unnumbered information/frame
-	a.set_pid    (0xcc);  // ARPA Internet Protocol (IPv4)
 	a.set_data   (payload_in, pl_size_in);
+
+	if (ether_type == 0x0800)
+		a.set_pid(0xcc);  // ARPA Internet Protocol (IPv4)
+	else if (ether_type == 0x0806)
+		a.set_pid(0xcd);  // ARPA Adress Resolving Protocol (IPv4)
+	else {
+		DOLOG(ll_info, "phys_kiss::transmit_packet: cannot transmit ethertype %04x over AX.25\n", ether_type);
+		return false;
+	}
 
 	auto     packet  = a.generate_packet();
 
@@ -124,15 +137,15 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 
 	out[offset++] = FEND;
 
-	if (WRITE(fd, out, offset) != offset) {
-		DOLOG(ll_error, "failed writing to mkiss device");
+	ssize_t rc = WRITE(fd, out, offset);
 
-		free(out);
+	free(out);
+
+	if (rc != offset) {
+		DOLOG(ll_error, "failed writing to kiss device");
 
 		return false;
 	}
-
-	free(out);
 
 	return true;
 }
