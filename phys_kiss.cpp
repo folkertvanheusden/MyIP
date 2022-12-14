@@ -227,11 +227,6 @@ void phys_kiss::operator()()
 
 			DOLOG(ll_debug, "port: %d, cmd: %d, len: %d\n", (p[0] >> 4) & 0x0f, cmd, len);
 
-			len--;
-
-			if (len)
-				memmove(&p[0], &p[1], len);
-
 			if (cmd == 1)
 				DOLOG(ll_debug, "TX delay: %d", p[1] * 10);
 			else if (cmd == 2)
@@ -246,6 +241,11 @@ void phys_kiss::operator()()
 				DOLOG(ll_debug, "set hardware");
 			else if (cmd == 15)
 				DOLOG(ll_info, "kernel asked for shutdown");
+
+			len--;
+
+			if (len)
+				memmove(&p[0], &p[1], len);
 		}
 
 		if (ok) {
@@ -254,14 +254,16 @@ void phys_kiss::operator()()
 
 			int pid = ap.get_pid().has_value() ? ap.get_pid().value() : -1;
 
+			if (ap.get_valid()) {
+				DOLOG(ll_info, "phys_kiss(%s -> %s): received packet of %d bytes\n",
+						ap.get_from().get_any_addr().to_str().c_str(),
+						ap.get_to  ().get_any_addr().to_str().c_str(),
+						len);
+			}
+
 			if (ap.get_valid() && pid == 0xcc) {  // check for valid IPv4 payload
 				auto payload = ap.get_data();
 				int  pl_size = payload.get_n_bytes_left();
-
-				DOLOG(ll_info, "phys_kiss(%s -> %s): received packet of %d bytes, payload size: %d\n",
-						ap.get_from().get_any_addr().to_str().c_str(),
-						ap.get_to  ().get_any_addr().to_str().c_str(),
-						len, pl_size);
 
 				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
 
@@ -272,6 +274,15 @@ void phys_kiss::operator()()
 				std::string payload_str = bin_to_text(p, len);
 
 				DOLOG(ll_info, "phys_kiss(): pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
+			}
+			else if (ap.get_valid() && pid == 0xcd) {  // check for valid ARP payload
+				auto payload = ap.get_data();
+				int  pl_size = payload.get_n_bytes_left();
+
+				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
+
+				auto it = prot_map.find(0x0806);
+				it->second->queue_incoming_packet(this, p);
 			}
 			else {
 				DOLOG(ll_info, "phys_kiss(): don't know how to handle pid %02x (%d bytes)\n", pid, len);
