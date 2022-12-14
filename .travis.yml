@@ -1,6 +1,6 @@
 language: cpp
 
-dist: focal
+dist: jammy
 
 before_install:
   - sudo apt-get -y install libiniparser-dev libsndfile1-dev libspeex-dev libsamplerate0-dev libconfig++-dev libjansson-dev libbearssl-dev
