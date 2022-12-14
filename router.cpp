@@ -208,7 +208,7 @@ void router::operator()()
 			continue;
 		}
 
-		if (po.value()->src_mac.has_value() == false || po.value()->src_mac.value().get_family() != re->interface->get_phys_type()) {
+		if (po.value()->src_mac.has_value() == false) {
 			if (re->network_address.get_family() == any_addr::ipv4) {
 				// must always succeed, see main where a static rarp is setup
 				po.value()->src_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->src_ip);
@@ -218,7 +218,7 @@ void router::operator()()
 			}
 		}
 
-		if (po.value()->dst_mac.has_value() == false || po.value()->dst_mac.value().get_family() != re->interface->get_phys_type()) {
+		if (po.value()->dst_mac.has_value() == false) {
 			if (re->network_address.get_family() == any_addr::ipv4) {
 				DOLOG(ll_debug, "router::operator: ARPing MAC for %s (%d)\n", po.value()->dst_ip.to_str().c_str(), re->interface->get_phys_type());
 
