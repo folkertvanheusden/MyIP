@@ -10,10 +10,9 @@ class buffer_in
 private:
 	const uint8_t *p    { nullptr };
 	int            size { 0 };
-	int            o    { 0 };
+	mutable int    o    { 0 };
 
 	const uint8_t * get_pointer() const { return p; };
-	int             get_size()    const { return size; };
 
 public:
 	buffer_in();
@@ -27,9 +26,11 @@ public:
 	uint64_t    get_net_long_long();  // 8 bytes
 	float       get_net_float();
 	double      get_net_double();
-	const uint8_t * get_bytes(const int len);
+	const uint8_t * get_bytes(const int len) const;
 
-	buffer_in      get_segment(const int len);
+	int         get_size() const { return size; };
+
+	buffer_in   get_segment(const int len);
 
 	std::string get_string(const int len);
 

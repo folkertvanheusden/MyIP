@@ -10,7 +10,9 @@
 #include <sys/types.h>
 
 #include "any_addr.h"
+#include "ax25.h"
 #include "stats.h"
+#include "phys_kiss.h"
 #include "phys_tap.h"
 #include "phys_promiscuous.h"
 #include "phys_ppp.h"
@@ -332,7 +334,7 @@ int main(int argc, char *argv[])
 		std::string type = cfg_str(interface, "type", "network interface type (e.g. \"ethernet\", \"ppp\" or \"slip\")", true, "ethernet");
 
 		std::string mac = cfg_str(interface, "mac-address", "MAC address", true, "52:34:84:16:44:22");
-		any_addr my_mac = parse_address(mac, 6, ":", 16);
+		any_addr my_mac = type == "kiss" ? ax25_address(mac.c_str(), true, false).get_any_addr() : parse_address(mac, 6, ":", 16);
 
 		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
 
@@ -355,6 +357,13 @@ int main(int argc, char *argv[])
 			std::string dev_name = cfg_str(interface, "dev-name", "device name", false, "eth0");
 
 			dev = new phys_promiscuous(i + 1, &s, dev_name);
+		}
+		else if (type == "kiss") {
+			std::string dev_file = cfg_str(interface, "serial-dev", "device file (/dev/tty-something usuaully)", false, "");
+
+			int         baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
+
+			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
@@ -599,9 +608,12 @@ int main(int argc, char *argv[])
 		}
 
 		// LLDP
-		lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, r);
-		protocols.push_back(lldp_);
-		dev->register_protocol(0x0806, lldp_);
+		bool enable_lldp = cfg_bool(interface, "enable-lldp", "enable LLDP announcements", true, false);
+		if (enable_lldp) {
+			lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, r);
+			protocols.push_back(lldp_);
+			dev->register_protocol(0x0806, lldp_);
+		}
 
 		// socks proxy
 		try {

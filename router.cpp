@@ -180,6 +180,12 @@ void router::operator()()
 			if (entry.network_address.get_family() != po.value()->src_ip.get_family())
 				continue;
 
+			if (po.value()->src_mac.has_value() == true && entry.interface->get_phys_type() != po.value()->src_mac.value().get_family())
+				continue;
+
+			if (po.value()->dst_mac.has_value() == true && entry.interface->get_phys_type() != po.value()->dst_mac.value().get_family())
+				continue;
+
 			if (entry.network_address.get_family() == any_addr::ipv4) {
 				if (check_subnet(po.value()->dst_ip, entry.network_address, entry.mask.ipv4_netmask)) {
 					re = &entry; // route through this
@@ -214,7 +220,7 @@ void router::operator()()
 
 		if (po.value()->dst_mac.has_value() == false) {
 			if (re->network_address.get_family() == any_addr::ipv4) {
-				DOLOG(ll_debug, "router::operator: ARPing MAC for %s\n", po.value()->dst_ip.to_str().c_str());
+				DOLOG(ll_debug, "router::operator: ARPing MAC for %s (%d)\n", po.value()->dst_ip.to_str().c_str(), re->interface->get_phys_type());
 
 				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->dst_ip);
 			}

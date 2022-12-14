@@ -23,9 +23,9 @@ private:
         uint64_t *ndp_cache_req { nullptr };
 	uint64_t *ndp_cache_hit { nullptr };
 
-	bool send_request(const any_addr & ip) override;
+	bool send_request(const any_addr & ip, const any_addr::addr_family af) override;
 
-	std::optional<any_addr> check_special_ip_addresses(const any_addr & ip) override;
+	std::optional<any_addr> check_special_ip_addresses(const any_addr & ip, const any_addr::addr_family family) override;
 
 public:
 	ndp(stats *const s);

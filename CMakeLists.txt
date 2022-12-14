@@ -8,11 +8,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_definitions("-D_FILE_OFFSET_BITS=64")
 
-set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_BUILD_TYPE RelWithDebInfo)
-#set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_BUILD_TYPE RelWithDebInfo)
+set(CMAKE_BUILD_TYPE Debug)
 
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+#set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 add_compile_options(-Wall -pedantic)
 
@@ -20,6 +19,7 @@ add_executable(myip
 	address_cache.cpp
 	any_addr.cpp
 	arp.cpp
+	ax25.cpp
 	BearSSLHelpers.cpp
 	buffer_in.cpp
 	buffer_out.cpp
@@ -47,6 +47,7 @@ add_executable(myip
 	ntp.cpp
 	packet.cpp
 	phys.cpp
+	phys_kiss.cpp
 	phys_ppp.cpp
 	phys_promiscuous.cpp
 	phys_sctp_udp.cpp
@@ -107,6 +108,8 @@ target_link_libraries(myip Threads::Threads)
 target_link_libraries(myip -lrt)
 
 target_link_libraries(myip -lbearssl)
+
+target_link_libraries(myip -latomic)
 
 include(FindPkgConfig)
 

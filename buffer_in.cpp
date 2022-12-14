@@ -150,7 +150,7 @@ const std::vector<uint8_t> buffer_in::peek() const
 	return std::vector<uint8_t>(&p[o], &p[size]);
 }
 
-const uint8_t *buffer_in::get_bytes(const int len)
+const uint8_t *buffer_in::get_bytes(const int len) const
 {
 	if (o + len > size)
 		throw std::out_of_range("buffer_in::get_bytes");

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "arp.h"
+#include "ax25.h"
 #include "log.h"
 #include "net.h"
 #include "phys.h"
@@ -49,9 +50,38 @@ void arp::operator()()
 		const uint8_t *const p = pkt->get_data();
 		const int size = pkt->get_size();
 
-		if (p[6] == 0x00 && p[7] == 0x01 &&  // request
-		    p[2] == 0x08 && p[3] == 0x00 &&  // ethertype IPv4
-		    any_addr(any_addr::ipv4, &p[24]) == my_ip)  // am I the target?
+		if (size < 6) {
+			DOLOG(ll_debug, "ARP: packet too small (%d bytes)\n", size);
+			delete pkt;
+			continue;
+		}
+
+		uint8_t hw_size = p[4];
+		uint8_t p_size  = p[5];
+
+                uint16_t sha_offset = 8;
+                uint16_t spa_offset = 8 + hw_size;
+                uint16_t tha_offset = spa_offset + p_size;
+                uint16_t tpa_offset = tha_offset + hw_size;
+                uint16_t end_offset = tpa_offset + p_size;
+
+		if (size < end_offset) {
+			DOLOG(ll_debug, "ARP: invalid packet size (%d bytes, expected %d)\n", size, end_offset);
+			delete pkt;
+			continue;
+		}
+
+		uint16_t ether_type = (p[2] << 8) + p[3];
+
+		if ((ether_type == 0x0800 && p_size != 4) || (ether_type == 0x08ff && hw_size != 7)) {
+			DOLOG(ll_debug, "ARP: ethertype p/hw-size mismatch\n");
+			delete pkt;
+			continue;
+		}
+
+		uint16_t request = (p[6] << 8) + p[7];
+
+		if (request == 0x0001 && any_addr(any_addr::ipv4, &p[tpa_offset]) == my_ip)  // am I the target?
 		{
 			DOLOG(ll_debug, "arp::operator: received arp for %s\n", my_ip.to_str().c_str());
 
@@ -59,24 +89,35 @@ void arp::operator()()
 
 			uint8_t *reply = duplicate(p, size);
 
-			swap_mac(&reply[8], &reply[18]); // arp addresses
+			swap_mac(&reply[sha_offset], &reply[tha_offset]); // arp addresses
 
 			// my MAC address
-			my_mac.get(&reply[8], 6);
+			if (ether_type == 0x0800)  // ipv4
+				my_mac.get(&reply[sha_offset], 6);
+			else if (ether_type == 0x08ff)  // AX.25
+				my_mac.get(&reply[sha_offset], 7);
+			else
+				DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
 
 			reply[7] = 0x02; // reply
 
-			swap_ipv4(&reply[14], &reply[24]);
+			swap_ipv4(&reply[spa_offset], &reply[tpa_offset]);
 
 			po.value().interface->transmit_packet(pkt->get_src_addr(), my_mac, 0x0806, reply, size);
 
 			delete [] reply;
 		}
-		else if (p[6] == 0x00 && p[7] == 0x02 &&  // reply
-			pkt->get_dst_addr() == my_mac) {
+		else if (request == 0x0002 && pkt->get_dst_addr() == my_mac) {
+			any_addr work_ip (any_addr::ipv4, &p[spa_offset]);
 
-			any_addr work_ip (any_addr::ipv4, &p[14]);
-			any_addr work_mac(any_addr::mac,  &p[8]);
+			any_addr work_mac;
+
+			if (ether_type == 0x0800)
+				work_mac = any_addr(any_addr::mac,  &p[sha_offset]);
+			else if (ether_type == 0x08ff)  // AX.25
+				work_mac = any_addr(any_addr::ax25, &p[sha_offset]);
+			else
+				DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
 
 			DOLOG(ll_debug, "arp::operator: received arp-reply for %s (is at %s)\n", work_ip.to_str().c_str(), work_mac.to_str().c_str());
 
@@ -90,48 +131,77 @@ void arp::operator()()
 			work_cv.notify_all();
 		}
 		else {
-			DOLOG(ll_debug, "ARP: not for me? request %02x%02x, ethertype %02x%02x target %s\n", p[6], p[7], p[2], p[3], any_addr(any_addr::ipv4, &p[24]).to_str().c_str());
+			DOLOG(ll_debug, "ARP: not for me? request %04x, ethertype %04x\n", request, ether_type);
 		}
 
 		delete pkt;
 	}
 }
 
-bool arp::send_request(const any_addr & ip)
+bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 {
 	uint8_t request[28] { 0 };
 
-	request[1] = 1;  // HTYPE (Ethernet)
+	uint8_t hw_size = 0;
+
+	if (af == any_addr::mac)
+		request[1] = 1, hw_size = 6;  // HTYPE (Ethernet)
+	else if (af == any_addr::ax25)
+		request[1] = 3, hw_size = 7;  // HTYPE (AX.25)
+	else {
+		DOLOG(ll_warning, "ARP::send_request: unsupported address family %d\n", af);
+		return false;
+	}
+
+	uint8_t p_size = 0;
 
 	// PTYPE
 	if (ip.get_family() == any_addr::ipv4)
-		request[2] = 0x08, request[3] = 0x00;
+		request[2] = 0x08, request[3] = 0x00, p_size = 4;
 	else {
 		DOLOG(ll_warning, "ARP::send_request: don't know how to resolve \"%s\" with ARP", ip.to_str().c_str());
 		return false;
 	}
 
-	request[4] = 6;  // HLEN
+	request[4] = hw_size;  // HLEN
 	request[5] = ip.get_len();  // PLEN
 
 	request[6] = 0x00;  // OPER
 	request[7] = 1;
 
-	my_mac.get(&request[8], 6);  // SHA
+	uint16_t sha_offset = 8;
+	uint16_t spa_offset = 8 + hw_size;
+	uint16_t tha_offset = spa_offset + p_size;
+	uint16_t tpa_offset = tha_offset + hw_size;
 
-	my_ip.get(&request[14], 4);  // SPA
+	my_mac.get(&request[sha_offset], hw_size);  // SHA
 
-	ip.get(&request[24], 4);  // TPA
+	my_ip.get(&request[spa_offset], p_size);  // SPA
 
-	any_addr dest_mac(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
+	ip.get(&request[tpa_offset], p_size);  // TPA
+
+	any_addr dest_mac;
+
+	if (my_mac.get_family() == any_addr::ipv4)
+		dest_mac = any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
+	else if (my_mac.get_family() == any_addr::ax25)
+		dest_mac = ax25_address("QST", 0, false, false).get_any_addr();
 
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
 }
 
-std::optional<any_addr> arp::check_special_ip_addresses(const any_addr & ip)
+std::optional<any_addr> arp::check_special_ip_addresses(const any_addr & ip, const any_addr::addr_family family)
 {
-	if ((ip[0] & 0xf0) == 224)  // multicast
-		return any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0x01, 0x00, 0x5e, ip[1], ip[2], ip[3] }).begin());
+	if ((ip[0] & 0xf0) == 224) {  // multicast
+		if (family == any_addr::mac)
+			return any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0x01, 0x00, 0x5e, ip[1], ip[2], ip[3] }).begin());
+
+		if (family == any_addr::ax25) {
+			ax25_address bc("QST", 0, false, false);
+
+			return bc.get_any_addr();
+		}
+	}
 
 	return { };
 }

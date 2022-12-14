@@ -29,9 +29,9 @@ private:
 
 	phys *const interface  { nullptr };
 
-	bool send_request(const any_addr & ip) override;
+	bool send_request(const any_addr & ip, const any_addr::addr_family af) override;
 
-	std::optional<any_addr> check_special_ip_addresses(const any_addr & ip) override;
+	std::optional<any_addr> check_special_ip_addresses(const any_addr & ip, const any_addr::addr_family family) override;
 
 public:
 	arp(stats *const s, phys *const interface, const any_addr & mymac, const any_addr & myip);

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "any_addr.h"
+#include "ax25.h"
 #include "hash.h"
 #include "str.h"
 #include "utils.h"
@@ -125,11 +126,14 @@ void any_addr::set(const addr_family af_in, const uint8_t src[])
 		src_size = 6;
 	else if (af_in == ipv4)
 		src_size = 4;
+	else if (af_in == ax25)
+		src_size = 7;
 	else if (af_in == ipv6)
 		src_size = 16;
 
 	memcpy(addr, src, src_size);
 	addr_size = src_size;
+
 	this->af = af_in;
 
 	set_ = true;
@@ -150,6 +154,12 @@ std::string any_addr::to_str() const
 				addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 
 		return buffer;
+	}
+
+	if (af == ax25) {
+		ax25_address aa(std::vector<uint8_t>(addr, addr + 7));
+
+		return aa.get_address() + "-" + aa.get_ssid();
 	}
 
 	if (af == ipv6) {

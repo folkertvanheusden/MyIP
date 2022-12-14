@@ -9,7 +9,7 @@
 
 class any_addr {
 public:
-	enum addr_family { ipv4, mac, ipv6 };
+	enum addr_family { ipv4, mac, ax25, ipv6 };
 
 private:
 	addr_family af              { mac   };
