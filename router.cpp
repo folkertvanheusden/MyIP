@@ -105,7 +105,21 @@ void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4],
 	re.default_gateway      = gateway;
 
 	std::unique_lock<std::shared_mutex> lck(table_lock);
-	table.push_back(re);
+
+	bool found = false;
+	for(auto & e: table) {
+		if (re.network_address == e.network_address && memcmp(re.mask.ipv4_netmask, e.mask.ipv4_netmask, 4) == 0) {
+			e.interface       = interface;
+			e.mac_lookup.iarp = iarp;
+			e.default_gateway = gateway;
+
+			found             = true;
+			break;
+		}
+	}
+
+	if (!found)
+		table.push_back(re);
 }
 
 void router::add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, ndp *const indp)
@@ -120,7 +134,20 @@ void router::add_router_ipv6(const any_addr & network, const int cidr, phys *con
 	re.mac_lookup.indp         = indp;
 
 	std::unique_lock<std::shared_mutex> lck(table_lock);
-	table.push_back(re);
+
+	bool found = false;
+	for(auto & e : table) {
+		if (e.network_address == re.network_address && e.mask.ipv6_prefix_length == re.mask.ipv6_prefix_length) {
+			e.interface       = interface;
+			e.mac_lookup.indp = re.mac_lookup.indp;
+
+			found             = true;
+			break;
+		}
+	}
+
+	if (!found)
+		table.push_back(re);
 }
 
 bool router::route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_mac, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size)
