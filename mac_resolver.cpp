@@ -54,7 +54,9 @@ int mac_resolver::get_max_packet_size() const
 
 std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_addr & ip)
 {
-	auto special_ip_addresses_mac = check_special_ip_addresses(ip, interface->get_phys_type());
+	auto phys_family = interface->get_phys_type();
+
+	auto special_ip_addresses_mac = check_special_ip_addresses(ip, phys_family);
 	if (special_ip_addresses_mac.has_value())
 		return special_ip_addresses_mac;
 
@@ -68,7 +70,7 @@ std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_a
 		return rc;
 	}
 
-	if (!send_request(ip))
+	if (!send_request(ip, phys_family))
 		return { };
 
 	DOLOG(ll_debug, "mac_resolver::get_mac waiting for %s\n", ip.to_str().c_str());
@@ -110,7 +112,7 @@ std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_a
 		if (repeated == false && get_ms() - start_ts >= 500) {
 			repeated = true;
 
-			send_request(ip);
+			send_request(ip, phys_family);
 		}
 
 		work_cv.wait_for(lck, 100ms);

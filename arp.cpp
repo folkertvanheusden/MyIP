@@ -138,33 +138,54 @@ void arp::operator()()
 	}
 }
 
-bool arp::send_request(const any_addr & ip)
+bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 {
 	uint8_t request[28] { 0 };
 
-	request[1] = 1;  // HTYPE (Ethernet)
+	uint8_t hw_size = 0;
+
+	if (af == any_addr::mac)
+		request[1] = 1, hw_size = 6;  // HTYPE (Ethernet)
+	else if (af == any_addr::ax25)
+		request[1] = 3, hw_size = 7;  // HTYPE (AX.25)
+	else {
+		DOLOG(ll_warning, "ARP::send_request: unsupported address family %d\n", af);
+		return false;
+	}
+
+	uint8_t p_size = 0;
 
 	// PTYPE
 	if (ip.get_family() == any_addr::ipv4)
-		request[2] = 0x08, request[3] = 0x00;
+		request[2] = 0x08, request[3] = 0x00, p_size = 4;
 	else {
 		DOLOG(ll_warning, "ARP::send_request: don't know how to resolve \"%s\" with ARP", ip.to_str().c_str());
 		return false;
 	}
 
-	request[4] = 6;  // HLEN
+	request[4] = hw_size;  // HLEN
 	request[5] = ip.get_len();  // PLEN
 
 	request[6] = 0x00;  // OPER
 	request[7] = 1;
 
-	my_mac.get(&request[8], 6);  // SHA
+	uint16_t sha_offset = 8;
+	uint16_t spa_offset = 8 + hw_size;
+	uint16_t tha_offset = spa_offset + p_size;
+	uint16_t tpa_offset = tha_offset + hw_size;
 
-	my_ip.get(&request[14], 4);  // SPA
+	my_mac.get(&request[sha_offset], hw_size);  // SHA
 
-	ip.get(&request[24], 4);  // TPA
+	my_ip.get(&request[spa_offset], p_size);  // SPA
 
-	any_addr dest_mac(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
+	ip.get(&request[tpa_offset], p_size);  // TPA
+
+	any_addr dest_mac;
+
+	if (my_mac.get_family() == any_addr::ipv4)
+		dest_mac = any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
+	else if (my_mac.get_family() == any_addr::ax25)
+		dest_mac = ax25_address("QST", 0, false, false).get_any_addr();
 
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
 }

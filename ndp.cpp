@@ -24,7 +24,7 @@ void ndp::operator()()
 {
 }
 
-bool ndp::send_request(const any_addr & ip)
+bool ndp::send_request(const any_addr & ip, const any_addr::addr_family af)
 {
 	if (icmp6_) {
 		icmp6_->send_packet_neighbor_solicitation(ip);
