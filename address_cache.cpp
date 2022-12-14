@@ -34,7 +34,7 @@ void address_cache::update_cache(const any_addr & mac, const any_addr & ip, phys
 {
 	const std::lock_guard<std::shared_mutex> lock(cache_lock);
 
-	assert(mac.get_family() == any_addr::mac);
+	assert(mac.get_family() == any_addr::mac  || mac.get_family() == any_addr::ax25);
 	assert(ip.get_family()  == any_addr::ipv4 || ip.get_family()  == any_addr::ipv6);
 
 	auto it = cache.find(ip);
