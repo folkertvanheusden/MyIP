@@ -105,7 +105,8 @@ void icmp6::process_router_advertisement(const packet *const pkt)
 
 		any_addr prefix(any_addr::ipv6, prefix_bytes);
 
-		r->add_router_ipv6(prefix, prefix_length, interface, indp);
+		// TODO priority
+		r->add_router_ipv6(prefix, prefix_length, 0, interface, indp);
 
 		break;
 	}

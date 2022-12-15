@@ -89,7 +89,7 @@ bool check_subnet(const any_addr & addr, const any_addr & network, const uint8_t
 	return true;
 }
 
-void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, phys *const interface, arp *const iarp)
+void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, const int priority, phys *const interface, arp *const iarp)
 {
 	assert(network.get_family() == any_addr::ipv4);
 
@@ -103,16 +103,16 @@ void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4],
 	re.interface            = interface;
 	re.mac_lookup.iarp      = iarp;
 	re.default_gateway      = gateway;
+	re.priority             = priority;
 
 	std::unique_lock<std::shared_mutex> lck(table_lock);
 
 	bool found = false;
 	for(auto & e: table) {
-		if (re.network_address == e.network_address && memcmp(re.mask.ipv4_netmask, e.mask.ipv4_netmask, 4) == 0) {
+		if (re.network_address == e.network_address && memcmp(re.mask.ipv4_netmask, e.mask.ipv4_netmask, 4) == 0 && e.interface == interface) {
 			DOLOG(ll_debug, "router::add_router_ipv4: updated %s/%d.%d.%d.%d to gateway %s\n", re.network_address.to_str().c_str(),
 					netmask[0], netmask[1], netmask[2], netmask[3], gateway.has_value() ? gateway.value().to_str().c_str() : "-");
 
-			e.interface       = interface;
 			e.mac_lookup.iarp = iarp;
 			e.default_gateway = gateway;
 
@@ -129,7 +129,7 @@ void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4],
 	}
 }
 
-void router::add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, ndp *const indp)
+void router::add_router_ipv6(const any_addr & network, const int cidr, const int priority, phys *const interface, ndp *const indp)
 {
 	assert(network.get_family() == any_addr::ipv6);
 
@@ -139,19 +139,14 @@ void router::add_router_ipv6(const any_addr & network, const int cidr, phys *con
 	re.mask.ipv6_prefix_length = cidr;
 	re.interface               = interface;
 	re.mac_lookup.indp         = indp;
+	re.priority                = priority;
 
 	std::unique_lock<std::shared_mutex> lck(table_lock);
 
 	bool found = false;
 	for(auto & e : table) {
 		if (e.network_address == re.network_address && e.mask.ipv6_prefix_length == re.mask.ipv6_prefix_length) {
-			DOLOG(ll_debug, "router::add_router_ipv6: updated %s/%d via interface %s\n", re.network_address.to_str().c_str(),
-					cidr, interface->to_str().c_str());
-
-			e.interface       = interface;
-			e.mac_lookup.indp = re.mac_lookup.indp;
-
-			found             = true;
+			found = true;
 			break;
 		}
 	}
@@ -229,14 +224,14 @@ void router::operator()()
 
 			if (entry.network_address.get_family() == any_addr::ipv4) {
 				if (check_subnet(po.value()->dst_ip, entry.network_address, entry.mask.ipv4_netmask)) {
-					re = &entry; // route through this
-					break;
+					if (re == nullptr || entry.priority > re->priority)
+						re = &entry; // route through this
 				}
 			}
 			else if (entry.network_address.get_family() == any_addr::ipv6) {
 				if (check_subnet(po.value()->src_ip, entry.network_address, entry.mask.ipv6_prefix_length)) {
-					re = &entry;
-					break;
+					if (re == nullptr || entry.priority > re->priority)
+						re = &entry;
 				}
 			}
 			else {
@@ -246,27 +241,33 @@ void router::operator()()
 
 		if (!re) {
 			DOLOG(ll_debug, "router::operator: no route for packet (%s)\n", po.value()->to_str().c_str());
+			dump();
 			continue;
 		}
+
+		DOLOG(ll_debug, "router::operator: selected routing entry: %s\n", re->to_str().c_str());
 
 		if (po.value()->src_mac.has_value() == false) {
 			if (re->network_address.get_family() == any_addr::ipv4) {
 				// must always succeed, see main where a static rarp is setup
 				po.value()->src_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->src_ip);
 			}
-			else {
+			else if (re->network_address.get_family() == any_addr::ipv6) {
 				po.value()->src_mac = re->mac_lookup.indp->get_mac(re->interface, po.value()->src_ip);
 			}
+
+			if (po.value()->src_mac.has_value() == false)
+				DOLOG(ll_info, "router::operator: cannot determine mac for source (%s)\n", po.value()->src_mac.value().to_str().c_str());
 		}
 
 		if (po.value()->dst_mac.has_value() == false) {
 			if (re->network_address.get_family() == any_addr::ipv4) {
-				DOLOG(ll_debug, "router::operator: ARPing MAC for %s (%d)\n", po.value()->dst_ip.to_str().c_str(), re->interface->get_phys_type());
+				DOLOG(ll_debug, "router::operator: ARPing MAC for %s (%s)\n", po.value()->dst_ip.to_str().c_str(), re->interface->to_str().c_str());
 
 				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->dst_ip);
 			}
 			else {
-				DOLOG(ll_debug, "router::operator: NDPing MAC for %s\n", po.value()->dst_ip.to_str().c_str());
+				DOLOG(ll_debug, "router::operator: NDPing MAC for %s (%s)\n", po.value()->dst_ip.to_str().c_str(), re->interface->to_str().c_str());
 
 				po.value()->dst_mac = re->mac_lookup.indp->get_mac(re->interface, po.value()->dst_ip);
 			}

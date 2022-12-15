@@ -572,6 +572,8 @@ int main(int argc, char *argv[])
 
 				std::string ip_family = str_tolower(cfg_str(route, "ip-family", "IP family: ipv4 or ipv6", false, "ipv4"));
 
+				int priority = cfg_int(route, "priority", "priority", true, 0);
+
 				if (ip_family == "ipv4") {
 					std::string network_str = cfg_str(route, "network", "network address", false, "");
 					any_addr network = parse_address(network_str, 4, ".", 10);
@@ -586,7 +588,7 @@ int main(int argc, char *argv[])
 					if (gateway_str.empty() == false)
 						gateway = parse_address(gateway_str, 4, ".", 10);
 
-					r->add_router_ipv4(network, netmask_bytes, gateway, dev, a);
+					r->add_router_ipv4(network, netmask_bytes, gateway, priority, dev, a);
 				}
 				else if (ip_family == "ipv6") {
 					std::string network_str = cfg_str(route, "network", "network address", false, "");
@@ -594,13 +596,11 @@ int main(int argc, char *argv[])
 
 					int cidr = cfg_int(route, "cidr", "cidr", false, 0);
 
-					r->add_router_ipv6(network, cidr, dev, ndp_);
+					r->add_router_ipv6(network, cidr, priority, dev, ndp_);
 				}
 				else {
 					error_exit(false, "ip-family must be either ipv4 or ipv6");
 				}
-
-				// r->add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, arp *const iarp);
 			}
 		}
 		catch(const libconfig::SettingNotFoundException &nfex) {
@@ -939,6 +939,8 @@ int main(int argc, char *argv[])
 	}
 
 	ud_stats *us = unix_domain_socket.empty() ? nullptr : new ud_stats(stream_session_handlers, unix_domain_socket);
+
+	r->dump();
 
 	DOLOG(ll_debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");

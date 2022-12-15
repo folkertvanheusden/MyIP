@@ -29,6 +29,8 @@ private:
 			int ipv6_prefix_length;
 		} mask;
 
+		int priority { -1 };
+
 		phys *interface;
 
 		union {
@@ -88,8 +90,8 @@ public:
 
 	void stop();
 
-	void add_router_ipv4(const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, phys *const interface, arp *const iarp);
-	void add_router_ipv6(const any_addr & network, const int cidr, phys *const interface, ndp *const indp);
+	void add_router_ipv4(const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, const int priority, phys *const interface, arp *const iarp);
+	void add_router_ipv6(const any_addr & network, const int cidr, const int priority, phys *const interface, ndp *const indp);
 
 	void set_default_interface(phys *const default_interface) { this->default_interface = default_interface; }
 

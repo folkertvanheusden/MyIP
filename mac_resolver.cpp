@@ -73,7 +73,7 @@ std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_a
 	if (!send_request(ip, phys_family))
 		return { };
 
-	DOLOG(ll_debug, "mac_resolver::get_mac waiting for %s\n", ip.to_str().c_str());
+	DOLOG(ll_debug, "mac_resolver::get_mac waiting for %s (on %s)\n", ip.to_str().c_str(), interface->to_str().c_str());
 
 	uint64_t start_ts = get_ms();
 
