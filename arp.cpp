@@ -73,7 +73,7 @@ void arp::operator()()
 
 		uint16_t ether_type = (p[2] << 8) + p[3];
 
-		if ((ether_type == 0x0800 && p_size != 4) || (ether_type == 0x08ff && hw_size != 7)) {
+		if ((ether_type == 0x0800 && p_size != 4) || (ether_type == 0x08ff && hw_size != 7) || (ether_type == 0x00cc && hw_size != 7)) {
 			DOLOG(ll_debug, "ARP: ethertype p/hw-size mismatch\n");
 			delete pkt;
 			continue;
@@ -94,7 +94,7 @@ void arp::operator()()
 			// my MAC address
 			if (ether_type == 0x0800)  // ipv4
 				my_mac.get(&reply[sha_offset], 6);
-			else if (ether_type == 0x08ff)  // AX.25
+			else if (ether_type == 0x08ff || ether_type == 0x00cc)  // AX.25
 				my_mac.get(&reply[sha_offset], 7);
 			else
 				DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
@@ -114,7 +114,7 @@ void arp::operator()()
 
 			if (ether_type == 0x0800)
 				work_mac = any_addr(any_addr::mac,  &p[sha_offset]);
-			else if (ether_type == 0x08ff)  // AX.25
+			else if (ether_type == 0x08ff || ether_type == 0x00cc)  // AX.25
 				work_mac = any_addr(any_addr::ax25, &p[sha_offset]);
 			else
 				DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
@@ -156,15 +156,21 @@ bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 	uint8_t p_size = 0;
 
 	// PTYPE
-	if (ip.get_family() == any_addr::ipv4)
-		request[2] = 0x08, request[3] = 0x00, p_size = 4;
+	if (ip.get_family() == any_addr::ipv4) {
+		if (af == any_addr::ax25)
+			request[2] = 0x00, request[3] = 0xcc;
+		else
+			request[2] = 0x08, request[3] = 0x00;
+		
+		p_size = 4;
+	}
 	else {
 		DOLOG(ll_warning, "ARP::send_request: don't know how to resolve \"%s\" with ARP", ip.to_str().c_str());
 		return false;
 	}
 
 	request[4] = hw_size;  // HLEN
-	request[5] = ip.get_len();  // PLEN
+	request[5] = p_size;  // PLEN
 
 	request[6] = 0x00;  // OPER
 	request[7] = 1;
@@ -185,7 +191,7 @@ bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 	if (af == any_addr::mac)
 		dest_mac = any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
 	else if (af == any_addr::ax25)
-		dest_mac = ax25_address("QST", 0, false, false).get_any_addr();
+		dest_mac = ax25_address("QST", 0, true, false).get_any_addr();
 
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
 }

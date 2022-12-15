@@ -21,6 +21,8 @@ class router
 private:
 	class router_entry {
 	public:
+		any_addr local_ip;
+
 		any_addr network_address;
 
 		union {
@@ -84,14 +86,18 @@ private:
 
 	std::atomic_bool stop_flag { false };
 
+	router_entry *find_route(const std::optional<any_addr> & mac, const any_addr & ip);
+
+	std::optional<any_addr> resolve_mac_by_addr(router_entry *const re, const any_addr & addr);
+
 public:
 	router(stats *const s, const int n_threads);
 	virtual ~router();
 
 	void stop();
 
-	void add_router_ipv4(const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, const int priority, phys *const interface, arp *const iarp);
-	void add_router_ipv6(const any_addr & network, const int cidr, const int priority, phys *const interface, ndp *const indp);
+	void add_router_ipv4(const any_addr & local_ip, const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, const int priority, phys *const interface, arp *const iarp);
+	void add_router_ipv6(const any_addr & local_ip, const any_addr & network, const int cidr, const int priority, phys *const interface, ndp *const indp);
 
 	void set_default_interface(phys *const default_interface) { this->default_interface = default_interface; }
 

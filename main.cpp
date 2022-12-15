@@ -417,27 +417,30 @@ int main(int argc, char *argv[])
 		any_addr mgmt_addr;
 
 		// ipv4
-		arp *a = nullptr;
+		arp     *a { nullptr };
+
+		any_addr my_ipv4_address;
+
 		try {
 			const libconfig::Setting & ipv4_ = interface.lookup("ipv4");
 
 			std::string ma_str = cfg_str(ipv4_, "my-address", "IPv4 address", false, "192.168.3.2");
 
-			any_addr my_address = parse_address(ma_str, 4, ".", 10);
+			my_ipv4_address = parse_address(ma_str, 4, ".", 10);
 
-			mgmt_addr = my_address;
+			mgmt_addr = my_ipv4_address;
 
-			printf("%zu] Will listen on IPv4 address: %s\n", i, my_address.to_str().c_str());
+			printf("%zu] Will listen on IPv4 address: %s\n", i, my_ipv4_address.to_str().c_str());
 
-			a = new arp(&s, dev, my_mac, my_address);
-			a->add_static_entry(dev, my_mac, my_address);
+			a = new arp(&s, dev, my_mac, my_ipv4_address);
+			a->add_static_entry(dev, my_mac, my_ipv4_address);
 			dev->register_protocol(0x0806, a);
 
 			int n_ipv4_threads = cfg_int(ipv4_, "n-ipv4-threads", "number of ipv4 threads", true, 4);
 
 			bool forward = cfg_bool(ipv4_, "forwarder", "act as a router?", true, false);
 
-			ipv4 *ipv4_instance = new ipv4(&s, a, my_address, r, forward, n_ipv4_threads);
+			ipv4 *ipv4_instance = new ipv4(&s, a, my_ipv4_address, r, forward, n_ipv4_threads);
 			protocols.push_back(ipv4_instance);
 
 			bool use_icmp = cfg_bool(ipv4_, "use-icmp", "wether to enable icmp", true, true);
@@ -501,25 +504,27 @@ int main(int argc, char *argv[])
 		}
 
 		// ipv6
-		ndp *ndp_ = nullptr;
+		ndp     *ndp_ { nullptr };
+		any_addr my_ipv6_address;
+
 		try {
 			const libconfig::Setting & ipv6_ = interface.lookup("ipv6");
 
 			std::string ma_str = cfg_str(ipv6_, "my-address", "IPv6 address", false, "2001:980:c324:4242:f588:20f4:4d4e:7c2d");
-			any_addr my_ip6 = parse_address(ma_str, 16, ":", 16);
+			my_ipv6_address = parse_address(ma_str, 16, ":", 16);
 
 			if (mgmt_addr.is_set() == false)
-				mgmt_addr = my_ip6;
+				mgmt_addr = my_ipv6_address;
 
-			printf("%zu] Will listen on IPv6 address: %s\n", i, my_ip6.to_str().c_str());
+			printf("%zu] Will listen on IPv6 address: %s\n", i, my_ipv6_address.to_str().c_str());
 
 			ndp_ = new ndp(&s);
-			ndp_->add_static_entry(dev, my_mac, my_ip6);
+			ndp_->add_static_entry(dev, my_mac, my_ipv6_address);
 			protocols.push_back(ndp_);
 
 			int n_ipv6_threads = cfg_int(ipv6_, "n-ipv6-threads", "number of ipv6 threads", true, 4);
 
-			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ip6, r, n_ipv6_threads);
+			ipv6 *ipv6_instance = new ipv6(&s, ndp_, my_ipv6_address, r, n_ipv6_threads);
 			protocols.push_back(ipv6_instance);
 
 			dev->register_protocol(0x86dd, ipv6_instance);
@@ -529,7 +534,7 @@ int main(int argc, char *argv[])
 			if (use_icmp) {
 				int n_threads = cfg_int(ipv6_, "n-icmp-threads", "number of icmp6 threads", true, 8);
 
-				icmp6_ = new icmp6(&s, my_mac, my_ip6, r, dev, n_threads);
+				icmp6_ = new icmp6(&s, my_mac, my_ipv6_address, r, dev, n_threads);
 				transport_layers.push_back(icmp6_);
 
 				ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
@@ -588,7 +593,7 @@ int main(int argc, char *argv[])
 					if (gateway_str.empty() == false)
 						gateway = parse_address(gateway_str, 4, ".", 10);
 
-					r->add_router_ipv4(network, netmask_bytes, gateway, priority, dev, a);
+					r->add_router_ipv4(my_ipv4_address, network, netmask_bytes, gateway, priority, dev, a);
 				}
 				else if (ip_family == "ipv6") {
 					std::string network_str = cfg_str(route, "network", "network address", false, "");
@@ -596,7 +601,7 @@ int main(int argc, char *argv[])
 
 					int cidr = cfg_int(route, "cidr", "cidr", false, 0);
 
-					r->add_router_ipv6(network, cidr, priority, dev, ndp_);
+					r->add_router_ipv6(my_ipv6_address, network, cidr, priority, dev, ndp_);
 				}
 				else {
 					error_exit(false, "ip-family must be either ipv4 or ipv6");

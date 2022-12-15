@@ -89,12 +89,13 @@ bool check_subnet(const any_addr & addr, const any_addr & network, const uint8_t
 	return true;
 }
 
-void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, const int priority, phys *const interface, arp *const iarp)
+void router::add_router_ipv4(const any_addr & local_ip, const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, const int priority, phys *const interface, arp *const iarp)
 {
 	assert(network.get_family() == any_addr::ipv4);
 
 	router_entry re;
 
+	re.local_ip             = local_ip;
 	re.network_address      = network;
 	re.mask.ipv4_netmask[0] = netmask[0];
 	re.mask.ipv4_netmask[1] = netmask[1];
@@ -129,12 +130,13 @@ void router::add_router_ipv4(const any_addr & network, const uint8_t netmask[4],
 	}
 }
 
-void router::add_router_ipv6(const any_addr & network, const int cidr, const int priority, phys *const interface, ndp *const indp)
+void router::add_router_ipv6(const any_addr & local_ip, const any_addr & network, const int cidr, const int priority, phys *const interface, ndp *const indp)
 {
 	assert(network.get_family() == any_addr::ipv6);
 
 	router_entry re;
 
+	re.local_ip                = local_ip;
 	re.network_address         = network;
 	re.mask.ipv6_prefix_length = cidr;
 	re.interface               = interface;
@@ -201,6 +203,48 @@ void router::dump()
 	DOLOG(ll_debug, "-----\n");
 }
 
+router::router_entry *router::find_route(const std::optional<any_addr> & mac, const any_addr & ip)
+{
+	router_entry *re = nullptr;
+
+	for(auto & entry : table) {
+		if (entry.network_address.get_family() != ip.get_family())
+			continue;
+
+		if (mac.has_value() == true && entry.interface->get_phys_type() != mac.value().get_family())
+			continue;
+
+		if (entry.network_address.get_family() == any_addr::ipv4) {
+			if (check_subnet(ip, entry.network_address, entry.mask.ipv4_netmask)) {
+				if (re == nullptr || entry.priority > re->priority)
+					re = &entry; // route through this
+			}
+		}
+		else if (entry.network_address.get_family() == any_addr::ipv6) {
+			if (check_subnet(ip, entry.network_address, entry.mask.ipv6_prefix_length)) {
+				if (re == nullptr || entry.priority > re->priority)
+					re = &entry;
+			}
+		}
+		else {
+			DOLOG(ll_warning, "router::find_route: unknown address family in queued packet (%d)\n", ip.get_family());
+		}
+	}
+
+	return re;
+}
+
+std::optional<any_addr> router::resolve_mac_by_addr(router_entry *const re, const any_addr & addr)
+{
+	if (re->network_address.get_family() == any_addr::ipv4)
+		return re->mac_lookup.iarp->get_mac(re->interface, addr);
+
+	if (re->network_address.get_family() == any_addr::ipv6)
+		return re->mac_lookup.indp->get_mac(re->interface, addr);
+
+	return { };
+}
+
 void router::operator()()
 {
 	while(!stop_flag) {
@@ -208,78 +252,51 @@ void router::operator()()
 		if (!po.has_value())
 			continue;
 
-		router_entry *re = nullptr;
-
 		std::shared_lock<std::shared_mutex> lck(table_lock);
 
-		for(auto & entry : table) {
-			if (entry.network_address.get_family() != po.value()->src_ip.get_family())
-				continue;
+		// also required: for MAC lookups
+		router_entry *re_src = find_route(po.value()->src_mac, po.value()->src_ip);
 
-			if (po.value()->src_mac.has_value() == true && entry.interface->get_phys_type() != po.value()->src_mac.value().get_family())
-				continue;
-
-			if (po.value()->dst_mac.has_value() == true && entry.interface->get_phys_type() != po.value()->dst_mac.value().get_family())
-				continue;
-
-			if (entry.network_address.get_family() == any_addr::ipv4) {
-				if (check_subnet(po.value()->dst_ip, entry.network_address, entry.mask.ipv4_netmask)) {
-					if (re == nullptr || entry.priority > re->priority)
-						re = &entry; // route through this
-				}
-			}
-			else if (entry.network_address.get_family() == any_addr::ipv6) {
-				if (check_subnet(po.value()->src_ip, entry.network_address, entry.mask.ipv6_prefix_length)) {
-					if (re == nullptr || entry.priority > re->priority)
-						re = &entry;
-				}
-			}
-			else {
-				DOLOG(ll_warning, "router::operator: unknown address family in queued packet (%d)\n", po.value()->src_ip.get_family());
-			}
-		}
-
-		if (!re) {
-			DOLOG(ll_debug, "router::operator: no route for packet (%s)\n", po.value()->to_str().c_str());
-			dump();
+		if (!re_src) {
+			DOLOG(ll_debug, "router::operator: no route for source (%s)\n", po.value()->to_str().c_str());
 			continue;
 		}
 
-		DOLOG(ll_debug, "router::operator: selected routing entry: %s\n", re->to_str().c_str());
+		router_entry *re_dst = find_route(po.value()->dst_mac, po.value()->dst_ip);
+
+		if (!re_dst) {
+			DOLOG(ll_debug, "router::operator: no route for destination (%s)\n", po.value()->to_str().c_str());
+			continue;
+		}
+
+		DOLOG(ll_debug, "router::operator: selected source routing entry: %s\n", re_src->to_str().c_str());
+
+		DOLOG(ll_debug, "router::operator: selected destination routing entry: %s\n", re_dst->to_str().c_str());
+
+		// when routing to an other physical address family, use for source-mac the local
+		// destination-interface mac as we're a router
+		if (re_src != re_dst) {
+			re_src = re_dst;
+
+			po.value()->src_mac = resolve_mac_by_addr(re_dst, re_dst->local_ip);
+		}
 
 		if (po.value()->src_mac.has_value() == false) {
-			if (re->network_address.get_family() == any_addr::ipv4) {
-				// must always succeed, see main where a static rarp is setup
-				po.value()->src_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->src_ip);
-			}
-			else if (re->network_address.get_family() == any_addr::ipv6) {
-				po.value()->src_mac = re->mac_lookup.indp->get_mac(re->interface, po.value()->src_ip);
-			}
+			// must always succeed, see main where a static rarp is setup
+			po.value()->src_mac = resolve_mac_by_addr(re_src, po.value()->src_ip);
 
 			if (po.value()->src_mac.has_value() == false)
 				DOLOG(ll_info, "router::operator: cannot determine mac for source (%s)\n", po.value()->src_mac.value().to_str().c_str());
 		}
 
 		if (po.value()->dst_mac.has_value() == false) {
-			if (re->network_address.get_family() == any_addr::ipv4) {
-				DOLOG(ll_debug, "router::operator: ARPing MAC for %s (%s)\n", po.value()->dst_ip.to_str().c_str(), re->interface->to_str().c_str());
-
-				po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, po.value()->dst_ip);
-			}
-			else {
-				DOLOG(ll_debug, "router::operator: NDPing MAC for %s (%s)\n", po.value()->dst_ip.to_str().c_str(), re->interface->to_str().c_str());
-
-				po.value()->dst_mac = re->mac_lookup.indp->get_mac(re->interface, po.value()->dst_ip);
-			}
+			po.value()->dst_mac = resolve_mac_by_addr(re_dst, po.value()->dst_ip);
 
 			// not found? try the default gateway
-			if (po.value()->dst_mac.has_value() == false && re->default_gateway.has_value()) {
-				DOLOG(ll_debug, "router::operator: MAC for %s not found, resolving default gateway (%s)\n", po.value()->dst_ip.to_str().c_str(), re->default_gateway.value().to_str().c_str());
+			if (po.value()->dst_mac.has_value() == false && re_dst->default_gateway.has_value()) {
+				DOLOG(ll_debug, "router::operator: MAC for %s not found, resolving default gateway (%s)\n", po.value()->dst_ip.to_str().c_str(), re_dst->default_gateway.value().to_str().c_str());
 
-				if (re->network_address.get_family() == any_addr::ipv4)
-					po.value()->dst_mac = re->mac_lookup.iarp->get_mac(re->interface, re->default_gateway.value());
-				else
-					po.value()->dst_mac = re->mac_lookup.indp->get_mac(re->interface, re->default_gateway.value());
+				po.value()->dst_mac = resolve_mac_by_addr(re_dst, re_dst->default_gateway.value());
 			}
 		}
 
@@ -296,7 +313,7 @@ void router::operator()()
 		}
 
 		if (ok) {
-			if (re->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false)
+			if (re_dst->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false)
 				DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s)\n", po.value()->to_str().c_str());
 		}
 		else {

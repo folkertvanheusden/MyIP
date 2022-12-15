@@ -281,7 +281,8 @@ void phys_kiss::operator()()
 				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
 
 				auto it = prot_map.find(0x0800);
-				it->second->queue_incoming_packet(this, p);
+				if (it != prot_map.end())
+					it->second->queue_incoming_packet(this, p);
 			}
 			else if (pid == 0xf0) {  // usually beacons etc
 				std::string payload_str = bin_to_text(p, len, true);
@@ -295,7 +296,8 @@ void phys_kiss::operator()()
 				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
 
 				auto it = prot_map.find(0x0806);
-				it->second->queue_incoming_packet(this, p);
+				if (it != prot_map.end())
+					it->second->queue_incoming_packet(this, p);
 			}
 			else {
 				std::string payload_str = bin_to_text(p, len, true);
