@@ -7,7 +7,7 @@ class snmp_client:
     @staticmethod
     def make_snmp_BER(type_: int, data: bytes):
         assert type_ >= 0x00 and type_ <= 0xff
-        assert len(data) < 256
+        assert len(data) <= 256
 
         for d in data:
             assert d >= 0x00 and d <= 0xff
@@ -121,8 +121,10 @@ class snmp_client:
         v = 0
 
         for i in range(0, data[offset + 1]):
+            cv = data[offset + 2 + i]
+
             v <<= 8
-            v |= data[offset + 2]
+            v |= cv
 
         return (v, data[offset + 1] + 2)
 
