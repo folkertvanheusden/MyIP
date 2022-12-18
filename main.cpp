@@ -356,12 +356,20 @@ int main(int argc, char *argv[])
 		else if (type == "promiscuous") {
 			std::string dev_name = cfg_str(interface, "dev-name", "device name", false, "eth0");
 
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);  // name
+			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP Ethernet device");  // description
+			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
+
 			dev = new phys_promiscuous(i + 1, &s, dev_name);
 		}
 		else if (type == "kiss") {
 			std::string dev_file = cfg_str(interface, "serial-dev", "device file (/dev/tty-something usuaully)", false, "");
 
 			int         baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
+
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_file);  // name
+			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP kiss device");  // description
+			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
 			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac);
 		}
@@ -370,6 +378,7 @@ int main(int argc, char *argv[])
 
 			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), myformat("MyIP %s device", type.c_str()));
+			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
 			int baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
 			int bps_setting = 0;
