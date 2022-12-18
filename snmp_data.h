@@ -31,7 +31,7 @@ public:
 class snmp_data_type_static : public snmp_data_type
 {
 private:
-	const bool        is_string { false};
+	const bool        is_string { false };
 	const std::string data;
 	const snmp_integer::snmp_integer_type type { snmp_integer::si_integer };
 	const int         data_int  { 0 };

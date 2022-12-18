@@ -127,8 +127,6 @@ bool udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any
 	out[6] = checksum >> 8;
 	out[7] = checksum;
 
-	out_size += out_size & 1;
-
 	bool rc = false;
 	if (idev)
 		rc = idev->transmit_packet({ }, dst_ip, src_ip, 0x11, out, out_size, nullptr);
