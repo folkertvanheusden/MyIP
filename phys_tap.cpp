@@ -81,7 +81,11 @@ bool phys_tap::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 	DOLOG(ll_debug, "phys_tap(%s): transmit packet %s -> %s\n", name.c_str(), src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	size_t out_size = pl_size + 14;
-	uint8_t *out = new uint8_t[out_size];
+
+	if (out_size < 64)
+		out_size = 64;
+
+	uint8_t *out = new uint8_t[out_size]();
 
 	dst_mac.get(&out[0], 6);
 
