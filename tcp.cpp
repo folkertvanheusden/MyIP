@@ -960,27 +960,27 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	handler.session_closed_2 = session_closed_2;
 
 	// generate id/port mapping
-	uint16_t port = 0;
+	uint16_t local_port = 0;
 
 	// lock all sesions
 	std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 	// allocate free port
 	for(;;) {
-		get_random((uint8_t *)&port, sizeof port);
+		get_random(reinterpret_cast<uint8_t *>(&local_port), sizeof local_port);
 
-		if (port > 1023 && port < 65535 && tcp_clients.find(port) == tcp_clients.end())
+		if (local_port > 1023 && local_port < 65535 && tcp_clients.find(local_port) == tcp_clients.end())
 			break;
 	}
 
 	const any_addr src = idev->get_addr();
 
-	uint64_t id = hash_address(dst_addr, port, dst_port);
+	uint64_t id = hash_address(dst_addr, local_port, dst_port);
 
-	tcp_clients.insert({ port, id });
+	tcp_clients.insert({ local_port, id });
 
 	// generate tcp session
-	tcp_session *new_session = new tcp_session(this, dst_addr, dst_port, src, port, nullptr);
+	tcp_session *new_session = new tcp_session(this, dst_addr, dst_port, src, local_port, nullptr);
 	new_session->state       = tcp_syn_sent;
 	new_session->state_since = time(nullptr);
 
@@ -1011,11 +1011,11 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	sessions.insert({ id, new_session });
 	stats_set(tcp_cur_n_sessions, sessions.size());
 
-	add_handler(port, handler);
+	add_handler(local_port, handler);
 
 	lck.unlock();
 
-	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: new client session, my seq nr: %u, local port: %d, destination port: %d\n", id, new_session->initial_my_seq_nr, port, dst_port);
+	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: new client session, my seq nr: %u, local port: %d, destination port: %d\n", id, new_session->initial_my_seq_nr, local_port, dst_port);
 
 	// start session
 	new_session->tlock.lock();
@@ -1024,7 +1024,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 
 	new_session->tlock.unlock();
 
-	return port;
+	return local_port;
 }
 
 void tcp::close_client_session(const int port)
