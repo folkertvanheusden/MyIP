@@ -31,7 +31,7 @@ void syslog_srv::input(const any_addr & src_ip, int src_port, const any_addr & d
 		return;
 	}
 
-	std::string pl_str = std::string((const char *)pl.first, pl.second);
+	std::string pl_str = std::string(reinterpret_cast<const char *>(pl.first), pl.second);
 
 	DOLOG(ll_info, "SYSLOG: \"%s\" from [%s]:%d\n", pl_str.c_str(), src_ip.to_str().c_str(), src_port);
 }
