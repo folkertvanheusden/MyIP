@@ -124,7 +124,7 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		work_p += 2;
 
 		if (len == 4 && type == 0x0001 /* type A */) {
-			any_addr a(any_addr::ipv4, work_p);
+			any_addr  a(any_addr::ipv4, work_p);
 			dns_rec_t dr { a, p->get_recv_ts().tv_sec, ttl };
 
 			std::string name = name_len.first.substr(0, name_len.first.size() - 1);  // remove '.'
@@ -140,7 +140,8 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		}
 	}
 
-	updated.notify_all();
+	if (ancount)
+		updated.notify_all();
 }
 
 using namespace std::chrono_literals;
