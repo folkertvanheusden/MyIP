@@ -297,6 +297,9 @@ void router::operator()()
 				DOLOG(ll_debug, "router::operator: MAC for %s not found, resolving default gateway (%s)\n", po.value()->dst_ip.to_str().c_str(), re_dst->default_gateway.value().to_str().c_str());
 
 				po.value()->dst_mac = resolve_mac_by_addr(re_dst, re_dst->default_gateway.value());
+
+				if (po.value()->dst_mac.has_value())
+					DOLOG(ll_debug, "router::operator: default gateway (%s) can be reached via %s\n", po.value()->dst_ip.to_str().c_str(), re_dst->default_gateway.value().to_str().c_str(), po.value()->dst_mac.value().to_str().c_str());
 			}
 		}
 
