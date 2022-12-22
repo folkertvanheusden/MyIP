@@ -136,8 +136,8 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 			a_cache.insert_or_assign(name, dr);
 		}
 		else if (type == 0x0005 /* CNAME */) {
-			auto name_len = get_name(p->get_data(), work_p, true);
-			auto cname    = name_len.first;
+			auto cname_len = get_name(p->get_data(), work_p, true);
+			auto cname     = cname_len.first.substr(0, cname_len.first.size() - 1);  // remove '.'
 
 			dns_cname_rec_t dr { cname, p->get_recv_ts().tv_sec, ttl };
 
@@ -183,6 +183,8 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 			if (itc == cname_cache.end() || now - itc->second.t >= itc->second.max_age)
 				break;
 
+			DOLOG(ll_debug, "DNS resolve for \"%s\": %s maps to %s\n", name.c_str(), work.c_str(), itc->second.name.c_str());
+
 			work = itc->second.name;
 
 			send_req = true;
@@ -193,11 +195,15 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 		if (ita != a_cache.end() && now - ita->second.t < ita->second.max_age) {
 			stats_inc_counter(dns_queries_hit);
 
+			DOLOG(ll_debug, "DNS succeeded to resolve %s\n", work.c_str());
+
 			return ita->second.a;
 		}
 
 		if (send_req) {
 			send_req = false;
+
+			DOLOG(ll_debug, "Sending DNS resolve request for \"%s\"\n", work.c_str());
 
 			uint8_t buffer[256] { 0 };
 			int     offset      { 0 };
