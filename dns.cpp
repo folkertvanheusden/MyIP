@@ -124,16 +124,29 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		work_p += 2;
 
 		if (len == 4 && type == 0x0001 /* type A */) {
-			any_addr  a(any_addr::ipv4, work_p);
-			dns_rec_t dr { a, p->get_recv_ts().tv_sec, ttl };
+			any_addr    a  (any_addr::ipv4, work_p);
+			dns_a_rec_t dr { a, p->get_recv_ts().tv_sec, ttl };
 
 			std::string name = name_len.first.substr(0, name_len.first.size() - 1);  // remove '.'
 
-			DOLOG(ll_debug, "DNS: Mapping %s to %s\n", name.c_str(), a.to_str().c_str());
+			DOLOG(ll_debug, "DNS: A record for %s to %s\n", name.c_str(), a.to_str().c_str());
 
 			std::unique_lock lck(lock);
 
-			cache.insert_or_assign(name, dr);
+			a_cache.insert_or_assign(name, dr);
+		}
+		else if (type == 0x0005 /* CNAME */) {
+			std::string cname(reinterpret_cast<const char *>(work_p), len);
+
+			dns_cname_rec_t dr { cname, p->get_recv_ts().tv_sec, ttl };
+
+			std::string name = name_len.first.substr(0, name_len.first.size() - 1);  // remove '.'
+
+			DOLOG(ll_debug, "DNS: CNAME record for %s to %s\n", name.c_str(), cname.c_str());
+
+			std::unique_lock lck(lock);
+
+			cname_cache.insert_or_assign(name, dr);
 		}
 		else {
 			DOLOG(ll_debug, "DNS: type: %04x, class: %04x, len: %d for %s\n", type, class_, len, name_len.first.c_str());
@@ -156,28 +169,37 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 
 	auto wait_until  = std::chrono::system_clock::now() + 1ms * to;
 
-	bool first       = true;
+	bool send_req    = true;
 
 	std::unique_lock lck(lock);
 
 	do {
-		auto   it  = cache.find(work);
-
 		time_t now = time(nullptr);
 
-		if (it != cache.end() && now - it->second.t < it->second.max_age) {
-			stats_inc_counter(dns_queries_miss);
+		for(int i=0; i<8; i++) {  // cname max depth is 8 here
+			auto itc = cname_cache.find(work);
 
-			return it->second.a;
+			if (itc == cname_cache.end() || now - itc->second.t >= itc->second.max_age)
+				break;
+
+			work = itc->second.name;
+
+			send_req = true;
 		}
 
-		if (first) {
-			first = false;
+		auto ita = a_cache.find(work);
 
-			stats_inc_counter(dns_queries_miss);
+		if (ita != a_cache.end() && now - ita->second.t < ita->second.max_age) {
+			stats_inc_counter(dns_queries_hit);
+
+			return ita->second.a;
+		}
+
+		if (send_req) {
+			send_req = false;
 
 			uint8_t buffer[256] { 0 };
-			int     offset = 0;
+			int     offset      { 0 };
 
 			buffer[offset++] = 0;  // transaction id
 			buffer[offset++] = 0;
@@ -242,15 +264,17 @@ void dns::operator()()
 
 		std::unique_lock lck(lock);
 
-		if (cache.size() > 1024) {
+		if (a_cache.size() > 1024) {
 			time_t now = time(nullptr);
 
-			for(auto it = cache.begin(); it != cache.end();) {
+			for(auto it = a_cache.begin(); it != a_cache.end();) {
 				if (now - it->second.t >= it->second.max_age)
-					it = cache.erase(it);
+					it = a_cache.erase(it);
 				else
 					it++;
 			}
 		}
+
+		// TODO cname_cache
 	}
 }

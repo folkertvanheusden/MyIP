@@ -9,28 +9,36 @@
 
 typedef struct {
 	any_addr a;
-	time_t t;
-	int max_age;
-} dns_rec_t;
+	time_t   t;
+	int      max_age;
+} dns_a_rec_t;
+
+typedef struct {
+	std::string name;
+	time_t      t;
+	int         max_age;
+} dns_cname_rec_t;
 
 class dns : public application
 {
 private:
-	udp *const u { nullptr };
+	udp *const u                      { nullptr };
 
-	const any_addr my_ip, dns_ip;
+	const any_addr my_ip;
+	const any_addr dns_ip;
 
-	std::thread *th { nullptr };
+	std::thread *th                   { nullptr };
 
-	uint64_t *dns_queries { nullptr };
-	uint64_t *dns_queries_hit { nullptr };
-	uint64_t *dns_queries_miss { nullptr };
+	uint64_t *dns_queries             { nullptr };
+	uint64_t *dns_queries_hit         { nullptr };
+	uint64_t *dns_queries_miss        { nullptr };
 	uint64_t *dns_queries_alien_reply { nullptr };
-	uint64_t *dns_queries_to { nullptr };
+	uint64_t *dns_queries_to          { nullptr };
 
-	std::mutex lock;
-	std::map<std::string, dns_rec_t> cache;
-	std::condition_variable updated;
+	std::mutex                         lock;
+	std::map<std::string, dns_a_rec_t> a_cache;
+	std::map<std::string, dns_cname_rec_t> cname_cache;
+	std::condition_variable            updated;
 
 public:
 	dns(stats *const s, udp *const u, const any_addr & my_ip, const any_addr & dns_ip);
