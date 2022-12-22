@@ -136,7 +136,8 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 			a_cache.insert_or_assign(name, dr);
 		}
 		else if (type == 0x0005 /* CNAME */) {
-			std::string cname(reinterpret_cast<const char *>(work_p), len);
+			auto name_len = get_name(p->get_data(), work_p, true);
+			auto cname    = name_len.first;
 
 			dns_cname_rec_t dr { cname, p->get_recv_ts().tv_sec, ttl };
 
