@@ -176,7 +176,7 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 
 		if (a.has_value() == false) {
 			close(fd);
-			DOLOG(ll_debug, "socks_handler: cannot resolve\n");
+			DOLOG(ll_debug, "socks_handler: cannot resolve \"%s\"\n", host.c_str());
 			return;
 		}
 
