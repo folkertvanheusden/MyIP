@@ -90,7 +90,12 @@ bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 
 	auto src_mac = iarp->query_cache(q_addr);
 
-	bool rc = r->route_packet(dst_mac, 0x0800, dst_ip, *src_mac.second, q_addr, out, out_size);
+	bool rc = false;
+
+	if (src_mac.second)
+		rc = r->route_packet(dst_mac, 0x0800, dst_ip, *src_mac.second, q_addr, out, out_size);
+	else
+		DOLOG(ll_debug, "IPv4[%04x]: source mac not known\n", (out[4] << 8) | out[5]);
 
 	delete src_mac.second;
 
