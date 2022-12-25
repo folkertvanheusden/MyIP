@@ -232,6 +232,7 @@ int main(int argc, char *argv[])
 	}
 
 	signal(SIGCHLD, SIG_IGN);
+	signal(SIGPIPE, SIG_IGN);
 
 	libconfig::Config lc_cfg;
 
