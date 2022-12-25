@@ -431,6 +431,44 @@ myipACObjectRequestUpdateCount OBJECT-TYPE
         "Total number of AC cache update packets"
     ::= { myipACTable 6 }
 
+myipPhysTable OBJECT IDENTIFIER ::= { myipObject 8 }
+
+myipPhysGroup OBJECT-GROUP
+    OBJECTS {
+	myipPhysObjectReceivedCount,
+	myipPhysObjectInvalidCount,
+	myipPhysObjectIgnoredCount
+              }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects providing basic instrumentation and
+            control of an MyIP Phys entity."
+    ::= { myipPhysTable 999 }
+
+myipPhysObjectReceivedCount OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of frames received"
+    ::= { myipPhysTable 1 }
+
+myipPhysObjectInvalidCount OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of invalid frames received"
+    ::= { myipPhysTable 2 }
+
+myipPhysObjectIgnoredCount OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of ignored frames"
+    ::= { myipPhysTable 3 }
+
 myipCompliances    MODULE-COMPLIANCE
     STATUS     current
     DESCRIPTION
@@ -443,7 +481,9 @@ myipCompliances    MODULE-COMPLIANCE
 	myipNTPGroup,
 	myipNTPProtCGroup,
 	myipSNMPGroup,
-	myipACGroup
+	myipACGroup,
+	myipSYSLOGGroup,
+	myipPhysGroup
     }
     ::= { myipObject 999 }
 
