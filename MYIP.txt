@@ -2,7 +2,7 @@ MYIP-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises FROM SNMPv2-SMI
-    OBJECT-GROUP FROM SNMPv2-CONF
+    OBJECT-GROUP, MODULE-COMPLIANCE FROM SNMPv2-CONF
 ;
 
 vanheusdendotcom MODULE-IDENTITY
@@ -112,5 +112,16 @@ myipVNCObjectDuratrion OBJECT-TYPE
     DESCRIPTION
         "Total duration of all VNC sessions"
     ::= { myipVNCTable 3 }
+
+myipCompliances    MODULE-COMPLIANCE
+    STATUS     current
+    DESCRIPTION
+	"Compliance statement for the the entities in this (myipObject) MIB."
+    MODULE
+    MANDATORY-GROUPS {
+	myipHttpGroup,
+	myipVNCGroup
+    }
+    ::= { myipObject 999 }
 
 END
