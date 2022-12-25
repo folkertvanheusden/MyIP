@@ -21,6 +21,23 @@ myipObject OBJECT IDENTIFIER ::= { vanheusdendotcom 1 }
 
 myipHttpTable OBJECT IDENTIFIER ::= { myipObject 1 }
 
+myipHttpGroup OBJECT-GROUP
+    OBJECTS { 
+	myipHttpObjectRequestCount,
+	myipHttpObject200Count,
+	myipHttpObject404Count,
+	myipHttpObject500Count,
+	myipHttpObjectErrorCount,
+	myipVNCObjectRequestCount,
+	myipVNCObjectErrors,
+	myipVNCObjectDuratrion
+              }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects providing basic instrumentation and
+            control of an MyIP HTTP entity."
+    ::= { myipHttpTable 999 }
+
 myipHttpObjectRequestCount OBJECT-TYPE
     SYNTAX	Integer32
     MAX-ACCESS	read-only
