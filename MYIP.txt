@@ -515,8 +515,93 @@ myipFirewallObjectDrops OBJECT-TYPE
     MAX-ACCESS	read-only
     STATUS	current
     DESCRIPTION
-        "Total number of firewall dropts"
+        "Total number of firewall drops"
     ::= { myipFirewallTable 1 }
+
+myipARPTable OBJECT IDENTIFIER ::= { myipObject 11 }
+
+myipARPGroup OBJECT-GROUP
+    OBJECTS { 
+	myipARPObjectMessages,
+	myipARPObjectForMe
+              }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects providing basic instrumentation and
+            control of an MyIP ARP entity."
+    ::= { myipARPTable 999 }
+
+myipARPObjectMessages OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of ARP messages"
+    ::= { myipARPTable 1 }
+
+myipARPObjectForMe OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of ARP messages for me"
+    ::= { myipARPTable 2 }
+
+myipDNSTable OBJECT IDENTIFIER ::= { myipObject 12 }
+
+myipDNSGroup OBJECT-GROUP
+    OBJECTS { 
+	myipDNSObjectQueries,
+	myipDNSObjectQueriesHit,
+	myipDNSObjectQueriesMiss,
+	myipDNSObjectQueriesAlienReply,
+	myipDNSObjectQueriesTo
+              }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects providing basic instrumentation and
+            control of an MyIP DNS entity."
+    ::= { myipDNSTable 999 }
+
+myipDNSObjectQueries OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of DNS messages"
+    ::= { myipDNSTable 1 }
+
+myipDNSObjectQueriesHit OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of DNS messages hits"
+    ::= { myipDNSTable 2 }
+
+myipDNSObjectQueriesMiss OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of DNS messages miss"
+    ::= { myipDNSTable 3 }
+
+myipDNSObjectQueriesAlienReply OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of DNS messages alien replies"
+    ::= { myipDNSTable 4 }
+
+myipDNSObjectQueriesTo OBJECT-TYPE
+    SYNTAX	Integer32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+        "Total number of DNS messages to"
+    ::= { myipDNSTable 5 }
 
 myipCompliances    MODULE-COMPLIANCE
     STATUS     current
@@ -534,7 +619,9 @@ myipCompliances    MODULE-COMPLIANCE
 	myipSYSLOGGroup,
 	myipPhysGroup,
 	myipNDPGroup,
-	myipFirewallGroup
+	myipFirewallGroup,
+	myipARPGroup,
+	myipDNSGroup
     }
     ::= { myipObject 999 }
 
