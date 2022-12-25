@@ -223,11 +223,11 @@ port_handler_t nrpe_get_handler(stats *const s)
 	nrpe_private_data *npd = new nrpe_private_data();
 	npd->s = s;
 
-	// 1.3.6.1.2.1.4.57850: vanheusden.com
-	// 1.3.6.1.2.1.4.57850.1: myip
-	// 1.3.6.1.2.1.4.57850.1.13: nrpe
-	npd->nrpe_requests = s->register_stat("nrpe_requests", "1.3.6.1.2.1.4.57850.1.13.1");
-	npd->nrpe_r_err    = s->register_stat("nrpe_r_err",    "1.3.6.1.2.1.4.57850.1.13.2");
+	// 1.3.6.1.4.1.57850: vanheusden.com
+	// 1.3.6.1.4.1.57850.1: myip
+	// 1.3.6.1.4.1.57850.1.13: nrpe
+	npd->nrpe_requests = s->register_stat("nrpe_requests", "1.3.6.1.4.1.57850.1.13.1");
+	npd->nrpe_r_err    = s->register_stat("nrpe_r_err",    "1.3.6.1.4.1.57850.1.13.2");
 
 	tcp_nrpe.pd = npd;
 

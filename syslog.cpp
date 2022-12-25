@@ -11,8 +11,8 @@
 
 syslog_srv::syslog_srv(stats *const s)
 {
-	// 1.3.6.1.2.1.4.57850.1.6: syslog
-	syslog_srv_requests = s->register_stat("syslog_srv_requests", "1.3.6.1.2.1.4.57850.1.6.1");
+	// 1.3.6.1.4.1.57850.1.6: syslog
+	syslog_srv_requests = s->register_stat("syslog_srv_requests", "1.3.6.1.4.1.57850.1.6.1");
 }
 
 syslog_srv::~syslog_srv()

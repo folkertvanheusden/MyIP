@@ -39,18 +39,18 @@ struct sntp_datagram
 
 ntp::ntp(stats *const s, udp *const u, const any_addr & my_ip, const any_addr & upstream_ntp_server, const bool broadcast) : u(u), my_ip(my_ip), upstream_ntp_server(upstream_ntp_server), broadcast(broadcast)
 {
-	// 1.3.6.1.2.1.4.57850.1.4: ntp
-	ntp_requests  = s->register_stat("ntp_requests",  "1.3.6.1.2.1.4.57850.1.4.1");
-	ntp_invalid   = s->register_stat("ntp_invalid",   "1.3.6.1.2.1.4.57850.1.4.2");
-	ntp_time_req  = s->register_stat("ntp_time_req",  "1.3.6.1.2.1.4.57850.1.4.3");
-	ntp_broadcast = s->register_stat("ntp_broadcast", "1.3.6.1.2.1.4.57850.1.4.4");
+	// 1.3.6.1.4.1.57850.1.4: ntp
+	ntp_requests  = s->register_stat("ntp_requests",  "1.3.6.1.4.1.57850.1.4.1");
+	ntp_invalid   = s->register_stat("ntp_invalid",   "1.3.6.1.4.1.57850.1.4.2");
+	ntp_time_req  = s->register_stat("ntp_time_req",  "1.3.6.1.4.1.57850.1.4.3");
+	ntp_broadcast = s->register_stat("ntp_broadcast", "1.3.6.1.4.1.57850.1.4.4");
 
 	for(int i=0; i<8; i++) {
 		char stat_name[] = "ntp_t_req_v_";
 
 		stat_name[11] = '0' + i;
 
-		std::string snmp_name = myformat("1.3.6.1.2.1.4.57850.1.4.5.%d", i + 1);
+		std::string snmp_name = myformat("1.3.6.1.4.1.57850.1.4.5.%d", i + 1);
 
 		ntp_t_req_v[i] = s->register_stat(stat_name, snmp_name);
 	}

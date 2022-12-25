@@ -19,10 +19,10 @@ phys::phys(const size_t dev_index, stats *const s, const std::string & name) :
 	dev_index(dev_index),  // used for SNMP
 	name(name)
 {
-	// 1.3.6.1.2.1.4.57850.1.8: physical device
-	phys_recv_frame = s->register_stat("phys_recv_frame", "1.3.6.1.2.1.4.57850.1.8.1");
-	phys_invl_frame = s->register_stat("phys_invl_frame", "1.3.6.1.2.1.4.57850.1.8.2");
-	phys_ign_frame  = s->register_stat("phys_ign_frame",  "1.3.6.1.2.1.4.57850.1.8.3");
+	// 1.3.6.1.4.1.57850.1.8: physical device
+	phys_recv_frame = s->register_stat("phys_recv_frame", "1.3.6.1.4.1.57850.1.8.1");
+	phys_invl_frame = s->register_stat("phys_invl_frame", "1.3.6.1.4.1.57850.1.8.2");
+	phys_ign_frame  = s->register_stat("phys_ign_frame",  "1.3.6.1.4.1.57850.1.8.3");
 
 	phys_ifInOctets     = s->register_stat("phys_ifInOctets",     myformat("1.3.6.1.2.1.2.2.1.10.%zu", dev_index), snmp_integer::si_counter32);
 	phys_ifHCInOctets   = s->register_stat("phys_ifHCInOctets",   myformat("1.3.6.1.2.1.31.1.1.1.6.%zu", dev_index), snmp_integer::si_counter64);

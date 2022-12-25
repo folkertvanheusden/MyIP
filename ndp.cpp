@@ -11,9 +11,9 @@
 
 ndp::ndp(stats *const s) : mac_resolver(s, nullptr)
 {
-	// 1.3.6.1.2.1.4.57850.1.9: ndp
-        ndp_cache_req = s->register_stat("ndp_cache_req", "1.3.6.1.2.1.4.57850.1.9.1");
-        ndp_cache_hit = s->register_stat("ndp_cache_hit", "1.3.6.1.2.1.4.57850.1.9.2");
+	// 1.3.6.1.4.1.57850.1.9: ndp
+        ndp_cache_req = s->register_stat("ndp_cache_req", "1.3.6.1.4.1.57850.1.9.1");
+        ndp_cache_hit = s->register_stat("ndp_cache_hit", "1.3.6.1.4.1.57850.1.9.2");
 }
 
 ndp::~ndp()

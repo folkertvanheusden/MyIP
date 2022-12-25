@@ -16,11 +16,11 @@ using namespace std::chrono_literals;
 
 dns::dns(stats *const s, udp *const u, const any_addr & my_ip, const any_addr & dns_ip) : u(u), my_ip(my_ip), dns_ip(dns_ip)
 {
-	dns_queries             = s->register_stat("dns_queries",       "1.3.6.1.2.1.4.57850.1.12.1");
-	dns_queries_hit         = s->register_stat("dns_queries_hit",   "1.3.6.1.2.1.4.57850.1.12.2");
-	dns_queries_miss        = s->register_stat("dns_queries_miss",  "1.3.6.1.2.1.4.57850.1.12.3");
-	dns_queries_alien_reply = s->register_stat("dns_queries_alien", "1.3.6.1.2.1.4.57850.1.12.4");
-	dns_queries_to          = s->register_stat("dns_queries_to",    "1.3.6.1.2.1.4.57850.1.12.5");
+	dns_queries             = s->register_stat("dns_queries",       "1.3.6.1.4.1.57850.1.12.1");
+	dns_queries_hit         = s->register_stat("dns_queries_hit",   "1.3.6.1.4.1.57850.1.12.2");
+	dns_queries_miss        = s->register_stat("dns_queries_miss",  "1.3.6.1.4.1.57850.1.12.3");
+	dns_queries_alien_reply = s->register_stat("dns_queries_alien", "1.3.6.1.4.1.57850.1.12.4");
+	dns_queries_to          = s->register_stat("dns_queries_to",    "1.3.6.1.4.1.57850.1.12.5");
 
 	th = new std::thread(std::ref(*this));
 }

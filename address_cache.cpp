@@ -11,13 +11,13 @@
 
 address_cache::address_cache(stats *const s)
 {
-	// 1.3.6.1.2.1.4.57850.1.7: address cache
-	address_cache_requests = s->register_stat("address_cache_requests", "1.3.6.1.2.1.4.57850.1.7.1");
-	address_cache_for_me   = s->register_stat("address_cache_for_me", "1.3.6.1.2.1.4.57850.1.7.2");
-	address_cache_req      = s->register_stat("address_cache_req", "1.3.6.1.2.1.4.57850.1.7.3");
-	address_cache_hit      = s->register_stat("address_cache_hit", "1.3.6.1.2.1.4.57850.1.7.4");
-	address_cache_store    = s->register_stat("address_cache_store", "1.3.6.1.2.1.4.57850.1.7.5");
-	address_cache_update   = s->register_stat("address_cache_cache_update", "1.3.6.1.2.1.4.57850.1.7.6");
+	// 1.3.6.1.4.1.57850.1.7: address cache
+	address_cache_requests = s->register_stat("address_cache_requests", "1.3.6.1.4.1.57850.1.7.1");
+	address_cache_for_me   = s->register_stat("address_cache_for_me", "1.3.6.1.4.1.57850.1.7.2");
+	address_cache_req      = s->register_stat("address_cache_req", "1.3.6.1.4.1.57850.1.7.3");
+	address_cache_hit      = s->register_stat("address_cache_hit", "1.3.6.1.4.1.57850.1.7.4");
+	address_cache_store    = s->register_stat("address_cache_store", "1.3.6.1.4.1.57850.1.7.5");
+	address_cache_update   = s->register_stat("address_cache_cache_update", "1.3.6.1.4.1.57850.1.7.6");
 
 	cleaner_th = new std::thread(&address_cache::cache_cleaner, this);
 }

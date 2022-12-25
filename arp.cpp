@@ -19,9 +19,9 @@ arp::arp(stats *const s, phys *const interface, const any_addr & my_mac, const a
 	my_mac(my_mac), my_ip(my_ip),
 	interface(interface)
 {
-	// 1.3.6.1.2.1.4.57850.1.11: arp
-	arp_requests = s->register_stat("arp_requests", "1.3.6.1.2.1.4.57850.1.11.1");
-	arp_for_me   = s->register_stat("arp_for_me",   "1.3.6.1.2.1.4.57850.1.11.2");
+	// 1.3.6.1.4.1.57850.1.11: arp
+	arp_requests = s->register_stat("arp_requests", "1.3.6.1.4.1.57850.1.11.1");
+	arp_for_me   = s->register_stat("arp_for_me",   "1.3.6.1.4.1.57850.1.11.2");
 
 	arp_th = new std::thread(std::ref(*this));
 }
