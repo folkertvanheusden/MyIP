@@ -27,10 +27,7 @@ myipHttpGroup OBJECT-GROUP
 	myipHttpObject200Count,
 	myipHttpObject404Count,
 	myipHttpObject500Count,
-	myipHttpObjectErrorCount,
-	myipVNCObjectRequestCount,
-	myipVNCObjectErrors,
-	myipVNCObjectDuratrion
+	myipHttpObjectErrorCount
               }
     STATUS  current
     DESCRIPTION
@@ -79,6 +76,18 @@ myipHttpObjectErrorCount OBJECT-TYPE
     ::= { myipHttpTable 5 }
 
 myipVNCTable OBJECT IDENTIFIER ::= { myipObject 2 }
+
+myipVNCGroup OBJECT-GROUP
+    OBJECTS { 
+	myipVNCObjectRequestCount,
+	myipVNCObjectErrors,
+	myipVNCObjectDuratrion
+              }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects providing basic instrumentation and
+            control of an MyIP VNC entity."
+    ::= { myipVNCTable 999 }
 
 myipVNCObjectRequestCount OBJECT-TYPE
     SYNTAX	Integer32
