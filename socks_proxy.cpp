@@ -223,7 +223,7 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 
 	t->close_client_session(src_port);
 
-	DOLOG(ll_debug, "socks_handler: end (port %d, fd %)\n", port, fd);
+	DOLOG(ll_debug, "socks_handler: end (port %d, fd %d)\n", port, fd);
 }
 
 void socks_proxy::operator()()
