@@ -148,14 +148,14 @@ void ntp::operator()()
 
 		sntp_datagram msgout { 0 };
 
-		msgout.li = 0;
-		msgout.mode = 5; // broadcast
-		msgout.vn = 3;
-		msgout.precision = -18; // 3.8us
-		msgout.stratum = 2;
-		msgout.root_delay = 1; // not known
+		msgout.li              = 0;
+		msgout.mode            = 5; // broadcast
+		msgout.vn              = 3;
+		msgout.precision       = -18; // 3.8us
+		msgout.stratum         = 2;
+		msgout.root_delay      = 1; // not known
 		msgout.root_dispersion = 1; // not known
-		msgout.poll = 16;
+		msgout.poll            = 16;
 
 		// what to do with IPv6 addresses?
 		upstream_ntp_server.get((uint8_t *)&msgout.reference_identifier, 4);
