@@ -267,7 +267,11 @@ void phys_kiss::operator()()
 
 			int pid = ap.get_pid().has_value() ? ap.get_pid().value() : -1;
 
+			std::string log_prefix;
+
 			if (ap.get_valid()) {
+				log_prefix = myformat("KISS[%s]", ap.get_from().get_any_addr().to_str().c_str());
+
 				DOLOG(ll_info, "phys_kiss(%s -> %s): received packet of %d bytes\n",
 						ap.get_from().get_any_addr().to_str().c_str(),
 						ap.get_to  ().get_any_addr().to_str().c_str(),
@@ -278,7 +282,7 @@ void phys_kiss::operator()()
 				auto payload = ap.get_data();
 				int  pl_size = payload.get_n_bytes_left();
 
-				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
+				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0, log_prefix);
 
 				auto it = prot_map.find(0x0800);
 				if (it != prot_map.end())
@@ -293,7 +297,7 @@ void phys_kiss::operator()()
 				auto payload = ap.get_data();
 				int  pl_size = payload.get_n_bytes_left();
 
-				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0);
+				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0, log_prefix);
 
 				auto it = prot_map.find(0x0806);
 				if (it != prot_map.end())

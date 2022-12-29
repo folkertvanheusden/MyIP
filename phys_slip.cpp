@@ -184,7 +184,7 @@ void phys_slip::operator()()
 			if (it == prot_map.end())
 				DOLOG(ll_warning, "phys_slip: no IPv4 stack attached to SLIP device (yet)\n");
 			else {
-				packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0);
+				packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0, "SLIP[]");
 
 				it->second->queue_incoming_packet(this, p);
 			}

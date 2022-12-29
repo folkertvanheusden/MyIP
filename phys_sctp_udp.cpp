@@ -158,7 +158,9 @@ void phys_sctp_udp::operator()()
 		my_addr.get(&ip_buffer[16], 4);                    // TO (here)
 		memcpy(&ip_buffer[20], buffer, size);
 
-		packet *p = new packet(ts, src_mac, src_mac, my_mac, ip_buffer, total_length, nullptr, 0);
+		std::string log_prefix = myformat("SCTP/UDP[%s]", host.value().c_str());
+
+		packet *p = new packet(ts, src_mac, src_mac, my_mac, ip_buffer, total_length, nullptr, 0, log_prefix);
 
 		it->second->queue_incoming_packet(this, p);
 	}

@@ -34,7 +34,7 @@ bool lldp::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 	return false;
 }
 
-void lldp::queue_incoming_packet(phys *const interface, const packet *p)
+void lldp::queue_incoming_packet(phys *const interface, packet *p)
 {
 	delete p;
 }

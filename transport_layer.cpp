@@ -9,7 +9,7 @@ constexpr size_t pkts_max_size { 256 };
 
 transport_layer::transport_layer(stats *const s, const std::string & stats_name)
 {
-	pkts = new fifo<const packet *>(s, stats_name, pkts_max_size);
+	pkts = new fifo<packet *>(s, stats_name, pkts_max_size);
 }
 
 transport_layer::~transport_layer()
@@ -17,7 +17,7 @@ transport_layer::~transport_layer()
 	delete pkts;
 }
 
-void transport_layer::queue_packet(const packet *p)
+void transport_layer::queue_packet(packet *p)
 {
 	if (pkts->try_put(p) == false) {
 		DOLOG(ll_debug, "IP-Protocol: packet dropped\n");

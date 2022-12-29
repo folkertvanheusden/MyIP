@@ -29,7 +29,7 @@ any_addr mac_resolver::get_addr() const
 	return any_addr();
 }
 
-void mac_resolver::queue_incoming_packet(phys *const interface, const packet *p)
+void mac_resolver::queue_incoming_packet(phys *const interface, packet *p)
 {
 	if (pkts->try_put({ interface, p }) == false) {
 		DOLOG(ll_debug, "mac_resolver: packet dropped\n");

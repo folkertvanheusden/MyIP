@@ -12,6 +12,7 @@
 #include "log.h"
 #include "phys.h"
 #include "router.h"
+#include "str.h"
 #include "utils.h"
 
 
@@ -96,7 +97,7 @@ void ipv6::operator()()
 		if (!po.has_value())
 			continue;
 
-		const packet *pkt = po.value().p;
+		packet *pkt = po.value().p;
 
 		stats_inc_counter(ip_n_pkt);
 
@@ -114,9 +115,11 @@ void ipv6::operator()()
 
 		const uint32_t flow_label = ((payload_header[1] & 15) << 16) | (payload_header[2] << 8) | payload_header[3];
 
+		pkt->add_to_log_prefix(myformat("IPv6[%x]", flow_label));
+
 		uint8_t version = payload_header[0] >> 4;
 		if (version != 0x06) {
-			DOLOG(ll_info, "IPv6[%04x]: not an IPv6 packet (version: %d)\n", flow_label, version);
+			DOLOG(ll_info, "%s: not an IPv6 packet (version: %d)\n", pkt->get_log_prefix().c_str(), version);
 			stats_inc_counter(ip_n_disc);
 			delete pkt;
 			continue;
@@ -127,12 +130,12 @@ void ipv6::operator()()
 		any_addr pkt_dst(any_addr::ipv6, &payload_header[24]);
 		any_addr pkt_src(any_addr::ipv6, &payload_header[8]);
 
-		DOLOG(ll_debug, "IPv6[%04x]: packet %s => %s\n", flow_label, pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
+		DOLOG(ll_debug, "%s: packet %s => %s\n", pkt->get_log_prefix().c_str(), pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
 		bool link_local_scope_multicast_adress = pkt_dst[0] == 0xff && pkt_dst[1] == 0x02;
 
 		if (pkt_dst != myip && !link_local_scope_multicast_adress) {
-			DOLOG(ll_debug, "IPv6[%04x]: packet (%s) not for me (=%s)\n", flow_label, pkt_src.to_str().c_str(), myip.to_str().c_str());
+			DOLOG(ll_debug, "%s: packet (%s) not for me (=%s)\n", pkt->get_log_prefix().c_str(), pkt_src.to_str().c_str(), myip.to_str().c_str());
 			delete pkt;
 			stats_inc_counter(ipv6_not_me);
 			stats_inc_counter(ip_n_disc);
@@ -144,7 +147,7 @@ void ipv6::operator()()
 		int ip_size = (payload_header[4] << 8) | payload_header[5];
 
 		if (ip_size > size) {
-			DOLOG(ll_info, "IPv6[%04x]: packet is bigger on the inside (%d) than on the outside (%d)\n", flow_label, ip_size, size);
+			DOLOG(ll_info, "%s: packet is bigger on the inside (%d) than on the outside (%d)\n", pkt->get_log_prefix().c_str(), ip_size, size);
 			ip_size = size;
 		}
 
@@ -158,10 +161,10 @@ void ipv6::operator()()
 
 		int header_size = nh - payload_header;
 
-		DOLOG(ll_debug, "IPv6[%04x]: total packet size: %d, IP header says: %d, header size: %d\n", flow_label, size, ip_size, header_size);
+		DOLOG(ll_debug, "%s: total packet size: %d, IP header says: %d, header size: %d\n", pkt->get_log_prefix().c_str(), size, ip_size, header_size);
 
 		if (ip_size > size) {
-			DOLOG(ll_info, "IPv6[%04x] size (%d) > Ethernet size (%d)\n", flow_label, ip_size, size);
+			DOLOG(ll_info, "%s size (%d) > Ethernet size (%d)\n", pkt->get_log_prefix().c_str(), ip_size, size);
 			delete pkt;
 			stats_inc_counter(ip_n_disc);
 			continue;
@@ -176,16 +179,16 @@ void ipv6::operator()()
 
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
-			DOLOG(ll_debug, "IPv6[%04x]: dropping packet %02x (= unknown protocol) and size %d\n", flow_label, protocol, size);
+			DOLOG(ll_debug, "%s: dropping packet %02x (= unknown protocol) and size %d\n", pkt->get_log_prefix().c_str(), protocol, size);
 			delete pkt;
 			stats_inc_counter(ipv6_unk_prot);
 			stats_inc_counter(ip_n_disc);
 			continue;
 		}
 
-		DOLOG(ll_debug, "IPv6[%04x]: queing packet protocol %02x and size %d\n", flow_label, protocol, payload_size);
+		DOLOG(ll_debug, "%s: queing packet protocol %02x and size %d\n", pkt->get_log_prefix().c_str(), protocol, payload_size);
 
-		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size);
+		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size, pkt->get_log_prefix());
 
 		it->second->queue_packet(ip_p);
 

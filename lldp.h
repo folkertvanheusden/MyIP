@@ -35,7 +35,7 @@ public:
 
 	virtual int get_max_packet_size() const override { return 1500; }
 
-	void queue_incoming_packet(phys *const interface, const packet *p) override;
+	void queue_incoming_packet(phys *const interface, packet *p) override;
 
 	void operator()() override;
 };

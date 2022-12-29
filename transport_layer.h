@@ -20,7 +20,7 @@ protected:
 	std::vector<std::thread *> ths;
 	std::atomic_bool           stop_flag { false };
 
-	fifo<const packet *>      *pkts      { nullptr };
+	fifo<packet *>            *pkts      { nullptr };
 
 	network_layer             *idev      { nullptr };
 
@@ -34,7 +34,7 @@ public:
 
 	any_addr get_ip_address() const { return idev->get_addr(); }
 
-	void queue_packet(const packet *p);
+	void queue_packet(packet *p);
 
 	virtual void operator()() = 0;
 };

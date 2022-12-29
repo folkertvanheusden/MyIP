@@ -35,7 +35,7 @@ transport_layer *network_layer::get_transport_layer(const uint8_t protocol)
 	return it->second;
 }
 
-void network_layer::queue_incoming_packet(phys *const interface, const packet *p)
+void network_layer::queue_incoming_packet(phys *const interface, packet *p)
 {
 	if (pkts->try_put({ interface, p }) == false) {
 		DOLOG(ll_debug, "network_layer: packet dropped\n");

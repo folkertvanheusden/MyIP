@@ -13,24 +13,32 @@ private:
 	const struct timespec ts { 0, 0 };
 
 	const any_addr src_mac_addr;
-	const any_addr src_addr, dst_addr;
+
+	const any_addr src_addr;
+	const any_addr dst_addr;
 
 	uint8_t *data;
-	int size;
+	int      size;
+
+	std::string log_prefix;
 
 	// this is required for ICMP: it needs certain fields from the source (IP-)header
 	uint8_t *header;
-	int header_size;
+	int      header_size;
 
 public:
-	packet(const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
-	packet(const struct timespec & ts, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size);
+	packet(const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix);
+	packet(const struct timespec & ts, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix);
 	virtual ~packet();
 
 	uint8_t *get_data() const { return data; }
 	std::pair<const uint8_t *, int> get_payload() const { return { data, size }; }
 
 	int get_size() const { return size; }
+
+	void add_to_log_prefix(const std::string & what) { log_prefix += what; }
+
+	std::string get_log_prefix() const { return log_prefix; }
 
 	const any_addr & get_src_mac_addr() const { return src_mac_addr; }
 

@@ -119,14 +119,14 @@ private:
 
 	void send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len, const uint32_t TSencr);
 
-	void packet_handler(const packet *const pkt);
+	void packet_handler(packet *const pkt);
 	void cleanup_session_helper(std::map<uint64_t, tcp_session *>::iterator *it);
 	void session_cleaner();
 	void unacked_sender();
 
 	void set_state(tcp_session *const session, const tcp_state_t new_state);
 
-	std::optional<port_handler_t> get_lock_listener(const int dst_port, const uint64_t id);
+	std::optional<port_handler_t> get_lock_listener(const int dst_port, const std::string & log_prefix);
 	void release_listener_lock();
 
 	void free_tcp_session(tcp_session *const p);

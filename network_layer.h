@@ -20,7 +20,7 @@ class phys;
 
 typedef struct {
 	phys *interface;
-	const packet *p;
+	packet *p;
 } fifo_element_t;
 
 
@@ -55,7 +55,7 @@ public:
 
 	void register_icmp(icmp *const icmp_) { this->icmp_ = icmp_; }
 
-	virtual void queue_incoming_packet(phys *const interface, const packet *p);
+	virtual void queue_incoming_packet(phys *const interface, packet *p);
 
 	virtual bool transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template) = 0;
 

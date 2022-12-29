@@ -31,7 +31,7 @@ constexpr const char *const states[] = { "closed", "listen", "syn_rcvd", "syn_se
 
 void tcp::free_tcp_session(tcp_session *const p)
 {
-	auto port_record = get_lock_listener(p->get_my_port(), -1);
+	auto port_record = get_lock_listener(p->get_my_port(), "");
 
 	if (port_record.has_value()) {
 		if (port_record.value().session_closed_1)
@@ -204,14 +204,14 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 	ts->e_last_pkt_ts = get_us();
 }
 
-std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const uint64_t id)
+std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const std::string & log_prefix)
 {
 	listeners_lock.lock();
 
 	auto cb_it = listeners.find(dst_port);
 
 	if (cb_it == listeners.end()) {
-		DOLOG(ll_info, "TCP[%012" PRIx64 "]: no listener for that (%d) port\n", id, dst_port);
+		DOLOG(ll_info, "%s: no listener for that (%d) port\n", log_prefix.c_str(), dst_port);
 
 		return { };
 	}
@@ -279,7 +279,7 @@ void tcp::send_rst_for_port(const packet *const pkt, const int dst_port, const i
 	delete [] temp;
 }
 
-void tcp::packet_handler(const packet *const pkt)
+void tcp::packet_handler(packet *const pkt)
 {
 	set_thread_name("myip-ptcp-handler");
 
@@ -314,10 +314,12 @@ void tcp::packet_handler(const packet *const pkt)
 	auto     src = pkt->get_src_addr();
 	uint64_t id  = hash_address(src, dst_port, src_port);
 
-	std::string flag_str = flags_to_str(p[13]);
-	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", id, src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str.c_str(), their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
+	pkt->add_to_log_prefix(myformat("TCP[%012" PRIx64 "]", id));
 
-	auto port_record  = get_lock_listener(dst_port, id);
+	std::string flag_str = flags_to_str(p[13]);
+	DOLOG(ll_debug, "%s: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", pkt->get_log_prefix().c_str(), src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str.c_str(), their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
+
+	auto port_record  = get_lock_listener(dst_port, pkt->get_log_prefix());
 	bool has_listener = port_record.has_value();
 	release_listener_lock();
 
@@ -331,7 +333,7 @@ void tcp::packet_handler(const packet *const pkt)
 
 	// check concuncurrent session count
 	if (sessions.size() >= 128) {
-		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: too many TCP sessions (%zu)\n", id, sessions.size());
+		DOLOG(ll_debug, "%s: too many TCP sessions (%zu)\n", pkt->get_log_prefix().c_str(), sessions.size());
 		// drop packet
 		delete pkt;
 		return;
@@ -371,13 +373,13 @@ void tcp::packet_handler(const packet *const pkt)
 
 			stats_inc_counter(tcp_new_sessions);
 
-			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: ...is a new session (initial my seq nr: %u, their: %u)\n", id, new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
+			DOLOG(ll_debug, "%s: ...is a new session (initial my seq nr: %u, their: %u)\n", pkt->get_log_prefix().c_str(), new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
 
 			cur_it = sessions.find(id);
 		}
 		else {
 			lck.unlock();
-			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: new session which does not start with SYN [IC]\n", id);
+			DOLOG(ll_debug, "%s: new session which does not start with SYN [IC]\n", pkt->get_log_prefix().c_str());
 			delete pkt;
 			stats_inc_counter(tcp_errors);
 			return;
@@ -394,7 +396,7 @@ void tcp::packet_handler(const packet *const pkt)
 		if (cur_extra_headers_p[0] == 8 && flag_ack) {
 			TSecr = (cur_extra_headers_p[2] << 24) | (cur_extra_headers_p[3] << 16) | (cur_extra_headers_p[4] << 8) | cur_extra_headers_p[5];
 
-			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: will set TSecr to %08x\n", TSecr);
+			DOLOG(ll_debug, "%s: will set TSecr to %08x\n", pkt->get_log_prefix().c_str(), TSecr);
 		}
 
 		if (cur_extra_headers_p[0] == 0 || cur_extra_headers_p[0] == 1) // 1-byte?
@@ -407,7 +409,7 @@ void tcp::packet_handler(const packet *const pkt)
 
 	cur_session->e_last_pkt_ts = get_us();
 
-	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: start processing TCP segment, state: %s, my seq nr %d, opponent seq nr %d\n", id, states[cur_session->state], rel_seqnr(cur_session, true, cur_session->my_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
+	DOLOG(ll_debug, "%s: start processing TCP segment, state: %s, my seq nr %d, opponent seq nr %d\n", pkt->get_log_prefix().c_str(), states[cur_session->state], rel_seqnr(cur_session, true, cur_session->my_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
 	cur_session->tlock.lock();
 
 	cur_session->window_size = std::max(1, win_size);
@@ -416,19 +418,19 @@ void tcp::packet_handler(const packet *const pkt)
 	bool delete_entry = false;
 
 	if (header_size > size) {
-		DOLOG(ll_info, "TCP[%012" PRIx64 "]: header with options > packet size [F]\n", id);
+		DOLOG(ll_info, "%s: header with options > packet size [F]\n", pkt->get_log_prefix().c_str());
 		fail = true;
 	}
 
 	if (!fail) {
 		if (flag_rst) {
 			if (cur_session->state >= tcp_syn_rcvd) {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: received RST: session setup aborted\n", id);
+				DOLOG(ll_debug, "%s: received RST: session setup aborted\n", pkt->get_log_prefix().c_str());
 				set_state(cur_session, tcp_closing);
 				delete_entry = true;
 			}		
 			else {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unexpected RST\n", id);
+				DOLOG(ll_debug, "%s: unexpected RST\n", pkt->get_log_prefix().c_str());
 			}
 		}
 
@@ -437,14 +439,14 @@ void tcp::packet_handler(const packet *const pkt)
 
 			// tcp_syn_rcvd: opponent may not have received the syn,ack reply
 			if (cur_session->state == tcp_listen || cur_session->state == tcp_syn_rcvd) {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: received SYN, send SYN + ACK\n", id);
+				DOLOG(ll_debug, "%s: received SYN, send SYN + ACK\n", pkt->get_log_prefix().c_str());
 				// send SYN + ACK
 				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_SYN | FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 
 				set_state(cur_session, tcp_syn_rcvd);
 			}
 			else if (cur_session->state != tcp_syn_sent) { // not a client?
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unexpected SYN\n", id);
+				DOLOG(ll_debug, "%s: unexpected SYN\n", pkt->get_log_prefix().c_str());
 			}
 		}
 
@@ -453,7 +455,7 @@ void tcp::packet_handler(const packet *const pkt)
 				cur_session->initial_their_seq_nr = their_seq_nr;
 				cur_session->their_seq_nr = their_seq_nr + 1;
 
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: received ACK%s: session established, their seq: %u, my seq: %u\n", id, flag_syn ? " and SYN" : "", cur_session->their_seq_nr, cur_session->my_seq_nr);
+				DOLOG(ll_debug, "%s: received ACK%s: session established, their seq: %u, my seq: %u\n", pkt->get_log_prefix().c_str(), flag_syn ? " and SYN" : "", cur_session->their_seq_nr, cur_session->my_seq_nr);
 
 				send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 
@@ -463,16 +465,16 @@ void tcp::packet_handler(const packet *const pkt)
 			}
 			// listener (server)
 			else if (cur_session->state == tcp_syn_rcvd) {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: received ACK: session is established\n", id);
+				DOLOG(ll_debug, "%s: received ACK: session is established\n", pkt->get_log_prefix().c_str());
 				set_state(cur_session, tcp_established);
 
 				stats_inc_counter(tcp_succ_estab);
 
-				auto cb = get_lock_listener(dst_port, id);
+				auto cb = get_lock_listener(dst_port, pkt->get_log_prefix());
 
 				if (cb.has_value()) {
 					if (cb.value().new_session && cb.value().new_session(this, cur_session) == false) {
-						DOLOG(ll_debug, "TCP[%012" PRIx64 "]: session terminated by layer 7\n", id);
+						DOLOG(ll_debug, "%s: session terminated by layer 7\n", pkt->get_log_prefix().c_str());
 						fail = true;
 					}
 				}
@@ -483,7 +485,7 @@ void tcp::packet_handler(const packet *const pkt)
 				release_listener_lock();
 			}
 			else if (cur_session->state == tcp_last_ack) {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: received ACK: session is finished\n", id);
+				DOLOG(ll_debug, "%s: received ACK: session is finished\n", pkt->get_log_prefix().c_str());
 				set_state(cur_session, tcp_listen);  // tcp_closed really
 				delete_entry = true;
 			}
@@ -492,14 +494,14 @@ void tcp::packet_handler(const packet *const pkt)
 				int ack_n = ack_to - cur_session->unacked_start_seq_nr;
 
 				if (ack_n > 0 && cur_session->unacked_size > 0) {
-					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", id, rel_seqnr(cur_session, true, ack_to), rel_seqnr(cur_session, true, cur_session->my_seq_nr), ack_n, cur_session->unacked_size);
+					DOLOG(ll_debug, "%s: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", pkt->get_log_prefix().c_str(), rel_seqnr(cur_session, true, ack_to), rel_seqnr(cur_session, true, cur_session->my_seq_nr), ack_n, cur_session->unacked_size);
 
 					// delete acked
 					int left_n = cur_session->unacked_size - ack_n;
 					if (left_n > 0)
 						memmove(&cur_session->unacked[0], &cur_session->unacked[ack_n], left_n);
 					else if (left_n < 0) {
-						DOLOG(ll_warning, "TCP[%012" PRIx64 "]: ack underrun? %d\n", id, left_n);
+						DOLOG(ll_warning, "%s: ack underrun? %d\n", pkt->get_log_prefix().c_str(), left_n);
 						// terminate this invalid session
 						// can happen for data coming in after finished
 						delete_entry = fail = true;
@@ -508,12 +510,12 @@ void tcp::packet_handler(const packet *const pkt)
 					cur_session->unacked_size -= ack_n;
 					cur_session->unacked_start_seq_nr += ack_n;
 
-					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unacked left: %zu, fin after empty: %d\n", id, cur_session->unacked_size, cur_session->fin_after_unacked_empty);
+					DOLOG(ll_debug, "%s: unacked left: %zu, fin after empty: %d\n", pkt->get_log_prefix().c_str(), cur_session->unacked_size, cur_session->fin_after_unacked_empty);
 
 					cur_session->my_seq_nr += ack_n;
 
 					if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
-						DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unacked buffer empy, FIN\n", id);
+						DOLOG(ll_debug, "%s: unacked buffer empy, FIN\n", pkt->get_log_prefix().c_str());
 
 						send_segment(cur_session, cur_session->id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 
@@ -527,7 +529,7 @@ void tcp::packet_handler(const packet *const pkt)
 				unacked_cv.notify_all();
 			}
 			else {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unexpected ACK\n", id);
+				DOLOG(ll_debug, "%s: unexpected ACK\n", pkt->get_log_prefix().c_str());
 			}
 
 			cur_session->data_since_last_ack = 0;
@@ -535,9 +537,9 @@ void tcp::packet_handler(const packet *const pkt)
 
 		if (flag_fin) {
 			if (cur_session->state == tcp_established) {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: received FIN\n", id);
+				DOLOG(ll_debug, "%s: received FIN\n", pkt->get_log_prefix().c_str());
 
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: cur_session->their_seq_nr %ld, their: %ld\n", id, cur_session->their_seq_nr, their_seq_nr);
+				DOLOG(ll_debug, "%s: cur_session->their_seq_nr %ld, their: %ld\n", pkt->get_log_prefix().c_str(), cur_session->their_seq_nr, their_seq_nr);
 
 				cur_session->seq_for_fin_when_all_received = their_seq_nr;
 				cur_session->flag_fin_when_all_received    = true;
@@ -547,12 +549,12 @@ void tcp::packet_handler(const packet *const pkt)
 				set_state(cur_session, tcp_fin_wait_1);
 			}
 			else {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unexpected FIN\n", id);
+				DOLOG(ll_debug, "%s: unexpected FIN\n", pkt->get_log_prefix().c_str());
 			}
 		}
 
 		if (cur_session->flag_fin_when_all_received && cur_session->seq_for_fin_when_all_received == cur_session->their_seq_nr) {
-			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: ack FIN after all data has been received\n", id);
+			DOLOG(ll_debug, "%s: ack FIN after all data has been received\n", pkt->get_log_prefix().c_str());
 
 			// send ACK + FIN
 			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0, TSecr);
@@ -566,21 +568,21 @@ void tcp::packet_handler(const packet *const pkt)
 	// process payload
 	int data_len = size - header_size;
 	if (data_len > 0 && fail == false) {
-		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: packet len %d, header size: %d, payload size: %d\n", id, size, header_size, data_len);
+		DOLOG(ll_debug, "%s: packet len %d, header size: %d, payload size: %d\n", pkt->get_log_prefix().c_str(), size, header_size, data_len);
 
 		const uint8_t *data_start = &p[header_size];
 
-		// DOLOG(ll_debug, "TCP[%012" PRIx64 "]: %s\n", id, std::string((const char *)&p[header_size], data_len).c_str());
+		// DOLOG(ll_debug, "%s: %s\n", pkt->get_log_prefix().c_str(), std::string((const char *)&p[header_size], data_len).c_str());
 
 		if (their_seq_nr == cur_session->their_seq_nr) {
 			// std::string content = bin_to_text(data_start, data_len);
-			// DOLOG(ll_debug, "TCP[%012" PRIx64 "]: Received content: %s\n", id, content.c_str());
+			// DOLOG(ll_debug, "%s: Received content: %s\n", pkt->get_log_prefix().c_str(), content.c_str());
 
-			auto cb = get_lock_listener(dst_port, id);
+			auto cb = get_lock_listener(dst_port, pkt->get_log_prefix());
 
 			if (cb.has_value()) {
 				if (cb.value().new_data(this, cur_session, buffer_in(data_start, data_len)) == false) {
-					DOLOG(ll_error, "TCP[%012" PRIx64 "]: layer 7 indicated an error\n", id);
+					DOLOG(ll_error, "%s: layer 7 indicated an error\n", pkt->get_log_prefix().c_str());
 					fail = true;
 				}
 			}
@@ -598,12 +600,12 @@ void tcp::packet_handler(const packet *const pkt)
 					if (it == cur_session->fragments.end())
 						break;
 
-					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: use from fragment cache\n", id);
+					DOLOG(ll_debug, "%s: use from fragment cache\n", pkt->get_log_prefix().c_str());
 
-					auto cb = get_lock_listener(dst_port, id);
+					auto cb = get_lock_listener(dst_port, pkt->get_log_prefix());
 
 					if (cb.value().new_data(this, cur_session, buffer_in(it->second.data(), it->second.size())) == false) {
-						DOLOG(ll_error, "TCP[%012" PRIx64 "]: layer 7 indicated an error\n", id);
+						DOLOG(ll_error, "%s: layer 7 indicated an error\n", pkt->get_log_prefix().c_str());
 						fail = true;
 					}
 
@@ -621,21 +623,21 @@ void tcp::packet_handler(const packet *const pkt)
 			if (fail == false) {
 				// will be acked in the 'unacked_sender'-thread
 				if (cur_session->unacked_size == 0) {
-					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: acknowledging received content\n", id);
+					DOLOG(ll_debug, "%s: acknowledging received content\n", pkt->get_log_prefix().c_str());
 
 					send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 				}
 			}
 		}
 		else {
-			DOLOG(ll_info, "TCP[%012" PRIx64 "]: unexpected sequence nr %u, expected: %u\n", id, rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
+			DOLOG(ll_info, "%s: unexpected sequence nr %u, expected: %u\n", pkt->get_log_prefix().c_str(), rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
 
 			if (their_seq_nr > cur_session->their_seq_nr) {
 				std::vector<uint8_t> fragment(data_start, data_start + data_len);
 
 				cur_session->fragments.insert({ their_seq_nr, std::move(fragment) });
 
-				DOLOG(ll_info, "TCP[%012" PRIx64 "]: number of fragments in cache: %zu\n", id, cur_session->fragments.size());
+				DOLOG(ll_info, "%s: number of fragments in cache: %zu\n", pkt->get_log_prefix().c_str(), cur_session->fragments.size());
 			}
 
 			const uint32_t ack_to = cur_session->their_seq_nr;
@@ -647,7 +649,7 @@ void tcp::packet_handler(const packet *const pkt)
 	}
 
 	if (fail) {
-		auto cb = get_lock_listener(dst_port, id);
+		auto cb = get_lock_listener(dst_port, pkt->get_log_prefix());
 
 		if (cb.has_value())
 			cb.value().session_closed_1(this, cur_session);
@@ -660,7 +662,7 @@ void tcp::packet_handler(const packet *const pkt)
 
 		delete_entry = true;
 
-		DOLOG(ll_info, "TCP[%012" PRIx64 "]: sending fail packet [IC]\n", id);
+		DOLOG(ll_info, "%s: sending fail packet [IC]\n", pkt->get_log_prefix().c_str());
 		send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0, TSecr);
 	}
 
@@ -672,7 +674,7 @@ void tcp::packet_handler(const packet *const pkt)
 	lck.unlock();
 
 	if (delete_entry) {
-		DOLOG(ll_info, "TCP[%012" PRIx64 "]: cleaning up session\n", id);
+		DOLOG(ll_info, "%s: cleaning up session\n", pkt->get_log_prefix().c_str());
 
 		lck.lock();
 
@@ -689,12 +691,12 @@ void tcp::packet_handler(const packet *const pkt)
 			// call session_closed_2
 			int close_port       = pointer->get_my_port();
 
-			auto cb_org          = get_lock_listener(close_port, id);
+			auto cb_org          = get_lock_listener(close_port, pkt->get_log_prefix());
 
 			if (cb_org.has_value())  // is session initiated here?
 				cb_org.value().session_closed_2(this, pointer);
 			else
-				DOLOG(ll_info, "TCP[%012" PRIx64 "]: port %d not known\n", id, close_port);
+				DOLOG(ll_info, "%s: port %d not known\n", pkt->get_log_prefix().c_str(), close_port);
 
 			release_listener_lock();
 
@@ -729,16 +731,18 @@ void tcp::session_cleaner()
 		for(auto it = sessions.cbegin(); it != sessions.cend();) {
 			tcp_session *const s = dynamic_cast<tcp_session *>(it->second);
 
+			std::string log_prefix = myformat("TCP[%012" PRIx64 "]", it->first);
+
 			uint64_t age = (now - s->e_last_pkt_ts) / 1000000;
 
 			if (age >= session_timeout || s->state > tcp_established) {
 				if (s->state > tcp_established)
-					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: session closed (state: %s)\n", it->first, states[s->state]);
+					DOLOG(ll_debug, "%s: session closed (state: %s)\n", log_prefix.c_str(), states[s->state]);
 				else
-					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: session timed out\n", it->first);
+					DOLOG(ll_debug, "%s: session timed out\n", log_prefix.c_str());
 
 				// call session_closed
-				auto cb = get_lock_listener(s->get_my_port(), it->first);
+				auto cb = get_lock_listener(s->get_my_port(), log_prefix);
 
 				if (cb.has_value()) {  // session not initiated here?
 					if (cb.value().session_closed_1)
@@ -761,7 +765,7 @@ void tcp::session_cleaner()
 				stats_inc_counter(tcp_sessions_to);
 			}
 			else if (s->state == tcp_time_wait && age >= 2) {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: session clean-up after tcp_time_wait state\n", it->first);
+				DOLOG(ll_debug, "%s: session clean-up after tcp_time_wait state\n", log_prefix.c_str());
 
 				if (s->is_client) {
 					// forget client session
@@ -774,7 +778,7 @@ void tcp::session_cleaner()
 				it = sessions.erase(it);
 			}
 			else if (s->state == tcp_syn_rcvd && age >= 5) {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: delete session in SYN state for 5 or more seconds\n", it->first);
+				DOLOG(ll_debug, "%s: delete session in SYN state for 5 or more seconds\n", log_prefix.c_str());
 
 				if (s->is_client)
 					tcp_clients.erase(s->get_my_port());
@@ -857,7 +861,7 @@ void tcp::operator()()
 		if (!po.has_value())
 			continue;
 
-		const packet *pkt = po.value();
+		packet *pkt = po.value();
 
 		stats_inc_counter(tcp_packets);
 
