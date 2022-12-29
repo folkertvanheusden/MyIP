@@ -271,17 +271,22 @@ void dns::operator()()
 
 		std::unique_lock lck(lock);
 
-		if (a_cache.size() > 1024) {
-			time_t now = time(nullptr);
+		// clean A cache
+		time_t now = time(nullptr);
 
-			for(auto it = a_cache.begin(); it != a_cache.end();) {
-				if (now - it->second.t >= it->second.max_age)
-					it = a_cache.erase(it);
-				else
-					it++;
-			}
+		for(auto it = a_cache.begin(); it != a_cache.end();) {
+			if (now - it->second.t >= it->second.max_age)
+				it = a_cache.erase(it);
+			else
+				it++;
 		}
 
-		// TODO cname_cache
+		// clean CNAME cache
+		for(auto it = cname_cache.begin(); it != cname_cache.end();) {
+			if (now - it->second.t >= it->second.max_age)
+				it = cname_cache.erase(it);
+			else
+				it++;
+		}
 	}
 }
