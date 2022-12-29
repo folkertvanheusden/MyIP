@@ -8,6 +8,7 @@
 #include "log.h"
 #include "sctp.h"
 #include "sctp_crc32c.h"
+#include "str.h"
 #include "utils.h"
 
 // This code uses the 'buffer_in' object: it is a test for how well it is usable when
@@ -270,7 +271,7 @@ void sctp::operator()()
 		if (!po.has_value())
 			continue;
 
-		const packet        *pkt        = po.value();
+		packet              *pkt        = po.value();
 
 		const any_addr       their_addr = pkt->get_src_addr();
 
@@ -293,7 +294,9 @@ void sctp::operator()()
 
 			uint64_t hash                = session::get_hash(their_addr, source_port, destination_port);
 
-			DOLOG(dl, "SCTP[%lx]: source addr %s, source port %d, destination port %d, size: %d, verification tag: %08x\n", hash, their_addr.to_str().c_str(), source_port, destination_port, size, my_verification_tag);
+			pkt->add_to_log_prefix(myformat("SCTP[%d->%d]", source_port, destination_port));
+
+			DOLOG(dl, "%s: source addr %s, source port %d, destination port %d, size: %d, verification tag: %08x\n", pkt->get_log_prefix().c_str(), their_addr.to_str().c_str(), source_port, destination_port, size, my_verification_tag);
 
 			bool send_reply = true;
 
@@ -315,7 +318,7 @@ void sctp::operator()()
 				uint8_t  type_unh  = type >> 6;  // what to do when it can not be processed
 
 				if (len < 4) {
-					DOLOG(dl, "SCTP[%lx]: chunk too short\n", hash);
+					DOLOG(dl, "%s: chunk too short\n", pkt->get_log_prefix().c_str());
 
 					terminate_session = true;
 					break;
@@ -323,10 +326,10 @@ void sctp::operator()()
 
 				buffer_in chunk    = b.get_segment(len - 4);
 
-				DOLOG(dl, "SCTP[%lx]: type %d flags %d length %d\n", hash, type, flags, len);
+				DOLOG(dl, "%s: type %d flags %d length %d\n", pkt->get_log_prefix().c_str(), type, flags, len);
 
 				if (type == 0) {  // DATA
-					DOLOG(dl, "SCTP[%lx]: DATA chunk of length %d\n", hash, chunk.get_n_bytes_left());
+					DOLOG(dl, "%s: DATA chunk of length %d\n", pkt->get_log_prefix().c_str(), chunk.get_n_bytes_left());
 
 					std::function<bool(pstream *const ps, session *const s, buffer_in data)> new_data_handler = nullptr;
 
@@ -366,7 +369,7 @@ void sctp::operator()()
 						}
 					}
 					else {
-						DOLOG(dl, "SCTP[%lx]: DATA: new_data_handler went away?\n", hash);
+						DOLOG(dl, "%s: DATA: new_data_handler went away?\n", pkt->get_log_prefix().c_str());
 
 						reply.add_buffer_out(chunk_gen_abort());
 
@@ -374,7 +377,7 @@ void sctp::operator()()
 					}
 				}
 				else if (type == 1) {  // INIT
-					DOLOG(dl, "SCTP[%lx]: INIT chunk of length %d\n", hash, chunk.get_n_bytes_left());
+					DOLOG(dl, "%s: INIT chunk of length %d\n", pkt->get_log_prefix().c_str(), chunk.get_n_bytes_left());
 
 					bool has_listener = false;
 
@@ -406,7 +409,7 @@ void sctp::operator()()
 					if (has_listener)
 						reply.add_buffer_out(temp);
 					else {
-						DOLOG(dl, "SCTP[%lx]: no listener for port %d\n", hash, destination_port);
+						DOLOG(dl, "%s: no listener for port %d\n", pkt->get_log_prefix().c_str(), destination_port);
 
 						reply.add_buffer_out(chunk_gen_abort());
 
@@ -414,12 +417,12 @@ void sctp::operator()()
 					}
 				}
 				else if (type == 4) {  // HEARTBEAT (-request)
-					DOLOG(dl, "SCTP[%lx]: heartbeat request received\n", hash);
+					DOLOG(dl, "%s: heartbeat request received\n", pkt->get_log_prefix().c_str());
 
 					reply.add_buffer_out(chunk_heartbeat_request(chunk));
 				}
 				else if (type == 6) {  // ABORT
-					DOLOG(dl, "SCTP[%lx]: abort request received\n", hash);
+					DOLOG(dl, "%s: abort request received\n", pkt->get_log_prefix().c_str());
 
 					terminate_session = true;
 
@@ -449,7 +452,7 @@ void sctp::operator()()
 							new_session_handler      = it->second.new_session;
 						}
 						else {
-							DOLOG(dl, "SCTP[%lx]: listener for port %d went away?\n", hash, destination_port);
+							DOLOG(dl, "%s: listener for port %d went away?\n", pkt->get_log_prefix().c_str(), destination_port);
 						}
 					}
 
@@ -458,9 +461,9 @@ void sctp::operator()()
 						std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 						if (sessions.find(hash) != sessions.end())
-							DOLOG(dl, "SCTP[%lx]: session already on-going\n", hash);
+							DOLOG(dl, "%s: session already on-going\n", pkt->get_log_prefix().c_str());
 						else {
-							DOLOG(dl, "SCTP[%lx]: their initial tsn: %lu, my initial tsn: %lu\n", hash, their_initial_tsn, my_initial_tsn);
+							DOLOG(dl, "%s: their initial tsn: %lu, my initial tsn: %lu\n", pkt->get_log_prefix().c_str(), their_initial_tsn, my_initial_tsn);
 
 							sctp_session *s = new sctp_session(this, their_addr, source_port, pkt->get_dst_addr(), destination_port, their_initial_tsn, my_initial_tsn, their_verification_tag, application_private_data);
 							new_session_handler(this, s);
@@ -471,13 +474,13 @@ void sctp::operator()()
 						// send ack
 						reply.add_buffer_out(chunk_gen_cookie_ack());
 
-						DOLOG(dl, "SCTP[%lx]: COOKIE ECHO ACK\n", hash);
+						DOLOG(dl, "%s: COOKIE ECHO ACK\n", pkt->get_log_prefix().c_str());
 					}
 					else {
 						// send deny
 						reply.add_buffer_out(chunk_gen_abort());
 
-						DOLOG(dl, "SCTP[%lx]: ABORT\n", hash);
+						DOLOG(dl, "%s: ABORT\n", pkt->get_log_prefix().c_str());
 
 						terminate_session = true;
 					}
@@ -485,7 +488,7 @@ void sctp::operator()()
 					reply.add_net_long(their_verification_tag, their_verification_tag_offset);
 				}
 				else {
-					DOLOG(dl, "SCTP[%lx]: %d is an unknown chunk type\n", hash, type);
+					DOLOG(dl, "%s: %d is an unknown chunk type\n", pkt->get_log_prefix().c_str(), type);
 
 					send_reply = false;
 				}
@@ -494,7 +497,7 @@ void sctp::operator()()
 				if (padding) {
 					padding = 4 - padding;
 
-					DOLOG(dl, "SCTP[%lx]: chunk padding: %d bytes\n", hash, padding);
+					DOLOG(dl, "%s: chunk padding: %d bytes\n", pkt->get_log_prefix().c_str(), padding);
 
 					b.seek(padding);
 				}
@@ -505,11 +508,11 @@ void sctp::operator()()
 				uint32_t crc32c = generate_crc32c(reply.get_content(), reply.get_size());
 				reply.add_net_long(crc32c, crc_offset);
 
-				DOLOG(dl, "SCTP[%lx]: CRC32c over %zu bytes: %08lx\n", hash, reply.get_size(), crc32c);
+				DOLOG(dl, "%s: CRC32c over %zu bytes: %08lx\n", pkt->get_log_prefix().c_str(), reply.get_size(), crc32c);
 
 				// transmit 'reply' (0x84 is SCTP protocol number)
 				if (transmit_packet(their_addr, pkt->get_dst_addr(), reply.get_content(), reply.get_size()) == false)
-					DOLOG(ll_info, "SCTP[%lx]: failed to transmit reply packet\n", hash);
+					DOLOG(ll_info, "%s: failed to transmit reply packet\n", pkt->get_log_prefix().c_str());
 			}
 
 			if (terminate_session) {

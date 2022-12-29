@@ -135,8 +135,6 @@ void ipv4::operator()()
 
 		stats_inc_counter(ipv4_n_pkt);
 
-		pkt->add_to_log_prefix(myformat("IPv4[%04x]", id));
-
 		uint8_t version = payload_header[0] >> 4;
 		if (version != 0x04) {
 			delete pkt;
@@ -147,6 +145,8 @@ void ipv4::operator()()
 
 		any_addr pkt_dst(any_addr::ipv4, &payload_header[16]);
 		any_addr pkt_src(any_addr::ipv4, &payload_header[12]);
+
+		pkt->add_to_log_prefix(myformat("IPv4[%s]", pkt_src.to_str().c_str()));
 
 		iarp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 

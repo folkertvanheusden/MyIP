@@ -5,6 +5,7 @@
 #include "ipv4.h"
 #include "icmp.h"
 #include "log.h"
+#include "str.h"
 #include "time.h"
 #include "utils.h"
 
@@ -38,7 +39,7 @@ void udp::operator()()
 		if (!po.has_value())
 			continue;
 
-		const packet *pkt = po.value();
+		packet *pkt = po.value();
 
 		const uint8_t *const p    = pkt->get_data();
 		const int            size = pkt->get_size();
@@ -74,6 +75,8 @@ void udp::operator()()
 			auto dst_addr = pkt->get_dst_addr();
 
 			auto header   = pkt->get_header();
+
+			pkt->add_to_log_prefix(myformat("UDP[%d->%d]", src_port, dst_port));
 
 			packet *up    = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), src_addr, dst_addr, &p[8], size - 8, header.first, header.second, pkt->get_log_prefix());
 

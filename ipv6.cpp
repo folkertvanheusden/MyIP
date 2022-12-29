@@ -115,8 +115,6 @@ void ipv6::operator()()
 
 		const uint32_t flow_label = ((payload_header[1] & 15) << 16) | (payload_header[2] << 8) | payload_header[3];
 
-		pkt->add_to_log_prefix(myformat("IPv6[%x]", flow_label));
-
 		uint8_t version = payload_header[0] >> 4;
 		if (version != 0x06) {
 			DOLOG(ll_info, "%s: not an IPv6 packet (version: %d)\n", pkt->get_log_prefix().c_str(), version);
@@ -129,6 +127,8 @@ void ipv6::operator()()
 
 		any_addr pkt_dst(any_addr::ipv6, &payload_header[24]);
 		any_addr pkt_src(any_addr::ipv6, &payload_header[8]);
+
+		pkt->add_to_log_prefix(myformat("IPv6[%s]", pkt_src.to_str().c_str()));
 
 		DOLOG(ll_debug, "%s: packet %s => %s\n", pkt->get_log_prefix().c_str(), pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 

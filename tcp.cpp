@@ -314,7 +314,7 @@ void tcp::packet_handler(packet *const pkt)
 	auto     src = pkt->get_src_addr();
 	uint64_t id  = hash_address(src, dst_port, src_port);
 
-	pkt->add_to_log_prefix(myformat("TCP[%012" PRIx64 "]", id));
+	pkt->add_to_log_prefix(myformat("TCP[%d->%d]", src_port, dst_port));
 
 	std::string flag_str = flags_to_str(p[13]);
 	DOLOG(ll_debug, "%s: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", pkt->get_log_prefix().c_str(), src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str.c_str(), their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
