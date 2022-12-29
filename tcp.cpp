@@ -34,9 +34,11 @@ void tcp::free_tcp_session(tcp_session *const p)
 	auto port_record = get_lock_listener(p->get_my_port(), -1);
 
 	if (port_record.has_value()) {
-		port_record.value().session_closed_1(this, p);
+		if (port_record.value().session_closed_1)
+			port_record.value().session_closed_1(this, p);
 
-		port_record.value().session_closed_2(this, p);
+		if (port_record.value().session_closed_2)
+			port_record.value().session_closed_2(this, p);
 	}
 
 	release_listener_lock();
@@ -553,10 +555,7 @@ void tcp::packet_handler(const packet *const pkt)
 			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: ack FIN after all data has been received\n", id);
 
 			// send ACK + FIN
-			if (cur_session->is_client)
-				send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0, TSecr);
-			else
-				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 
 			set_state(cur_session, tcp_fin_wait_2);
 
@@ -624,10 +623,7 @@ void tcp::packet_handler(const packet *const pkt)
 				if (cur_session->unacked_size == 0) {
 					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: acknowledging received content\n", id);
 
-					if (cur_session->is_client)
-						send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
-					else
-						send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+					send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 				}
 			}
 		}
@@ -644,10 +640,7 @@ void tcp::packet_handler(const packet *const pkt)
 
 			const uint32_t ack_to = cur_session->their_seq_nr;
 
-			if (cur_session->is_client)
-				send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
-			else
-				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 		}
 
 		unacked_cv.notify_all();
@@ -668,10 +661,7 @@ void tcp::packet_handler(const packet *const pkt)
 		delete_entry = true;
 
 		DOLOG(ll_info, "TCP[%012" PRIx64 "]: sending fail packet [IC]\n", id);
-		if (cur_session->is_client)
-			send_segment(cur_session, id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0, TSecr);
-		else
-			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0, TSecr);
+		send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0, TSecr);
 	}
 
 	if (delete_entry)
@@ -696,10 +686,8 @@ void tcp::packet_handler(const packet *const pkt)
 
 			lck.unlock();
 
-			bool is_client       = pointer->is_client;
-
 			// call session_closed_2
-			int close_port       = is_client ? pointer->get_their_port() : pointer->get_my_port();
+			int close_port       = pointer->get_my_port();
 
 			auto cb_org          = get_lock_listener(close_port, id);
 
@@ -753,11 +741,17 @@ void tcp::session_cleaner()
 				auto cb = get_lock_listener(s->get_my_port(), it->first);
 
 				if (cb.has_value()) {  // session not initiated here?
-					cb.value().session_closed_1(this, s);
-					cb.value().session_closed_2(this, s);
+					if (cb.value().session_closed_1)
+						cb.value().session_closed_1(this, s);
+
+					if (cb.value().session_closed_2)
+						cb.value().session_closed_2(this, s);
 				}
 
 				release_listener_lock();
+
+				if (s->is_client)
+					tcp_clients.erase(s->get_my_port());
 
 				// clean-up
 				free_tcp_session(s);
@@ -771,7 +765,7 @@ void tcp::session_cleaner()
 
 				if (s->is_client) {
 					// forget client session
-					tcp_clients.erase(s->get_their_port());
+					tcp_clients.erase(s->get_my_port());
 				}
 
 				// clean-up
@@ -783,7 +777,7 @@ void tcp::session_cleaner()
 				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: delete session in SYN state for 5 or more seconds\n", it->first);
 
 				if (s->is_client)
-					tcp_clients.erase(s->get_their_port());
+					tcp_clients.erase(s->get_my_port());
 
 				free_tcp_session(s);
 
@@ -833,10 +827,7 @@ void tcp::unacked_sender()
 
 					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", it->first, send_n, rel_seqnr(s, true, s->my_seq_nr), s->window_size, s->unacked_size, s->data_since_last_ack);
 
-					if (s->is_client)
-						send_segment(s, s->id, s->get_their_addr(), s->get_their_port(), s->get_my_addr(), s->get_my_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n, 0);
-					else
-						send_segment(s, s->id, s->get_my_addr(), s->get_my_port(), s->get_their_addr(), s->get_their_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n, 0);
+					send_segment(s, s->id, s->get_my_addr(), s->get_my_port(), s->get_their_addr(), s->get_their_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n, 0);
 
 					s->data_since_last_ack += send_n;
 
@@ -938,10 +929,7 @@ void tcp::end_session(session *const ts_in)
 	if (ts->unacked_size == 0) {
 		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: end session, seq %u\n", ts->id, rel_seqnr(ts, true, ts->my_seq_nr));
 
-		if (ts->is_client)
-			send_segment(ts, ts->id, ts->get_their_addr(), ts->get_their_port(), ts->get_my_addr(), ts->get_my_port(), 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0, 0);
-		else
-			send_segment(ts, ts->id, ts->get_my_addr(), ts->get_my_port(), ts->get_their_addr(), ts->get_their_port(), 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0, 0);
+		send_segment(ts, ts->id, ts->get_my_addr(), ts->get_my_port(), ts->get_their_addr(), ts->get_their_port(), 1, FLAG_FIN, ts->their_seq_nr, &ts->my_seq_nr, nullptr, 0, 0);
 
 		set_state(ts, tcp_fin_wait_1);
 	}
@@ -980,7 +968,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	tcp_clients.insert({ local_port, id });
 
 	// generate tcp session
-	tcp_session *new_session = new tcp_session(this, dst_addr, dst_port, src, local_port, nullptr);
+	tcp_session *new_session = new tcp_session(this, src, local_port, dst_addr, dst_port, nullptr);
 	new_session->state       = tcp_syn_sent;
 	new_session->state_since = time(nullptr);
 
@@ -1020,7 +1008,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	// start session
 	new_session->tlock.lock();
 
-	send_segment(new_session, id, new_session->get_their_addr(), new_session->get_their_port(), new_session->get_my_addr(), new_session->get_my_port(), 512, FLAG_SYN, new_session->their_seq_nr, &new_session->my_seq_nr, nullptr, 0, 0);
+	send_segment(new_session, id, new_session->get_my_addr(), new_session->get_my_port(), new_session->get_their_addr(), new_session->get_their_port(), 512, FLAG_SYN, new_session->their_seq_nr, &new_session->my_seq_nr, nullptr, 0, 0);
 
 	new_session->tlock.unlock();
 
