@@ -47,6 +47,7 @@ add_executable(myip
 	ntp.cpp
 	packet.cpp
 	phys.cpp
+	phys_gen_ppp.cpp
 	phys_kiss.cpp
 	phys_ppp.cpp
 	phys_promiscuous.cpp
