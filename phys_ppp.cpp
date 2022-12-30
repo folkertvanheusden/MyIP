@@ -82,13 +82,15 @@ void phys_ppp::operator()()
 		if (size == -1)
 			continue;
 
-		stats_add_counter(phys_ifInOctets, size);
-		stats_add_counter(phys_ifHCInOctets, size);
-		stats_inc_counter(phys_ifInUcastPkts);
-
 		if (buffer == 0x7e) {
 			if (packet_buffer.empty() == false) {  // START/END of packet
-				process_incoming_packet(unwrap_ppp_frame(packet_buffer, ACCM_rx));
+				auto unwrapped = unwrap_ppp_frame(packet_buffer, ACCM_rx);
+
+				stats_add_counter(phys_ifInOctets,   unwrapped.size());
+				stats_add_counter(phys_ifHCInOctets, unwrapped.size());
+				stats_inc_counter(phys_ifInUcastPkts);
+
+				process_incoming_packet(unwrapped);
 
 				packet_buffer.clear();
 
