@@ -196,7 +196,7 @@ bool phys_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 	bool ok = true;
 
 	send_lock.lock();
-	int rc = write(fd, ppp_frame.data(), ppp_frame.size());
+	int rc = WRITE(fd, ppp_frame.data(), ppp_frame.size());
 	send_lock.unlock();
 
 	if (size_t(rc) != ppp_frame.size()) {
