@@ -18,8 +18,8 @@ class phys_ppp : public phys_gen_ppp
 private:
 	std::mutex send_lock;
 
-	bool       emulate_modem_xp { false };
 	int        fd               { -1    };
+	bool       emulate_modem_xp { false };
 
 protected:
 	bool transmit_low(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> & ACCM, const bool not_ppp_meta) override;

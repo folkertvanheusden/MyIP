@@ -72,6 +72,7 @@ add_executable(myip
 	tcp_udp_fw.cpp
 	time.cpp
 	transport_layer.cpp
+	tty.cpp
 	ud.cpp
 	udp.cpp
 	utils.cpp

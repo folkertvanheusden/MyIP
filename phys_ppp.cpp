@@ -13,9 +13,10 @@
 #include <sys/types.h>
 
 #include "log.h"
-#include "phys_ppp.h"
 #include "packet.h"
+#include "phys_ppp.h"
 #include "str.h"
+#include "tty.h"
 #include "utils.h"
 
 
@@ -23,10 +24,12 @@ phys_ppp::phys_ppp(const size_t dev_index, stats *const s, const std::string & d
 	phys_gen_ppp(dev_index, s, dev_name, my_mac, opponent_address),
 	emulate_modem_xp(emulate_modem_xp)
 {
+	fd = open_tty(dev_name, bps);
 }
 
 phys_ppp::~phys_ppp()
 {
+	close(fd);
 }
 
 bool phys_ppp::transmit_low(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> & ACCM, const bool not_ppp_meta)
@@ -40,7 +43,7 @@ bool phys_ppp::transmit_low(const std::vector<uint8_t> & payload, const uint16_t
 	send_lock.unlock();
 
 	if (size_t(rc) != out_wrapped.size()) {
-		DOLOG(ll_error, "phys_ppp: problem sending packet (%d for %zu bytes)\n", rc, out_wrapped.size());
+		DOLOG(ll_error, "phys_ppp: problem sending packet (%d for %zu bytes): %s\n", rc, out_wrapped.size(), strerror(errno));
 
 		if (rc == -1)
 			DOLOG(ll_error, "phys_ppp: %s\n", strerror(errno));
@@ -84,6 +87,8 @@ void phys_ppp::operator()()
 
 		if (buffer == 0x7e) {
 			if (packet_buffer.empty() == false) {  // START/END of packet
+				DOLOG(ll_error, "received ppp frame\n");
+
 				auto unwrapped = unwrap_ppp_frame(packet_buffer, ACCM_rx);
 
 				stats_add_counter(phys_ifInOctets,   unwrapped.size());
