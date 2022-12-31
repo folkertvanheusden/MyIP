@@ -39,6 +39,12 @@ phys_promiscuous::phys_promiscuous(const size_t dev_index, stats *const s, const
 
 	memcpy(ifr.ifr_name, dev_name.c_str(), if_name_len);
 
+	if (ioctl(fd, SIOCGIFMTU, &ifr) == -1)
+		error_exit(true, "phys_promiscuous: ioctl(SIOCGIFMTU) failed");
+
+	mtu_size = ifr.ifr_mtu;
+	DOLOG(ll_debug, "phys_promiscuous: MTU size: %d\n", mtu_size);
+
 	if (ioctl(fd, SIOCGIFINDEX, &ifr) == -1)
 		error_exit(true, "phys_promiscuous: ioctl(SIOCGIFINDEX) failed");
 
@@ -116,6 +122,8 @@ void phys_promiscuous::operator()()
 
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
+	uint8_t *buffer = new uint8_t[mtu_size];
+
 	while(!stop_flag) {
 		int rc = poll(fds, 1, 150);
 		if (rc == -1) {
@@ -129,8 +137,7 @@ void phys_promiscuous::operator()()
 		if (rc == 0)
 			continue;
 
-		uint8_t buffer[1600];
-		int size = read(fd, (char *)buffer, sizeof buffer);
+		int size = read(fd, (char *)buffer, mtu_size);
 
 	        struct timespec ts { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
@@ -167,6 +174,8 @@ void phys_promiscuous::operator()()
 
 		it->second->queue_incoming_packet(this, p);
 	}
+
+	delete [] buffer;
 
 	DOLOG(ll_info, "phys_promiscuous: thread stopped\n");
 }

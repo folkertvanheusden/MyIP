@@ -33,7 +33,6 @@ phys::phys(const size_t dev_index, stats *const s, const std::string & name) :
 
 	// MTU size for Ethernet
 	mtu_size = 1500;
-	DOLOG(ll_debug, "phys: MTU size: %d\n", mtu_size);
 }
 
 phys::~phys()

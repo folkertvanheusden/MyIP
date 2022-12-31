@@ -113,8 +113,9 @@ void icmp4::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const 
 	out[1] = code;
 	out[2] = out[3] = 0; // checksum
 	out[4] = out[5] = 0; // unused
-	out[6] = 1500 >> 8; // next hop MTU
-	out[7] = 1500 & 255;
+	int mtu = idev->get_max_packet_size();
+	out[6] = mtu >> 8; // next hop MTU
+	out[7] = mtu & 255;
 
 	auto org_header = p->get_header();
 	auto org_payload = p->get_payload();

@@ -318,8 +318,14 @@ void router::operator()()
 		}
 
 		if (ok) {
-			if (re_dst->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false)
+			DOLOG(ll_debug, "router::operator: transmit packet from %s (%s) to %s (%s) via %s\n",
+					po.value()->src_ip.to_str().c_str(), po.value()->src_mac.value().to_str().c_str(),
+					po.value()->dst_ip.to_str().c_str(), po.value()->dst_mac.value().to_str().c_str(),
+					re_dst->interface->to_str().c_str());
+
+			if (re_dst->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
 				DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s)\n", po.value()->to_str().c_str());
+			}
 		}
 		else {
 			dump();
