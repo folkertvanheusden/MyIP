@@ -157,8 +157,8 @@ void ipv4::operator()()
 		DOLOG(ll_debug, "%s: total packet size: %d, IP header says: %d, header size: %d\n", pkt->get_log_prefix().c_str(), size, ip_size, header_size);
 
 		if (ip_size > size) {
-			delete pkt;
 			DOLOG(ll_info, "%s: size (%d) > Ethernet size (%d)\n", pkt->get_log_prefix().c_str(), ip_size, size);
+			delete pkt;
 			stats_inc_counter(ip_n_disc);
 			continue;
 		}
@@ -167,8 +167,8 @@ void ipv4::operator()()
 		size = ip_size;
 
 		if (header_size > size) {
-			delete pkt;
 			DOLOG(ll_info, "%s: Header size (%d) > size (%d)\n", pkt->get_log_prefix().c_str(), header_size, size);
+			delete pkt;
 			stats_inc_counter(ip_n_disc);
 			continue;
 		}
