@@ -609,7 +609,12 @@ void phys_gen_ppp::process_incoming_packet(std::vector<uint8_t> packet_buffer)
 	if (protocol == 0x0021) {  // IP
 		stats_inc_counter(phys_recv_frame);
 
-		any_addr src_mac(any_addr::mac, reinterpret_cast<const uint8_t *>("\0\0\0\0\0\1"));
+		uint8_t src_mac_bin[6] { 0 };
+
+		for(int i=0; i<6; i++)
+			src_mac_bin[i] = my_mac[i] ^ ((i & 1) ? 0x55 : 0xaa);
+
+		any_addr src_mac(any_addr::mac, src_mac_bin);
 
 		DOLOG(ll_debug, "phys_gen_ppp: queing packet, size %zu\n", packet_buffer.size());
 
