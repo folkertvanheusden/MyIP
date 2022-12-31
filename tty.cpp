@@ -25,7 +25,7 @@ int open_tty(const std::string & dev_name, const int bps)
 
         struct termios tty;
         if (tcgetattr(fd, &tty) != 0) {
-		DOLOG(ll_error, "tcgetattr: %s", strerror(errno));
+		DOLOG(ll_error, "tcgetattr on %s: %s\n", dev_name.c_str(), strerror(errno));
 		exit(1);
         }
 
@@ -40,7 +40,7 @@ int open_tty(const std::string & dev_name, const int bps)
         tty.c_cc[VMIN]  = 1;            // read blocks
         tty.c_cc[VTIME] = 127;            // 12.7 seconds read timeout
 
-        tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+        tty.c_iflag &= ~(IXON | IXOFF | IXANY); // disable xon/xoff ctrl
 
         tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls,
                                         // enable reading
@@ -49,7 +49,7 @@ int open_tty(const std::string & dev_name, const int bps)
         tty.c_cflag &= ~CRTSCTS;
 
         if (tcsetattr(fd, TCSANOW, &tty) != 0) {
-		DOLOG(ll_error, "tcsetattr: %s", strerror(errno));
+		DOLOG(ll_error, "tcsetattr on %s: %s\n", dev_name.c_str(), strerror(errno));
 		exit(1);
         }
 
