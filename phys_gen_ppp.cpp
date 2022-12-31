@@ -657,6 +657,9 @@ void phys_gen_ppp::process_incoming_packet(std::vector<uint8_t> packet_buffer)
 
 bool phys_gen_ppp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
+	DOLOG(ll_debug, "phys_gen_ppp::transmit_packet: %s -> %s over %s\n",
+			src_mac.to_str().c_str(), dst_mac.to_str().c_str(), to_str().c_str());
+
         std::vector<uint8_t> temp(payload, &payload[pl_size]);
 
         stats_add_counter(phys_ifOutOctets,   pl_size);
