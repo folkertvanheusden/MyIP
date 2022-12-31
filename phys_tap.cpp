@@ -28,7 +28,7 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 	ifr->ifr_name[IFNAMSIZ - 1] = 0x00;
 }
 
-phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid) :
+phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid, const int mtu_size) :
 	phys(dev_index, s, "tap-" + dev_name)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
@@ -41,6 +41,8 @@ phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & d
 		exit(1);
 	}
 
+	this->mtu_size = mtu_size;
+
 	struct ifreq ifr_tap;
 	memset(&ifr_tap, 0, sizeof ifr_tap);
 
@@ -49,23 +51,30 @@ phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & d
 	set_ifr_name(&ifr_tap, dev_name);
 
 	if (ioctl(fd, TUNSETIFF, &ifr_tap) == -1) {
-		DOLOG(ll_error, "ioctl TUNSETIFF: %s", strerror(errno));
+		DOLOG(ll_error, "ioctl TUNSETIFF: %s\n", strerror(errno));
 		exit(1);
 	}
 
 	// myip calcs checksums by itself
 	if (ioctl(fd, TUNSETNOCSUM, 1) == -1) {
-		DOLOG(ll_error, "ioctl TUNSETNOCSUM: %s", strerror(errno));
+		DOLOG(ll_error, "ioctl TUNSETNOCSUM: %s\n", strerror(errno));
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETGROUP, gid) == -1) {
-		DOLOG(ll_error, "ioctl TUNSETGROUP: %s", strerror(errno));
+		DOLOG(ll_error, "ioctl TUNSETGROUP: %s\n", strerror(errno));
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETOWNER, uid) == -1) {
-		DOLOG(ll_error, "ioctl TUNSETOWNER: %s", strerror(errno));
+		DOLOG(ll_error, "ioctl TUNSETOWNER: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	ifr_tap.ifr_mtu = mtu_size;
+
+	if (ioctl(fd, SIOCSIFMTU, &ifr_tap) == -1) {
+		DOLOG(ll_error, "ioctl SIOCGIFMTU: %s\n", strerror(errno));
 		exit(1);
 	}
 
@@ -99,7 +108,7 @@ bool phys_tap::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 
 	// crc32 is not included in a tap device
 
-	stats_add_counter(phys_ifOutOctets, out_size);
+	stats_add_counter(phys_ifOutOctets,   out_size);
 	stats_add_counter(phys_ifHCOutOctets, out_size);
 	stats_inc_counter(phys_ifOutUcastPkts);
 
@@ -129,6 +138,8 @@ void phys_tap::operator()()
 
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
+	uint8_t *buffer = new uint8_t[mtu_size];
+
 	while(!stop_flag) {
 		int rc = poll(fds, 1, 150);
 		if (rc == -1) {
@@ -142,8 +153,7 @@ void phys_tap::operator()()
 		if (rc == 0)
 			continue;
 
-		uint8_t buffer[1600];
-		int size = read(fd, (char *)buffer, sizeof buffer);
+		int size = read(fd, (char *)buffer, mtu_size);
 
 	        struct timespec ts { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
@@ -180,6 +190,8 @@ void phys_tap::operator()()
 
 		it->second->queue_incoming_packet(this, p);
 	}
+
+	delete [] buffer;
 
 	DOLOG(ll_info, "phys_tap: thread stopped\n");
 }

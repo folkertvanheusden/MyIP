@@ -18,7 +18,7 @@ private:
 	int fd { -1 };
 
 public:
-	phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid);
+	phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid, const int mtu_size);
 	phys_tap(const phys_tap &) = delete;
 	virtual ~phys_tap();
 

@@ -355,7 +355,9 @@ int main(int argc, char *argv[])
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP Ethernet device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_tap(i + 1, &s, dev_name, uid, gid);
+			int         mtu_size = cfg_int(interface, "mtu-size", "MTU size", true, 1520);
+
+			dev = new phys_tap(i + 1, &s, dev_name, uid, gid, mtu_size);
 		}
 		else if (type == "promiscuous") {
 			std::string dev_name = cfg_str(interface, "dev-name", "device name", false, "eth0");
