@@ -600,6 +600,11 @@ void phys_gen_ppp::handle_lcp(const std::vector<uint8_t> & data)
 
 void phys_gen_ppp::process_incoming_packet(std::vector<uint8_t> packet_buffer)
 {
+	if (packet_buffer.size() < 4) {
+		DOLOG(ll_debug, "phys_gen_ppp: packet too small: dropped (size %zu)\n", packet_buffer.size());
+		return;
+	}
+
 	if (packet_buffer.at(0) != 0xff && ac_field_compression) {
 		packet_buffer.insert(packet_buffer.begin()+0, 0xff);
 		packet_buffer.insert(packet_buffer.begin()+1, 0x03);
