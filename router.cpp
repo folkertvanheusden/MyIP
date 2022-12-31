@@ -111,8 +111,9 @@ void router::add_router_ipv4(const any_addr & local_ip, const any_addr & network
 	bool found = false;
 	for(auto & e: table) {
 		if (re.network_address == e.network_address && memcmp(re.mask.ipv4_netmask, e.mask.ipv4_netmask, 4) == 0 && e.interface == interface) {
-			DOLOG(ll_debug, "router::add_router_ipv4: updated %s/%d.%d.%d.%d to gateway %s\n", re.network_address.to_str().c_str(),
-					netmask[0], netmask[1], netmask[2], netmask[3], gateway.has_value() ? gateway.value().to_str().c_str() : "-");
+			DOLOG(ll_debug, "router::add_router_ipv4: updated %s/%d.%d.%d.%d to gateway %s via %s\n", re.network_address.to_str().c_str(),
+					netmask[0], netmask[1], netmask[2], netmask[3], gateway.has_value() ? gateway.value().to_str().c_str() : "-",
+					interface->to_str().c_str());
 
 			e.mac_lookup.iarp = iarp;
 			e.default_gateway = gateway;
@@ -123,8 +124,9 @@ void router::add_router_ipv4(const any_addr & local_ip, const any_addr & network
 	}
 
 	if (!found) {
-		DOLOG(ll_debug, "router::add_router_ipv4: added route %s/%d.%d.%d.%d via gateway %s\n", re.network_address.to_str().c_str(),
-				netmask[0], netmask[1], netmask[2], netmask[3], gateway.has_value() ? gateway.value().to_str().c_str() : "-");
+		DOLOG(ll_debug, "router::add_router_ipv4: added route %s/%d.%d.%d.%d via gateway %s via %s\n", re.network_address.to_str().c_str(),
+				netmask[0], netmask[1], netmask[2], netmask[3], gateway.has_value() ? gateway.value().to_str().c_str() : "-",
+				interface->to_str().c_str());
 
 		table.push_back(re);
 	}
@@ -262,14 +264,14 @@ void router::operator()()
 			continue;
 		}
 
+		DOLOG(ll_debug, "router::operator: selected source routing entry: %s\n", re_src->to_str().c_str());
+
 		router_entry *re_dst = find_route(po.value()->dst_mac, po.value()->dst_ip);
 
 		if (!re_dst) {
 			DOLOG(ll_debug, "router::operator: no route for destination (%s)\n", po.value()->to_str().c_str());
 			continue;
 		}
-
-		DOLOG(ll_debug, "router::operator: selected source routing entry: %s\n", re_src->to_str().c_str());
 
 		DOLOG(ll_debug, "router::operator: selected destination routing entry: %s\n", re_dst->to_str().c_str());
 
