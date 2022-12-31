@@ -12,6 +12,8 @@
 #include "stats.h"
 
 
+any_addr gen_opponent_mac(const any_addr & my_mac);
+
 std::vector<uint8_t> unwrap_ppp_frame(const std::vector<uint8_t> & payload, const std::vector<uint8_t> & ACCM);
 
 class phys_gen_ppp : public phys

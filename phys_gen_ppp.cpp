@@ -19,6 +19,16 @@
 #include "utils.h"
 
 
+any_addr gen_opponent_mac(const any_addr & my_mac)
+{
+	uint8_t src_mac_bin[6] { 0 };
+
+	for(int i=0; i<6; i++)
+		src_mac_bin[i] = my_mac[i] ^ ((i & 1) ? 0x55 : 0xaa);
+
+	return any_addr(any_addr::mac, src_mac_bin);
+}
+
 phys_gen_ppp::phys_gen_ppp(const size_t dev_index, stats *const s, const std::string & name, const any_addr & my_mac, const any_addr & opponent_address) :
 	phys(dev_index, s, "ppp-" + name),
 	my_mac(my_mac),
@@ -609,12 +619,7 @@ void phys_gen_ppp::process_incoming_packet(std::vector<uint8_t> packet_buffer)
 	if (protocol == 0x0021) {  // IP
 		stats_inc_counter(phys_recv_frame);
 
-		uint8_t src_mac_bin[6] { 0 };
-
-		for(int i=0; i<6; i++)
-			src_mac_bin[i] = my_mac[i] ^ ((i & 1) ? 0x55 : 0xaa);
-
-		any_addr src_mac(any_addr::mac, src_mac_bin);
+		any_addr src_mac = gen_opponent_mac(my_mac);
 
 		DOLOG(ll_debug, "phys_gen_ppp: queing packet, size %zu\n", packet_buffer.size());
 

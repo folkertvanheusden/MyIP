@@ -343,6 +343,9 @@ int main(int argc, char *argv[])
 
 		sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.1.%zu", i + 1), snmp_integer::si_integer, int(i + 1));
 
+		// MAC, IP
+		std::vector<std::pair<any_addr, any_addr> > static_mappings;
+
 		phys *dev = nullptr;
 
 		if (type == "tap") {
@@ -399,6 +402,8 @@ int main(int argc, char *argv[])
 				any_addr opponent_address = parse_address(oa_str, 4, ".", 10);
 
 				dev = new phys_ppp(i + 1, &s, dev_name, bps_setting, my_mac, emulate_modem_xp, opponent_address);
+
+				static_mappings.push_back({ gen_opponent_mac(my_mac), opponent_address });
 			}
 			else {
 				error_exit(false, "internal error");
@@ -444,6 +449,10 @@ int main(int argc, char *argv[])
 
 			a = new arp(&s, dev, my_mac, my_ipv4_address);
 			a->add_static_entry(dev, my_mac, my_ipv4_address);
+
+			for(auto & se : static_mappings)
+				a->add_static_entry(dev, se.first, se.second);
+
 			dev->register_protocol(0x0806, a);
 
 			int n_ipv4_threads = cfg_int(ipv4_, "n-ipv4-threads", "number of ipv4 threads", true, 4);
