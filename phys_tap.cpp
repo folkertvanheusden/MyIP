@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <sys/ioctl.h>
@@ -25,7 +26,7 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 
 	memcpy(ifr->ifr_name, dev_name.c_str(), copy_name_n);
 
-	ifr->ifr_name[IFNAMSIZ - 1] = 0x00;
+	ifr->ifr_name[copy_name_n] = 0x00;
 }
 
 phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid, const int mtu_size) :
@@ -43,14 +44,13 @@ phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & d
 
 	this->mtu_size = mtu_size;
 
-	struct ifreq ifr_tap;
-	memset(&ifr_tap, 0, sizeof ifr_tap);
+	struct ifreq ifr_tap1 { 0 };
 
-	ifr_tap.ifr_flags = IFF_TAP | IFF_NO_PI;
+	ifr_tap1.ifr_flags = IFF_TAP | IFF_NO_PI;
 
-	set_ifr_name(&ifr_tap, dev_name);
+	set_ifr_name(&ifr_tap1, dev_name);
 
-	if (ioctl(fd, TUNSETIFF, &ifr_tap) == -1) {
+	if (ioctl(fd, TUNSETIFF, &ifr_tap1) == -1) {
 		DOLOG(ll_error, "ioctl TUNSETIFF: %s\n", strerror(errno));
 		exit(1);
 	}
@@ -71,12 +71,21 @@ phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & d
 		exit(1);
 	}
 
-	ifr_tap.ifr_mtu = mtu_size;
+	int fd_sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
-	if (ioctl(fd, SIOCSIFMTU, &ifr_tap) == -1) {
-		DOLOG(ll_error, "ioctl SIOCGIFMTU: %s\n", strerror(errno));
+	struct ifreq ifr_tap2 { 0 };
+
+	set_ifr_name(&ifr_tap2, dev_name);
+
+	ifr_tap2.ifr_addr.sa_family = AF_INET;
+	ifr_tap2.ifr_mtu            = mtu_size;
+
+	if (ioctl(fd_sock, SIOCSIFMTU, &ifr_tap2) == -1) {
+		DOLOG(ll_error, "ioctl SIOCSIFMTU(%d): %s\n", mtu_size, strerror(errno));
 		exit(1);
 	}
+
+	close(fd_sock);
 
 	th = new std::thread(std::ref(*this));
 }
