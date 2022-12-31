@@ -218,14 +218,20 @@ router::router_entry *router::find_route(const std::optional<any_addr> & mac, co
 
 		if (entry.network_address.get_family() == any_addr::ipv4) {
 			if (check_subnet(ip, entry.network_address, entry.mask.ipv4_netmask)) {
-				if (re == nullptr || entry.priority > re->priority)
+				if (re == nullptr || entry.priority > re->priority) {
 					re = &entry; // route through this
+
+					break;
+				}
 			}
 		}
 		else if (entry.network_address.get_family() == any_addr::ipv6) {
 			if (check_subnet(ip, entry.network_address, entry.mask.ipv6_prefix_length)) {
-				if (re == nullptr || entry.priority > re->priority)
+				if (re == nullptr || entry.priority > re->priority) {
 					re = &entry;
+
+					break;
+				}
 			}
 		}
 		else {
