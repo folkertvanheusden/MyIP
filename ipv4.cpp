@@ -195,7 +195,7 @@ void ipv4::operator()()
 				r->route_packet({ }, 0x0800, pkt_dst, pkt->get_src_mac_addr(), pkt_src, p, size);
 			}
 			else {
-				DOLOG(ll_debug, "%s: dropping packet\n", pkt->get_log_prefix().c_str());
+				DOLOG(ll_debug, "%s: dropping packet (not forwarding)\n", pkt->get_log_prefix().c_str());
 
 				stats_inc_counter(ip_n_disc);
 			}
