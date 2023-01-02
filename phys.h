@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <atomic>
@@ -10,6 +10,10 @@
 #include "network_layer.h"
 #include "stats.h"
 
+
+#ifndef SIOCGSTAMPNS_OLD
+#define SIOCGSTAMPNS_OLD SIOCGSTAMPNS
+#endif
 
 class phys
 {
