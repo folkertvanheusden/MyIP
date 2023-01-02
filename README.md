@@ -18,6 +18,7 @@ how to build
 ------------
 Make sure you have the following packages installed:
 
+* libbsd-dev
 * libbearssl-dev
 * libssl-dev
 * libncurses-dev
