@@ -152,6 +152,17 @@ void ipv4::operator()()
 
 		DOLOG(ll_debug, "%s: packet %s => %s\n", pkt->get_log_prefix().c_str(), pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
+		if (payload_header[8] <= 1) {  // TTL exceeded?
+			DOLOG(ll_debug, "%s: TTL exceeded\n", pkt->get_log_prefix().c_str());
+
+			delete pkt;
+
+			stats_inc_counter(ip_n_disc);
+			stats_inc_counter(ipv4_ttl_ex);
+
+			continue;
+		}
+
 		int header_size = (payload_header[0] & 15) * 4;
 		int ip_size     = (payload_header[2] << 8) | payload_header[3];
 		DOLOG(ll_debug, "%s: total packet size: %d, IP header says: %d, header size: %d\n", pkt->get_log_prefix().c_str(), size, ip_size, header_size);
@@ -179,8 +190,8 @@ void ipv4::operator()()
 
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
-			delete pkt;
 			DOLOG(ll_debug, "%s: dropping packet %02x (= unknown protocol) and size %d\n", pkt->get_log_prefix().c_str(), protocol, size);
+			delete pkt;
 			stats_inc_counter(ipv4_unk_prot);
 			stats_inc_counter(ip_n_disc);
 			continue;
@@ -208,16 +219,6 @@ void ipv4::operator()()
 		}
 
 		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size, pkt->get_log_prefix());
-
-		if (payload_header[8] <= 1) { // check TTL
-			send_ttl_exceeded(ip_p);
-			delete ip_p;
-			delete pkt;
-			DOLOG(ll_debug, "%s: TTL exceeded\n", pkt->get_log_prefix().c_str());
-			stats_inc_counter(ipv4_ttl_ex);
-			stats_inc_counter(ip_n_disc);
-			continue;
-		}
 
 		DOLOG(ll_debug, "%s: queing packet protocol %02x and size %d\n", pkt->get_log_prefix().c_str(), protocol, payload_size);
 
