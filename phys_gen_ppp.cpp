@@ -598,7 +598,7 @@ void phys_gen_ppp::handle_lcp(const std::vector<uint8_t> & data)
 	}
 }
 
-void phys_gen_ppp::process_incoming_packet(std::vector<uint8_t> packet_buffer)
+void phys_gen_ppp::process_incoming_packet(std::vector<uint8_t> packet_buffer, const struct timespec & ts)
 {
 	if (packet_buffer.size() < 4) {
 		DOLOG(ll_debug, "phys_gen_ppp: packet too small: dropped (size %zu)\n", packet_buffer.size());
@@ -633,7 +633,7 @@ void phys_gen_ppp::process_incoming_packet(std::vector<uint8_t> packet_buffer)
 			DOLOG(ll_warning, "phys_gen_ppp: no IPv4 stack attached to PPP device (yet)\n");
 		else {
 			// 4 ppp header, 2 fcs (=crc)
-			packet *p = new packet(src_mac, my_mac, packet_buffer.data() + 4, packet_buffer.size() - (4 + 2), NULL, 0, "PPP[]");
+			packet *p = new packet(ts, src_mac, my_mac, packet_buffer.data() + 4, packet_buffer.size() - (4 + 2), NULL, 0, "PPP[]");
 
 			it->second->queue_incoming_packet(this, p);
 		}

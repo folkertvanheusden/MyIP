@@ -94,6 +94,8 @@ void phys_slip::operator()()
 
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
+	struct timespec ts { 0, 0 };
+
 	while(!stop_flag) {
 		int rc = poll(fds, 1, 150);
 		if (rc == -1) {
@@ -115,6 +117,11 @@ void phys_slip::operator()()
 		stats_add_counter(phys_ifInOctets, size);
 		stats_add_counter(phys_ifHCInOctets, size);
 		stats_inc_counter(phys_ifInUcastPkts);
+
+		if (packet_buffer.empty()) {
+			if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+				DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
+		}
 
 		if (buffer == 0xdb) {
 			uint8_t buffer2 = 0x00;
@@ -147,7 +154,7 @@ void phys_slip::operator()()
 			if (it == prot_map.end())
 				DOLOG(ll_warning, "phys_slip: no IPv4 stack attached to SLIP device (yet)\n");
 			else {
-				packet *p = new packet(src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0, "SLIP[]");
+				packet *p = new packet(ts, src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0, "SLIP[]");
 
 				it->second->queue_incoming_packet(this, p);
 			}

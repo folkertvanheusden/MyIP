@@ -67,6 +67,8 @@ void phys_ppp::operator()()
 
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
+	struct timespec ts { 0, 0 };
+
 	while(!stop_flag) {
 		int rc = poll(fds, 1, 150);
 		if (rc == -1) {
@@ -95,12 +97,18 @@ void phys_ppp::operator()()
 				stats_add_counter(phys_ifHCInOctets, unwrapped.size());
 				stats_inc_counter(phys_ifInUcastPkts);
 
-				process_incoming_packet(unwrapped);
+				process_incoming_packet(unwrapped, ts);
 
 				packet_buffer.clear();
 
 				modem_7e_flag = false;
 				modem.clear();
+
+				ts = { 0, 0 };
+			}
+			else {  // start of packet
+				if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+					DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
 			}
 		}
 		else {

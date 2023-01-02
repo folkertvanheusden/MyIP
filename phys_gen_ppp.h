@@ -48,7 +48,7 @@ protected:
 
 	std::vector<uint8_t> wrap_in_ppp_frame(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> & ACCM, const bool not_ppp_meta);
 
-	void process_incoming_packet(std::vector<uint8_t> packet_buffer);
+	void process_incoming_packet(std::vector<uint8_t> packet_buffer, const struct timespec & ts);
 
 	virtual bool transmit_low(const std::vector<uint8_t> & payload, const uint16_t protocol, const std::vector<uint8_t> & ACCM, const bool not_ppp_meta) = 0;
 
