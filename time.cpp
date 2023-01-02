@@ -37,7 +37,7 @@ uint32_t ms_since_midnight()
 	date->tm_min  = 0;
 	date->tm_sec  = 0;
 
-	auto midnight = std::chrono::system_clock::from_time_t(std::mktime(date));
+	auto midnight   = std::chrono::system_clock::from_time_t(std::mktime(date));
 
 	auto difference = now - midnight;
 

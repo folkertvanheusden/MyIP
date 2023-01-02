@@ -98,7 +98,7 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 	socket_address.sll_halen   = ETH_ALEN;
 	src_mac.get(socket_address.sll_addr, 6);
 
-	int rc = write(fd, out, out_size);
+	int rc = sendto(fd, out, out_size, 0, reinterpret_cast<const sockaddr *>(&socket_address), sizeof socket_address);
 
 	if (size_t(rc) != out_size) {
 		DOLOG(ll_error, "phys_promiscuous: problem sending packet (%d for %zu bytes)\n", rc, out_size);
