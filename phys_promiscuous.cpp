@@ -94,8 +94,9 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 	bool ok = true;
 
 	struct sockaddr_ll socket_address { 0 };
-	socket_address.sll_ifindex = ifr_index;
-	socket_address.sll_halen   = ETH_ALEN;
+	socket_address.sll_ifindex  = ifr_index;
+	socket_address.sll_halen    = ETH_ALEN;
+	socket_address.sll_protocol = htons(ETH_P_ALL);
 	src_mac.get(socket_address.sll_addr, 6);
 
 	int rc = sendto(fd, out, out_size, 0, reinterpret_cast<const sockaddr *>(&socket_address), sizeof socket_address);
