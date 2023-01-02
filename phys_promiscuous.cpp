@@ -27,7 +27,7 @@
 phys_promiscuous::phys_promiscuous(const size_t dev_index, stats *const s, const std::string & dev_name) :
 	phys(dev_index, s, "promiscuous-" + dev_name)
 {
-	fd = socket( PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+	fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (fd == -1)
 		error_exit(true, "phys_promiscuous: cannot create raw socket");
 
@@ -137,7 +137,7 @@ void phys_promiscuous::operator()()
 		if (rc == 0)
 			continue;
 
-		int size = read(fd, (char *)buffer, mtu_size);
+		int size = read(fd, reinterpret_cast<char *>(buffer), mtu_size);
 
 	        struct timespec ts { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
