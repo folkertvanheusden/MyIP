@@ -91,6 +91,20 @@ void icmp4::operator()()
 			reply[2] = checksum >> 8;
 			reply[3] = checksum;
 
+			timespec ts { 0, 0 };
+
+			if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+				DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
+			else {
+				timespec in_ts = pkt->get_recv_ts();
+				timespec diff { 0, 0 };
+				timespecsub(&ts, &in_ts, &diff);
+
+				uint32_t tdiff = diff.tv_sec * 1000 + diff.tv_nsec / 1000000;
+
+				DOLOG(ll_debug, "ICMP: sending response after %dms\n", tdiff);
+			}
+
 			// this is the correct order! sending a reply!
 			idev->transmit_packet({ }, src_ip, pkt->get_dst_addr(), 0x01, reply, size, header_copy);
 

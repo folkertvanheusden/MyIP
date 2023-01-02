@@ -148,6 +148,11 @@ target_link_libraries(myip ${ZLIB_LIBRARIES})
 target_include_directories(myip PUBLIC ${ZLIB_INCLUDE_DIRS})
 target_compile_options(myip PUBLIC ${ZLIB_CFLAGS_OTHER})
 
+pkg_check_modules(LIBBSD REQUIRED libbsd-overlay)
+target_link_libraries(myip ${LIBBSD_LIBRARIES})
+target_include_directories(myip PUBLIC ${LIBBSD_INCLUDE_DIRS})
+target_compile_options(myip PUBLIC ${LIBBSD_CFLAGS_OTHER})
+
 find_package(OpenSSL REQUIRED)
 target_include_directories(myip PUBLIC ${OPENSSL_INCLUDE_DIR})
 target_link_libraries(myip OpenSSL::SSL OpenSSL::Crypto)
