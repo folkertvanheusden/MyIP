@@ -2,6 +2,7 @@ extraction:
   cpp:
     prepare:
       packages:
+        - libbsd-dev
         - libconfig++-dev
         - libsndfile1-dev
         - libspeex-dev
