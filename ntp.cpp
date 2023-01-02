@@ -55,14 +55,18 @@ ntp::ntp(stats *const s, udp *const u, const any_addr & my_ip, const any_addr & 
 		ntp_t_req_v[i] = s->register_stat(stat_name, snmp_name);
 	}
 
-	th = new std::thread(std::ref(*this));
+	if (broadcast)
+		th = new std::thread(std::ref(*this));
 }
 
 ntp::~ntp()
 {
 	stop_flag = true;
-	th->join();
-	delete th;
+
+	if (th) {
+		th->join();
+		delete th;
+	}
 }
 
 void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd)

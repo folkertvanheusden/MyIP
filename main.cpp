@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <errno.h>
 #include <libconfig.h++>
 #include <signal.h>
@@ -717,6 +717,8 @@ int main(int argc, char *argv[])
 		std::string ntp_u_ip_str = cfg_str(s_ntp, "upstream-ip-address", "upstream NTP server", false, "");
 		any_addr upstream_ntp_server = parse_address(ntp_u_ip_str, 4, ".", 10);
 
+		bool        broadcast    = cfg_bool(s_ntp, "broadcast", "Periodically announce the local time", true, false);
+
 		int port = cfg_int(s_ntp, "port", "udp port to listen on", true, 123);
 
 		for(auto & dev : devs) {
@@ -728,7 +730,7 @@ int main(int argc, char *argv[])
 			if (!u)
 				continue;
 
-			ntp *ntp_ = new ntp(&s, u, i4->get_addr(), upstream_ntp_server, true);
+			ntp *ntp_ = new ntp(&s, u, i4->get_addr(), upstream_ntp_server, broadcast);
 
 			u->add_handler(port, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
