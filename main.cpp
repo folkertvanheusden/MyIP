@@ -358,6 +358,8 @@ int main(int argc, char *argv[])
 			int         mtu_size = cfg_int(interface, "mtu-size", "MTU size", true, 1520);
 
 			dev = new phys_tap(i + 1, &s, dev_name, uid, gid, mtu_size);
+
+			dev->start_pcap("test.pcap", true, false);
 		}
 		else if (type == "promiscuous") {
 			std::string dev_name = cfg_str(interface, "dev-name", "device name", false, "eth0");

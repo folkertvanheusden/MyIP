@@ -9,9 +9,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "buffer_out.h"
 #include "log.h"
-#include "phys.h"
 #include "packet.h"
+#include "phys.h"
 #include "str.h"
 
 
@@ -50,6 +51,65 @@ void phys::start()
 void phys::ask_to_stop()
 {
 	stop_flag = true;
+}
+
+void phys::start_pcap(const std::string & pcap_file, const bool in, const bool out)
+{
+	if (pcap_fd != -1)
+		error_exit(false, "phys: pcap already running");
+
+	pcap_fd = open(pcap_file.c_str(), O_WRONLY);
+	if (pcap_fd == -1)
+		error_exit(true, "phys: canot create \"%s\"", pcap_file.c_str());
+
+	buffer_out header;
+	header.add_net_long(0xA1B23C4D);  // magic
+	header.add_net_short(2);  // major
+	header.add_net_short(4);  // minor
+	header.add_net_long(0);  // reserved1
+	header.add_net_long(0);  // reserved2
+	header.add_net_long(mtu_size);  // snaplen
+	header.add_net_long(1);  // linktype
+
+	pcap_write_incoming = in;
+	pcap_write_outgoing = out;
+
+	if (WRITE(pcap_fd, header.get_content(), header.get_size()) != header.get_size())
+		DOLOG(ll_error, "phys: cannot write to pcap file (header)\n");
+}
+
+void phys::stop_pcap()
+{
+	if (pcap_fd != -1) {
+		close(pcap_fd);
+
+		pcap_fd = -1;
+	}
+}
+
+void phys::pcap_write_packet(const timespec & ts, const uint8_t *const data, const size_t n)
+{
+	buffer_out record;
+	record.add_net_long(ts.tv_sec); // timestamp seconds
+	record.add_net_long(ts.tv_nsec); // timestamp nano seconds
+	record.add_net_long(n);  // captured packet length
+	record.add_net_long(n);  // original packet length
+	record.add_buffer(data, n);
+
+	if (WRITE(pcap_fd, record.get_content(), record.get_size()) != record.get_size())
+		DOLOG(ll_error, "phys: cannot write to pcap file (record)\n");
+}
+
+void phys::pcap_write_packet_incoming(const timespec & ts, const uint8_t *const data, const size_t n)
+{
+	if (pcap_write_incoming)
+		pcap_write_packet(ts, data, n);
+}
+
+void phys::pcap_write_packet_outgoing(const timespec & ts, const uint8_t *const data, const size_t n)
+{
+	if (pcap_write_outgoing)
+		pcap_write_packet(ts, data, n);
 }
 
 void phys::register_protocol(const uint16_t ether_type, network_layer *const p)

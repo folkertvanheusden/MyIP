@@ -40,12 +40,25 @@ protected:
 
 	const std::string name;
 
+	int       pcap_fd             { -1    };
+	bool      pcap_write_incoming { false };
+	bool      pcap_write_outgoing { false };
+
+	void pcap_write_packet_incoming(const timespec & ts, const uint8_t *const data, const size_t n);
+	void pcap_write_packet_outgoing(const timespec & ts, const uint8_t *const data, const size_t n);
+
+private:
+	void pcap_write_packet(const timespec & ts, const uint8_t *const data, const size_t n);
+
 public:
 	phys(const size_t dev_index, stats *const s, const std::string & name);
 	phys(const phys &) = delete;
 	virtual ~phys();
 
 	void ask_to_stop();
+
+	void start_pcap(const std::string & pcap_file, const bool in, const bool out);
+	void stop_pcap();
 
 	virtual void start();
 	void stop();
