@@ -52,7 +52,7 @@ void icmp4::operator()()
 		stats_inc_counter(icmp_requests);
 
 		const any_addr src_ip = pkt->get_src_addr();
-		DOLOG(ll_debug, "ICMP: request by %s\n", src_ip.to_str().c_str());
+		DOLOG(ll_debug, "ICMP: request %d/%d by %s\n", p[0], p[1], src_ip.to_str().c_str());
 
 		uint8_t *reply = duplicate(p, size);
 
