@@ -209,5 +209,8 @@ std::optional<any_addr> arp::check_special_ip_addresses(const any_addr & ip, con
 		}
 	}
 
+	if (ip[0] == 255 && ip[1] == 255 && ip[2] == 255 && ip[3] == 255)  // broadcast
+		return any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
+
 	return { };
 }
