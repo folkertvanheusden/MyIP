@@ -58,7 +58,7 @@ void phys::start_pcap(const std::string & pcap_file, const bool in, const bool o
 	if (pcap_fd != -1)
 		error_exit(false, "phys: pcap already running");
 
-	pcap_fd = open(pcap_file.c_str(), O_WRONLY);
+	pcap_fd = open(pcap_file.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 	if (pcap_fd == -1)
 		error_exit(true, "phys: canot create \"%s\"", pcap_file.c_str());
 
