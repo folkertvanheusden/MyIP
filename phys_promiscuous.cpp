@@ -87,6 +87,12 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 
 	memcpy(&out[14], payload, pl_size);
 
+	timespec ts { 0, 0 };
+	if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+		DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
+
+	pcap_write_packet_outgoing(ts, out, out_size);
+
 	stats_add_counter(phys_ifOutOctets, out_size);
 	stats_add_counter(phys_ifHCOutOctets, out_size);
 	stats_inc_counter(phys_ifOutUcastPkts);
@@ -143,6 +149,8 @@ void phys_promiscuous::operator()()
 	        timespec ts { 0, 0 };
 		if (ioctl(fd, SIOCGSTAMPNS_OLD, &ts) == -1)
 			DOLOG(ll_warning, "ioctl(SIOCGSTAMP_OLD) failed: %s\n", strerror(errno));
+
+		pcap_write_packet_incoming(ts, buffer, size);
 
 		stats_inc_counter(phys_recv_frame);
 		stats_inc_counter(phys_ifInUcastPkts);
