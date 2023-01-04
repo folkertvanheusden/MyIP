@@ -78,6 +78,12 @@ phys_promiscuous::~phys_promiscuous()
 
 bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
+	if (dst_mac == my_mac) {
+		DOLOG(ll_debug, "phys_promiscuous::transmit_packet: dropping packet to myself (%s)\n", dst_mac.to_str().c_str());
+
+		return false;
+	}
+
 	DOLOG(ll_debug, "phys_promiscuous: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	size_t   out_size = pl_size + 14;
