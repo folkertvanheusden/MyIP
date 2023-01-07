@@ -7,6 +7,7 @@
 #include "packet.h"
 #include "pstream.h"
 #include "session.h"
+#include "time.h"
 #include "types.h"
 
 
@@ -24,8 +25,9 @@ typedef struct {
 class application
 {
 protected:
-	std::atomic_bool stop_flag { false   };
-	private_data    *const pd  { nullptr };
+	interruptable_sleep stop_flag;
+
+	private_data *const pd  { nullptr };
 
 public:
 	application() {
@@ -36,6 +38,6 @@ public:
 	}
 
 	void ask_to_stop() {
-		stop_flag = true;
+		stop_flag.signal_stop();
 	}
 };

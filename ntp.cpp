@@ -61,7 +61,7 @@ ntp::ntp(stats *const s, udp *const u, const any_addr & my_ip, const any_addr & 
 
 ntp::~ntp()
 {
-	stop_flag = true;
+	stop_flag.signal_stop();
 
 	if (th) {
 		th->join();
@@ -130,21 +130,12 @@ void ntp::operator()()
 
 	set_thread_name("myip-ntp");
 
-	while(!stop_flag) {
-		uint64_t now = get_us();
-		uint64_t diff = now - prev;
-
+	for(;;) {
 		// send a packet each 64s
-		if (diff < 64000000) {
-			if (diff > 100000)
-				diff = 100000;
+		if (stop_flag.sleep(64000))
+			break;
 
-			myusleep(diff);
-			
-			continue;
-		}
-
-		prev = now;
+		uint64_t now = get_us();
 
 		DOLOG(ll_debug, "NTP: Sending broadcast\n");
 

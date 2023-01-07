@@ -259,15 +259,9 @@ void dns::operator()()
 {
 	set_thread_name("myip-dns");
 
-	int count = 0;
-
-	while(!stop_flag) {
-		myusleep(500000);
-
-		if (++count < 60) // flush every 30s
-			continue;
-
-		count = 0;
+	for(;;) {
+		if (stop_flag.sleep(30000))
+			break;
 
 		std::unique_lock lck(lock);
 

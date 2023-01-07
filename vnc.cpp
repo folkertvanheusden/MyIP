@@ -28,7 +28,7 @@ static std::atomic_bool stop { false };
 struct frame_buffer_t
 {
 	std::thread     *th        { nullptr };
-	std::atomic_bool terminate { false   };
+	interruptable_sleep terminate;
 
 	int              w         { 0       };
 	int              h         { 0       };
@@ -95,7 +95,6 @@ void vnc_init()
 		size_t n_bytes = size_t(frame_buffer.w) * size_t(frame_buffer.h) * 3;
 		frame_buffer.buffer = new uint8_t[n_bytes]();
 
-		frame_buffer.terminate = false;
 		frame_buffer.th = new std::thread(frame_buffer_thread, &frame_buffer);
 	}
 }
@@ -107,7 +106,7 @@ void vnc_deinit()
 	std::unique_lock<std::mutex> lck(frame_buffer.fb_lock);
 
 	if (frame_buffer.th) {
-		frame_buffer.terminate = true;
+		frame_buffer.terminate.signal_stop();
 
 		frame_buffer.th->join();
 		delete frame_buffer.th;
@@ -151,7 +150,7 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 
 	uint64_t latest_update = 0;
 
-	for(;!fb_work->terminate;) {
+	for(;;) {
 		// should be locking for these as well
 
 		// bounce
@@ -213,7 +212,8 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 			fb_work->callback();
 		}
 
-		myusleep(101000);  // ignore any errors during usleep
+		if (fb_work->terminate.sleep(101))
+			break;
 	}
 
 	delete [] fb_work->buffer;

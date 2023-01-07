@@ -17,7 +17,7 @@ syslog_srv::syslog_srv(stats *const s)
 
 syslog_srv::~syslog_srv()
 {
-	stop_flag = true;
+	stop_flag.signal_stop();
 }
 
 void syslog_srv::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd)
