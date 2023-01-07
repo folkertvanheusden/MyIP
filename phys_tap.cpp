@@ -51,7 +51,7 @@ phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & d
 	set_ifr_name(&ifr_tap1, dev_name);
 
 	if (ioctl(fd, TUNSETIFF, &ifr_tap1) == -1) {
-		DOLOG(ll_error, "ioctl TUNSETIFF: %s\n", strerror(errno));
+		DOLOG(ll_error, "ioctl TUNSETIFF (%s): %s\n", dev_name.c_str(), strerror(errno));
 		exit(1);
 	}
 

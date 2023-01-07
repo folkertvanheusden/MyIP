@@ -18,6 +18,8 @@ private:
 	int fd        { -1 };
 	int ifr_index { -1 };
 
+	any_addr my_mac;
+
 public:
 	phys_promiscuous(const size_t dev_index, stats *const s, const std::string & dev_name);
 	phys_promiscuous(const phys_promiscuous &) = delete;
