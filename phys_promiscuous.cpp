@@ -184,17 +184,15 @@ void phys_promiscuous::operator()()
 
 		any_addr dst_mac(any_addr::mac, &buffer[0]);
 
-		if (dst_mac == my_mac) {
-			any_addr src_mac(any_addr::mac, &buffer[6]);
+		any_addr src_mac(any_addr::mac, &buffer[6]);
 
-			DOLOG(ll_debug, "phys_promiscuous: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
+		DOLOG(ll_debug, "phys_promiscuous: queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
-			std::string log_prefix = myformat("PRM[%02x%02x%02x%02x%02x%02x]", buffer[6], buffer[7], buffer[8], buffer[9], buffer[10], buffer[11]);
+		std::string log_prefix = myformat("PRM[%02x%02x%02x%02x%02x%02x]", buffer[6], buffer[7], buffer[8], buffer[9], buffer[10], buffer[11]);
 
-			packet *p = new packet(ts, src_mac, src_mac, dst_mac, &buffer[14], size - 14, &buffer[0], 14, log_prefix);
+		packet *p = new packet(ts, src_mac, src_mac, dst_mac, &buffer[14], size - 14, &buffer[0], 14, log_prefix);
 
-			it->second->queue_incoming_packet(this, p);
-		}
+		it->second->queue_incoming_packet(this, p);
 	}
 
 	delete [] buffer;
