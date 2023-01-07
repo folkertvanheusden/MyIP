@@ -7,12 +7,15 @@
 #include <sys/un.h>
 #include <sys/types.h>
 
+#include "phys.h"
+#include "str.h"
 #include "ud.h"
 #include "utils.h"
 
 
-ud_stats::ud_stats(const std::vector<pstream *> & stream_session_handlers, const std::string & socket_path) :
-	stream_session_handlers(stream_session_handlers)
+ud_stats::ud_stats(const std::vector<pstream *> & stream_session_handlers, std::vector<phys *> *const devs, const std::string & socket_path) :
+	stream_session_handlers(stream_session_handlers),
+	devs(devs)
 {
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
@@ -41,6 +44,13 @@ ud_stats::~ud_stats()
 
 	th->join();
 	delete th;
+}
+
+static void eol(int fd)
+{
+	const uint8_t lf = '\n';
+
+	WRITE(fd, &lf, 1);
 }
 
 void ud_stats::emit_sessions(const int cfd)
@@ -82,21 +92,96 @@ void ud_stats::emit_sessions(const int cfd)
 	free(temp);
 
 	json_decref(out);
+
+	eol(cfd);
+}
+
+void ud_stats::emit_devices(const int cfd)
+{
+	json_t *out = json_array();
+
+	for(auto & dev : *devs) {
+		json_t *record = json_object();
+
+		json_object_set(record, "name", json_string(dev->to_str().c_str()));
+
+		json_array_append(out, record);
+	}
+
+	char *temp = json_dumps(out, 0);
+
+	WRITE(cfd, reinterpret_cast<uint8_t *>(temp), strlen(temp));
+
+	free(temp);
+
+	json_decref(out);
+
+	eol(cfd);
+}
+
+std::string gen_pcap_name()
+{
+	char buffer[16] { 0 };
+
+	snprintf(buffer, sizeof buffer, "%ld.pcap", time(nullptr));
+
+	return buffer;
+}
+
+void ud_stats::handle_pcap(const int cfd, const std::string & dev_name, const bool open)
+{
+	for(auto & dev : *devs) {
+		if (dev->to_str() == dev_name) {
+			if (open)
+				dev->start_pcap(gen_pcap_name(), true, true);
+			else
+				dev->stop_pcap();
+
+			WRITE(cfd, reinterpret_cast<const uint8_t *>("OK\n"), 3);
+
+			return;
+		}
+	}
+
+	WRITE(cfd, reinterpret_cast<const uint8_t *>("FAIL\n"), 5);
 }
 
 void ud_stats::handler(const int cfd)
 {
-	char buffer[16] { 0 };
+	for(;;) {
+		std::string cmd;
 
-	if (READ(cfd, reinterpret_cast<uint8_t *>(buffer), 15) == -1)
-		return;
+		for(;;) {
+			char buffer[16] { 0 };
 
-	std::string cmd = buffer;
+			if (read(cfd, reinterpret_cast<uint8_t *>(buffer), 15) <= 0) {
+				close(cfd);
 
-	if (cmd == "sessions")
-		emit_sessions(cfd);
+				return;
+			}
 
-	close(cfd);
+			cmd += buffer;
+
+			std::size_t lf = cmd.find('\n');
+			if (lf != std::string::npos) {
+				cmd = cmd.substr(0, lf);
+				break;
+			}
+		}
+
+		auto parts = split(cmd, "|");
+
+		if (parts[0] == "sessions")
+			emit_sessions(cfd);
+		else if (parts[0] == "list-devices")
+			emit_devices(cfd);
+		else if (parts[0] == "start-pcap" && parts.size() == 2)
+			handle_pcap(cfd, parts[1], true);
+		else if (parts[0] == "stop-pcap" && parts.size() == 2)
+			handle_pcap(cfd, parts[1], false);
+		else
+			WRITE(cfd, reinterpret_cast<const uint8_t *>("???\n"), 4);
+	}
 }
 
 void ud_stats::operator()()
