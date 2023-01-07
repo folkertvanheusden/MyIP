@@ -5,6 +5,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "time.h"
+
 
 uint64_t get_us()
 {
@@ -59,5 +61,36 @@ void myusleep(uint64_t us)
 			break;
 
 		memcpy(&req, &rem, sizeof(struct timespec));
+	}
+}
+
+interruptable_sleep::interruptable_sleep()
+{
+}
+
+void interruptable_sleep::signal_stop()
+{
+	std::unique_lock<std::mutex> lck(lock);
+
+	stop = true;
+
+	cv.notify_all();
+}
+
+	// returns true when stop is set
+bool interruptable_sleep::sleep(const uint32_t ms)
+{
+	using namespace std::chrono_literals;
+
+	auto wait_until  = std::chrono::system_clock::now() + 1ms * ms;
+
+	std::unique_lock lck(lock);
+
+	for(;;) {
+		if (stop)
+			return true;
+
+		if (cv.wait_until(lck, wait_until) == std::cv_status::timeout)
+			return stop;
 	}
 }

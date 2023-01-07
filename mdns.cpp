@@ -226,7 +226,7 @@ mdns::mdns()
 
 mdns::~mdns()
 {
-	stop_flag = true;
+	stop_flag.signal_stop();
 
 	th->join();
 	delete th;
@@ -241,17 +241,9 @@ void mdns::add_protocol(udp *const interface, const int port, const std::string 
 
 void mdns::operator()()
 {
-	uint64_t prev_ts = 0;
-
-	while(!stop_flag) {
-		uint64_t now = get_ms();
-
-		if (now - prev_ts < 5000) {
-			myusleep(100000);
-			continue;
-		}
-
-		prev_ts = now;
+	for(;;) {
+		if (stop_flag.sleep(5000))
+			break;
 
 		DOLOG(ll_debug, "MDNS: transmit %zu records\n", protocols.size());
 

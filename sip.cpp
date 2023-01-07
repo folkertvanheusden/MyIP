@@ -131,7 +131,7 @@ sip::sip(stats *const s, udp *const u, const std::string & sample, const std::st
 
 sip::~sip()
 {
-	stop_flag = true;
+	stop_flag.signal_stop();
 
 	th2->join();
 	delete th2;
@@ -565,7 +565,7 @@ void sip::transmit_audio(const any_addr & tgt_addr, const int tgt_port, const an
 {
 	int n_work = n_audio, offset = 0;
 
-	while(n_work > 0 && !stop_flag) {
+	while(n_work > 0) {
 		int cur_n = 0;
 		int cur_n_before = std::min(n_work, ss->schema.frame_size);
 		std::pair<uint8_t *, int> rtpp;
@@ -599,8 +599,10 @@ void sip::transmit_audio(const any_addr & tgt_addr, const int tgt_port, const an
 			delete [] rtpp.first;
 		}
 
-		double sleep = 1000000.0 / (samplerate / double(cur_n_before));
-		myusleep(sleep);
+		double sleep = 1000.0 / (samplerate / double(cur_n_before));
+
+		if (stop_flag.sleep(sleep))
+			break;
 	}
 }
 
@@ -682,8 +684,8 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 	ss->latest_pkt = get_us();
 
 	// session time-out
-	while(get_us() - ss->latest_pkt < 5000000l && !stop_flag)
-		myusleep(500000);
+	while(get_us() - ss->latest_pkt < 5000000l && !stop_flag.sleep(500)) {
+	}
 
 	send_BYE(ss->sip_addr_peer, ss->sip_port_peer, ss->sip_addr_me, ss->sip_port_me, ss->headers);
 
@@ -816,8 +818,9 @@ void sip::operator()()
 {
 	set_thread_name("myip-sip");
 
-	while(!stop_flag) {
-		myusleep(500000);
+	for(;;) {
+		if (stop_flag.sleep(500))
+			break;
 
 		slock.lock();
 		for(auto it=sessions.begin(); it!=sessions.end();) {
@@ -884,13 +887,13 @@ void sip::register_thread()
 {
 	myusleep(2500000);
 
-	while(!stop_flag) {
-		int cur_interval = interval;
+	bool stop = false;
 
-		if (!send_REGISTER("", ""))
-			cur_interval = 30;
-
-		for(int i=0; i<cur_interval * 2 && !stop_flag; i++)
-			myusleep(500 * 1000);
+	do {
+		if (send_REGISTER("", ""))
+			stop = stop_flag.sleep(15000);
+		else
+			stop = stop_flag.sleep(30000);
 	}
+	while(!stop);
 }

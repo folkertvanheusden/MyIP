@@ -8,6 +8,7 @@
 #include "phys.h"
 #include "network_layer.h"
 #include "stats.h"
+#include "time.h"
 
 
 typedef struct {
@@ -22,8 +23,8 @@ protected:
 	std::shared_mutex cache_lock;
 	std::map<any_addr, address_entry_t> cache;
 
-	std::atomic_bool cleaner_stop_flag { false   };
-	std::thread     *cleaner_th        { nullptr };
+	interruptable_sleep cleaner_stop;
+	std::thread        *cleaner_th   { nullptr };
 
 	uint64_t *address_cache_requests { nullptr }, *address_cache_for_me { nullptr };
 	uint64_t *address_cache_req      { nullptr }, *address_cache_hit    { nullptr };
