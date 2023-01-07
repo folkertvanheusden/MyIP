@@ -11,26 +11,28 @@ template <typename T>
 class fifo
 {
 private:
-	T *data { nullptr };
-	const int n_elements;
+	T        *data       { nullptr };
+	const int n_elements { 0       };
 
-	int read_pointer { 0 }, write_pointer { 0 };
-	bool full { false };
+	int  read_pointer    { 0       };
+	int  write_pointer   { 0       };
+	bool full            { false   };
 
 	pthread_mutex_t lock;
 
 	/* cond_push is signalled when a new item is pushed
 	 * cond_pull is signalled when an item is removed
 	 */
-	pthread_cond_t cond_push, cond_pull;
+	pthread_cond_t cond_push;
+	pthread_cond_t cond_pull;
 
-	fifo_stats *fs { nullptr };
-	uint64_t n_in { 0 };
+	fifo_stats *fs   { nullptr };
+	uint64_t    n_in { 0       };
 
-	uint64_t *fifo_n_in_stats { nullptr };
+	uint64_t   *fifo_n_in_stats { nullptr };
 
 public:
-	fifo(stats *const s, const std::string & name,const int n_elements) : n_elements(n_elements)
+	fifo(stats *const s, const std::string & name, const int n_elements) : n_elements(n_elements)
 	{
 		data = new T[n_elements];
 
