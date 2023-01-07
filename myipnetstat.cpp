@@ -24,9 +24,9 @@ int main(int argc, char *argv[])
 	if (connect(fd, reinterpret_cast<sockaddr *>(&remote), len) == -1)
 		error_exit(true, "Failed to connect");
 
-	char cmd[16] = "sessions";
+	char cmd[] = "sessions\n";
 
-	WRITE(fd, reinterpret_cast<const uint8_t *>(cmd), sizeof cmd);
+	WRITE(fd, reinterpret_cast<const uint8_t *>(cmd), sizeof(cmd) - 1);
 
 	for(;;) {
 		char buffer[4096] { 0 };

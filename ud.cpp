@@ -86,12 +86,22 @@ void ud_stats::emit_sessions(const int cfd)
 
 void ud_stats::handler(const int cfd)
 {
-	char buffer[16] { 0 };
+	std::string cmd;
 
-	if (READ(cfd, reinterpret_cast<uint8_t *>(buffer), 15) == -1)
-		return;
+	for(;;) {
+		char buffer[16] { 0 };
 
-	std::string cmd = buffer;
+		if (read(cfd, reinterpret_cast<uint8_t *>(buffer), 15) <= 0)
+			return;
+
+		cmd += buffer;
+
+		std::size_t lf = cmd.find('\n');
+		if (lf != std::string::npos) {
+			cmd = cmd.substr(0, lf);
+			break;
+		}
+	}
 
 	if (cmd == "sessions")
 		emit_sessions(cfd);
