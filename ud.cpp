@@ -7,12 +7,14 @@
 #include <sys/un.h>
 #include <sys/types.h>
 
+#include "phys.h"
 #include "ud.h"
 #include "utils.h"
 
 
-ud_stats::ud_stats(const std::vector<pstream *> & stream_session_handlers, const std::string & socket_path) :
-	stream_session_handlers(stream_session_handlers)
+ud_stats::ud_stats(const std::vector<pstream *> & stream_session_handlers, std::vector<phys *> *const devs, const std::string & socket_path) :
+	stream_session_handlers(stream_session_handlers),
+	devs(devs)
 {
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
@@ -41,6 +43,13 @@ ud_stats::~ud_stats()
 
 	th->join();
 	delete th;
+}
+
+static void eol(int fd)
+{
+	const uint8_t lf = '\n';
+
+	WRITE(fd, &lf, 1);
 }
 
 void ud_stats::emit_sessions(const int cfd)
@@ -82,31 +91,63 @@ void ud_stats::emit_sessions(const int cfd)
 	free(temp);
 
 	json_decref(out);
+
+	eol(cfd);
+}
+
+void ud_stats::emit_devices(const int cfd)
+{
+	json_t *out = json_array();
+
+	for(auto & dev : *devs) {
+		json_t *record = json_object();
+
+		json_object_set(record, "name", json_string(dev->to_str().c_str()));
+
+		json_array_append(out, record);
+	}
+
+	char *temp = json_dumps(out, 0);
+
+	WRITE(cfd, reinterpret_cast<uint8_t *>(temp), strlen(temp));
+
+	free(temp);
+
+	json_decref(out);
+
+	eol(cfd);
 }
 
 void ud_stats::handler(const int cfd)
 {
-	std::string cmd;
-
 	for(;;) {
-		char buffer[16] { 0 };
+		std::string cmd;
 
-		if (read(cfd, reinterpret_cast<uint8_t *>(buffer), 15) <= 0)
-			return;
+		for(;;) {
+			char buffer[16] { 0 };
 
-		cmd += buffer;
+			if (read(cfd, reinterpret_cast<uint8_t *>(buffer), 15) <= 0) {
+				close(cfd);
 
-		std::size_t lf = cmd.find('\n');
-		if (lf != std::string::npos) {
-			cmd = cmd.substr(0, lf);
-			break;
+				return;
+			}
+
+			cmd += buffer;
+
+			std::size_t lf = cmd.find('\n');
+			if (lf != std::string::npos) {
+				cmd = cmd.substr(0, lf);
+				break;
+			}
 		}
+
+		if (cmd == "sessions")
+			emit_sessions(cfd);
+		else if (cmd == "list-devices")
+			emit_devices(cfd);
+		else
+			WRITE(cfd, reinterpret_cast<const uint8_t *>("???\n"), 4);
 	}
-
-	if (cmd == "sessions")
-		emit_sessions(cfd);
-
-	close(cfd);
 }
 
 void ud_stats::operator()()

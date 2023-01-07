@@ -970,7 +970,7 @@ int main(int argc, char *argv[])
 		// just fine
 	}
 
-	ud_stats *us = unix_domain_socket.empty() ? nullptr : new ud_stats(stream_session_handlers, unix_domain_socket);
+	ud_stats *us = unix_domain_socket.empty() ? nullptr : new ud_stats(stream_session_handlers, &devs, unix_domain_socket);
 
 	r->dump();
 
