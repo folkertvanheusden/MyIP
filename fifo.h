@@ -18,6 +18,8 @@ private:
 	int  write_pointer   { 0       };
 	bool full            { false   };
 
+	bool interrupted     { false   };
+
 	pthread_mutex_t lock;
 
 	/* cond_push is signalled when a new item is pushed
@@ -52,6 +54,17 @@ public:
 		delete fs;
 
 		delete [] data;
+	}
+
+	void interrupt()
+	{
+		pthread_mutex_lock(&lock);
+
+		interrupted = true;
+
+		pthread_cond_broadcast(&cond_push);
+
+		pthread_mutex_unlock(&lock);
 	}
 
 	void put(const T & element)
@@ -126,11 +139,17 @@ public:
 
 		bool ok = true;
 
-		while(read_pointer == write_pointer && !full) {
+		while(read_pointer == write_pointer && !full && !interrupted) {
 			if (pthread_cond_timedwait(&cond_push, &lock, &ts)) {
 				ok = false;
 				break;
 			}
+		}
+
+		if (interrupted) {
+			pthread_mutex_unlock(&lock);
+
+			return { };
 		}
 
 		if (ok) {
@@ -155,12 +174,18 @@ public:
 		return { };
 	}
 
-	T get()
+	std::optional<T> get()
 	{
 		pthread_mutex_lock(&lock);
 
-		while(read_pointer == write_pointer && !full)
+		while(read_pointer == write_pointer && !full && !interrupted)
 			pthread_cond_wait(&cond_push, &lock);
+
+		if (interrupted) {
+			pthread_mutex_unlock(&lock);
+
+			return { };
+		}
 
 		T copy = data[read_pointer];
 

@@ -35,15 +35,13 @@ protected:
 
 	icmp                 *icmp_        { nullptr };
 
-	std::atomic_bool      stop_flag    { false   };
-
 	router               *r            { nullptr };
 
 public:
 	network_layer(stats *const s, const std::string & stats_name, router *const r);
 	virtual ~network_layer();
 
-	void ask_to_stop() { stop_flag = true; }
+	void ask_to_stop() { pkts->interrupt(); }
 
 	virtual any_addr get_addr() const = 0;
 

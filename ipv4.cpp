@@ -38,8 +38,6 @@ ipv4::ipv4(stats *const s, arp *const iarp, const any_addr & myip, router *const
 
 ipv4::~ipv4()
 {
-	stop_flag = true;
-
 	for(auto & th : ths) {
 		th->join();
 
@@ -109,10 +107,10 @@ void ipv4::operator()()
 {
 	set_thread_name("myip-ipv4");
 
-	while(!stop_flag) {
-		auto po = pkts->get(500);
+	for(;;) {
+		auto po = pkts->get();
 		if (!po.has_value())
-			continue;
+			break;
 
 		packet *pkt = po.value().p;
 

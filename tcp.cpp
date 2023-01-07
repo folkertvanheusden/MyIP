@@ -100,6 +100,8 @@ tcp::tcp(stats *const s, icmp *const icmp_, const int n_threads) : transport_lay
 
 tcp::~tcp()
 {
+	pkts->interrupt();
+
 	stop_flag = true;
 
 	for(auto & th : ths) {
@@ -856,10 +858,10 @@ void tcp::operator()()
 {
 	set_thread_name("myip-tcp");
 
-	while(!stop_flag) {
-		auto po = pkts->get(500);
+	for(;;) {
+		auto po = pkts->get();
 		if (!po.has_value())
-			continue;
+			break;
 
 		packet *pkt = po.value();
 

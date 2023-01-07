@@ -21,7 +21,7 @@ udp::udp(stats *const s, icmp *const icmp_, const int n_threads) : transport_lay
 
 udp::~udp()
 {
-	stop_flag = true;
+	pkts->interrupt();
 
 	for(auto & th : ths) {
 		th->join();
@@ -34,10 +34,10 @@ void udp::operator()()
 {
 	set_thread_name("myip-udp");
 
-	while(!stop_flag) {
-		auto po = pkts->get(500);
+	for(;;) {
+		auto po = pkts->get();
 		if (!po.has_value())
-			continue;
+			break;
 
 		packet *pkt = po.value();
 

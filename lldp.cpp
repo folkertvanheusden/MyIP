@@ -21,7 +21,7 @@ lldp::lldp(stats *const s, const any_addr & my_mac, const any_addr & mgmt_addr, 
 
 lldp::~lldp()
 {
-	stop_flag = true;
+	stop_flag.signal_stop();
 
 	th->join();
 	delete th;
@@ -112,24 +112,19 @@ void lldp::operator()()
 {
 	set_thread_name("myip-lldp");
 
-	int      sleep_cnt = 0;
-
 	any_addr dest_mac(any_addr::mac, std::initializer_list<uint8_t>({ 0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e }).begin());
 
 	auto     payload      = generate_lldp_packet();
 
-	while(!stop_flag) {
+	for(;;) {
+		if (stop_flag.sleep(15000))
+			break;
+
 		// every 15s
-		if (++sleep_cnt >= 30) {
-			if (default_pdev) {
-				DOLOG(ll_debug, "lldp::operator: transmit LLDP packet\n");
+		if (default_pdev) {
+			DOLOG(ll_debug, "lldp::operator: transmit LLDP packet\n");
 
-				default_pdev->transmit_packet(dest_mac, my_mac, 0x88cc, payload.data(), payload.size());
-			}
-
-			sleep_cnt = 0;
-		}	
-
-		myusleep(500 * 1000);
+			default_pdev->transmit_packet(dest_mac, my_mac, 0x88cc, payload.data(), payload.size());
+		}
 	}
 }

@@ -28,7 +28,7 @@ arp::arp(stats *const s, phys *const interface, const any_addr & my_mac, const a
 
 arp::~arp()
 {
-	arp_stop_flag = true;
+	pkts->interrupt();
 
 	arp_th->join();
 	delete arp_th;
@@ -38,10 +38,10 @@ void arp::operator()()
 {
 	set_thread_name("myip-arp");
 
-	while(!arp_stop_flag) {
-		auto po = pkts->get(500);
+	for(;;) {
+		auto po = pkts->get();
 		if (!po.has_value())
-			continue;
+			break;
 
 		const packet *pkt = po.value().p;
 

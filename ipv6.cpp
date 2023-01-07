@@ -38,8 +38,6 @@ ipv6::ipv6(stats *const s, ndp *const indp, const any_addr & myip, router *const
 
 ipv6::~ipv6()
 {
-	stop_flag = true;
-
 	for(auto & th : ths) {
 		th->join();
 
@@ -92,10 +90,10 @@ void ipv6::operator()()
 {
 	set_thread_name("myip-ipv6");
 
-	while(!stop_flag) {
-		auto po = pkts->get(500);
+	for(;;) {
+		auto po = pkts->get();
 		if (!po.has_value())
-			continue;
+			break;
 
 		packet *pkt = po.value().p;
 

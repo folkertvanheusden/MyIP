@@ -1010,9 +1010,6 @@ int main(int argc, char *argv[])
 	progress(n_actions_done++, n_actions);
 	delete us;
 
-	progress(n_actions_done++, n_actions);
-	delete r;
-
 	for(auto & s : socks_proxies) {
 		progress(n_actions_done++, n_actions);
 		delete s;
@@ -1022,6 +1019,9 @@ int main(int argc, char *argv[])
 		progress(n_actions_done++, n_actions);
 		delete a;
 	}
+
+	progress(n_actions_done++, n_actions);
+	delete r;
 
 	for(auto & p : transport_layers) {
 		progress(n_actions_done++, n_actions);

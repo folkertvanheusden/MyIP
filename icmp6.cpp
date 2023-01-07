@@ -27,7 +27,7 @@ icmp6::icmp6(stats *const s, const any_addr & my_mac, const any_addr & my_ip, ro
 
 icmp6::~icmp6()
 {
-	stop_flag = true;
+	pkts->interrupt();
 
 	for(auto & th : ths) {
 		th->join();
@@ -40,10 +40,10 @@ void icmp6::operator()()
 {
 	set_thread_name("myip-icmp6");
 
-	while(!stop_flag) {
-		auto po = pkts->get(500);
+	for(;;) {
+		auto po = pkts->get();
 		if (!po.has_value())
-			continue;
+			break;
 
 		const packet *pkt = po.value();
 

@@ -11,12 +11,15 @@
 #include "phys.h"
 #include "router.h"
 #include "stats.h"
+#include "time.h"
 
 
 class lldp : public network_layer
 {
 private:
 	std::thread   *th { nullptr };
+
+	interruptable_sleep stop_flag;
 
 	const any_addr my_mac;
 	const any_addr mgmt_addr;

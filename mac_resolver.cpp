@@ -19,6 +19,8 @@ mac_resolver::mac_resolver(stats *const s, router *const r) :
 
 mac_resolver::~mac_resolver()
 {
+	stop_flag = true;
+
 	delete pkts;
 }
 

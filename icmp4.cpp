@@ -20,7 +20,7 @@ icmp4::icmp4(stats *const s, const int n_threads) : icmp(s)
 
 icmp4::~icmp4()
 {
-	stop_flag = true;
+	pkts->interrupt();
 
 	for(auto & th : ths) {
 		th->join();
@@ -33,10 +33,10 @@ void icmp4::operator()()
 {
 	set_thread_name("myip-icmp4");
 
-	while(!stop_flag) {
-		auto po = pkts->get(500);
+	for(;;) {
+		auto po = pkts->get();
 		if (!po.has_value())
-			continue;
+			break;
 
 		const packet *pkt = po.value();
 

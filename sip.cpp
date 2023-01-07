@@ -823,6 +823,7 @@ void sip::operator()()
 			break;
 
 		slock.lock();
+
 		for(auto it=sessions.begin(); it!=sessions.end();) {
 			if (it->second->finished) {
 				it->first->join();
@@ -836,6 +837,7 @@ void sip::operator()()
 				it++;
 			}
 		}
+
 		slock.unlock();
 	}
 }

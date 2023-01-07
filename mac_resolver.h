@@ -24,7 +24,9 @@ protected:
 	std::mutex work_lock;
 	std::condition_variable work_cv;
 
-	fifo<fifo_element_t> *pkts { nullptr };
+	bool                  stop_flag { false   }; 
+
+	fifo<fifo_element_t> *pkts      { nullptr };
 
 	virtual bool send_request(const any_addr & ip, const any_addr::addr_family af) = 0;
 

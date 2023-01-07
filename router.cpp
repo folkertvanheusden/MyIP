@@ -38,7 +38,7 @@ router::router(stats *const s, const int n_threads)
 
 router::~router()
 {
-	stop_flag = true;
+	stop();
 
 	for(auto th : router_ths) {
 		th->join();
@@ -51,7 +51,7 @@ router::~router()
 
 void router::stop()
 {
-	stop_flag = true;
+	pkts->interrupt();
 }
 
 bool check_subnet(const any_addr & addr, const any_addr & network, const int cidr)
@@ -249,10 +249,10 @@ std::optional<any_addr> router::resolve_mac_by_addr(router_entry *const re, cons
 
 void router::operator()()
 {
-	while(!stop_flag) {
-		auto po = pkts->get(500);
+	for(;;) {
+		auto po = pkts->get();
 		if (!po.has_value())
-			continue;
+			break;
 
 		std::shared_lock<std::shared_mutex> lck(table_lock);
 

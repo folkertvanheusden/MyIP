@@ -35,7 +35,7 @@ sctp::sctp(stats *const s, icmp *const icmp_, const int n_threads) : transport_l
 
 sctp::~sctp()
 {
-	stop_flag = true;
+	pkts->interrupt();
 
 	for(auto & th : ths) {
 		th->join();
@@ -266,10 +266,10 @@ void sctp::operator()()
 {
 	set_thread_name("myip-sctp");
 
-	while(!stop_flag) {
-		auto po = pkts->get(500);
+	for(;;) {
+		auto po = pkts->get();
 		if (!po.has_value())
-			continue;
+			break;
 
 		packet              *pkt        = po.value();
 
