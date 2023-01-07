@@ -8,6 +8,7 @@
 #include <sys/types.h>
 
 #include "phys.h"
+#include "str.h"
 #include "ud.h"
 #include "utils.h"
 
@@ -118,6 +119,33 @@ void ud_stats::emit_devices(const int cfd)
 	eol(cfd);
 }
 
+std::string gen_pcap_name()
+{
+	char buffer[16] { 0 };
+
+	snprintf(buffer, sizeof buffer, "%ld.pcap", time(nullptr));
+
+	return buffer;
+}
+
+void ud_stats::handle_pcap(const int cfd, const std::string & dev_name, const bool open)
+{
+	for(auto & dev : *devs) {
+		if (dev->to_str() == dev_name) {
+			if (open)
+				dev->start_pcap(gen_pcap_name(), true, true);
+			else
+				dev->stop_pcap();
+
+			WRITE(cfd, reinterpret_cast<const uint8_t *>("OK\n"), 3);
+
+			return;
+		}
+	}
+
+	WRITE(cfd, reinterpret_cast<const uint8_t *>("FAIL\n"), 5);
+}
+
 void ud_stats::handler(const int cfd)
 {
 	for(;;) {
@@ -141,10 +169,16 @@ void ud_stats::handler(const int cfd)
 			}
 		}
 
-		if (cmd == "sessions")
+		auto parts = split(cmd, "|");
+
+		if (parts[0] == "sessions")
 			emit_sessions(cfd);
-		else if (cmd == "list-devices")
+		else if (parts[0] == "list-devices")
 			emit_devices(cfd);
+		else if (parts[0] == "start-pcap" && parts.size() == 2)
+			handle_pcap(cfd, parts[1], true);
+		else if (parts[0] == "stop-pcap" && parts.size() == 2)
+			handle_pcap(cfd, parts[1], false);
 		else
 			WRITE(cfd, reinterpret_cast<const uint8_t *>("???\n"), 4);
 	}

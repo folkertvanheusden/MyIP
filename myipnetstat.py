@@ -39,3 +39,5 @@ mi = myipud('/tmp/myipstats.sock')
 print(mi.request('sessions'))
 
 print(mi.request('list-devices'))
+
+print(mi.request('start-pcap|tap-myip'))

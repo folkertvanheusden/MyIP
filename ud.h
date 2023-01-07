@@ -21,6 +21,8 @@ private:
 	void emit_devices (const int cfd);
 	void emit_sessions(const int cfd);
 
+	void handle_pcap  (const int cfd, const std::string & dev, const bool open);
+
 public:
 	ud_stats(const std::vector<pstream *> & stream_session_handlers, std::vector<phys *> *const devs, const std::string & socket_path);
 	virtual ~ud_stats();

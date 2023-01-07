@@ -55,8 +55,11 @@ void phys::ask_to_stop()
 
 void phys::start_pcap(const std::string & pcap_file, const bool in, const bool out)
 {
-	if (pcap_fd != -1)
-		error_exit(false, "phys: pcap already running");
+	if (pcap_fd != -1) {
+		DOLOG(ll_error, "phys: pcap already running\n");
+
+		close(pcap_fd);
+	}
 
 	pcap_fd = open(pcap_file.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 	if (pcap_fd == -1)
