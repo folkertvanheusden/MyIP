@@ -140,7 +140,7 @@ void arp::operator()()
 
 bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 {
-	uint8_t request[28] { 0 };
+	uint8_t request[44] { 0 };
 
 	uint8_t hw_size = 0;
 
