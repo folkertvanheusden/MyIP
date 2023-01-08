@@ -892,7 +892,6 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 	tcp_session *const ts = dynamic_cast<tcp_session *>(ts_in);
 
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %lu packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
-	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: %s\n", ts->id, std::string((const char *)data, len).c_str());
 
 	for(;;) {
 		// lock for unacked and for my_seq_nr
