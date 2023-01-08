@@ -148,8 +148,6 @@ void send_response(session *t_s, uint8_t *request, int32_t data_len)
 
 bool nrpe_new_data(pstream *ps, session *ts, buffer_in b)
 {
-	nrpe_session_data *t_s = dynamic_cast<nrpe_session_data *>(ts->get_callback_private_data());
-
 	if (!ts) {
 		DOLOG(ll_info, "NRPE: Data for a non-existing session\n");
 
@@ -157,6 +155,8 @@ bool nrpe_new_data(pstream *ps, session *ts, buffer_in b)
 
 		return false;
 	}
+
+	nrpe_session_data *t_s = dynamic_cast<nrpe_session_data *>(ts->get_callback_private_data());
 
 	int data_len = b.get_n_bytes_left();
 
