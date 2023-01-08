@@ -274,7 +274,7 @@ void mqtt_recv_thread(void *ts_in)
 {
 	set_thread_name("myip-mqtt");
 
-	session           *ts  = (session *)ts_in;
+	session           *ts  = reinterpret_cast<session *>(ts_in);
 	mqtt_session_data *msd = dynamic_cast<mqtt_session_data *>(ts->get_callback_private_data());
 
 	std::string identifier;
