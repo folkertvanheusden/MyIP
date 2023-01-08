@@ -170,9 +170,7 @@ void phys_tap::operator()()
 
 		int size = read(fd, reinterpret_cast<char *>(buffer), mtu_size);
 
-	        timespec ts { 0, 0 };
-		if (ioctl(fd, SIOCGSTAMPNS_OLD, &ts) == -1)
-			DOLOG(ll_warning, "ioctl(SIOCGSTAMP_OLD) failed: %s\n", strerror(errno));
+		auto ts = gen_packet_timestamp(fd);
 
 		pcap_write_packet_incoming(ts, buffer, size);
 

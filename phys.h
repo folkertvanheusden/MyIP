@@ -63,6 +63,8 @@ public:
 	virtual void start();
 	void stop();
 
+	timespec gen_packet_timestamp(const int fd);
+
 	void register_protocol(const uint16_t ether_type, network_layer *const p);
 
 	network_layer *get_protocol(const uint16_t p);
