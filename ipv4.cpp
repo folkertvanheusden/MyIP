@@ -135,9 +135,9 @@ void ipv4::operator()()
 
 		uint8_t version = payload_header[0] >> 4;
 		if (version != 0x04) {
-			delete pkt;
 			stats_inc_counter(ip_n_disc);
 			DOLOG(ll_info, "%s: not an IPv4 packet (version: %d)\n", pkt->get_log_prefix().c_str(), version);
+			delete pkt;
 			continue;
 		}
 

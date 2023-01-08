@@ -119,6 +119,9 @@ void icmp4::operator()()
 
 void icmp4::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const uint8_t type, const uint8_t code, const packet *const p) const
 {
+	if (!idev)
+		return;
+
 	stats_inc_counter(icmp_transmit);
 
 	uint8_t *out = new uint8_t[576]();
@@ -146,8 +149,7 @@ void icmp4::send_packet(const any_addr & dst_ip, const any_addr & src_ip, const 
 	out[2] = checksum >> 8;
 	out[3] = checksum;
 
-	if (idev)
-		idev->transmit_packet({ }, dst_ip, src_ip, 0x01, out, out_size, nullptr);
+	idev->transmit_packet({ }, dst_ip, src_ip, 0x01, out, out_size, nullptr);
 
 	delete [] out;
 }
