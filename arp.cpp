@@ -179,6 +179,7 @@ bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 	uint16_t spa_offset = 8 + hw_size;
 	uint16_t tha_offset = spa_offset + p_size;
 	uint16_t tpa_offset = tha_offset + hw_size;
+	uint16_t end        = tpa_offset + p_size;
 
 	my_mac.get(&request[sha_offset], hw_size);  // SHA
 
@@ -193,7 +194,7 @@ bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 	else if (af == any_addr::ax25)
 		dest_mac = ax25_address("QST", 0, true, false).get_any_addr();
 
-	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, sizeof request);
+	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, end);
 }
 
 std::optional<any_addr> arp::check_special_ip_addresses(const any_addr & ip, const any_addr::addr_family family)
