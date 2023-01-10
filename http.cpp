@@ -207,7 +207,7 @@ int sock_read(void *ctx, unsigned char *buf, size_t len)
 {
 	https_ctx *const hc = reinterpret_cast<https_ctx *>(ctx);
 
-	for(;!hc->s->get_is_terminating() && !hc->hs->terminate;) {
+	for(;;) {
 		std::unique_lock<std::mutex> lck(hc->hs->r_lock);
 
 		if (hc->hs->req_len >= len) {
@@ -222,6 +222,9 @@ int sock_read(void *ctx, unsigned char *buf, size_t len)
 
 			return len;
 		}
+
+		if (hc->s->get_is_terminating() || hc->hs->terminate)
+			break;
 
 		hc->hs->r_cond.wait_for(lck, 100ms);
 	}
@@ -276,7 +279,8 @@ void https_thread(session *ts)
 
 	br_ssl_engine_set_buffer(&sc.eng, iobuf, sizeof iobuf, 1);
 
-	br_ssl_server_reset(&sc);
+	if (br_ssl_server_reset(&sc) == 0)
+		DOLOG(ll_error, "https_thread: br_ssl_server_reset failed\n");
 
 	br_sslio_init(&ioc, &sc.eng, sock_read, &hc, sock_write, &hc);
 
@@ -285,39 +289,44 @@ void https_thread(session *ts)
 	bool        ok      = true;
 
         for(;hs->terminate == false;) {
-		char x { 0 };
+		char buffer[4096] { 0 };
 
-		if (br_sslio_read(&ioc, &x, 1) < 0) {
+		if (br_sslio_read(&ioc, buffer, sizeof(buffer) - 1) < 0) {
 			ok = false;
 			break;
 		}
 
-		headers += x;
+		headers += buffer;
 
-		if (x == 0x0a) {
-			if (headers.find("\r\n\r\n") != std::string::npos) {
-				auto rc = generate_response(ts, headers);
+		if (headers.find("\r\n\r\n") != std::string::npos) {
+			auto rc = generate_response(ts, headers);
 
-				if (rc.has_value()) {
-					if (br_sslio_write_all(&ioc, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size()) == -1)
-						ok = false;
-					else if (rc.value().second.empty() == false)
-						ok = br_sslio_write_all(&ioc, rc.value().second.data(), rc.value().second.size()) == 0;
-				}
-				else {
+			if (rc.has_value()) {
+				if (br_sslio_write_all(&ioc, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size()) == -1) {
 					ok = false;
-				}
 
-				break;
+					DOLOG(ll_debug, "https_thread: br_sslio_write_all failed\n");
+				}
+				else if (rc.value().second.empty() == false) {
+					ok = br_sslio_write_all(&ioc, rc.value().second.data(), rc.value().second.size()) == 0;
+
+					if (!ok)
+						DOLOG(ll_debug, "https_thread: br_sslio_write_all failed\n");
+				}
 			}
+			else {
+				ok = false;
+			}
+
+			break;
 		}
 	}
 
 	if (ok && hs->terminate == false) {
 		ts->set_is_terminating();
 
-// this often ends in a busy loop in bearssl
-//		br_sslio_close(&ioc);
+		// this often ends in a busy loop in bearssl
+		br_sslio_close(&ioc);
 	}
 
 	ts->get_stream_target()->end_session(ts);
