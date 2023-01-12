@@ -54,6 +54,7 @@ add_executable(myip
 	phys_sctp_udp.cpp
 	phys_slip.cpp
 	phys_tap.cpp
+	proc.cpp
 	router.cpp
 	sctp.cpp
 	sctp_crc32c.cpp
@@ -112,6 +113,8 @@ target_link_libraries(myip -lrt)
 target_link_libraries(myip -lbearssl)
 
 target_link_libraries(myip -latomic)
+
+target_link_libraries(myip -lutil)
 
 include(FindPkgConfig)
 

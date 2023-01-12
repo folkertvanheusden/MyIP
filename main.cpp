@@ -210,11 +210,13 @@ std::pair<port_handler_t, int> get_http_handler(stats *const s, const libconfig:
 	std::string web_root    = cfg_str(s_http,  "web-root",    "HTTP server files root", false, "");
 	std::string web_logfile = cfg_str(s_http,  "web-logfile", "HTTP server logfile", false, "");
 
+	std::string php_cgi_bin = cfg_str(s_http,  "php-cgi",     "Path to php-cgi binary", true, "");
+
 	int         port        = cfg_int(s_http,  "port",        "tcp port to listen on", true, 80);
 
 	bool        is_https    = cfg_bool(s_http, "is-https",    "Set to true if https (e.g. port 443)", true, false);
 
-	return { http_get_handler(s, web_root, web_logfile, is_https), port };
+	return { http_get_handler(s, web_root, web_logfile, is_https, php_cgi_bin), port };
 }
 
 void progress(const int cur, const int total)

@@ -28,6 +28,7 @@ public:
 	stats      *s        { nullptr };
 	std::string private_key;
 	std::string certificate;
+	std::string php_cgi;
 
 	uint64_t *http_requests { nullptr };
 	uint64_t *http_r_200 { nullptr };

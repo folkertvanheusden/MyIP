@@ -1,5 +1,7 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <errno.h>
+#include <optional>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,15 +9,17 @@
 #include <string.h>
 #include <vector>
 #include <bearssl/bearssl.h>
+#include <sys/types.h>
 
 #include "BearSSLHelpers.h"
+#include "ipv4.h"
 #include "log.h"
+#include "proc.h"
+#include "stats_utils.h"
 #include "str.h"
 #include "tcp.h"
-#include "utils.h"
-#include "ipv4.h"
 #include "types.h"
-#include "stats_utils.h"
+#include "utils.h"
 
 
 using namespace std::chrono_literals;
@@ -25,6 +29,39 @@ std::vector<uint8_t> str_to_vector(const std::string & in)
 	return std::vector<uint8_t>(reinterpret_cast<const uint8_t *>(in.c_str()), reinterpret_cast<const uint8_t *>(in.c_str() + in.size()));
 }
 
+std::optional<std::string> invoke_cgi(const std::string & bin, const std::string & path, const std::string & request)
+{
+	// TODO: send vector of strings because of potential spaces in path names
+	auto proc = exec_with_pipe(bin + " " + path, "");
+
+	std::string out;
+
+	for(;;) {
+		char buffer[4097] { 0 };
+
+		int rc = read(std::get<1>(proc), buffer, sizeof buffer - 1);
+
+		if (rc == 0 || (rc == -1 && errno == EIO))
+			break;
+
+		if (rc == -1) {
+			DOLOG(ll_info, "invoke_cgi(%s): %s\n", bin.c_str(), strerror(errno));
+
+			close(std::get<1>(proc));
+
+			return { };
+		}
+
+		out += buffer;
+	}
+
+	close(std::get<1>(proc));
+
+	kill(std::get<0>(proc), SIGTERM);
+
+	return out;
+}
+
 std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(session *const ts, const std::string & request)
 {
 	http_session_data *hs  = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
@@ -32,6 +69,7 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 
 	std::string logfile  = hpd->logfile;
 	std::string web_root = hpd->web_root;
+	std::string php_cgi  = hpd->php_cgi;
 
 	std::size_t end_marker = request.find("\r\n\r\n");
 
@@ -83,6 +121,10 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 	else if (ext == ".ico")
 		mime_type = "image/x-icon";
 
+	std::size_t php_extension = url.rfind(".php");
+
+	std::string header;
+
 	std::vector<uint8_t> content;
 
 	size_t file_size = 0;
@@ -97,7 +139,41 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 	else if (file_exists(path, &file_size) == false) {
 		rc      = 404;
 		content = str_to_vector("File does not exist.");
-		DOLOG(ll_debug, "HTTP: requested file \"%s\" does not exist", path.c_str());
+		DOLOG(ll_debug, "HTTP: requested file \"%s\" does not exist\n", path.c_str());
+	}
+	else if (php_extension != std::string::npos && php_cgi.empty() == false) {
+		auto reply = invoke_cgi(php_cgi, path, request);
+
+		if (reply.has_value() == false) {
+			rc = 500;
+			DOLOG(ll_debug, "HTTP: failed invoking %s for %s\n", php_cgi.c_str(), path.c_str());
+		}
+		else {
+			std::string text = reply.value();
+
+			bool cr = false;
+			bool lf = false;
+
+			for(size_t i=0; i<text.size(); i++) {
+				if (text.at(i) == '\r')
+					cr = true;
+				else if (text.at(i) == '\n') 
+					lf = true;
+				else
+					cr = lf = false;
+
+				if (cr && lf) {
+					header  = text.substr(0, i);
+					content = str_to_vector(text.substr(i));
+					break;
+				}
+			}
+
+			if (content.empty() && header.empty()) {
+				rc = 500;
+				DOLOG(ll_debug, "HTTP: no response headers in PHP-CGI output\n");
+			}
+		}
 	}
 	else {
 		content.resize(file_size);
@@ -118,11 +194,14 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 		}
 	}
 
-	std::string header;
-
 	if (rc == 200) {
-		header = myformat("HTTP/1.0 %d OK\r\nServer: MyIP\r\nContent-Type: %s\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n", rc, mime_type.c_str(), content.size());
-		stats_inc_counter(hpd->http_r_200);
+		if (header.empty()) {
+			header = myformat("HTTP/1.0 %d OK\r\nServer: MyIP\r\nContent-Type: %s\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n", rc, mime_type.c_str(), content.size());
+			stats_inc_counter(hpd->http_r_200);
+		}
+		else {
+			header = myformat("HTTP/1.0 %d OK\r\nServer: MyIP\r\nConnection: close\r\n%s\r\n", rc, header.c_str());
+		}
 	}
 	else {
 		header = myformat("HTTP/1.0 %d Something is wrong\r\nServer: MyIP\r\nConnection: close\r\n\r\n", rc);
@@ -408,7 +487,7 @@ bool http_close_session_2(pstream *const ps, session *ts)
 	return true;
 }
 
-port_handler_t http_get_handler(stats *const s, const std::string & web_root, const std::string & logfile, const bool is_https)
+port_handler_t http_get_handler(stats *const s, const std::string & web_root, const std::string & logfile, const bool is_https, const std::string & php_cgi)
 {
 	port_handler_t http { 0 };
 
@@ -424,6 +503,7 @@ port_handler_t http_get_handler(stats *const s, const std::string & web_root, co
 	hpd->web_root          = web_root;
 	hpd->s                 = s;
 	hpd->is_https          = is_https;
+	hpd->php_cgi           = php_cgi;
 
 	// 1.3.6.1.4.1.57850: vanheusden.com
 	// 1.3.6.1.4.1.57850.1: myip
