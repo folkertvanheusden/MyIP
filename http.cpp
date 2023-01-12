@@ -151,18 +151,18 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 		else {
 			std::string text = reply.value();
 
-			bool cr = false;
-			bool lf = false;
+			int cr = 0;
+			int lf = 0;
 
 			for(size_t i=0; i<text.size(); i++) {
 				if (text.at(i) == '\r')
-					cr = true;
+					cr++;
 				else if (text.at(i) == '\n') 
-					lf = true;
+					lf++;
 				else
-					cr = lf = false;
+					cr = lf = 0;
 
-				if (cr && lf) {
+				if (cr >= 2 && lf >= 2) {
 					header  = text.substr(0, i);
 					content = str_to_vector(text.substr(i));
 					break;
