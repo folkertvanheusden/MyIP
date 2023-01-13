@@ -14,7 +14,7 @@
 
 
 // this code needs more error checking TODO
-std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir)
+std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const std::string & dir, const std::vector<std::string> & envs)
 {
 	int fd_master { -1 };
 
@@ -44,7 +44,13 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
                         pars[i] = (char *)parts.at(i).c_str();
                 pars[n_args] = nullptr;
 
-                if (execv(pars[0], &pars[0]) == -1) {
+		size_t n_env = envs.size();
+                char **env = new char *[n_env + 1];
+                for(size_t i=0; i<n_env; i++)
+                        env[i] = (char *)envs.at(i).c_str();
+                env[n_env] = nullptr;
+
+                if (execvpe(pars[0], &pars[0], env) == -1) {
 			std::string error = myformat("CANNOT INVOKE \"%s\"!", command.c_str());
 
 			write(fd_master, error.c_str(), error.size());

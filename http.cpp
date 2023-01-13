@@ -1,4 +1,5 @@
 // (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+#include <ctype.h>
 #include <errno.h>
 #include <optional>
 #include <signal.h>
@@ -29,10 +30,48 @@ std::vector<uint8_t> str_to_vector(const std::string & in)
 	return std::vector<uint8_t>(reinterpret_cast<const uint8_t *>(in.c_str()), reinterpret_cast<const uint8_t *>(in.c_str() + in.size()));
 }
 
+std::vector<std::string> request_to_env(const std::string & request)
+{
+	std::vector<std::string> out;
+
+	auto lines = split(request, "\r\n");
+
+	for(auto & line : lines) {
+		auto kv = split(line, ":");
+
+		if (kv.size() != 2)
+			continue;
+
+		std::string key = "HTTP_";
+
+		for(size_t i=0; i<kv.at(0).size(); i++) {
+			if (kv.at(0).at(i) == '-')
+				key += "_";
+			else
+				key += toupper(kv.at(0).at(i));
+		}
+
+		std::string value = kv.at(1);
+
+		while(!value.empty() && value.at(0) == ' ')
+			value = value.substr(1);
+
+		std::string env_key_value = key + "=" + value;
+
+//		DOLOG(ll_debug, "HTTP env |%s|\n", env_key_value.c_str());
+
+		out.push_back(env_key_value);
+	}
+
+	return out;
+}
+
 std::optional<std::string> invoke_cgi(const std::string & bin, const std::string & path, const std::string & request)
 {
+	std::vector<std::string> env = request_to_env(request);
+
 	// TODO: send vector of strings because of potential spaces in path names
-	auto proc = exec_with_pipe(bin + " " + path, "");
+	auto proc = exec_with_pipe(bin + " -e " + path, "", env);
 
 	std::string out;
 
@@ -169,6 +208,16 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 				}
 			}
 
+			FILE *fhi = fopen("/tmp/in.dat", "wb");
+			if (fhi) {
+				fprintf(fhi, "%s", request.c_str());
+				fclose(fhi);
+			}
+			FILE *fho = fopen("/tmp/out.dat", "wb");
+			if (fho) {
+				fprintf(fho, "%s", text.c_str());
+				fclose(fho);
+			}
 			if (content.empty() && header.empty()) {
 				rc = 500;
 				DOLOG(ll_debug, "HTTP: no response headers in PHP-CGI output\n");
