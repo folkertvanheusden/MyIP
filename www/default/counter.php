@@ -20,11 +20,18 @@ else {
 }
 
 mysqli_report(MYSQLI_REPORT_ERROR);
-$connection = new mysqli($db_hostname, $db_user, $db_pass, $db_db);
-$q = 'INSERT INTO hits(cookie, count) VALUES (?, ?) ON DUPLICATE KEY UPDATE count = ?';
-$stmt = $connection->prepare($q);
-$stmt->bind_param('sii', $uuid, $count, $count);
 
+$q1 = 'INSERT INTO hits(cookie, count) VALUES (?, ?) ON DUPLICATE KEY UPDATE count=?';
+
+$connection = new mysqli($db_hostname, $db_user, $db_pass, $db_db);
+
+$stmt = $connection->prepare($q1);
+$stmt->bind_param('sii', $uuid, $count, $count);
 $stmt->execute();
 
-print($count); ?>
+$q2 = 'SELECT COUNT(*) AS n FROM hits';
+
+$res = $connection->query($q2);
+$row = $res->fetch_assoc();
+
+print($row['n']); ?>
