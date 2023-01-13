@@ -887,11 +887,9 @@ void tcp::add_handler(const int port, port_handler_t & tph)
 
 bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_t len)
 {
-	uint64_t internal_id = get_us();
-
 	tcp_session *const ts = dynamic_cast<tcp_session *>(ts_in);
 
-	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, internal id: %lu, %lu packets\n", ts->id, len, internal_id, (len + ts->window_size - 1) / ts->window_size);
+	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, %lu packets\n", ts->id, len, (len + ts->window_size - 1) / ts->window_size);
 
 	for(;;) {
 		// lock for unacked and for my_seq_nr

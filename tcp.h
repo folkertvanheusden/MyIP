@@ -50,15 +50,15 @@ public:
 	uint32_t initial_my_seq_nr    { 0 };
 	uint32_t initial_their_seq_nr { 0 };
 
-	uint8_t *unacked              { nullptr };
-	uint32_t unacked_start_seq_nr { 0       };
-	size_t data_since_last_ack    { 0       };
-	size_t unacked_size           { 0       };
-	bool fin_after_unacked_empty  { false   };
+	uint8_t *unacked                 { nullptr };
+	uint32_t unacked_start_seq_nr    { 0       };
+	size_t   data_since_last_ack     { 0       };
+	size_t   unacked_size            { 0       };
+	bool     fin_after_unacked_empty { false   };
 	std::condition_variable unacked_sent_cv;
 
 	uint32_t seq_for_fin_when_all_received { 0     };
-	bool flag_fin_when_all_received        { false };
+	bool     flag_fin_when_all_received    { false };
 
 public:
 	tcp_session(pstream *const t, const any_addr & my_addr, const int my_port, const any_addr & their_addr, const int their_port, private_data *app_private_data) :
