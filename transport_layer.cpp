@@ -30,7 +30,7 @@ uint16_t tcp_udp_checksum(const any_addr & src_addr, const any_addr & dst_addr, 
 {
 	uint16_t checksum { 0 };
 
-	if (dst_addr.get_len() == 16 && src_addr.get_len() == 16) {  // IPv6
+	if (dst_addr.get_family() == any_addr::ipv6) {  // IPv6
 		size_t temp_len = 40 + len + (len & 1);
 		uint8_t *temp = new uint8_t[temp_len]();
 
@@ -51,7 +51,7 @@ uint16_t tcp_udp_checksum(const any_addr & src_addr, const any_addr & dst_addr, 
 
 		delete [] temp;
 	}
-	else if (dst_addr.get_len() == 4 && src_addr.get_len() == 4) {  // IPv4
+	else if (dst_addr.get_family() == any_addr::ipv4) {  // IPv4
 		size_t temp_len = 12 + len + (len & 1);
 		uint8_t *temp = new uint8_t[temp_len]();
 
