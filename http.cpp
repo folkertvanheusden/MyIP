@@ -208,16 +208,6 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 				}
 			}
 
-			FILE *fhi = fopen("/tmp/in.dat", "wb");
-			if (fhi) {
-				fprintf(fhi, "%s", request.c_str());
-				fclose(fhi);
-			}
-			FILE *fho = fopen("/tmp/out.dat", "wb");
-			if (fho) {
-				fprintf(fho, "%s", text.c_str());
-				fclose(fho);
-			}
 			if (content.empty() && header.empty()) {
 				rc = 500;
 				DOLOG(ll_debug, "HTTP: no response headers in PHP-CGI output\n");
