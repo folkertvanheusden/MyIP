@@ -133,7 +133,7 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 			std::unique_lock lck(lock);
 
-			a_cache.insert_or_assign(name, dr);
+			a_aaaa_cache.insert_or_assign(name, dr);
 		}
 		else if (type == 0x0005 /* CNAME */) {
 			auto cname_len = get_name(p->get_data(), work_p, true);
@@ -148,6 +148,18 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 			std::unique_lock lck(lock);
 
 			cname_cache.insert_or_assign(name, dr);
+		}
+		else if (len == 16 && type == 0x001c /* type AAAA (28 decimal) */) {
+			any_addr    a  (any_addr::ipv6, work_p);
+			dns_a_rec_t dr { a, p->get_recv_ts().tv_sec, ttl };
+
+			std::string name = name_len.first.substr(0, name_len.first.size() - 1);  // remove '.'
+
+			DOLOG(ll_debug, "DNS: AAAA record for %s to %s\n", name.c_str(), a.to_str().c_str());
+
+			std::unique_lock lck(lock);
+
+			a_aaaa_cache.insert_or_assign(name, dr);
 		}
 		else {
 			DOLOG(ll_debug, "DNS: type: %04x, class: %04x, len: %d for %s\n", type, class_, len, name_len.first.c_str());
@@ -190,9 +202,9 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 			send_req = true;
 		}
 
-		auto ita = a_cache.find(work);
+		auto ita = a_aaaa_cache.find(work);
 
-		if (ita != a_cache.end() && now - ita->second.t < ita->second.max_age) {
+		if (ita != a_aaaa_cache.end() && now - ita->second.t < ita->second.max_age) {
 			stats_inc_counter(dns_queries_hit);
 
 			DOLOG(ll_debug, "DNS succeeded to resolve %s\n", work.c_str());
@@ -268,9 +280,9 @@ void dns::operator()()
 		// clean A cache
 		time_t now = time(nullptr);
 
-		for(auto it = a_cache.begin(); it != a_cache.end();) {
+		for(auto it = a_aaaa_cache.begin(); it != a_aaaa_cache.end();) {
 			if (now - it->second.t >= it->second.max_age)
-				it = a_cache.erase(it);
+				it = a_aaaa_cache.erase(it);
 			else
 				it++;
 		}

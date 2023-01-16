@@ -37,7 +37,7 @@ private:
 	uint64_t *dns_queries_to          { nullptr };
 
 	std::mutex                         lock;
-	std::map<std::string, dns_a_rec_t> a_cache;
+	std::map<std::string, dns_a_rec_t> a_aaaa_cache;
 	std::map<std::string, dns_cname_rec_t> cname_cache;
 	std::condition_variable            updated;
 
