@@ -41,13 +41,13 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
                 size_t n_args = parts.size();
                 char **pars = new char *[n_args + 1];
                 for(size_t i=0; i<n_args; i++)
-                        pars[i] = (char *)parts.at(i).c_str();
+                        pars[i] = const_cast<char *>(parts.at(i).c_str());
                 pars[n_args] = nullptr;
 
 		size_t n_env = envs.size();
                 char **env = new char *[n_env + 1];
                 for(size_t i=0; i<n_env; i++)
-                        env[i] = (char *)envs.at(i).c_str();
+                        env[i] = const_cast<char *>(envs.at(i).c_str());
                 env[n_env] = nullptr;
 
                 if (execvpe(pars[0], &pars[0], env) == -1) {

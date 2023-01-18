@@ -44,7 +44,7 @@ void network_layer::queue_incoming_packet(phys *const interface, packet *p)
 	}
 }
 
-uint16_t ip_checksum(const uint16_t *p, const size_t n)
+uint16_t ip_checksum(const uint16_t *const p, const size_t n)
 {
         uint32_t cksum = 0;
 
@@ -52,7 +52,7 @@ uint16_t ip_checksum(const uint16_t *p, const size_t n)
                 cksum += htons(p[i]);
 
 	cksum = (cksum >> 16) + (cksum & 0xffff);
-	cksum += (cksum >>16);
+	cksum += cksum >> 16;
 
         return ~cksum;
 }
