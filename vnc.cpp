@@ -145,6 +145,8 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 {
 	set_thread_name("myip-framebuf");
 
+	char text[16] { 0 };
+
 	int x = fb_work->w / 2, y = fb_work->h / 2;
 	int dx = 1, dy = 1;
 
@@ -200,12 +202,9 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 				}
 			}
 
-			char *text = nullptr;
-			asprintf(&text, "%02d:%02d:%02d - MyIP", tm.tm_hour, tm.tm_min, tm.tm_sec);
+			snprintf(text, sizeof text, "%02d:%02d:%02d - MyIP", tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 			draw_text(fb_work, x, y, text);
-
-			free(text);
 
 			fb_work->fb_lock.unlock();
 
