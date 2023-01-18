@@ -914,7 +914,7 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 		if (ts->unacked_size == 0)
 			ts->unacked_start_seq_nr = ts->my_seq_nr;
 
-		ts->unacked = (uint8_t *)realloc(ts->unacked, ts->unacked_size + len);
+		ts->unacked = reinterpret_cast<uint8_t *>(realloc(ts->unacked, ts->unacked_size + len));
 		memcpy(&ts->unacked[ts->unacked_size], data, len);
 		ts->unacked_size += len;
 	}
