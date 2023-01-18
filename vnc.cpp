@@ -1,8 +1,9 @@
-// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <atomic>
 #include <climits>
 #include <errno.h>
+#include <math.h>
 #include <set>
 #include <stdint.h>
 #include <stdio.h>
@@ -147,8 +148,10 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 
 	char text[16] { 0 };
 
-	int x = fb_work->w / 2, y = fb_work->h / 2;
-	int dx = 1, dy = 1;
+	int x  = fb_work->w / 2;
+	int y  = fb_work->h / 2;
+	int dx = 1;
+	int dy = 1;
 
 	uint64_t latest_update = 0;
 
@@ -190,15 +193,17 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 
 			time_t tnow = time(nullptr);
 
-			struct tm tm { 0 };
+			tm     tm { 0 };
 			gmtime_r(&tnow, &tm);
 
 			for(int y=0; y<fb_work->h; y++) {
-				for(int x=0; x<fb_work->w; x++) {
-					int o = y * fb_work->w * 3 + x * 3;
+				const int o = y * fb_work->w * 3;
 
-					if (fb_work->buffer[o] >= subn)
-						fb_work->buffer[o] -= subn;
+				for(int x=0; x<fb_work->w; x++) {
+					int ox = o + x * 3;
+
+					if (fb_work->buffer[ox] >= subn)
+						fb_work->buffer[ox] -= subn;
 				}
 			}
 
