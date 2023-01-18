@@ -279,7 +279,7 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 				int offset = yo * w * 3 + xo * 3;
 
 				temp[otemp++] = (fb->buffer[offset + 0] & 0xe0) |  // red
-						(fb->buffer[offset + 1] >> 3) |  // green
+						((fb->buffer[offset + 1] >> 3) & 0x1c) |  // green
 						(fb->buffer[offset + 2] >> 6);  // blue
 			}
 		}
