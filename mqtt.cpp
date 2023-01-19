@@ -324,7 +324,7 @@ void mqtt_recv_thread(void *ts_in)
 
 		if (cmsg == 1) {  // CONNECT
 			if (len > 12) {  // should be true (variable header + at least 0x00 for identifier)
-				identifier = (char *)&mqtt_msg[12];
+				identifier = reinterpret_cast<char *>(&mqtt_msg[12]);
 			}
 
 			DOLOG(ll_debug, "MQTT(%s): Connect by %s\n", msd->session_name.c_str(), identifier.c_str());
@@ -341,7 +341,7 @@ void mqtt_recv_thread(void *ts_in)
 			int o = 0;
 			int topic_len = std::min((mqtt_msg[0] << 8) | mqtt_msg[1], int(len));
 			DOLOG(ll_debug, "MQTT(%s): topic len: %d (%d | %d)\n", msd->session_name.c_str(), topic_len, (mqtt_msg[0] << 8) | mqtt_msg[1], len);
-			std::string topic((const char *)&mqtt_msg[2], topic_len);
+			std::string topic(reinterpret_cast<const char *>(&mqtt_msg[2]), topic_len);
 			o += 2 + topic_len;
 
 			DOLOG(ll_debug, "MQTT(%s): publish to %s\n", msd->session_name.c_str(), topic.c_str());
