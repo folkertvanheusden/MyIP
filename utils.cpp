@@ -232,3 +232,15 @@ ssize_t WRITE(int fd, const uint8_t *whereto, size_t len)
 
 	return cnt;
 }
+
+int determine_value_size(uint32_t n)
+{
+	int count = 0;
+
+	while (n) {
+		count++;
+		n >>= 1;
+	}
+
+	return count;
+}
