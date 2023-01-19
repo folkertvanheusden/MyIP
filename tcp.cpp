@@ -1041,7 +1041,7 @@ void tcp::close_client_session(const int port)
 	s->tlock.unlock();
 }
 
-void tcp::wait_for_client_connected_state(const int local_port)
+bool tcp::wait_for_client_connected_state(const int local_port)
 {
 	int counter = 0;
 
@@ -1057,14 +1057,14 @@ void tcp::wait_for_client_connected_state(const int local_port)
 		auto it_id = tcp_clients.find(local_port);
 		if (it_id == tcp_clients.end()) {
 			DOLOG(ll_debug, "wait_for_client_connected_state: session id not found\n");
-			return;
+			return false;
 		}
 
 		DOLOG(ll_debug, "wait_for_client_connected_state: session id: [%012" PRIx64 "]\n", it_id->second);
 
 		auto sd_it = sessions.find(it_id->second);
 		if (sd_it == sessions.end())
-			return;
+			return false;
 
 		DOLOG(ll_debug, "wait_for_client_connected_state: found session-data, send_data\n");
 
@@ -1079,7 +1079,7 @@ void tcp::wait_for_client_connected_state(const int local_port)
 		if (time(nullptr) - cur_session->state_since >= 30) {
 			end_session(sd_it->second);
 			DOLOG(ll_debug, "wait_for_client_connected_state: session setup time-out\n");
-			return;
+			return false;
 		}
 
 		if (++counter == 3) {
@@ -1098,9 +1098,11 @@ void tcp::wait_for_client_connected_state(const int local_port)
 		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid as
 		// lck gets unlocked by the wait_for
 	}
+
+	return true;
 }
 
-void tcp::client_session_send_data(const int local_port, const uint8_t *const data, const size_t len)
+bool tcp::client_session_send_data(const int local_port, const uint8_t *const data, const size_t len)
 {
 	DOLOG(ll_debug, "client_session_send_data: lock all sessions\n");
 
@@ -1113,20 +1115,22 @@ void tcp::client_session_send_data(const int local_port, const uint8_t *const da
 	auto it_id = tcp_clients.find(local_port);
 	if (it_id == tcp_clients.end()) {
 		DOLOG(ll_debug, "client_session_send_data: session id not found\n");
-		return;
+		return false;
 	}
 
 	DOLOG(ll_debug, "client_session_send_data: session id: [%012" PRIx64 "]\n", it_id->second);
 
 	auto sd_it = sessions.find(it_id->second);
 	if (sd_it == sessions.end())
-		return;
+		return false;
 
 	DOLOG(ll_debug, "client_session_send_data: found session-data, send_data\n");
 
 	tcp_session *const cur_session = dynamic_cast<tcp_session *>(sd_it->second);
 
-	send_data(cur_session, data, len);
+	bool rc = send_data(cur_session, data, len);
 
-	DOLOG(ll_debug, "client_session_send_data: found session-data, data sent\n");
+	DOLOG(ll_debug, "client_session_send_data: found session-data, data sent: %d\n", rc);
+
+	return rc;
 }
