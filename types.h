@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <atomic>
@@ -176,6 +176,14 @@ public:
 	std::string session_name;
 
 	std::atomic_bool terminate { false };
+};
+
+class mqtt_client;
+
+class mqtt_client_session_data : public session_data
+{
+public:
+	mqtt_client *mc;
 };
 
 class socks_session_data : public session_data

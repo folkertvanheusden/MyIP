@@ -40,6 +40,7 @@ add_executable(myip
 	main.cpp
 	mdns.cpp
 	mqtt.cpp
+	mqtt_client.cpp
 	ndp.cpp
 	net.cpp
 	network_layer.cpp
