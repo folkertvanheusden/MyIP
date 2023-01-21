@@ -350,6 +350,8 @@ int main(int argc, char *argv[])
 
 	sd.register_oid("1.3.6.1.2.1.2.1.0", snmp_integer::si_integer, int(n_interfaces));
 
+	std::map<any_addr, dns *> dns_instances;
+
 	std::vector<phys *> devs;
 
 	for(size_t i=0; i<n_interfaces; i++) {
@@ -706,6 +708,12 @@ int main(int argc, char *argv[])
 					u->add_handler(53, std::bind(&dns::input, dns_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 					applications.push_back(dns_);
+
+					if (my_ipv4_address.is_set())
+						dns_instances.insert({ my_ipv4_address, dns_ });
+
+					if (my_ipv6_address.is_set())
+						dns_instances.insert({ my_ipv6_address, dns_ });
 				}
 
 				if (dns_)
@@ -861,12 +869,12 @@ int main(int argc, char *argv[])
 		udp  *u = nullptr;
 		get_client_parameters(&devs, bind_to, &p, &t, &u);
 
-		std::string dns_str     = cfg_str(s_vnc, "dns-address", "IP address of upstream DNS server", false, "");
-		any_addr dns_a          = parse_address(dns_str, 4, ".", 10);
+		auto it_dns = dns_instances.find(bind_to);
 
-		dns *dns_ = new dns(&s, u, bind_to, dns_a);
+		if (it_dns == dns_instances.end())
+			error_exit(false, "%s has no DNS bound to it", bind_to_str.c_str());
 
-		mqtt_client *mc = new mqtt_client(t, dns_, "vps001.vanheusden.com", 1883, &s);
+		mqtt_client *mc = new mqtt_client(t, it_dns->second, "vps001.vanheusden.com", 1883, &s);
 
 		vnc_set_mqtt_client(mc);
 	}
