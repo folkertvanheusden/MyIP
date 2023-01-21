@@ -13,6 +13,7 @@
 
 static bool mqtt_new_data(pstream *const ps, session *const s, buffer_in data)
 {
+	DOLOG(ll_debug, "mqtt_new_data\n");
 	mqtt_client_session_data *t_s = dynamic_cast<mqtt_client_session_data *>(s->get_callback_private_data());
 
 	t_s->mc->new_data(data);
@@ -51,6 +52,8 @@ void mqtt_client::new_data(const buffer_in & data)
 {
 	size_t new_n = data.get_n_bytes_left();
 
+	DOLOG(ll_debug, "mqtt_client::new_data: %zu bytes\n", new_n);
+
 	std::unique_lock<std::mutex> lck(lock);
 
 	data_in = reinterpret_cast<uint8_t *>(realloc(data_in, n_data_in + new_n));
@@ -58,11 +61,17 @@ void mqtt_client::new_data(const buffer_in & data)
 
 	memcpy(&data_in[n_data_in], data.get_bytes(new_n), new_n);
 
+	n_data_in += new_n;
+
+	DOLOG(ll_debug, "mqtt_client::new_data: now have %zu bytes\n", n_data_in);
+
 	cv.notify_all();
 }
 
 void mqtt_client::close_session()
 {
+	DOLOG(ll_debug, "mqtt_client::close_session\n");
+
 	state = mc_disconnect;
 }
 
@@ -71,24 +80,28 @@ bool mqtt_client::read(uint8_t *target, size_t n)
 	std::unique_lock<std::mutex> lck(lock);
 
 	while(n) {
+		DOLOG(ll_debug, "mqtt_client::read %zu bytes, have: %zu\n", n, n_data_in);
+
 		if (n_data_in) {
 			size_t cur_n = std::min(n, n_data_in);
 
 			memcpy(target, data_in, cur_n);
 
 			size_t n_left = n_data_in - cur_n;
-			if (n_left) {
+			if (n_left)
 				memmove(&data_in[0], &data_in[cur_n], n_left);
 
-				n_data_in -= cur_n;
-			}
+			n_data_in -= cur_n;
 
 			target += cur_n;
 			n      -= cur_n;
 		}
-
-		cv.wait(lck);  // TODO timeout
+		else {
+			cv.wait(lck);  // TODO timeout
+		}
 	}
+
+	DOLOG(ll_debug, "mqtt_client::read finished\n");
 
 	return true;
 }
