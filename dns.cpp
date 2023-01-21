@@ -67,7 +67,6 @@ std::pair<std::string, int> get_name(const uint8_t *const base, const uint8_t *c
 	return { name, tl };
 }
 
-// verify if packet comes from 'dns_ip'!
 void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd)
 {
 	if (src_ip != dns_ip) {
@@ -131,9 +130,11 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 			DOLOG(ll_debug, "DNS: A record for %s to %s\n", name.c_str(), a.to_str().c_str());
 
-			std::unique_lock lck(lock);
+			std::unique_lock<std::mutex> lck(lock);
 
 			a_aaaa_cache.insert_or_assign(name, dr);
+
+			updated.notify_all();
 		}
 		else if (type == 0x0005 /* CNAME */) {
 			auto cname_len = get_name(p->get_data(), work_p, true);
@@ -145,9 +146,11 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 			DOLOG(ll_debug, "DNS: CNAME record for %s to %s\n", name.c_str(), cname.c_str());
 
-			std::unique_lock lck(lock);
+			std::unique_lock<std::mutex> lck(lock);
 
 			cname_cache.insert_or_assign(name, dr);
+
+			updated.notify_all();
 		}
 		else if (len == 16 && type == 0x001c /* type AAAA (28 decimal) */) {
 			any_addr    a  (any_addr::ipv6, work_p);
@@ -157,17 +160,18 @@ void dns::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 			DOLOG(ll_debug, "DNS: AAAA record for %s to %s\n", name.c_str(), a.to_str().c_str());
 
-			std::unique_lock lck(lock);
+			std::unique_lock<std::mutex> lck(lock);
 
 			a_aaaa_cache.insert_or_assign(name, dr);
+
+			updated.notify_all();
 		}
 		else {
 			DOLOG(ll_debug, "DNS: type: %04x, class: %04x, len: %d for %s\n", type, class_, len, name_len.first.c_str());
 		}
 	}
 
-	if (ancount)
-		updated.notify_all();
+	DOLOG(ll_debug, "DNS input processing finished\n");
 }
 
 using namespace std::chrono_literals;
@@ -176,6 +180,8 @@ using namespace std::chrono_literals;
 // check if set in chache. if not, wait. upto to ms.
 std::optional<any_addr> dns::query(const std::string & name, const int to)
 {
+	DOLOG(ll_debug, "DNS: search for \"%s\" with timeout %d\n", name.c_str(), to);
+
 	std::string work = str_tolower(name);
 
 	stats_inc_counter(dns_queries);
@@ -184,7 +190,7 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 
 	bool send_req    = true;
 
-	std::unique_lock lck(lock);
+	std::unique_lock<std::mutex> lck(lock);
 
 	do {
 		time_t now = time(nullptr);
@@ -202,14 +208,22 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 			send_req = true;
 		}
 
+		DOLOG(ll_debug, "DNS: iterate %s, cache entries: %zu\n", work.c_str(), a_aaaa_cache.size());
+
 		auto ita = a_aaaa_cache.find(work);
 
-		if (ita != a_aaaa_cache.end() && now - ita->second.t < ita->second.max_age) {
-			stats_inc_counter(dns_queries_hit);
+		if (ita != a_aaaa_cache.end()) {
+			int age = now - ita->second.t;
 
-			DOLOG(ll_debug, "DNS succeeded to resolve %s\n", work.c_str());
+			if (age < ita->second.max_age) {
+				stats_inc_counter(dns_queries_hit);
 
-			return ita->second.a;
+				DOLOG(ll_debug, "DNS succeeded to resolve %s\n", work.c_str());
+
+				return ita->second.a;
+			}
+
+			DOLOG(ll_debug, "DNS: record for %s too old (%d > %d)\n", work.c_str(), age, ita->second.max_age);
 		}
 
 		if (send_req) {
@@ -257,11 +271,12 @@ std::optional<any_addr> dns::query(const std::string & name, const int to)
 
 			u->transmit_packet(dns_ip, 53, my_ip, 53, buffer, offset);
 		}
-
 	}
-	while (updated.wait_until(lck, wait_until) != std::cv_status::timeout);
+	while(updated.wait_until(lck, wait_until) != std::cv_status::timeout);
 
 	stats_inc_counter(dns_queries_to);
+
+	DOLOG(ll_debug, "DNS: no result for %s\n", name.c_str());
 
 	return { };
 }
@@ -275,7 +290,9 @@ void dns::operator()()
 		if (stop_flag.sleep(30000))
 			break;
 
-		std::unique_lock lck(lock);
+		std::unique_lock<std::mutex> lck(lock);
+
+		DOLOG(ll_debug, "DNS cache clean\n");
 
 		// clean A cache
 		time_t now = time(nullptr);

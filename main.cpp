@@ -350,7 +350,8 @@ int main(int argc, char *argv[])
 
 	sd.register_oid("1.3.6.1.2.1.2.1.0", snmp_integer::si_integer, int(n_interfaces));
 
-	std::map<any_addr, dns *> dns_instances;
+	std::map<any_addr, dns *> dns_instances_4;
+	std::map<any_addr, dns *> dns_instances_6;
 
 	std::vector<phys *> devs;
 
@@ -710,10 +711,10 @@ int main(int argc, char *argv[])
 					applications.push_back(dns_);
 
 					if (my_ipv4_address.is_set())
-						dns_instances.insert({ my_ipv4_address, dns_ });
+						dns_instances_4.insert({ my_ipv4_address, dns_ });
 
 					if (my_ipv6_address.is_set())
-						dns_instances.insert({ my_ipv6_address, dns_ });
+						dns_instances_6.insert({ my_ipv6_address, dns_ });
 				}
 
 				if (dns_)
@@ -869,9 +870,9 @@ int main(int argc, char *argv[])
 		udp  *u = nullptr;
 		get_client_parameters(&devs, bind_to, &p, &t, &u);
 
-		auto it_dns = dns_instances.find(bind_to);
+		auto it_dns = dns_instances_4.find(bind_to);
 
-		if (it_dns == dns_instances.end())
+		if (it_dns == dns_instances_4.end())
 			error_exit(false, "%s has no DNS bound to it", bind_to_str.c_str());
 
 		mqtt_client *mc = new mqtt_client(t, it_dns->second, "vps001.vanheusden.com", 1883, &s);
