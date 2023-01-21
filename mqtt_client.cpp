@@ -226,24 +226,28 @@ void mqtt_client::operator()()
 {
 	set_thread_name("myip-mqtt-client");
 
-	mqtt_client_session_data session_data;
-	session_data.mc = this;
-
 	std::optional<any_addr> addr;
 
 	while(!stop_flag) {
 		if (state == mc_resolve) {
+			DOLOG(ll_debug, "mqtt_client state: resolve\n");
+
 			addr = dns_->query(mqtt_host, 2500);
 
 			if (addr.has_value()) {
 				DOLOG(ll_debug, "mqtt_client: address of \"%s\" is %s\n", mqtt_host.c_str(), addr.value().to_str().c_str());
 
-				state = mc_connect;
+				state = mc_setup;
 			}
 		}
 
 		if (state == mc_setup) {
-			src_port = t->allocate_client_session(mqtt_new_data, mqtt_session_closed_2, addr.value(), mqtt_port, &session_data);
+			DOLOG(ll_debug, "mqtt_client state: setup\n");
+
+			mqtt_client_session_data *session_data = new mqtt_client_session_data;
+			session_data->mc = this;
+
+			src_port = t->allocate_client_session(mqtt_new_data, mqtt_session_closed_2, addr.value(), mqtt_port, session_data);
 
 			DOLOG(ll_debug, "mqtt_client: using source port %d for %s:%d\n", src_port, mqtt_host.c_str(), mqtt_port);
 
@@ -256,6 +260,8 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_connect) {
+			DOLOG(ll_debug, "mqtt_client state: connect\n");
+
 			if (t->wait_for_client_connected_state(src_port))
 				state = mc_setup_mqtt_session_connect_req;
 			else {
@@ -266,24 +272,35 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_setup_mqtt_session_connect_req) {
+			DOLOG(ll_debug, "mqtt_client state: session_connect_req\n");
+
+			char id[17];
+			snprintf(id, sizeof id, "%016x", rand());
+
 			buffer_out b;
 			b.add_net_byte(0x10);  // CONNECT
+			b.add_net_byte(12 + 2 + 16);  // msg length
 
 			b.add_net_byte(0);  // protocol name length + name
 			b.add_net_byte(6);
 			b.add_net_byte('M');
 			b.add_net_byte('Q');
-			b.add_net_byte('l');
+			b.add_net_byte('I');
 			b.add_net_byte('s');
 			b.add_net_byte('d');
 			b.add_net_byte('p');
 
 			b.add_net_byte(3);  // protocol version
 
-			b.add_net_byte(0);  // flags
+			b.add_net_byte(0x02);  // flags
 
 			b.add_net_byte(0x00);  // keep alive timer
 			b.add_net_byte(0x0a);
+
+			b.add_net_byte(0);  // client id length
+			b.add_net_byte(16);
+			for(int i=0; i<16; i++)  // client id
+				b.add_net_byte(id[i]);
 
 			if (t->client_session_send_data(src_port, b.get_content(), b.get_size()) == false)
 				state = mc_disconnect;
@@ -292,6 +309,8 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_setup_mqtt_session_connect_ackwait) {
+			DOLOG(ll_debug, "mqtt_client state: session_connect_ackwait\n");
+
 			uint8_t buffer[4];
 
 			if (read(buffer, sizeof buffer) == false)
@@ -303,6 +322,8 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_setup_mqtt_subscribe) {
+			DOLOG(ll_debug, "mqtt_client state: session_connect_subscribe\n");
+
 			buffer_out b = create_subscribe_message({ });
 
 			if (t->client_session_send_data(src_port, b.get_content(), b.get_size()) == false)
@@ -312,6 +333,8 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_running) {
+			DOLOG(ll_debug, "mqtt_client state: running\n");
+
 			uint8_t  cmd    = 0;
 			uint8_t *pl     = nullptr;
 			uint32_t pl_len = 0;
@@ -341,6 +364,8 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_disconnect) {
+			DOLOG(ll_debug, "mqtt_client state: disconnect\n");
+
 			t->close_client_session(src_port);
 
 			state = mc_resolve;
