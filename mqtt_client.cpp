@@ -179,12 +179,16 @@ buffer_out mqtt_client::create_subscribe_message(const std::optional<std::string
 
 	put_variable_length(b_payload.get_size(), &b_header);
 
+	b_header.add_buffer_out(b_payload);
+
 	return b_header;
 }
 
 bool mqtt_client::process_command(const uint8_t cmd, const uint8_t *const payload, const size_t pl_len)
 {
 	if (cmd == 0x30 && pl_len > 8) {  // PUBLISH
+		DOLOG(ll_debug, "mqtt_client::process_command: PUBLISH\n");
+
 		size_t topic_name_len = (payload[0] << 8) | payload[1];
 
 		if (topic_name_len + 8 > pl_len) {
