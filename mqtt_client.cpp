@@ -392,6 +392,8 @@ void mqtt_client::operator()()
 			t->close_client_session(src_port);
 
 			state = mc_resolve;
+
+			sleep(2);
 		}
 	}
 

@@ -178,14 +178,14 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 	std::string latest_btc;
 
 	for(;;) {
-		// should be locking for these as well
-
 		if (fb_work->mc_data) {
 			auto rc = fb_work->mc_data->get(1);
 
 			if (rc.has_value())
 				latest_btc = "BTC price: " + rc.value();
 		}
+
+		// should be locking for these as well
 
 		// bounce
 		x += dx;
