@@ -313,12 +313,18 @@ void mqtt_client::operator()()
 
 			uint8_t buffer[4];
 
-			if (read(buffer, sizeof buffer) == false)
+			if (read(buffer, sizeof buffer) == false) {
+				DOLOG(ll_debug, "mqtt_client: connack reply read failed\n");
+
 				state = mc_disconnect;
+			}
 			else if (buffer[0] == 0x20 && buffer[3] == 0x00)
 				state = mc_setup_mqtt_subscribe;
-			else
+			else {
+				DOLOG(ll_debug, "mqtt_client: connack reply unexpected contents\n");
+
 				state = mc_disconnect;
+			}
 		}
 
 		if (state == mc_setup_mqtt_subscribe) {
