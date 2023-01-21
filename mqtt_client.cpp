@@ -186,13 +186,13 @@ buffer_out mqtt_client::create_subscribe_message(const std::optional<std::string
 
 bool mqtt_client::process_command(const uint8_t cmd, const uint8_t *const payload, const size_t pl_len)
 {
-	if (cmd == 0x30 && pl_len > 8) {  // PUBLISH
+	if (cmd == 0x30 && pl_len >= 4) {  // PUBLISH
 		DOLOG(ll_debug, "mqtt_client::process_command: PUBLISH\n");
 
 		size_t topic_name_len = (payload[0] << 8) | payload[1];
 
-		if (topic_name_len + 8 > pl_len) {
-			DOLOG(ll_debug, "mqtt_client: message malformed\n");
+		if (topic_name_len + 4 >= pl_len) {
+			DOLOG(ll_debug, "mqtt_client: message malformed: topic %zu while %zu available\n", topic_name_len + 8, pl_len);
 			return false;
 		}
 		
@@ -212,7 +212,7 @@ bool mqtt_client::process_command(const uint8_t cmd, const uint8_t *const payloa
 				return false;
 			}
 
-			it->second->try_put(std::string(reinterpret_cast<const char *>(&payload[2 + topic_name_len + 2]), pl_len - (2 + topic_name_len + 2)));
+			it->second->try_put(std::string(reinterpret_cast<const char *>(&payload[2 + topic_name_len]), pl_len - (2 + topic_name_len)));
 		}
 
 		// send ACK
@@ -311,8 +311,8 @@ void mqtt_client::operator()()
 
 			b.add_net_byte(0x02);  // flags
 
-			b.add_net_byte(0x00);  // keep alive timer
-			b.add_net_byte(0x0a);
+			b.add_net_byte(0xff);  // keep alive timer
+			b.add_net_byte(0xff);
 
 			b.add_net_byte(0);  // client id length
 			b.add_net_byte(16);
@@ -402,12 +402,14 @@ fifo<std::string> * mqtt_client::subscribe(const std::string & topic)
 {
 	buffer_out b = create_subscribe_message(topic);
 
-	if (t->client_session_send_data(src_port, b.get_content(), b.get_size()) == false)
-		return nullptr;
+	std::unique_lock<std::mutex> lck(lock);
+
+	if (state == mc_running) {
+		if (t->client_session_send_data(src_port, b.get_content(), b.get_size()) == false)
+			return nullptr;
+	}
 
 	auto f = new fifo<std::string>(s, "mqtt-" + topic, 256);
-
-	std::unique_lock<std::mutex> lck(lock);
 
 	topics.insert({ topic, f });
 
