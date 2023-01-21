@@ -1,4 +1,5 @@
 // (C) 2022-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+
 #include <assert.h>
 #include <atomic>
 #include <climits>
@@ -8,18 +9,21 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <string.h>
 #include <unistd.h>
 #include <zlib.h>
 
-#include "tcp.h"
-#include "utils.h"
+#include "fifo.h"
 #include "ipv4.h"
 #include "font.h"
 #include "log.h"
-#include "types.h"
+#include "mqtt_client.h"
 #include "stats.h"
+#include "tcp.h"
 #include "time.h"
+#include "types.h"
+#include "utils.h"
 
 
 using namespace std::chrono_literals;
@@ -39,6 +43,9 @@ struct frame_buffer_t
 
         mutable std::mutex cb_lock;
 	std::set<vnc_session_data *> callbacks;
+
+	mqtt_client       *mc      { nullptr };
+	fifo<std::string> *mc_data { nullptr };
 
 	bool has_listeners() const {
 		const std::lock_guard<std::mutex> lck(cb_lock);
@@ -90,14 +97,27 @@ void vnc_init()
 	std::unique_lock<std::mutex> lck(frame_buffer.fb_lock);
 
 	if (frame_buffer.buffer == nullptr) {
-		frame_buffer.w = 640;
-		frame_buffer.h = 480;
+		frame_buffer.w       = 640;
+		frame_buffer.h       = 480;
 
-		size_t n_bytes = size_t(frame_buffer.w) * size_t(frame_buffer.h) * 3;
-		frame_buffer.buffer = new uint8_t[n_bytes]();
+		size_t n_bytes       = size_t(frame_buffer.w) * size_t(frame_buffer.h) * 3;
+		frame_buffer.buffer  = new uint8_t[n_bytes]();
 
-		frame_buffer.th = new std::thread(frame_buffer_thread, &frame_buffer);
+		frame_buffer.th      = new std::thread(frame_buffer_thread, &frame_buffer);
+
+		frame_buffer.mc      = nullptr;
+
+		frame_buffer.mc_data = nullptr;
 	}
+}
+
+void vnc_set_mqtt_client(mqtt_client *const mc)
+{
+	std::unique_lock<std::mutex> lck(frame_buffer.fb_lock);
+
+	frame_buffer.mc      = mc;
+
+	frame_buffer.mc_data = frame_buffer.mc->subscribe("vanheusden/bitcoin/bitstamp_usd");
 }
 
 void vnc_deinit()
@@ -118,10 +138,10 @@ void vnc_deinit()
 	}
 }
 
-void draw_text(frame_buffer_t *fb_in, int x, int y, const char *text)
+void draw_text(frame_buffer_t *fb_in, int x, int y, const char *const text)
 {
 	const int maxo = fb_in->w * fb_in->h * 3;
-	int len = strlen(text);
+	int       len  = strlen(text);
 
 	for(int i=0; i<len; i++) {
 		int c = text[i] & 127;
@@ -155,8 +175,17 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 
 	uint64_t latest_update = 0;
 
+	std::string latest_btc;
+
 	for(;;) {
 		// should be locking for these as well
+
+		if (fb_work->mc_data) {
+			auto rc = fb_work->mc_data->get(1);
+
+			if (rc.has_value())
+				latest_btc = "BTC price: " + rc.value();
+		}
 
 		// bounce
 		x += dx;
@@ -210,6 +239,8 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 			snprintf(text, sizeof text, "%02d:%02d:%02d - MyIP", tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 			draw_text(fb_work, x, y, text);
+
+			draw_text(fb_work, 0, 8, latest_btc.c_str());
 
 			fb_work->fb_lock.unlock();
 

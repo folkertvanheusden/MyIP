@@ -154,6 +154,27 @@ void register_tcp_service(std::vector<phys *> *const devs, port_handler_t & tph,
 	}
 }
 
+void get_client_parameters(std::vector<phys *> *const devs, const any_addr & a, phys **const p, tcp **const t, udp **const u)
+{
+	*p = nullptr;
+	*t = nullptr;
+	*u = nullptr;
+
+	for(auto & dev : *devs) {
+		ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+
+		if (i4 && i4->get_addr() == a) {
+			*p = dev;
+
+			*t = dynamic_cast<tcp *>(i4->get_transport_layer(0x06));
+
+			*u = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
+
+			break;
+		}
+	}
+}
+
 void register_mdns_service(mdns *const m, std::vector<phys *> *const devs, const int port, const libconfig::Setting & settings)
 {
 	try {
@@ -767,8 +788,8 @@ int main(int argc, char *argv[])
 	try {
 		const libconfig::Setting & s_http = root.lookup("https");
 
-		std::string web_root    = cfg_str(s_http,  "web-root",    "HTTP server files root", false, "");
-		std::string web_logfile = cfg_str(s_http,  "web-logfile", "HTTP server logfile", false, "");
+		std::string web_root    = cfg_str(s_http, "web-root",    "HTTP server files root", false, "");
+		std::string web_logfile = cfg_str(s_http, "web-logfile", "HTTP server logfile",    false, "");
 
 		auto rc = get_http_handler(&s, s_http);
 
@@ -831,6 +852,23 @@ int main(int argc, char *argv[])
 		register_sctp_service(&devs, vnc_handler, port);
 
 		register_mdns_service(mdns_, &devs, port, s_vnc);
+
+		std::string bind_to_str = cfg_str(s_vnc, "bind-to-ip-address", "IP address to bind DNS to", false, "");
+		any_addr bind_to        = parse_address(bind_to_str, 4, ".", 10);
+
+		phys *p = nullptr;
+		tcp  *t = nullptr;
+		udp  *u = nullptr;
+		get_client_parameters(&devs, bind_to, &p, &t, &u);
+
+		std::string dns_str     = cfg_str(s_vnc, "dns-address", "IP address of upstream DNS server", false, "");
+		any_addr dns_a          = parse_address(dns_str, 4, ".", 10);
+
+		dns *dns_ = new dns(&s, u, bind_to, dns_a);
+
+		mqtt_client *mc = new mqtt_client(t, dns_, "vps001.vanheusden.com", 1883, &s);
+
+		vnc_set_mqtt_client(mc);
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine

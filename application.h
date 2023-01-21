@@ -21,7 +21,6 @@ typedef struct {
 	private_data *pd;
 } port_handler_t;
 
-
 class application
 {
 protected:

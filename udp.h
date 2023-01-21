@@ -1,17 +1,19 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <functional>
 #include <map>
 #include <shared_mutex>
 
-#include "transport_layer.h"
 #include "packet.h"
 #include "stats.h"
+#include "transport_layer.h"
 #include "types.h"
+
 
 class icmp;
 class ipv4;
+class session_data;
 
 typedef struct {
 	std::function<void(const any_addr &, int, const any_addr &, int, packet *, session_data *private_data)> cb;

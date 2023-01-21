@@ -1,7 +1,14 @@
 // (C) 2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
+#include <thread>
+
 #include "buffer_out.h"
+#include "dns.h"
+#include "log.h"
 #include "mqtt_client.h"
+#include "pstream.h"
+#include "tcp.h"
+#include "utils.h"
 
 
 static bool mqtt_new_data(pstream *const ps, session *const s, buffer_in data)
@@ -217,6 +224,8 @@ bool mqtt_client::process_command(const uint8_t cmd, const uint8_t *const payloa
 
 void mqtt_client::operator()()
 {
+	set_thread_name("myip-mqtt-client");
+
 	mqtt_client_session_data session_data;
 	session_data.mc = this;
 
@@ -226,8 +235,11 @@ void mqtt_client::operator()()
 		if (state == mc_resolve) {
 			addr = dns_->query(mqtt_host, 2500);
 
-			if (addr.has_value())
+			if (addr.has_value()) {
+				DOLOG(ll_debug, "mqtt_client: address of \"%s\" is %s\n", mqtt_host.c_str(), addr.value().to_str().c_str());
+
 				state = mc_connect;
+			}
 		}
 
 		if (state == mc_setup) {
@@ -334,6 +346,8 @@ void mqtt_client::operator()()
 			state = mc_resolve;
 		}
 	}
+
+	DOLOG(ll_info, "mqtt-client: thread terminating\n");
 }
 
 fifo<std::string> * mqtt_client::subscribe(const std::string & topic)

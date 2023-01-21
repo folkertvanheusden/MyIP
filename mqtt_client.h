@@ -1,14 +1,18 @@
 // (C) 2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+#pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <map>
 #include <mutex>
 
-#include "dns.h"
+#include "buffer_out.h"
 #include "fifo.h"
 #include "stats.h"
-#include "tcp.h"
 
+
+class dns;
+class tcp;
 
 typedef enum { mc_resolve, mc_setup, mc_connect, mc_setup_mqtt_session_connect_req, mc_setup_mqtt_session_connect_ackwait, mc_setup_mqtt_subscribe, mc_running, mc_disconnect } mc_state_t;
 

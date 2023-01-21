@@ -8,6 +8,7 @@
 #include <thread>
 #include <zlib.h>
 
+#include "mqtt_client.h"
 #include "packet.h"
 #include "stats.h"
 
@@ -141,25 +142,28 @@ typedef enum {  vs_initial_handshake_server_send = 0,
 class vnc_session_data : public session_data
 {
 public:
-	char  *buffer { nullptr };
-	size_t buffer_size { 0 };
+	char  *buffer      { nullptr };
+	size_t buffer_size { 0       };
 
-	vnc_state_t state { vs_initial_handshake_server_send };
+	vnc_state_t state  { vs_initial_handshake_server_send };
 
-	uint8_t depth { 8 };  // 'bits per pixel' really
+	uint8_t      depth { 8       };  // 'bits per pixel' really
 
-	std::thread *th { nullptr };
+	std::thread *th    { nullptr };
 
-	time_t start { 0 };
+	time_t       start { 0       };
 
 	std::queue<vnc_thread_work_t *> wq;
-        std::condition_variable w_cond;
-        mutable std::mutex w_lock;
+        std::condition_variable         w_cond;
+        mutable std::mutex              w_lock;
 
-	uint32_t prev_zsize { 0 };
-	vnc_private_data *vpd { nullptr };
+	uint32_t          prev_zsize { 0       };
+	vnc_private_data *vpd        { nullptr };
 
-	z_stream strm { 0 };
+	z_stream          strm       { 0       };
+
+	mqtt_client      *mc         { nullptr };
+	fifo<std::string> *mc_data   { nullptr };
 };
 
 class mqtt_session_data : public session_data
