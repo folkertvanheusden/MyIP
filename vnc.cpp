@@ -138,7 +138,7 @@ void vnc_deinit()
 	}
 }
 
-void draw_text(frame_buffer_t *fb_in, int x, int y, const char *const text)
+void draw_text(frame_buffer_t *fb_in, int x, int y, const char *const text, const int r, const int g, const int b)
 {
 	const int maxo = fb_in->w * fb_in->h * 3;
 	int       len  = strlen(text);
@@ -154,9 +154,9 @@ void draw_text(frame_buffer_t *fb_in, int x, int y, const char *const text)
 
 				uint8_t pixel_value = font_8x8[c][cy][cx];
 
-				fb_in->buffer[o + 0] = pixel_value;
-				fb_in->buffer[o + 1] = pixel_value;
-				fb_in->buffer[o + 2] = pixel_value;
+				fb_in->buffer[o + 0] = pixel_value ? r : 0;
+				fb_in->buffer[o + 1] = pixel_value ? g : 0;
+				fb_in->buffer[o + 2] = pixel_value ? b : 0;
 			}
 		}
 	}
@@ -238,9 +238,9 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 
 			snprintf(text, sizeof text, "%02d:%02d:%02d - MyIP", tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-			draw_text(fb_work, x, y, text);
+			draw_text(fb_work, x, y, text, 255, 255, 255);
 
-			draw_text(fb_work, 0, 8, latest_btc.c_str());
+			draw_text(fb_work, 0, 8, latest_btc.c_str(), 0, 255, 0);
 
 			fb_work->fb_lock.unlock();
 
