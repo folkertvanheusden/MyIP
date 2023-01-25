@@ -13,6 +13,7 @@
 
 static bool mqtt_new_data(pstream *const ps, session *const s, buffer_in data)
 {
+	DOLOG(ll_debug, "mqtt_new_data\n");
 	mqtt_client_session_data *t_s = dynamic_cast<mqtt_client_session_data *>(s->get_callback_private_data());
 
 	t_s->mc->new_data(data);
@@ -51,6 +52,8 @@ void mqtt_client::new_data(const buffer_in & data)
 {
 	size_t new_n = data.get_n_bytes_left();
 
+	DOLOG(ll_debug, "mqtt_client::new_data: %zu bytes\n", new_n);
+
 	std::unique_lock<std::mutex> lck(lock);
 
 	data_in = reinterpret_cast<uint8_t *>(realloc(data_in, n_data_in + new_n));
@@ -58,11 +61,17 @@ void mqtt_client::new_data(const buffer_in & data)
 
 	memcpy(&data_in[n_data_in], data.get_bytes(new_n), new_n);
 
+	n_data_in += new_n;
+
+	DOLOG(ll_debug, "mqtt_client::new_data: now have %zu bytes\n", n_data_in);
+
 	cv.notify_all();
 }
 
 void mqtt_client::close_session()
 {
+	DOLOG(ll_debug, "mqtt_client::close_session\n");
+
 	state = mc_disconnect;
 }
 
@@ -71,24 +80,28 @@ bool mqtt_client::read(uint8_t *target, size_t n)
 	std::unique_lock<std::mutex> lck(lock);
 
 	while(n) {
+		DOLOG(ll_debug, "mqtt_client::read %zu bytes, have: %zu\n", n, n_data_in);
+
 		if (n_data_in) {
 			size_t cur_n = std::min(n, n_data_in);
 
 			memcpy(target, data_in, cur_n);
 
 			size_t n_left = n_data_in - cur_n;
-			if (n_left) {
+			if (n_left)
 				memmove(&data_in[0], &data_in[cur_n], n_left);
 
-				n_data_in -= cur_n;
-			}
+			n_data_in -= cur_n;
 
 			target += cur_n;
 			n      -= cur_n;
 		}
-
-		cv.wait(lck);  // TODO timeout
+		else {
+			cv.wait(lck);  // TODO timeout
+		}
 	}
+
+	DOLOG(ll_debug, "mqtt_client::read finished\n");
 
 	return true;
 }
@@ -166,16 +179,20 @@ buffer_out mqtt_client::create_subscribe_message(const std::optional<std::string
 
 	put_variable_length(b_payload.get_size(), &b_header);
 
+	b_header.add_buffer_out(b_payload);
+
 	return b_header;
 }
 
 bool mqtt_client::process_command(const uint8_t cmd, const uint8_t *const payload, const size_t pl_len)
 {
-	if (cmd == 0x30 && pl_len > 8) {  // PUBLISH
+	if (cmd == 0x30 && pl_len >= 4) {  // PUBLISH
+		DOLOG(ll_debug, "mqtt_client::process_command: PUBLISH\n");
+
 		size_t topic_name_len = (payload[0] << 8) | payload[1];
 
-		if (topic_name_len + 8 > pl_len) {
-			DOLOG(ll_debug, "mqtt_client: message malformed\n");
+		if (topic_name_len + 4 >= pl_len) {
+			DOLOG(ll_debug, "mqtt_client: message malformed: topic %zu while %zu available\n", topic_name_len + 8, pl_len);
 			return false;
 		}
 		
@@ -195,7 +212,7 @@ bool mqtt_client::process_command(const uint8_t cmd, const uint8_t *const payloa
 				return false;
 			}
 
-			it->second->try_put(std::string(reinterpret_cast<const char *>(&payload[2 + topic_name_len + 2]), pl_len - (2 + topic_name_len + 2)));
+			it->second->try_put(std::string(reinterpret_cast<const char *>(&payload[2 + topic_name_len]), pl_len - (2 + topic_name_len)));
 		}
 
 		// send ACK
@@ -226,24 +243,28 @@ void mqtt_client::operator()()
 {
 	set_thread_name("myip-mqtt-client");
 
-	mqtt_client_session_data session_data;
-	session_data.mc = this;
-
 	std::optional<any_addr> addr;
 
 	while(!stop_flag) {
 		if (state == mc_resolve) {
+			DOLOG(ll_debug, "mqtt_client state: resolve\n");
+
 			addr = dns_->query(mqtt_host, 2500);
 
 			if (addr.has_value()) {
 				DOLOG(ll_debug, "mqtt_client: address of \"%s\" is %s\n", mqtt_host.c_str(), addr.value().to_str().c_str());
 
-				state = mc_connect;
+				state = mc_setup;
 			}
 		}
 
 		if (state == mc_setup) {
-			src_port = t->allocate_client_session(mqtt_new_data, mqtt_session_closed_2, addr.value(), mqtt_port, &session_data);
+			DOLOG(ll_debug, "mqtt_client state: setup\n");
+
+			mqtt_client_session_data *session_data = new mqtt_client_session_data;
+			session_data->mc = this;
+
+			src_port = t->allocate_client_session(mqtt_new_data, mqtt_session_closed_2, addr.value(), mqtt_port, session_data);
 
 			DOLOG(ll_debug, "mqtt_client: using source port %d for %s:%d\n", src_port, mqtt_host.c_str(), mqtt_port);
 
@@ -256,6 +277,8 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_connect) {
+			DOLOG(ll_debug, "mqtt_client state: connect\n");
+
 			if (t->wait_for_client_connected_state(src_port))
 				state = mc_setup_mqtt_session_connect_req;
 			else {
@@ -266,24 +289,35 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_setup_mqtt_session_connect_req) {
+			DOLOG(ll_debug, "mqtt_client state: session_connect_req\n");
+
+			char id[17];
+			snprintf(id, sizeof id, "%016x", rand());
+
 			buffer_out b;
 			b.add_net_byte(0x10);  // CONNECT
+			b.add_net_byte(12 + 2 + 16);  // msg length
 
 			b.add_net_byte(0);  // protocol name length + name
 			b.add_net_byte(6);
 			b.add_net_byte('M');
 			b.add_net_byte('Q');
-			b.add_net_byte('l');
+			b.add_net_byte('I');
 			b.add_net_byte('s');
 			b.add_net_byte('d');
 			b.add_net_byte('p');
 
 			b.add_net_byte(3);  // protocol version
 
-			b.add_net_byte(0);  // flags
+			b.add_net_byte(0x02);  // flags
 
-			b.add_net_byte(0x00);  // keep alive timer
-			b.add_net_byte(0x0a);
+			b.add_net_byte(0xff);  // keep alive timer
+			b.add_net_byte(0xff);
+
+			b.add_net_byte(0);  // client id length
+			b.add_net_byte(16);
+			for(int i=0; i<16; i++)  // client id
+				b.add_net_byte(id[i]);
 
 			if (t->client_session_send_data(src_port, b.get_content(), b.get_size()) == false)
 				state = mc_disconnect;
@@ -292,17 +326,27 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_setup_mqtt_session_connect_ackwait) {
+			DOLOG(ll_debug, "mqtt_client state: session_connect_ackwait\n");
+
 			uint8_t buffer[4];
 
-			if (read(buffer, sizeof buffer) == false)
+			if (read(buffer, sizeof buffer) == false) {
+				DOLOG(ll_debug, "mqtt_client: connack reply read failed\n");
+
 				state = mc_disconnect;
+			}
 			else if (buffer[0] == 0x20 && buffer[3] == 0x00)
 				state = mc_setup_mqtt_subscribe;
-			else
+			else {
+				DOLOG(ll_debug, "mqtt_client: connack reply unexpected contents\n");
+
 				state = mc_disconnect;
+			}
 		}
 
 		if (state == mc_setup_mqtt_subscribe) {
+			DOLOG(ll_debug, "mqtt_client state: session_connect_subscribe\n");
+
 			buffer_out b = create_subscribe_message({ });
 
 			if (t->client_session_send_data(src_port, b.get_content(), b.get_size()) == false)
@@ -312,6 +356,8 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_running) {
+			DOLOG(ll_debug, "mqtt_client state: running\n");
+
 			uint8_t  cmd    = 0;
 			uint8_t *pl     = nullptr;
 			uint32_t pl_len = 0;
@@ -341,9 +387,13 @@ void mqtt_client::operator()()
 		}
 
 		if (state == mc_disconnect) {
+			DOLOG(ll_debug, "mqtt_client state: disconnect\n");
+
 			t->close_client_session(src_port);
 
 			state = mc_resolve;
+
+			sleep(2);
 		}
 	}
 
@@ -354,12 +404,14 @@ fifo<std::string> * mqtt_client::subscribe(const std::string & topic)
 {
 	buffer_out b = create_subscribe_message(topic);
 
-	if (t->client_session_send_data(src_port, b.get_content(), b.get_size()) == false)
-		return nullptr;
+	std::unique_lock<std::mutex> lck(lock);
+
+	if (state == mc_running) {
+		if (t->client_session_send_data(src_port, b.get_content(), b.get_size()) == false)
+			return nullptr;
+	}
 
 	auto f = new fifo<std::string>(s, "mqtt-" + topic, 256);
-
-	std::unique_lock<std::mutex> lck(lock);
 
 	topics.insert({ topic, f });
 
