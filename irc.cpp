@@ -1,9 +1,12 @@
 // (C) 2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
 #include <errno.h>
+#include <map>
+#include <mutex>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <string.h>
 #include <thread>
 
@@ -20,6 +23,10 @@
 
 using namespace std::chrono_literals;
 
+static std::map<std::string, std::string> nicknames;
+static std::mutex nicknames_lock;
+
+
 void irc_init()
 {
 }
@@ -28,18 +35,71 @@ void irc_deinit()
 {
 }
 
-static void process_line(const std::string & line)
+// I.S.: Internet Session
+typedef enum { IS_wait_nick, IS_wait_user, IS_running, IS_disconnect } irc_state_t;
+
+static void process_line(session *const tcp_session, irc_state_t *const is, const std::string & line)
 {
+	if (line.empty())
+		return;
+
+	std::vector<std::string> parts = split(line, " ");
+
+	if (parts.size() == 0)
+		return;
+
+	if (*is == IS_wait_nick) {
+		if (parts.at(0) == "NICK" && parts.size() == 2) {  // ignoring hop count
+			// nick must be unique
+			auto nick = str_tolower(parts.at(1));
+
+			std::unique_lock<std::mutex> lck(nicknames_lock);
+
+			auto it   = nicknames.find(nick);
+			if (it == nicknames.end()) {
+				auto rn_offset = line.find(":");
+				auto realname  = rn_offset == std::string::npos ? "" : line.substr(rn_offset + 1);
+
+				nicknames.insert({ nick, realname });
+
+				lck.unlock();
+
+				*is = IS_wait_user;
+			}
+			else {
+				lck.unlock();
+
+				std::string error = ": 433 * " + nick + " :Nickname is already in use.";
+
+				tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size());
+			}
+		}
+		else {
+			std::string error = ": 421 * :Something is not right.";
+
+			tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size());
+		}
+	}
+	else {
+		std::string error = ": 421 * :Internal error.";
+
+		tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size());
+
+		*is = IS_disconnect;
+	}
+
 	// TODO
 }
 
-void irc_thread(session *t_s)
+void irc_thread(session *const tcp_session)
 {
         set_thread_name("myip-irc");
 
-        irc_session_data *ts = dynamic_cast<irc_session_data *>(t_s->get_callback_private_data());
+        irc_session_data *ts = dynamic_cast<irc_session_data *>(tcp_session->get_callback_private_data());
 
-        for(;ts->terminate == false;) {
+	irc_state_t is = IS_wait_nick;
+
+        for(;ts->terminate == false && is != IS_disconnect;) {
 		std::unique_lock<std::mutex> lck(ts->r_lock);
 
 		const char *start = reinterpret_cast<const char *>(ts->req_data);
@@ -48,7 +108,7 @@ void irc_thread(session *t_s)
 			const char *crlf = strnstr(start, "\r\n", ts->req_len);
 
 			if (crlf) {
-				process_line(std::string(start, crlf - start));
+				process_line(tcp_session, &is, std::string(start, crlf - start));
 
 				size_t n_left = ts->req_len - (crlf + 2 - start);
 
@@ -62,8 +122,11 @@ void irc_thread(session *t_s)
 			}
 		}
 
-		ts->r_cond.wait_for(lck, 500ms);
+		if (is != IS_disconnect)
+			ts->r_cond.wait_for(lck, 500ms);
 	}
+
+	tcp_session->get_stream_target()->end_session(tcp_session);
 }
 
 bool irc_new_session(pstream *const t, session *t_s)
@@ -85,7 +148,7 @@ bool irc_new_session(pstream *const t, session *t_s)
 bool irc_new_data(pstream *ps, session *ts, buffer_in b)
 {
 	if (!ts) {
-		DOLOG(ll_info, "IRC: Data for a non-existing session\n");
+		DOLOG(ll_info, "IRC: data for a non-existing session\n");
 
 		return false;
 	}
