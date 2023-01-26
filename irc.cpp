@@ -28,6 +28,11 @@ void irc_deinit()
 {
 }
 
+static void process_line(const std::string & line)
+{
+	// TODO
+}
+
 void irc_thread(session *t_s)
 {
         set_thread_name("myip-irc");
@@ -37,7 +42,25 @@ void irc_thread(session *t_s)
         for(;ts->terminate == false;) {
 		std::unique_lock<std::mutex> lck(ts->r_lock);
 
-		// TODO
+		const char *start = reinterpret_cast<const char *>(ts->req_data);
+
+		if (start) {
+			const char *crlf = strnstr(start, "\r\n", ts->req_len);
+
+			if (crlf) {
+				process_line(std::string(start, crlf - start));
+
+				size_t n_left = ts->req_len - (crlf + 2 - start);
+
+				if (n_left) {
+					memmove(ts->req_data, crlf + 2, n_left);
+					ts->req_len -= n_left;
+				}
+				else {
+					ts->req_len = 0;
+				}
+			}
+		}
 
 		ts->r_cond.wait_for(lck, 500ms);
 	}
