@@ -201,3 +201,16 @@ public:
 
 	int get_fd() const { return fd; }
 };
+
+class irc_session_data : public session_data
+{
+public:
+	std::thread     *th        { nullptr };
+	std::atomic_bool terminate { false   };
+
+        std::condition_variable r_cond;
+        mutable std::mutex      r_lock;
+
+	uint8_t *req_data { nullptr };
+	size_t   req_len  { 0       };
+};

@@ -34,6 +34,7 @@ add_executable(myip
 	icmp6.cpp
 	ipv4.cpp
 	ipv6.cpp
+	irc.cpp
 	lldp.cpp
 	log.cpp
 	mac_resolver.cpp

@@ -24,6 +24,7 @@
 #include "ipv6.h"
 #include "icmp4.h"
 #include "icmp6.h"
+#include "irc.h"
 #include "log.h"
 #include "arp.h"
 #include "mdns.h"
@@ -981,6 +982,13 @@ int main(int argc, char *argv[])
 	register_tcp_service(&devs, echo_sph, 7);  // port 7 (TCP) is 'echo'
 
 	register_sctp_service(&devs, echo_sph, 7);  // port 7 (TCP) is 'echo'
+
+	// IRC
+	port_handler_t irc_sph = irc_get_handler(&s);
+
+	register_tcp_service(&devs, irc_sph, 6667);
+
+	register_sctp_service(&devs, irc_sph, 6667);
 
 	// SYSLOG
 	try {
