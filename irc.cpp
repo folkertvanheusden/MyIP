@@ -257,6 +257,9 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 		return true;
 	}
 
+	if (parts.at(0) == "QUIT")
+		return false;
+
 	return true;
 }
 
