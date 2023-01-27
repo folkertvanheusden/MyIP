@@ -48,9 +48,12 @@ void irc_deinit()
 {
 }
 
-void transmit_to_channel(const std::string & channel, const std::string & msg_line)
+void transmit_to_channel(const std::string & channel, const std::string & msg_line, const std::string & sender_nick)
 {
 	for(auto & nick : nicknames) {
+		if (nick.first == sender_nick)
+			continue;
+
 		if (nick.second.channels.find(channel) != nick.second.channels.end() || channel == nick.first)
 			nick.second.tcp_session->get_stream_target()->send_data(nick.second.tcp_session, reinterpret_cast<const uint8_t *>(msg_line.c_str()), msg_line.size());
 	}
@@ -197,7 +200,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 			std::string join_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " JOIN " + channel + "\r\n";
 
-			transmit_to_channel(channel, join_line);
+			transmit_to_channel(channel, join_line, isd->nick);
 
 			send_user_for_channel(channel, isd->nick);
 		}
@@ -219,7 +222,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 			std::string part_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " PART " + channel + "\r\n";
 
-			transmit_to_channel(channel, part_line);
+			transmit_to_channel(channel, part_line, isd->nick);
 		}
 
 		return true;
@@ -232,7 +235,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 		std::string msg_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " " + line + "\r\n";
 
-		transmit_to_channel(target, msg_line);
+		transmit_to_channel(target, msg_line, isd->nick);
 
 		return true;
 	}
