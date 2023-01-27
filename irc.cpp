@@ -158,6 +158,16 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 			for(auto & channel : channels)
 				it->second.channels.insert(str_tolower(channel));
 		}
+		else if (parts.at(0) == "PART" && parts.size() >= 2) {
+			auto channels = split(parts.at(1), ",");
+
+			std::unique_lock<std::mutex> lck(nicknames_lock);
+
+			auto it = nicknames.find(isd->nick);
+
+			for(auto & channel : channels)
+				it->second.channels.erase(str_tolower(channel));
+		}
 		// TODO
 		else {
 			std::string error = ": 421 * :Unknown command.";
