@@ -48,18 +48,29 @@ void irc_deinit()
 {
 }
 
-void transmit_to_channel(const std::string & channel, const std::string & msg_line, const std::string & sender_nick)
+static bool transmit_to_client(session *const tcp_session, const std::string & line)
+{
+	std::string work = line;
+
+	work.erase(work.begin() + work.find("\r\n"), work.end());
+
+	DOLOG(ll_debug, "irc::transmit_to_client: %s\n", work.c_str());
+
+	return tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(line.c_str()), line.size());
+}
+
+static void transmit_to_channel(const std::string & channel, const std::string & msg_line, const std::string & sender_nick)
 {
 	for(auto & nick : nicknames) {
 		if (nick.first == sender_nick)
 			continue;
 
 		if (nick.second.channels.find(channel) != nick.second.channels.end() || channel == nick.first)
-			nick.second.tcp_session->get_stream_target()->send_data(nick.second.tcp_session, reinterpret_cast<const uint8_t *>(msg_line.c_str()), msg_line.size());
+			transmit_to_client(nick.second.tcp_session, msg_line);
 	}
 }
 
-void send_user_for_channel(const std::string & channel, const std::string & nick)
+static void send_user_for_channel(const std::string & channel, const std::string & nick)
 {
 	std::string out   = ":" + local_host + " 353 " + nick + " @ " + channel + " :";
 	bool        first = true;
@@ -80,10 +91,27 @@ void send_user_for_channel(const std::string & channel, const std::string & nick
 	out += ": 366 * " + channel + " :End of /NAMES list.\r\n";
 
 	for(auto & nick : nicknames) {
-		if (nick.second.channels.find(channel) != nick.second.channels.end()) {
-			nick.second.tcp_session->get_stream_target()->send_data(nick.second.tcp_session, reinterpret_cast<const uint8_t *>(out.c_str()), out.size());
+		if (nick.second.channels.find(channel) != nick.second.channels.end())
+			transmit_to_client(nick.second.tcp_session, out);
+	}
+}
+
+static std::map<std::string, int> get_channel_list()
+{
+	std::map<std::string, int> channels;
+
+	for(auto nick : nicknames) {
+		for(auto ch : nick.second.channels) {
+			auto it = channels.find(ch);
+
+			if (it != channels.end())
+				it->second++;
+			else
+				channels.insert({ ch, 1 });
 		}
 	}
+	
+	return channels;
 }
 
 static bool process_line(session *const tcp_session, bool *const seen_nick, bool *const seen_user, const std::string & line)
@@ -125,8 +153,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 			std::string error = ": 433 * " + nick + " :Nickname is already in use.\r\n";
 
-			if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
-				return false;
+			return transmit_to_client(tcp_session, error);
 		}
 
 		return true;
@@ -142,7 +169,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 			std::string error = ": 401 * :What is your nick?\r\n";
 
-			if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
+			if (transmit_to_client(tcp_session, error) == false)
 				return false;
 		}
 		else {
@@ -153,12 +180,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 			size_t user_count    = nicknames.size();
 
-			std::set<std::string> channels;
-
-			for(auto nick : nicknames) {
-				for(auto ch : nick.second.channels)
-					channels.insert(ch);
-			}
+			std::map<std::string, int> channels = get_channel_list();
 
 			lck.unlock();
 
@@ -188,7 +210,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 			};
 
 			for(auto & line : welcome) {
-				if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(line.c_str()), line.size()) == false)
+				if (transmit_to_client(tcp_session, line) == false)
 					return false;
 			}
 		}
@@ -262,9 +284,38 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 		reply += "\r\n";
 
-		if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()) == false)
+		if (transmit_to_client(tcp_session, reply) == false)
 			return false;
 
+		return true;
+	}
+
+	if (parts.at(0) == "LIST") {
+		std::map<std::string, int> channels;
+
+		{
+			std::unique_lock<std::mutex> lck(nicknames_lock);
+
+			channels = get_channel_list();
+		}
+
+		std::string start_line = ":" + local_host + " 321 " + isd->nick + " Channel :Users Name\r\n";
+
+		if (transmit_to_client(tcp_session, start_line) == false)
+			return false;
+
+		for(auto & ch : channels) {
+			std::string topic_line = ":" + local_host + " 322 " + isd->nick + " " + ch.first + " " + myformat("%d", ch.second) + " :[+nt] topic\r\n";
+
+			if (transmit_to_client(tcp_session, topic_line) == false)
+				return false;
+		}
+
+		std::string end_line = ":" + local_host + " 323 " + isd->nick + " :End of channel list.\r\n";
+
+		if (transmit_to_client(tcp_session, end_line) == false)
+			return false;
+		
 		return true;
 	}
 
@@ -289,8 +340,11 @@ void irc_thread(session *const tcp_session)
 		std::size_t crlf = isd->input.find("\r\n");
 
 		if (crlf != std::string::npos) {
-			if (process_line(tcp_session, &seen_nick, &seen_user, isd->input.substr(0, crlf)) == false)
+			if (process_line(tcp_session, &seen_nick, &seen_user, isd->input.substr(0, crlf)) == false) {
+				DOLOG(ll_debug, "irc_thread:: process_line returned abort status\n");
+
 				break;
+			}
 
 			isd->input.erase(0, crlf + 2);
 		}
