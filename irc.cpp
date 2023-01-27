@@ -24,6 +24,8 @@
 
 using namespace std::chrono_literals;
 
+static std::string local_host;
+
 class person
 {
 public:
@@ -155,7 +157,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 			std::vector<std::string> welcome {
 				": 001 " + isd->nick + " :Welcome\r\n",
 				": 002 " + isd->nick + " :Your host runs MyIP\r\n",
-				": 003 " + isd->nick + " :003\r\n",
+				": 003 " + isd->nick + " :\r\n",
 				": 004 " + isd->nick + " \r\n",
 				": 005 " + isd->nick + " :\r\n",
 				": 005 " + isd->nick + " :\r\n",
@@ -236,7 +238,8 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 	}
 
 	if (parts.at(0) == "PING") {
-		std::string reply = "PING ";
+		// :keetweej.vanheusden.com PONG keetweej.vanheusden.com :bla
+		std::string reply = ":" + local_host + " PONG " + local_host + " :";
 
 		std::size_t space = line.find(" ");
 
@@ -349,7 +352,7 @@ bool irc_close_session_2(pstream *const ps, session *ts)
 	return true;
 }
 
-port_handler_t irc_get_handler(stats *const s)
+port_handler_t irc_get_handler(stats *const s, const std::string & local_host_in)
 {
 	port_handler_t tcp_irc;
 
@@ -361,6 +364,8 @@ port_handler_t irc_get_handler(stats *const s)
 	tcp_irc.deinit           = irc_deinit;
 
 	tcp_irc.pd               = nullptr;
+
+	local_host               = local_host_in;
 
 	return tcp_irc;
 }

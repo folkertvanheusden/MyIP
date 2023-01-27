@@ -984,7 +984,7 @@ int main(int argc, char *argv[])
 	register_sctp_service(&devs, echo_sph, 7);  // port 7 (TCP) is 'echo'
 
 	// IRC
-	port_handler_t irc_sph = irc_get_handler(&s);
+	port_handler_t irc_sph = irc_get_handler(&s, "vps001.vanheusden.com");  // TODO
 
 	register_tcp_service(&devs, irc_sph, 6667);
 

@@ -3,4 +3,5 @@
 #include "stats.h"
 #include "tcp.h"
 
-port_handler_t irc_get_handler(stats *const s);
+
+port_handler_t irc_get_handler(stats *const s, const std::string & local_host_in);
