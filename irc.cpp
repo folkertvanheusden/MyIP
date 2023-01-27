@@ -34,6 +34,8 @@ public:
 static std::map<std::string, person> nicknames;
 static std::mutex nicknames_lock;
 
+static std::map<std::string, std::string> topicnames;
+static std::mutex topicnames_lock;
 
 void irc_init()
 {
@@ -146,7 +148,23 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 		}
 	}
 	else if (*is == IS_running) {
+		if (parts.at(0) == "JOIN" && parts.size() >= 2) {
+			auto channels = split(parts.at(1), ",");
+
+			std::unique_lock<std::mutex> lck(nicknames_lock);
+
+			auto it = nicknames.find(isd->nick);
+
+			for(auto & channel : channels)
+				it->second.channels.insert(str_tolower(channel));
+		}
 		// TODO
+		else {
+			std::string error = ": 421 * :Unknown command.";
+
+			if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
+				*is = IS_disconnect;
+		}
 	}
 	else {
 		std::string error = ": 421 * :Internal error.";
