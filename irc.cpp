@@ -151,11 +151,22 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 			it->second.real_name = real_name;
 
+			size_t user_count    = nicknames.size();
+
+			std::set<std::string> channels;
+
+			for(auto nick : nicknames) {
+				for(auto ch : nick.second.channels)
+					channels.insert(ch);
+			}
+
 			lck.unlock();
 
 			isd->username = parts.at(1);
 
 			*seen_user    = true;
+
+			std::string user_count_str = myformat("%zu", user_count);
 
 			std::vector<std::string> welcome {
 				": 001 " + isd->nick + " :Welcome\r\n",
@@ -167,10 +178,10 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 				": 251 " + isd->nick + " :\r\n",
 				": 252 " + isd->nick + " 0 :operator(s) online\r\n",
 				": 253 " + isd->nick + " 0 :unknown connections\r\n",
-				": 254 " + isd->nick + " 0 :channels formed\r\n",
-				": 255 " + isd->nick + " :I have 0 clients and 1 server\r\n",
-				": 265 " + isd->nick + " :Current local users: 0  Max: 0\r\n",
-				": 266 " + isd->nick + " :Current global users: 0  Max: 0\r\n",
+				": 254 " + isd->nick + " " + myformat("%zu", channels.size()) + " :channels formed\r\n",
+				": 255 " + isd->nick + " :I have " + user_count_str + " clients and 1 server\r\n",
+				": 265 " + isd->nick + " :Current local users: " + user_count_str + " Max: -1\r\n",
+				": 266 " + isd->nick + " :Current global users: " + user_count_str + "  Max: -1\r\n",
 				": 375 " + isd->nick + " :message of the day\r\n",
 				": 372 " + isd->nick + " :\r\n",
 				": 376 " + isd->nick + " :End of message of the day.\r\n"
