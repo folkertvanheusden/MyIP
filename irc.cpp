@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <map>
 #include <mutex>
+#include <set>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,7 +24,14 @@
 
 using namespace std::chrono_literals;
 
-static std::map<std::string, std::string> nicknames;
+class person
+{
+public:
+	std::string           real_name;
+	std::set<std::string> channels;
+};
+
+static std::map<std::string, person> nicknames;
 static std::mutex nicknames_lock;
 
 
@@ -48,6 +56,8 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 	if (parts.size() == 0)
 		return;
 
+	irc_session_data *isd = dynamic_cast<irc_session_data *>(tcp_session->get_callback_private_data());
+
 	if (*is == IS_wait_nick) {
 		if (parts.at(0) == "NICK" && parts.size() == 2) {  // ignoring hop count
 			// nick must be unique
@@ -57,12 +67,13 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 
 			auto it   = nicknames.find(nick);
 			if (it == nicknames.end()) {
-				auto rn_offset = line.find(":");
-				auto realname  = rn_offset == std::string::npos ? "" : line.substr(rn_offset + 1);
+				person p;
 
-				nicknames.insert({ nick, realname });
+				nicknames.insert({ nick, p });
 
 				lck.unlock();
+
+				isd->nick = nick;
 
 				*is = IS_wait_user;
 			}
@@ -71,14 +82,71 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 
 				std::string error = ": 433 * " + nick + " :Nickname is already in use.";
 
-				tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size());
+				if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
+					*is = IS_disconnect;
 			}
 		}
 		else {
 			std::string error = ": 421 * :Something is not right.";
 
-			tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size());
+			if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
+				*is = IS_disconnect;
 		}
+	}
+	else if (*is == IS_wait_user) {
+		if (parts.at(0) == "USER" && parts.size() >= 5) {
+			std::unique_lock<std::mutex> lck(nicknames_lock);
+
+			auto it = nicknames.find(isd->nick);
+
+			if (it == nicknames.end()) {
+				lck.unlock();
+
+				std::string error = ": 401 * :What is your nick?";
+
+				if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
+					*is = IS_disconnect;
+			}
+			else {
+				auto rn_offset = line.find(":");
+				auto real_name = rn_offset == std::string::npos ? "" : line.substr(rn_offset + 1);
+
+				it->second.real_name = real_name;
+
+				lck.unlock();
+
+				*is = IS_running;
+
+				std::vector<std::string> welcome {
+					": 001 " + isd->nick + " :Welcome",
+					": 002 " + isd->nick + " :Your host runs MyIP",
+					": 003 " + isd->nick + " :003",
+					": 004 " + isd->nick + " ",
+					": 005 " + isd->nick + " :",
+					": 005 " + isd->nick + " :",
+					": 251 " + isd->nick + " :",
+					": 252 " + isd->nick + " 0 :operator(s) online",
+					": 253 " + isd->nick + " 0 :unknown connections",
+					": 254 " + isd->nick + " 0 :channels formed",
+					": 255 " + isd->nick + " :I have 0 clients and 1 server",
+					": 265 " + isd->nick + " :Current local users: 0  Max: 0",
+					": 266 " + isd->nick + " :Current global users: 0  Max: 0",
+					": 375 " + isd->nick + " :message of the day",
+					": 372 " + isd->nick + " :",
+					": 376 " + isd->nick + " :End of message of the day."
+				};
+
+				for(auto & line : welcome) {
+					if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(line.c_str()), line.size()) == false) {
+						*is = IS_disconnect;
+						break;
+					}
+				}
+			}
+		}
+	}
+	else if (*is == IS_running) {
+		// TODO
 	}
 	else {
 		std::string error = ": 421 * :Internal error.";
@@ -87,8 +155,6 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 
 		*is = IS_disconnect;
 	}
-
-	// TODO
 }
 
 void irc_thread(session *const tcp_session)

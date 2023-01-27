@@ -213,4 +213,6 @@ public:
 
 	uint8_t *req_data { nullptr };
 	size_t   req_len  { 0       };
+
+	std::string nick;
 };
