@@ -29,6 +29,7 @@ class person
 public:
 	std::string           real_name;
 	std::set<std::string> channels;
+	session              *tcp_session { nullptr };
 };
 
 static std::map<std::string, person> nicknames;
@@ -71,11 +72,13 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 			if (it == nicknames.end()) {
 				person p;
 
+				p.tcp_session = tcp_session;
+
 				nicknames.insert({ nick, p });
 
 				lck.unlock();
 
-				isd->nick = nick;
+				isd->nick        = nick;
 
 				*is = IS_wait_user;
 			}
@@ -116,6 +119,8 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 				it->second.real_name = real_name;
 
 				lck.unlock();
+
+				isd->username  = parts.at(1);
 
 				*is = IS_running;
 
@@ -167,6 +172,18 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 
 			for(auto & channel : channels)
 				it->second.channels.erase(str_tolower(channel));
+		}
+		else if ((parts.at(0) == "PRIVMSG" || parts.at(0) == "NOTICE") && parts.size() >= 2) {
+			auto target = str_tolower(parts.at(1));
+
+			std::unique_lock<std::mutex> lck(nicknames_lock);
+
+			std::string line_out = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " " + line;
+
+			for(auto & nick : nicknames) {
+				if (nick.second.channels.find(target) != nick.second.channels.end() || target == nick.first)
+					nick.second.tcp_session->get_stream_target()->send_data(nick.second.tcp_session, reinterpret_cast<const uint8_t *>(line_out.c_str()), line_out.size());
+			}
 		}
 		// TODO
 		else {
