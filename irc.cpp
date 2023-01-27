@@ -86,6 +86,8 @@ void send_user_for_channel(const std::string & channel)
 
 static void process_line(session *const tcp_session, irc_state_t *const is, const std::string & line)
 {
+	DOLOG(ll_debug, "irc::process_line: |%s|\n", line.c_str());
+
 	if (line.empty())
 		return;
 
@@ -261,28 +263,16 @@ void irc_thread(session *const tcp_session)
         for(;ts->terminate == false && is != IS_disconnect;) {
 		std::unique_lock<std::mutex> lck(ts->r_lock);
 
-		const char *start = reinterpret_cast<const char *>(ts->req_data);
+		std::size_t crlf = ts->input.find("\r\n");
 
-		if (start) {
-			const char *crlf = strnstr(start, "\r\n", ts->req_len);
+		if (crlf != std::string::npos) {
+			process_line(tcp_session, &is, ts->input.substr(0, crlf));
 
-			if (crlf) {
-				process_line(tcp_session, &is, std::string(start, crlf - start));
-
-				size_t n_left = ts->req_len - (crlf + 2 - start);
-
-				if (n_left) {
-					memmove(ts->req_data, crlf + 2, n_left);
-					ts->req_len -= n_left;
-				}
-				else {
-					ts->req_len = 0;
-				}
-			}
+			ts->input.erase(0, crlf + 2);
 		}
-
-		if (is != IS_disconnect)
+		else if (is != IS_disconnect) {
 			ts->r_cond.wait_for(lck, 500ms);
+		}
 	}
 
 	tcp_session->get_stream_target()->end_session(tcp_session);
@@ -291,8 +281,6 @@ void irc_thread(session *const tcp_session)
 bool irc_new_session(pstream *const t, session *t_s)
 {
 	irc_session_data *ts = new irc_session_data();
-	ts->req_data = nullptr;
-	ts->req_len  = 0;
 
 	any_addr src_addr = t_s->get_their_addr();
 	ts->client_addr   = src_addr.to_str();
@@ -324,11 +312,7 @@ bool irc_new_data(pstream *ps, session *ts, buffer_in b)
 
 	const std::lock_guard<std::mutex> lck(t_s->r_lock);
 
-	t_s->req_data = reinterpret_cast<uint8_t *>(realloc(t_s->req_data, t_s->req_len + data_len + 1));
-
-	memcpy(&t_s->req_data[t_s->req_len], b.get_bytes(data_len), data_len);
-	t_s->req_len += data_len;
-	t_s->req_data[t_s->req_len] = 0x00;
+	t_s->input += std::string(reinterpret_cast<const char *>(b.get_bytes(data_len)), data_len);
 
 	t_s->r_cond.notify_one();
 
@@ -352,8 +336,6 @@ bool irc_close_session_2(pstream *const ps, session *ts)
 		nsd->th->join();
 		delete nsd->th;
 		nsd->th = nullptr;
-
-		free(nsd->req_data);
 
 		delete nsd;
 

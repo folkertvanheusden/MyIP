@@ -211,8 +211,7 @@ public:
         std::condition_variable r_cond;
         mutable std::mutex      r_lock;
 
-	uint8_t *req_data { nullptr };
-	size_t   req_len  { 0       };
+	std::string input;
 
 	std::string username;
 	std::string nick;
