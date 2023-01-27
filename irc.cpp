@@ -49,6 +49,14 @@ void irc_deinit()
 // I.S.: Internet Session
 typedef enum { IS_wait_nick, IS_wait_user, IS_running, IS_disconnect } irc_state_t;
 
+void transmit_to_channel(const std::string & channel, const std::string & msg_line)
+{
+	for(auto & nick : nicknames) {
+		if (nick.second.channels.find(target) != nick.second.channels.end() || target == nick.first)
+			nick.second.tcp_session->get_stream_target()->send_data(nick.second.tcp_session, reinterpret_cast<const uint8_t *>(msg_line.c_str()), msg_line.size());
+	}
+}
+
 static void process_line(session *const tcp_session, irc_state_t *const is, const std::string & line)
 {
 	if (line.empty())
@@ -85,14 +93,14 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 			else {
 				lck.unlock();
 
-				std::string error = ": 433 * " + nick + " :Nickname is already in use.";
+				std::string error = ": 433 * " + nick + " :Nickname is already in use.\r\n";
 
 				if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
 					*is = IS_disconnect;
 			}
 		}
 		else {
-			std::string error = ": 421 * :Something is not right.";
+			std::string error = ": 421 * :Something is not right.\r\n";
 
 			if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
 				*is = IS_disconnect;
@@ -107,7 +115,7 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 			if (it == nicknames.end()) {
 				lck.unlock();
 
-				std::string error = ": 401 * :What is your nick?";
+				std::string error = ": 401 * :What is your nick?\r\n";
 
 				if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
 					*is = IS_disconnect;
@@ -125,22 +133,22 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 				*is = IS_running;
 
 				std::vector<std::string> welcome {
-					": 001 " + isd->nick + " :Welcome",
-					": 002 " + isd->nick + " :Your host runs MyIP",
-					": 003 " + isd->nick + " :003",
-					": 004 " + isd->nick + " ",
-					": 005 " + isd->nick + " :",
-					": 005 " + isd->nick + " :",
-					": 251 " + isd->nick + " :",
-					": 252 " + isd->nick + " 0 :operator(s) online",
-					": 253 " + isd->nick + " 0 :unknown connections",
-					": 254 " + isd->nick + " 0 :channels formed",
-					": 255 " + isd->nick + " :I have 0 clients and 1 server",
-					": 265 " + isd->nick + " :Current local users: 0  Max: 0",
-					": 266 " + isd->nick + " :Current global users: 0  Max: 0",
-					": 375 " + isd->nick + " :message of the day",
-					": 372 " + isd->nick + " :",
-					": 376 " + isd->nick + " :End of message of the day."
+					": 001 " + isd->nick + " :Welcome\r\n",
+					": 002 " + isd->nick + " :Your host runs MyIP\r\n",
+					": 003 " + isd->nick + " :003\r\n",
+					": 004 " + isd->nick + " \r\n",
+					": 005 " + isd->nick + " :\r\n",
+					": 005 " + isd->nick + " :\r\n",
+					": 251 " + isd->nick + " :\r\n",
+					": 252 " + isd->nick + " 0 :operator(s) online\r\n",
+					": 253 " + isd->nick + " 0 :unknown connections\r\n",
+					": 254 " + isd->nick + " 0 :channels formed\r\n",
+					": 255 " + isd->nick + " :I have 0 clients and 1 server\r\n",
+					": 265 " + isd->nick + " :Current local users: 0  Max: 0\r\n",
+					": 266 " + isd->nick + " :Current global users: 0  Max: 0\r\n",
+					": 375 " + isd->nick + " :message of the day\r\n",
+					": 372 " + isd->nick + " :\r\n",
+					": 376 " + isd->nick + " :End of message of the day.\r\n"
 				};
 
 				for(auto & line : welcome) {
@@ -160,8 +168,15 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 
 			auto it = nicknames.find(isd->nick);
 
-			for(auto & channel : channels)
+			for(auto & channel : channels) {
 				it->second.channels.insert(str_tolower(channel));
+
+				std::string join_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " JOIN " + channel + "\r\n";
+
+				transmit_to_channel(channel, join_line);
+			}
+
+			// TODO: notify each user
 		}
 		else if (parts.at(0) == "PART" && parts.size() >= 2) {
 			auto channels = split(parts.at(1), ",");
@@ -170,31 +185,33 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 
 			auto it = nicknames.find(isd->nick);
 
-			for(auto & channel : channels)
+			for(auto & channel : channels) {
 				it->second.channels.erase(str_tolower(channel));
+
+				std::string part_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " PART " + channel + "\r\n";
+
+				transmit_to_channel(channel, part_line);
+			}
 		}
 		else if ((parts.at(0) == "PRIVMSG" || parts.at(0) == "NOTICE") && parts.size() >= 2) {
 			auto target = str_tolower(parts.at(1));
 
 			std::unique_lock<std::mutex> lck(nicknames_lock);
 
-			std::string line_out = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " " + line;
+			std::string msg_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " " + line + "\r\n";
 
-			for(auto & nick : nicknames) {
-				if (nick.second.channels.find(target) != nick.second.channels.end() || target == nick.first)
-					nick.second.tcp_session->get_stream_target()->send_data(nick.second.tcp_session, reinterpret_cast<const uint8_t *>(line_out.c_str()), line_out.size());
-			}
+			transmit_to_channel(target, msg_line);
 		}
 		// TODO
 		else {
-			std::string error = ": 421 * :Unknown command.";
+			std::string error = ": 421 * :Unknown command.\r\n";
 
 			if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size()) == false)
 				*is = IS_disconnect;
 		}
 	}
 	else {
-		std::string error = ": 421 * :Internal error.";
+		std::string error = ": 421 * :Internal error.\r\n";
 
 		tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(error.c_str()), error.size());
 
