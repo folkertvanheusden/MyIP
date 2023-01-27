@@ -235,6 +235,22 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 		return true;
 	}
 
+	if (parts.at(0) == "PING") {
+		std::string reply = "PING ";
+
+		std::size_t space = line.find(" ");
+
+		if (space != std::string::npos)
+			reply += line.substr(space + 1);
+
+		reply += "\r\n";
+
+		if (tcp_session->get_stream_target()->send_data(tcp_session, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size()) == false)
+			return false;
+
+		return true;
+	}
+
 	return true;
 }
 
