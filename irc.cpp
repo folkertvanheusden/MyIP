@@ -267,25 +267,31 @@ void irc_thread(session *const tcp_session)
 {
         set_thread_name("myip-irc");
 
-        irc_session_data *ts = dynamic_cast<irc_session_data *>(tcp_session->get_callback_private_data());
+        irc_session_data *isd = dynamic_cast<irc_session_data *>(tcp_session->get_callback_private_data());
 
 	bool seen_nick = false;
 	bool seen_user = false;
 
-        for(;ts->terminate == false;) {
-		std::unique_lock<std::mutex> lck(ts->r_lock);
+        for(;isd->terminate == false;) {
+		std::unique_lock<std::mutex> lck(isd->r_lock);
 
-		std::size_t crlf = ts->input.find("\r\n");
+		std::size_t crlf = isd->input.find("\r\n");
 
 		if (crlf != std::string::npos) {
-			if (process_line(tcp_session, &seen_nick, &seen_user, ts->input.substr(0, crlf)) == false)
+			if (process_line(tcp_session, &seen_nick, &seen_user, isd->input.substr(0, crlf)) == false)
 				break;
 
-			ts->input.erase(0, crlf + 2);
+			isd->input.erase(0, crlf + 2);
 		}
 		else {
-			ts->r_cond.wait_for(lck, 500ms);
+			isd->r_cond.wait_for(lck, 500ms);
 		}
+	}
+
+	{
+		std::unique_lock<std::mutex> lck(nicknames_lock);
+
+		nicknames.erase(isd->nick);
 	}
 
 	tcp_session->get_stream_target()->end_session(tcp_session);
