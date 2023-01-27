@@ -52,8 +52,35 @@ typedef enum { IS_wait_nick, IS_wait_user, IS_running, IS_disconnect } irc_state
 void transmit_to_channel(const std::string & channel, const std::string & msg_line)
 {
 	for(auto & nick : nicknames) {
-		if (nick.second.channels.find(target) != nick.second.channels.end() || target == nick.first)
+		if (nick.second.channels.find(channel) != nick.second.channels.end() || channel == nick.first)
 			nick.second.tcp_session->get_stream_target()->send_data(nick.second.tcp_session, reinterpret_cast<const uint8_t *>(msg_line.c_str()), msg_line.size());
+	}
+}
+
+void send_user_for_channel(const std::string & channel)
+{
+	std::string out   = ": 353 " + channel + " :";
+	bool        first = true;
+
+	for(auto & nick : nicknames) {
+		if (nick.second.channels.find(channel) != nick.second.channels.end()) {
+			if (first)
+				first = false;
+			else
+				out += " ";
+
+			out += nick.first;
+		}
+	}
+
+	out += "\r\n";
+
+	out += ": 366 * " + channel + " :End of /NAMES list.\r\n";
+
+	for(auto & nick : nicknames) {
+		if (nick.second.channels.find(channel) != nick.second.channels.end()) {
+			nick.second.tcp_session->get_stream_target()->send_data(nick.second.tcp_session, reinterpret_cast<const uint8_t *>(out.c_str()), out.size());
+		}
 	}
 }
 
@@ -174,6 +201,8 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 				std::string join_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " JOIN " + channel + "\r\n";
 
 				transmit_to_channel(channel, join_line);
+
+				send_user_for_channel(channel);
 			}
 
 			// TODO: notify each user
@@ -187,6 +216,8 @@ static void process_line(session *const tcp_session, irc_state_t *const is, cons
 
 			for(auto & channel : channels) {
 				it->second.channels.erase(str_tolower(channel));
+
+				send_user_for_channel(channel);
 
 				std::string part_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " PART " + channel + "\r\n";
 
