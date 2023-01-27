@@ -200,7 +200,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 			std::string join_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " JOIN " + channel + "\r\n";
 
-			transmit_to_channel(channel, join_line, isd->nick);
+			transmit_to_channel(channel, join_line, "___\x03invalid");
 
 			send_user_for_channel(channel, isd->nick);
 		}
@@ -218,7 +218,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 		for(auto & channel : channels) {
 			it->second.channels.erase(str_tolower(channel));
 
-			send_user_for_channel(channel, isd->nick);
+			send_user_for_channel(channel, "___\x03invalid");
 
 			std::string part_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " PART " + channel + "\r\n";
 
