@@ -114,6 +114,28 @@ static std::map<std::string, int> get_channel_list()
 	return channels;
 }
 
+static std::string get_topic(const std::string & channel)
+{
+	std::unique_lock<std::mutex> lck(topicnames_lock);
+
+	auto it = topicnames.find(channel);
+
+	if (it == topicnames.end())
+		return "";
+
+	return it->second;
+}
+
+bool send_topic(session *const tcp_session, const std::string & channel)
+{
+	std::string topic_line = ": TOPIC " + channel + " :" + get_topic(channel) + "\r\n";
+
+	if (transmit_to_client(tcp_session, topic_line) == false)
+		return false;
+
+	return true;
+}
+
 static bool process_line(session *const tcp_session, bool *const seen_nick, bool *const seen_user, const std::string & line)
 {
 	DOLOG(ll_debug, "irc::process_line: |%s|\n", line.c_str());
@@ -236,6 +258,9 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 			transmit_to_channel(channel, join_line, "___\x03invalid");
 
 			send_user_for_channel(channel, isd->nick);
+
+			if (send_topic(tcp_session, channel) == false)
+				return false;
 		}
 
 		return true;
@@ -290,6 +315,25 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 		return true;
 	}
 
+	if (parts.at(0) == "TOPIC" && parts.size() >= 3) {
+		std::string channel = parts.at(1);
+
+		std::size_t colon   = line.find(":");
+
+		std::string topic   = colon == std::string::npos ? "" : line.substr(colon + 1);
+
+		{
+			std::unique_lock<std::mutex> lck(topicnames_lock);
+
+			topicnames.insert_or_assign(channel, topic);
+		}
+
+		if (send_topic(tcp_session, channel) == false)
+			return false;
+
+		return true;
+	}
+
 	if (parts.at(0) == "LIST") {
 		std::map<std::string, int> channels;
 
@@ -305,7 +349,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 			return false;
 
 		for(auto & ch : channels) {
-			std::string topic_line = ":" + local_host + " 322 " + isd->nick + " " + ch.first + " " + myformat("%d", ch.second) + " :[+nt] topic\r\n";
+			std::string topic_line = ":" + local_host + " 322 " + isd->nick + " " + ch.first + " " + myformat("%d", ch.second) + " :[+nt] " + get_topic(ch.first) + "\r\n";
 
 			if (transmit_to_client(tcp_session, topic_line) == false)
 				return false;
