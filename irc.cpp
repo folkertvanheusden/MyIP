@@ -35,10 +35,10 @@ public:
 };
 
 static std::map<std::string, person> nicknames;
-static std::mutex nicknames_lock;
+static std::shared_mutex nicknames_lock;  // TODO: read/write lock
 
 static std::map<std::string, std::string> topicnames;
-static std::mutex topicnames_lock;
+static std::mutex topicnames_lock;  // TODO: read/write lock
 
 void irc_init()
 {
@@ -151,29 +151,61 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 	irc_session_data *isd = dynamic_cast<irc_session_data *>(tcp_session->get_callback_private_data());
 
 	if (parts.at(0) == "NICK" && parts.size() == 2) {  // ignoring hop count
-		// nick must be unique
-		auto nick = str_tolower(parts.at(1));
+		std::unique_lock<std::shared_mutex> lck(nicknames_lock);
 
-		std::unique_lock<std::mutex> lck(nicknames_lock);
+		auto new_nick = str_tolower(parts.at(1));
 
-		auto it   = nicknames.find(nick);
+		auto it       = nicknames.find(new_nick);
+
+		// new nick not existing?
 		if (it == nicknames.end()) {
-			person p;
+			// user already known? (old nick exists)
+			auto it_old = nicknames.find(isd->nick);
 
-			p.tcp_session = tcp_session;
+			// renaming existing user
+			if (it_old != nicknames.end()) {
+				// replace key in nicknames
+				auto node = nicknames.extract(isd->nick);
 
-			nicknames.insert({ nick, p });
+				node.key() = new_nick;
 
-			lck.unlock();
+				nicknames.insert(std::move(node));
 
-			isd->nick  = nick;
+				lck.unlock();
+
+				// notify other users
+				std::shared_lock<std::shared_mutex> lckr(nicknames_lock);
+
+				std::string nick_line = ":" + isd->nick +" NICK " + new_nick + "\r\n";
+
+				for(auto & nick : nicknames) {
+					DOLOG(ll_debug, "irc: notifying %s for nick-change of %s\n", nick.first.c_str(), isd->nick.c_str());
+
+					if (transmit_to_client(nick.second.tcp_session, nick_line) == false)
+						return false;
+				}
+
+				DOLOG(ll_debug, "irc: renamed %s to %s\n", isd->nick.c_str(), new_nick.c_str());
+			}
+			else {
+				DOLOG(ll_debug, "irc: new user %s\n", new_nick.c_str());
+
+				person p;
+
+				p.tcp_session = tcp_session;
+
+				nicknames.insert({ new_nick, p });
+			}
+
+			isd->nick  = new_nick;
 
 			*seen_nick = true;
 		}
+		// new nick name already exists
 		else {
 			lck.unlock();
 
-			std::string error = ": 433 * " + nick + " :Nickname is already in use.\r\n";
+			std::string error = ": 433 * " + new_nick + " :Nickname is already in use.\r\n";
 
 			return transmit_to_client(tcp_session, error);
 		}
@@ -182,7 +214,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 	}
 
 	if (parts.at(0) == "USER" && parts.size() >= 5) {
-		std::unique_lock<std::mutex> lck(nicknames_lock);
+		std::shared_lock<std::shared_mutex> lck(nicknames_lock);
 
 		auto it = nicknames.find(isd->nick);
 
@@ -246,21 +278,28 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 	if (parts.at(0) == "JOIN" && parts.size() >= 2) {
 		auto channels = split(parts.at(1), ",");
 
-		std::unique_lock<std::mutex> lck(nicknames_lock);
+		{
+			std::unique_lock<std::shared_mutex> lck(nicknames_lock);
 
-		auto it = nicknames.find(isd->nick);
+			auto it = nicknames.find(isd->nick);
 
-		for(auto & channel : channels) {
-			it->second.channels.insert(str_tolower(channel));
+			for(auto & channel : channels)
+				it->second.channels.insert(str_tolower(channel));
+		}
 
-			std::string join_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " JOIN " + channel + "\r\n";
+		{
+			std::shared_lock<std::shared_mutex> lck(nicknames_lock);
 
-			transmit_to_channel(channel, join_line, "___\x03invalid");
+			for(auto & channel : channels) {
+				std::string join_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " JOIN " + channel + "\r\n";
 
-			send_user_for_channel(channel, isd->nick);
+				transmit_to_channel(channel, join_line, "___\x03invalid");
 
-			if (send_topic(tcp_session, channel) == false)
-				return false;
+				send_user_for_channel(channel, isd->nick);
+
+				if (send_topic(tcp_session, channel) == false)
+					return false;
+			}
 		}
 
 		return true;
@@ -269,18 +308,25 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 	if (parts.at(0) == "PART" && parts.size() >= 2) {
 		auto channels = split(parts.at(1), ",");
 
-		std::unique_lock<std::mutex> lck(nicknames_lock);
+		{
+			std::unique_lock<std::shared_mutex> lck(nicknames_lock);
 
-		auto it = nicknames.find(isd->nick);
+			auto it = nicknames.find(isd->nick);
 
-		for(auto & channel : channels) {
-			it->second.channels.erase(str_tolower(channel));
+			for(auto & channel : channels)
+				it->second.channels.erase(str_tolower(channel));
+		}
 
-			std::string part_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " PART " + channel + "\r\n";
+		{
+			std::shared_lock<std::shared_mutex> lck(nicknames_lock);
 
-			transmit_to_channel(channel, part_line, isd->nick);
+			for(auto & channel : channels) {
+				std::string part_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " PART " + channel + "\r\n";
 
-			send_user_for_channel(channel, "___\x03invalid");
+				transmit_to_channel(channel, part_line, isd->nick);
+
+				send_user_for_channel(channel, "___\x03invalid");
+			}
 		}
 
 		return true;
@@ -289,7 +335,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 	if ((parts.at(0) == "PRIVMSG" || parts.at(0) == "NOTICE") && parts.size() >= 2) {
 		auto target = str_tolower(parts.at(1));
 
-		std::unique_lock<std::mutex> lck(nicknames_lock);
+		std::shared_lock<std::shared_mutex> lck(nicknames_lock);
 
 		std::string msg_line = ":" + isd->nick + "!" + isd->username + "@" + tcp_session->get_their_addr().to_str() + " " + line + "\r\n";
 
@@ -338,7 +384,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 		std::map<std::string, int> channels;
 
 		{
-			std::unique_lock<std::mutex> lck(nicknames_lock);
+			std::shared_lock<std::shared_mutex> lck(nicknames_lock);
 
 			channels = get_channel_list();
 		}
@@ -402,7 +448,7 @@ void irc_thread(session *const tcp_session)
 	}
 
 	{
-		std::unique_lock<std::mutex> lck(nicknames_lock);
+		std::unique_lock<std::shared_mutex> lck(nicknames_lock);
 
 		nicknames.erase(isd->nick);
 	}
