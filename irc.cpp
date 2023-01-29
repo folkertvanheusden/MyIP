@@ -384,13 +384,17 @@ void irc_thread(session *const tcp_session)
 		std::size_t crlf = isd->input.find("\r\n");
 
 		if (crlf != std::string::npos) {
-			if (process_line(tcp_session, &seen_nick, &seen_user, isd->input.substr(0, crlf)) == false) {
+			std::string line = isd->input.substr(0, crlf);
+
+			isd->input.erase(0, crlf + 2);
+
+			lck.unlock();
+
+			if (process_line(tcp_session, &seen_nick, &seen_user, line) == false) {
 				DOLOG(ll_debug, "irc_thread:: process_line returned abort status\n");
 
 				break;
 			}
-
-			isd->input.erase(0, crlf + 2);
 		}
 		else {
 			isd->r_cond.wait_for(lck, 500ms);
