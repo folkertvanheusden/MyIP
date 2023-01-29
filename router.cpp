@@ -249,6 +249,8 @@ std::optional<any_addr> router::resolve_mac_by_addr(router_entry *const re, cons
 
 void router::operator()()
 {
+	set_thread_name("myip-phys_router");
+
 	for(;;) {
 		auto po = pkts->get();
 		if (!po.has_value())
