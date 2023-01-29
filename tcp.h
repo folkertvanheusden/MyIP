@@ -96,7 +96,7 @@ private:
 	std::condition_variable_any   unacked_cv;
 
 	// listen port -> handler
-	std::mutex listeners_lock;
+	std::shared_mutex listeners_lock;
 	std::map<int, port_handler_t> listeners;
 
 	// client port -> session
@@ -126,8 +126,8 @@ private:
 
 	void set_state(tcp_session *const session, const tcp_state_t new_state);
 
-	std::optional<port_handler_t> get_lock_listener(const int dst_port, const std::string & log_prefix);
-	void release_listener_lock();
+	std::optional<port_handler_t> get_lock_listener(const int dst_port, const std::string & log_prefix, const bool write_lock);
+	void release_listener_lock(const bool write_lock);
 
 	void free_tcp_session(tcp_session *const p);
 

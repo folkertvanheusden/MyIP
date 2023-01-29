@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <atomic>
 #include <chrono>
@@ -31,7 +31,7 @@ constexpr const char *const states[] = { "closed", "listen", "syn_rcvd", "syn_se
 
 void tcp::free_tcp_session(tcp_session *const p)
 {
-	auto port_record = get_lock_listener(p->get_my_port(), "");
+	auto port_record = get_lock_listener(p->get_my_port(), "", false);
 
 	if (port_record.has_value()) {
 		if (port_record.value().session_closed_1)
@@ -41,7 +41,7 @@ void tcp::free_tcp_session(tcp_session *const p)
 			port_record.value().session_closed_2(this, p);
 	}
 
-	release_listener_lock();
+	release_listener_lock(false);
 
 	free(p->unacked);
 
@@ -206,9 +206,12 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 	ts->e_last_pkt_ts = get_us();
 }
 
-std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const std::string & log_prefix)
+std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const std::string & log_prefix, const bool write_lock)
 {
-	listeners_lock.lock();
+	if (write_lock)
+		listeners_lock.lock();
+	else
+		listeners_lock.lock_shared();
 
 	auto cb_it = listeners.find(dst_port);
 
@@ -221,9 +224,12 @@ std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const s
 	return cb_it->second;
 }
 
-void tcp::release_listener_lock()
+void tcp::release_listener_lock(const bool write_lock)
 {
-	listeners_lock.unlock();
+	if (write_lock)
+		listeners_lock.unlock();
+	else
+		listeners_lock.unlock_shared();
 }
 
 uint64_t hash_address(const any_addr & a, const int local_port, const int peer_port)
@@ -321,9 +327,9 @@ void tcp::packet_handler(packet *const pkt)
 	std::string flag_str = flags_to_str(p[13]);
 	DOLOG(ll_debug, "%s: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", pkt->get_log_prefix().c_str(), src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str.c_str(), their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
 
-	auto port_record  = get_lock_listener(dst_port, pkt->get_log_prefix());
+	auto port_record  = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
 	bool has_listener = port_record.has_value();
-	release_listener_lock();
+	release_listener_lock(false);
 
 	if (!has_listener) {
 		send_rst_for_port(pkt, dst_port, src_port);
@@ -472,7 +478,7 @@ void tcp::packet_handler(packet *const pkt)
 
 				stats_inc_counter(tcp_succ_estab);
 
-				auto cb = get_lock_listener(dst_port, pkt->get_log_prefix());
+				auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
 
 				if (cb.has_value()) {
 					if (cb.value().new_session && cb.value().new_session(this, cur_session) == false) {
@@ -484,7 +490,7 @@ void tcp::packet_handler(packet *const pkt)
 					fail = true;
 				}
 
-				release_listener_lock();
+				release_listener_lock(false);
 			}
 			else if (cur_session->state == tcp_last_ack) {
 				DOLOG(ll_debug, "%s: received ACK: session is finished\n", pkt->get_log_prefix().c_str());
@@ -580,7 +586,7 @@ void tcp::packet_handler(packet *const pkt)
 			// std::string content = bin_to_text(data_start, data_len);
 			// DOLOG(ll_debug, "%s: Received content: %s\n", pkt->get_log_prefix().c_str(), content.c_str());
 
-			auto cb = get_lock_listener(dst_port, pkt->get_log_prefix());
+			auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
 
 			if (cb.has_value()) {
 				if (cb.value().new_data(this, cur_session, buffer_in(data_start, data_len)) == false) {
@@ -592,7 +598,7 @@ void tcp::packet_handler(packet *const pkt)
 				fail = true;
 			}
 
-			release_listener_lock();
+			release_listener_lock(false);
 
 			if (fail == false) {
 				cur_session->their_seq_nr += data_len;  // TODO handle missing segments
@@ -604,14 +610,14 @@ void tcp::packet_handler(packet *const pkt)
 
 					DOLOG(ll_debug, "%s: use from fragment cache\n", pkt->get_log_prefix().c_str());
 
-					auto cb = get_lock_listener(dst_port, pkt->get_log_prefix());
+					auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
 
 					if (cb.value().new_data(this, cur_session, buffer_in(it->second.data(), it->second.size())) == false) {
 						DOLOG(ll_error, "%s: layer 7 indicated an error\n", pkt->get_log_prefix().c_str());
 						fail = true;
 					}
 
-					release_listener_lock();
+					release_listener_lock(false);
 
 					cur_session->their_seq_nr += it->second.size();
 
@@ -651,12 +657,12 @@ void tcp::packet_handler(packet *const pkt)
 	}
 
 	if (fail) {
-		auto cb = get_lock_listener(dst_port, pkt->get_log_prefix());
+		auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
 
 		if (cb.has_value())
 			cb.value().session_closed_1(this, cur_session);
 
-		release_listener_lock();
+		release_listener_lock(false);
 
 		stats_inc_counter(tcp_errors);
 
@@ -693,14 +699,14 @@ void tcp::packet_handler(packet *const pkt)
 			// call session_closed_2
 			int close_port       = pointer->get_my_port();
 
-			auto cb_org          = get_lock_listener(close_port, pkt->get_log_prefix());
+			auto cb_org          = get_lock_listener(close_port, pkt->get_log_prefix(), false);
 
 			if (cb_org.has_value())  // is session initiated here?
 				cb_org.value().session_closed_2(this, pointer);
 			else
 				DOLOG(ll_info, "%s: port %d not known\n", pkt->get_log_prefix().c_str(), close_port);
 
-			release_listener_lock();
+			release_listener_lock(false);
 
 			// clean-up
 			free_tcp_session(pointer);
@@ -744,7 +750,7 @@ void tcp::session_cleaner()
 					DOLOG(ll_debug, "%s: session timed out\n", log_prefix.c_str());
 
 				// call session_closed
-				auto cb = get_lock_listener(s->get_my_port(), log_prefix);
+				auto cb = get_lock_listener(s->get_my_port(), log_prefix, false);
 
 				if (cb.has_value()) {  // session not initiated here?
 					if (cb.value().session_closed_1)
@@ -754,7 +760,7 @@ void tcp::session_cleaner()
 						cb.value().session_closed_2(this, s);
 				}
 
-				release_listener_lock();
+				release_listener_lock(false);
 
 				if (s->is_client)
 					tcp_clients.erase(s->get_my_port());
