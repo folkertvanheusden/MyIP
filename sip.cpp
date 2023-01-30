@@ -197,11 +197,11 @@ void create_response_headers(const std::string & request, std::vector<std::strin
 {
 	target->push_back(request);
 
-	auto str_via = find_header(source, "Via");
-	auto str_from = find_header(source, "From");
-	auto str_to = find_header(source, "To");
-	auto str_call_id = find_header(source, "Call-ID");
-	auto str_cseq = find_header(source, "CSeq");
+	auto str_via     = find_header(source, "Via",     ":");
+	auto str_from    = find_header(source, "From",    ":");
+	auto str_to      = find_header(source, "To",      ":");
+	auto str_call_id = find_header(source, "Call-ID", ":");
+	auto str_cseq    = find_header(source, "CSeq",    ":");
 
 	if (str_via.has_value())
 		target->push_back("Via: " + str_via.value());
@@ -424,13 +424,13 @@ void sip::send_ACK(const any_addr & src_ip, const int src_port, const any_addr &
 
 void sip::reply_to_UNAUTHORIZED(const any_addr & src_ip, const int src_port, const any_addr & dst_ip, const int dst_port, const std::vector<std::string> *const headers, session_data *const pd)
 {
-	auto str_wa = find_header(headers, "WWW-Authenticate");
+	auto str_wa = find_header(headers, "WWW-Authenticate", ":");
 	if (!str_wa.has_value()) {
 		DOLOG(ll_info, "SIP: \"WWW-Authenticate\" missing");
 		return;
 	}
 
-	auto call_id = find_header(headers, "Call-ID");
+	auto call_id = find_header(headers, "Call-ID", ":");
 
 	std::string work = replace(str_wa.value(), ",", " ");
 
@@ -544,7 +544,7 @@ void sip::send_BYE(const any_addr & tgt_addr, const int tgt_port, const any_addr
 {
 	std::string number = "0";
 
-	auto str_to = find_header(&headers, "To");
+	auto str_to = find_header(&headers, "To", ":");
 	if (str_to.has_value()) {
 		std::string::size_type lt = str_to.value().rfind('<');
 		std::string::size_type gt = str_to.value().rfind('>');
@@ -650,7 +650,7 @@ void sip::voicemailbox(const any_addr & tgt_addr, const int tgt_port, const any_
 		if (rc)
 			DOLOG(ll_warning, "SIP: cannot add SF_STR_COMMENT to .wav: %s\n", sf_error_number(rc));
 
-		auto str_from = find_header(&ss->headers, "From");
+		auto str_from = find_header(&ss->headers, "From", ":");
 		if (str_from.has_value()) {
 			rc = sf_set_string(ss->sf, SF_STR_ARTIST, str_from.value().c_str());
 

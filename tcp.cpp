@@ -583,7 +583,7 @@ void tcp::packet_handler(packet *const pkt)
 		// DOLOG(ll_debug, "%s: %s\n", pkt->get_log_prefix().c_str(), std::string((const char *)&p[header_size], data_len).c_str());
 
 		if (their_seq_nr == cur_session->their_seq_nr) {
-			// std::string content = bin_to_text(data_start, data_len);
+			// std::string content = bin_to_text(data_start, data_len, false);
 			// DOLOG(ll_debug, "%s: Received content: %s\n", pkt->get_log_prefix().c_str(), content.c_str());
 
 			auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);

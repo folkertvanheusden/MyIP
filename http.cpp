@@ -144,7 +144,7 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 
 	int         rc   = 200;
 
-	auto        host = find_header(&lines, "Host");
+	auto        host = find_header(&lines, "Host", ":");
 
 	if (url == "" || url == "/")
 		url = "index.html";
@@ -262,8 +262,8 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 
 		constexpr const char *const month[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-		auto referer    = find_header(&lines, "Referer");
-		auto user_agent = find_header(&lines, "User-Agent");
+		auto referer    = find_header(&lines, "Referer",    ":");
+		auto user_agent = find_header(&lines, "User-Agent", ":");
 
 		fprintf(fh, "%s - - [%02d/%s/%04d:%02d:%02d:%02d +0000] \"%s\" %d %ld \"%s\" \"%s\"\n",
 				hs->client_addr.c_str(),
@@ -309,12 +309,17 @@ void http_thread(session *ts)
 
 					ts->get_stream_target()->end_session(ts);
 
+					DOLOG(ll_debug, "http session finished\n");
+
 					break;
 				}
 			}
 
 			hs->r_cond.wait_for(lck, 500ms);
 		}
+
+		if (hs->terminate)
+			DOLOG(ll_debug, "http_thread: terminate flag set\n");
 	}
 	catch(const std::runtime_error & error) {
 		DOLOG(ll_error, myformat("http: thread error \"%s\"", error.what()).c_str());

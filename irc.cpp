@@ -504,6 +504,8 @@ bool irc_close_session_1(pstream *const ps, session *ts)
 
 bool irc_close_session_2(pstream *const ps, session *ts)
 {
+	DOLOG(ll_debug, "IRC: closing %s\n", ts->to_str().c_str());
+
 	session_data *sd = ts->get_callback_private_data();
 
 	if (sd) {
