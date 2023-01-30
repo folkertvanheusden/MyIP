@@ -301,7 +301,7 @@ void http_thread(session *ts)
 					lck.unlock();
 
 					if (rc.has_value()) {
-						if (ts->get_stream_target()->send_data(ts, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size())) {
+						if (ts->get_stream_target()->send_data(ts, reinterpret_cast<const uint8_t *>(rc.value().first.c_str()), rc.value().first.size())) {
 							if (rc.value().second.empty() == false)
 								ts->get_stream_target()->send_data(ts, rc.value().second.data(), rc.value().second.size());
 						}
@@ -429,7 +429,7 @@ void https_thread(session *ts)
 				auto rc = generate_response(ts, headers);
 
 				if (rc.has_value()) {
-					if (br_sslio_write_all(&ioc, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size()) == -1) {
+					if (br_sslio_write_all(&ioc, reinterpret_cast<const uint8_t *>(rc.value().first.c_str()), rc.value().first.size()) == -1) {
 						ok = false;
 
 						DOLOG(ll_debug, "https_thread: br_sslio_write_all failed\n");
