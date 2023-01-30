@@ -228,6 +228,8 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 
 void socks_proxy::operator()()
 {
+	set_thread_name("myip-socksproxy");
+
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
 	while(!stop_flag) {
