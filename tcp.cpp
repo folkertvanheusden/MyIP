@@ -689,7 +689,7 @@ void tcp::packet_handler(packet *const pkt)
 		cur_it = sessions.find(id);
 
 		if (cur_it != sessions.end()) {
-			tcp_session *pointer = dynamic_cast<tcp_session *>(cur_it->second);
+			tcp_session *session_pointer = dynamic_cast<tcp_session *>(cur_it->second);
 
 			sessions.erase(cur_it);
 			stats_set(tcp_cur_n_sessions, sessions.size());
@@ -697,19 +697,19 @@ void tcp::packet_handler(packet *const pkt)
 			lck.unlock();
 
 			// call session_closed_2
-			int close_port       = pointer->get_my_port();
+			int close_port       = session_pointer->get_my_port();
 
 			auto cb_org          = get_lock_listener(close_port, pkt->get_log_prefix(), false);
 
 			if (cb_org.has_value())  // is session initiated here?
-				cb_org.value().session_closed_2(this, pointer);
+				cb_org.value().session_closed_2(this, session_pointer);
 			else
 				DOLOG(ll_info, "%s: port %d not known\n", pkt->get_log_prefix().c_str(), close_port);
 
 			release_listener_lock(false);
 
 			// clean-up
-			free_tcp_session(pointer);
+			free_tcp_session(session_pointer);
 		}
 		else {
 			lck.unlock();
