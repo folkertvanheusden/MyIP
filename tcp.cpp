@@ -216,7 +216,7 @@ std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const s
 	auto cb_it = listeners.find(dst_port);
 
 	if (cb_it == listeners.end()) {
-		DOLOG(ll_info, "%s: no listener for that (%d) port\n", log_prefix.c_str(), dst_port);
+		DOLOG(ll_debug, "%s: no listener for that (%d) port\n", log_prefix.c_str(), dst_port);
 
 		return { };
 	}
@@ -682,7 +682,7 @@ void tcp::packet_handler(packet *const pkt)
 	lck.unlock();
 
 	if (delete_entry) {
-		DOLOG(ll_info, "%s: cleaning up session\n", pkt->get_log_prefix().c_str());
+		DOLOG(ll_debug, "%s: cleaning up session\n", pkt->get_log_prefix().c_str());
 
 		lck.lock();
 
