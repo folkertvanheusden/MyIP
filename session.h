@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
 #include <stdint.h>
 #include <time.h>
 
@@ -24,6 +25,8 @@ protected:
 	private_data  *application_private_data { nullptr };
 
 	timespec       session_created { 0 };
+
+	std::mutex     session_lock;
 
 	std::atomic_bool is_terminating { false };
 
