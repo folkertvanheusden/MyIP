@@ -285,34 +285,42 @@ std::optional<std::pair<std::string, std::vector<uint8_t> > > generate_response(
 
 void http_thread(session *ts)
 {
-        set_thread_name("myip-http");
+	try {
+		set_thread_name("myip-http");
 
-        http_session_data *hs = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
+		http_session_data *hs = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
 
-        for(;hs->terminate == false;) {
-		std::unique_lock<std::mutex> lck(hs->r_lock);
+		for(;hs->terminate == false;) {
+			std::unique_lock<std::mutex> lck(hs->r_lock);
 
-		if (hs->req_data) {
-			char *end_marker = strstr(hs->req_data, "\r\n\r\n");
-			if (end_marker) {
-				auto rc = generate_response(ts, hs->req_data);
+			if (hs->req_data) {
+				char *end_marker = strstr(hs->req_data, "\r\n\r\n");
+				if (end_marker) {
+					auto rc = generate_response(ts, hs->req_data);
 
-				lck.unlock();
+					lck.unlock();
 
-				if (rc.has_value()) {
-					if (ts->get_stream_target()->send_data(ts, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size())) {
-						if (rc.value().second.empty() == false)
-							ts->get_stream_target()->send_data(ts, rc.value().second.data(), rc.value().second.size());
+					if (rc.has_value()) {
+						if (ts->get_stream_target()->send_data(ts, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size())) {
+							if (rc.value().second.empty() == false)
+								ts->get_stream_target()->send_data(ts, rc.value().second.data(), rc.value().second.size());
+						}
 					}
+
+					ts->get_stream_target()->end_session(ts);
+
+					break;
 				}
-
-				ts->get_stream_target()->end_session(ts);
-
-				break;
 			}
-		}
 
-		hs->r_cond.wait_for(lck, 500ms);
+			hs->r_cond.wait_for(lck, 500ms);
+		}
+	}
+	catch(const std::runtime_error & error) {
+		DOLOG(ll_error, myformat("http: thread error \"%s\"", error.what()).c_str());
+	}
+	catch(...) {
+		DOLOG(ll_error, "http: generic thread error");
 	}
 }
 
@@ -364,90 +372,98 @@ void https_thread(session *ts)
 {
         set_thread_name("myip-https");
 
-        http_session_data *hs  = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
-	http_private_data *hpd = dynamic_cast<http_private_data *>(ts->get_application_private_data());
+	try {
+		http_session_data *hs  = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
+		http_private_data *hpd = dynamic_cast<http_private_data *>(ts->get_application_private_data());
 
-	https_ctx             hc  { hs, ts };
+		https_ctx             hc  { hs, ts };
 
-	br_ssl_server_context sc  { 0 };
-	unsigned char         iobuf[BR_SSL_BUFSIZE_BIDI] { 0 };
-	br_sslio_context      ioc { 0 };
+		br_ssl_server_context sc  { 0 };
+		unsigned char         iobuf[BR_SSL_BUFSIZE_BIDI] { 0 };
+		br_sslio_context      ioc { 0 };
 
-	BearSSL::X509List c(hpd->certificate.c_str());
-	const br_x509_certificate *br_c       = c.getX509Certs();
-	size_t                     br_c_count = c.getCount();
+		BearSSL::X509List c(hpd->certificate.c_str());
+		const br_x509_certificate *br_c       = c.getX509Certs();
+		size_t                     br_c_count = c.getCount();
 
-	BearSSL::PrivateKey pk(hpd->private_key.c_str());
+		BearSSL::PrivateKey pk(hpd->private_key.c_str());
 
-	if (pk.isRSA()) {
-		DOLOG(ll_debug, "https: private key is an RSA key\n");
-		const br_rsa_private_key *br_pk = pk.getRSA();
+		if (pk.isRSA()) {
+			DOLOG(ll_debug, "https: private key is an RSA key\n");
+			const br_rsa_private_key *br_pk = pk.getRSA();
 
-		br_ssl_server_init_full_rsa(&sc, br_c, br_c_count, br_pk);
-	}
-	else if (pk.isEC()) {
-		DOLOG(ll_debug, "https: private key is an EC key\n");
-		const br_ec_private_key *br_pk = pk.getEC();
+			br_ssl_server_init_full_rsa(&sc, br_c, br_c_count, br_pk);
+		}
+		else if (pk.isEC()) {
+			DOLOG(ll_debug, "https: private key is an EC key\n");
+			const br_ec_private_key *br_pk = pk.getEC();
 
-		br_ssl_server_init_full_ec(&sc, br_c, br_c_count, BR_KEYTYPE_EC, br_pk);
-	}
-	else {
-		error_exit(false, "https_thread: private key is not RSA or EC");
-	}
-
-	br_ssl_engine_set_buffer(&sc.eng, iobuf, sizeof iobuf, 1);
-
-	if (br_ssl_server_reset(&sc) == 0)
-		DOLOG(ll_error, "https_thread: br_ssl_server_reset failed\n");
-
-	br_sslio_init(&ioc, &sc.eng, sock_read, &hc, sock_write, &hc);
-
-	std::string headers;
-
-	bool        ok      = true;
-
-        for(;hs->terminate == false;) {
-		char buffer[4096] { 0 };
-
-		if (br_sslio_read(&ioc, buffer, sizeof(buffer) - 1) < 0) {
-			ok = false;
-			break;
+			br_ssl_server_init_full_ec(&sc, br_c, br_c_count, BR_KEYTYPE_EC, br_pk);
+		}
+		else {
+			error_exit(false, "https_thread: private key is not RSA or EC");
 		}
 
-		headers += buffer;
+		br_ssl_engine_set_buffer(&sc.eng, iobuf, sizeof iobuf, 1);
 
-		if (headers.find("\r\n\r\n") != std::string::npos) {
-			auto rc = generate_response(ts, headers);
+		if (br_ssl_server_reset(&sc) == 0)
+			DOLOG(ll_error, "https_thread: br_ssl_server_reset failed\n");
 
-			if (rc.has_value()) {
-				if (br_sslio_write_all(&ioc, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size()) == -1) {
-					ok = false;
+		br_sslio_init(&ioc, &sc.eng, sock_read, &hc, sock_write, &hc);
 
-					DOLOG(ll_debug, "https_thread: br_sslio_write_all failed\n");
-				}
-				else if (rc.value().second.empty() == false) {
-					ok = br_sslio_write_all(&ioc, rc.value().second.data(), rc.value().second.size()) == 0;
+		std::string headers;
 
-					if (!ok)
-						DOLOG(ll_debug, "https_thread: br_sslio_write_all failed\n");
-				}
-			}
-			else {
+		bool        ok      = true;
+
+		for(;hs->terminate == false;) {
+			char buffer[4096] { 0 };
+
+			if (br_sslio_read(&ioc, buffer, sizeof(buffer) - 1) < 0) {
 				ok = false;
+				break;
 			}
 
-			break;
+			headers += buffer;
+
+			if (headers.find("\r\n\r\n") != std::string::npos) {
+				auto rc = generate_response(ts, headers);
+
+				if (rc.has_value()) {
+					if (br_sslio_write_all(&ioc, (const uint8_t *)rc.value().first.c_str(), rc.value().first.size()) == -1) {
+						ok = false;
+
+						DOLOG(ll_debug, "https_thread: br_sslio_write_all failed\n");
+					}
+					else if (rc.value().second.empty() == false) {
+						ok = br_sslio_write_all(&ioc, rc.value().second.data(), rc.value().second.size()) == 0;
+
+						if (!ok)
+							DOLOG(ll_debug, "https_thread: br_sslio_write_all failed\n");
+					}
+				}
+				else {
+					ok = false;
+				}
+
+				break;
+			}
 		}
+
+		if (ok && hs->terminate == false) {
+			ts->set_is_terminating();
+
+			// this often ends in a busy loop in bearssl
+			br_sslio_close(&ioc);
+		}
+
+		ts->get_stream_target()->end_session(ts);
 	}
-
-	if (ok && hs->terminate == false) {
-		ts->set_is_terminating();
-
-		// this often ends in a busy loop in bearssl
-		br_sslio_close(&ioc);
+	catch(const std::runtime_error & error) {
+		DOLOG(ll_error, myformat("https: thread error \"%s\"", error.what()).c_str());
 	}
-
-	ts->get_stream_target()->end_session(ts);
+	catch(...) {
+		DOLOG(ll_error, "https: generic thread error");
+	}
 }
 
 bool http_new_session(pstream *const t, session *ts)
