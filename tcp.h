@@ -88,7 +88,7 @@ typedef struct {
 class tcp : public transport_layer, public pstream
 {
 private:
-	icmp  *const icmp_          { nullptr };
+	icmp        *const icmp_       { nullptr };
 
 	std::thread *th_unacked_sender { nullptr };
 	std::thread *th_cleaner        { nullptr };
@@ -96,11 +96,11 @@ private:
 	std::condition_variable_any   unacked_cv;
 
 	// listen port -> handler
-	std::shared_mutex listeners_lock;
+	std::shared_mutex             listeners_lock;
 	std::map<int, port_handler_t> listeners;
 
 	// client port -> session
-	std::map<int, uint64_t> tcp_clients;
+	std::map<int, uint64_t>       tcp_clients;
 
 	uint64_t *tcp_packets           { nullptr };
 	uint64_t *tcp_errors            { nullptr };

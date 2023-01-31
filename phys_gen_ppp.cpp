@@ -216,7 +216,7 @@ void phys_gen_ppp::handle_ccp(const std::vector<uint8_t> & data)
 			uint8_t type = data.at(options_offset++);
 			uint8_t len = data.at(options_offset++);
 
-			DOLOG(ll_debug, "CCP option: %02x of %d bytes %s\n", type, len, bin_to_text(data.data() + next_offset, len).c_str());
+			DOLOG(ll_debug, "CCP option: %02x of %d bytes %s\n", type, len, bin_to_text(data.data() + next_offset, len, false).c_str());
 
 			if (data.size() - next_offset < len) {
 				DOLOG(ll_debug, "len: %d, got: %zu\n", len, data.size() - options_offset);
@@ -264,7 +264,7 @@ void phys_gen_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 			uint8_t type = data.at(options_offset++);
 			uint8_t len = data.at(options_offset++);
 
-			DOLOG(ll_debug, "IPCP REQ option: %02x of %d bytes (%s)\n", type, len, bin_to_text(data.data() + next_offset, len).c_str());
+			DOLOG(ll_debug, "IPCP REQ option: %02x of %d bytes (%s)\n", type, len, bin_to_text(data.data() + next_offset, len, false).c_str());
 
 			if (data.size() - next_offset < len) {
 				DOLOG(ll_debug, "IPCP len: %d, got: %zu\n", len, data.size() - options_offset);
@@ -286,7 +286,7 @@ void phys_gen_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 			}
 			else {
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
-				DOLOG(ll_debug, "IPCP unknown option %02x: %s\n", type, bin_to_text(data.data() + next_offset, len).c_str());
+				DOLOG(ll_debug, "IPCP unknown option %02x: %s\n", type, bin_to_text(data.data() + next_offset, len, false).c_str());
 			}
 
 			options_offset = next_offset + len;
@@ -359,7 +359,7 @@ void phys_gen_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 			uint8_t type = data.at(options_offset++);
 			uint8_t len = data.at(options_offset++);
 
-			DOLOG(ll_debug, "IPCP REJ option: %02x of %d bytes (%s)\n", type, len, bin_to_text(data.data() + next_offset, len).c_str());
+			DOLOG(ll_debug, "IPCP REJ option: %02x of %d bytes (%s)\n", type, len, bin_to_text(data.data() + next_offset, len, false).c_str());
 
 			if (data.size() - next_offset < len) {
 				DOLOG(ll_debug, "IPCP len: %d, got: %zu\n", len, data.size() - options_offset);
@@ -370,7 +370,7 @@ void phys_gen_ppp::handle_ipcp(const std::vector<uint8_t> & data)
 		}
 	}
 	else {
-		DOLOG(ll_debug, "IPCP: unknown code %02x: %s\n", code, bin_to_text(data.data(), data.size()).c_str());
+		DOLOG(ll_debug, "IPCP: unknown code %02x: %s\n", code, bin_to_text(data.data(), data.size(), false).c_str());
 	}
 }
 
@@ -399,7 +399,7 @@ void phys_gen_ppp::handle_ipv6cp(const std::vector<uint8_t> & data)
 			uint8_t type = data.at(options_offset++);
 			uint8_t len = data.at(options_offset++);
 
-			DOLOG(ll_debug, "IPV6CP option: %02x of %d bytes (%s)\n", type, len, bin_to_text(data.data() + next_offset, len).c_str());
+			DOLOG(ll_debug, "IPV6CP option: %02x of %d bytes (%s)\n", type, len, bin_to_text(data.data() + next_offset, len, false).c_str());
 
 			if (data.size() - next_offset < len) {
 				DOLOG(ll_debug, "IPV6CP len: %d, got: %zu\n", len, data.size() - options_offset);
@@ -410,7 +410,7 @@ void phys_gen_ppp::handle_ipv6cp(const std::vector<uint8_t> & data)
 			}
 			else {
 				std::copy(data.begin() + next_offset, data.begin() + next_offset + len, std::back_inserter(rej));	
-				DOLOG(ll_debug, "IPV6CP unknown option %02x: %s\n", type, bin_to_text(data.data() + next_offset, len).c_str());
+				DOLOG(ll_debug, "IPV6CP unknown option %02x: %s\n", type, bin_to_text(data.data() + next_offset, len, false).c_str());
 			}
 
 			options_offset = next_offset + len;
@@ -460,7 +460,7 @@ void phys_gen_ppp::handle_lcp(const std::vector<uint8_t> & data)
 			uint8_t type = data.at(options_offset++);
 			uint8_t len = data.at(options_offset++);
 
-			DOLOG(ll_debug, "LCP option: %02x of %d bytes (%s)\n", type, len, bin_to_text(data.data() + next_offset, len).c_str());
+			DOLOG(ll_debug, "LCP option: %02x of %d bytes (%s)\n", type, len, bin_to_text(data.data() + next_offset, len, false).c_str());
 
 			if (data.size() - next_offset < len) {
 				DOLOG(ll_debug, "LCP len: %d, got: %zu\n", len, data.size() - options_offset);

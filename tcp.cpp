@@ -216,7 +216,7 @@ std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const s
 	auto cb_it = listeners.find(dst_port);
 
 	if (cb_it == listeners.end()) {
-		DOLOG(ll_info, "%s: no listener for that (%d) port\n", log_prefix.c_str(), dst_port);
+		DOLOG(ll_debug, "%s: no listener for that (%d) port\n", log_prefix.c_str(), dst_port);
 
 		return { };
 	}
@@ -583,7 +583,7 @@ void tcp::packet_handler(packet *const pkt)
 		// DOLOG(ll_debug, "%s: %s\n", pkt->get_log_prefix().c_str(), std::string((const char *)&p[header_size], data_len).c_str());
 
 		if (their_seq_nr == cur_session->their_seq_nr) {
-			// std::string content = bin_to_text(data_start, data_len);
+			// std::string content = bin_to_text(data_start, data_len, false);
 			// DOLOG(ll_debug, "%s: Received content: %s\n", pkt->get_log_prefix().c_str(), content.c_str());
 
 			auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
@@ -682,14 +682,14 @@ void tcp::packet_handler(packet *const pkt)
 	lck.unlock();
 
 	if (delete_entry) {
-		DOLOG(ll_info, "%s: cleaning up session\n", pkt->get_log_prefix().c_str());
+		DOLOG(ll_debug, "%s: cleaning up session\n", pkt->get_log_prefix().c_str());
 
 		lck.lock();
 
 		cur_it = sessions.find(id);
 
 		if (cur_it != sessions.end()) {
-			tcp_session *pointer = dynamic_cast<tcp_session *>(cur_it->second);
+			tcp_session *session_pointer = dynamic_cast<tcp_session *>(cur_it->second);
 
 			sessions.erase(cur_it);
 			stats_set(tcp_cur_n_sessions, sessions.size());
@@ -697,19 +697,19 @@ void tcp::packet_handler(packet *const pkt)
 			lck.unlock();
 
 			// call session_closed_2
-			int close_port       = pointer->get_my_port();
+			int close_port       = session_pointer->get_my_port();
 
 			auto cb_org          = get_lock_listener(close_port, pkt->get_log_prefix(), false);
 
 			if (cb_org.has_value())  // is session initiated here?
-				cb_org.value().session_closed_2(this, pointer);
+				cb_org.value().session_closed_2(this, session_pointer);
 			else
 				DOLOG(ll_info, "%s: port %d not known\n", pkt->get_log_prefix().c_str(), close_port);
 
 			release_listener_lock(false);
 
 			// clean-up
-			free_tcp_session(pointer);
+			free_tcp_session(session_pointer);
 		}
 		else {
 			lck.unlock();

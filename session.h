@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "any_addr.h"
+#include "str.h"
 #include "types.h"
 
 
@@ -45,6 +46,8 @@ public:
 	const uint16_t get_my_port() const;
 
 	uint64_t get_hash() const;
+
+	std::string to_str() { return myformat("%s:%d <- [%lu] -> %s:%d", get_my_addr().to_str().c_str(), get_my_port(), get_their_addr().to_str().c_str(), get_their_port()); }
 
 	static uint64_t get_hash(const any_addr & their_addr, const uint16_t their_port, const uint16_t my_port);
 
