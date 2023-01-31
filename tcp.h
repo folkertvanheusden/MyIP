@@ -29,8 +29,6 @@ typedef enum { tcp_closed, tcp_listen, tcp_syn_rcvd, tcp_syn_sent, tcp_establish
 class tcp_session : public session
 {
 public:
-	std::mutex tlock;
-
 	bool is_client       { false };
 
 	uint64_t id          { 0 };

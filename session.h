@@ -27,14 +27,14 @@ protected:
 
 	timespec       session_created { 0 };
 
-	std::mutex     session_lock;
-
 	std::atomic_bool is_terminating { false };
 
 	session(pstream *const t, const any_addr & my_addr, const int my_port, const any_addr & their_addr, const int their_port, private_data *const application_private_data);
 
 public:
 	virtual ~session();
+
+	std::mutex     session_lock;
 
 	// the names of the following 4 methods assume a server situation
 	const any_addr get_their_addr() const;
