@@ -337,152 +337,266 @@ void tcp::packet_handler(packet *const pkt)
 		return;
 	}
 
-	std::unique_lock<std::shared_mutex> lck(sessions_lock);
+	{
+		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
-	// check concuncurrent session count
-	if (sessions.size() >= 128) {
-		DOLOG(ll_debug, "%s: too many TCP sessions (%zu)\n", pkt->get_log_prefix().c_str(), sessions.size());
-		// drop packet
-		delete pkt;
-		return;
-	}
-
-	auto cur_it = sessions.find(id);
-
-	if (cur_it == sessions.end()) {
-		if (flag_syn) {  // MUST start with SYN
-			private_data *pd          = port_record.value().pd;
-
-			tcp_session  *new_session = new tcp_session(this, pkt->get_dst_addr(), dst_port, pkt->get_src_addr(), src_port, pd);
-
-			new_session->state        = tcp_listen;
-			new_session->state_since  = 0;
-
-			get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
-			new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
-
-			new_session->initial_their_seq_nr = their_seq_nr;
-			new_session->their_seq_nr         = their_seq_nr + 1;
-
-			new_session->id           = id;
-
-			new_session->is_client    = false;
-
-			new_session->unacked      = nullptr;
-			new_session->unacked_start_seq_nr    = 0;
-			new_session->unacked_size = 0;
-			new_session->fin_after_unacked_empty = false;
-
-			new_session->window_size  = win_size;
-
-			sessions.insert({ id, new_session });
-
-			stats_set(tcp_cur_n_sessions, sessions.size());
-
-			stats_inc_counter(tcp_new_sessions);
-
-			DOLOG(ll_debug, "%s: ...is a new session (initial my seq nr: %u, their: %u)\n", pkt->get_log_prefix().c_str(), new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
-
-			cur_it = sessions.find(id);
-		}
-		else {
-			lck.unlock();
-			DOLOG(ll_debug, "%s: new session which does not start with SYN [IC]\n", pkt->get_log_prefix().c_str());
+		// check concuncurrent session count
+		if (sessions.size() >= 128) {
+			DOLOG(ll_debug, "%s: too many TCP sessions (%zu)\n", pkt->get_log_prefix().c_str(), sessions.size());
+			// drop packet
 			delete pkt;
-			stats_inc_counter(tcp_errors);
 			return;
 		}
-	}
 
-	// process extra headers
-	const uint8_t *cur_extra_headers_p = &p[20];
-	const uint8_t *const extra_headers_end = &p[header_size];
+		auto cur_it = sessions.find(id);
 
-	uint32_t TSecr = 0;  // TSecr that will be returned if ACK flag is set
+		if (cur_it == sessions.end()) {
+			if (flag_syn) {  // MUST start with SYN
+				private_data *pd          = port_record.value().pd;
 
-	while(extra_headers_end - cur_extra_headers_p >= 2) {
-		if (cur_extra_headers_p[0] == 8 && flag_ack) {
-			TSecr = (cur_extra_headers_p[2] << 24) | (cur_extra_headers_p[3] << 16) | (cur_extra_headers_p[4] << 8) | cur_extra_headers_p[5];
+				tcp_session  *new_session = new tcp_session(this, pkt->get_dst_addr(), dst_port, pkt->get_src_addr(), src_port, pd);
 
-			DOLOG(ll_debug, "%s: will set TSecr to %08x\n", pkt->get_log_prefix().c_str(), TSecr);
+				new_session->state        = tcp_listen;
+				new_session->state_since  = 0;
+
+				get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
+				new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
+
+				new_session->initial_their_seq_nr = their_seq_nr;
+				new_session->their_seq_nr         = their_seq_nr + 1;
+
+				new_session->id           = id;
+
+				new_session->is_client    = false;
+
+				new_session->unacked      = nullptr;
+				new_session->unacked_start_seq_nr    = 0;
+				new_session->unacked_size = 0;
+				new_session->fin_after_unacked_empty = false;
+
+				new_session->window_size  = win_size;
+
+				sessions.insert({ id, new_session });
+
+				stats_set(tcp_cur_n_sessions, sessions.size());
+
+				stats_inc_counter(tcp_new_sessions);
+
+				DOLOG(ll_debug, "%s: ...is a new session (initial my seq nr: %u, their: %u)\n", pkt->get_log_prefix().c_str(), new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
+			}
+			else {
+				lck.unlock();
+				DOLOG(ll_debug, "%s: new session which does not start with SYN [IC]\n", pkt->get_log_prefix().c_str());
+				delete pkt;
+				stats_inc_counter(tcp_errors);
+				return;
+			}
 		}
-
-		if (cur_extra_headers_p[0] == 0 || cur_extra_headers_p[0] == 1) // 1-byte?
-			cur_extra_headers_p++;
-		else
-			cur_extra_headers_p += cur_extra_headers_p[1];
 	}
 
-	tcp_session *const cur_session = dynamic_cast<tcp_session *>(cur_it->second);
-
-	cur_session->e_last_pkt_ts = get_us();
-
-	DOLOG(ll_debug, "%s: start processing TCP segment, state: %s, my seq nr %d, opponent seq nr %d\n", pkt->get_log_prefix().c_str(), states[cur_session->state], rel_seqnr(cur_session, true, cur_session->my_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
-	cur_session->tlock.lock();
-
-	cur_session->window_size = std::max(1, win_size);
-
-	bool fail         = false;
 	bool delete_entry = false;
 
-	if (header_size > size) {
-		DOLOG(ll_info, "%s: header with options > packet size [F]\n", pkt->get_log_prefix().c_str());
-		fail = true;
-	}
+	{
+		std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
-	if (!fail) {
-		if (flag_rst) {
-			if (cur_session->state >= tcp_syn_rcvd) {
-				DOLOG(ll_debug, "%s: received RST: session setup aborted\n", pkt->get_log_prefix().c_str());
-				set_state(cur_session, tcp_closing);
+		auto cur_it = sessions.find(id);
+
+		// process extra headers
+		const uint8_t *cur_extra_headers_p     = &p[20];
+		const uint8_t *const extra_headers_end = &p[header_size];
+
+		uint32_t TSecr = 0;  // TSecr that will be returned if ACK flag is set
+
+		while(extra_headers_end - cur_extra_headers_p >= 2) {
+			if (cur_extra_headers_p[0] == 8 && flag_ack) {
+				TSecr = (cur_extra_headers_p[2] << 24) | (cur_extra_headers_p[3] << 16) | (cur_extra_headers_p[4] << 8) | cur_extra_headers_p[5];
+
+				DOLOG(ll_debug, "%s: will set TSecr to %08x\n", pkt->get_log_prefix().c_str(), TSecr);
+			}
+
+			if (cur_extra_headers_p[0] == 0 || cur_extra_headers_p[0] == 1) // 1-byte?
+				cur_extra_headers_p++;
+			else
+				cur_extra_headers_p += cur_extra_headers_p[1];
+		}
+
+		tcp_session *const cur_session = dynamic_cast<tcp_session *>(cur_it->second);
+
+		cur_session->e_last_pkt_ts = get_us();
+
+		DOLOG(ll_debug, "%s: start processing TCP segment, state: %s, my seq nr %d, opponent seq nr %d\n", pkt->get_log_prefix().c_str(), states[cur_session->state], rel_seqnr(cur_session, true, cur_session->my_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
+		cur_session->tlock.lock();
+
+		cur_session->window_size = std::max(1, win_size);
+
+		bool fail = false;
+
+		if (header_size > size) {
+			DOLOG(ll_info, "%s: header with options > packet size [F]\n", pkt->get_log_prefix().c_str());
+			fail = true;
+		}
+
+		if (!fail) {
+			if (flag_rst) {
+				if (cur_session->state >= tcp_syn_rcvd) {
+					DOLOG(ll_debug, "%s: received RST: session setup aborted\n", pkt->get_log_prefix().c_str());
+					set_state(cur_session, tcp_closing);
+					delete_entry = true;
+				}		
+				else {
+					DOLOG(ll_debug, "%s: unexpected RST\n", pkt->get_log_prefix().c_str());
+				}
+			}
+
+			if (flag_syn && !delete_entry) {
+				stats_inc_counter(tcp_syn);
+
+				// tcp_syn_rcvd: opponent may not have received the syn,ack reply
+				if (cur_session->state == tcp_listen || cur_session->state == tcp_syn_rcvd) {
+					DOLOG(ll_debug, "%s: received SYN, send SYN + ACK\n", pkt->get_log_prefix().c_str());
+					// send SYN + ACK
+					send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_SYN | FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+
+					set_state(cur_session, tcp_syn_rcvd);
+				}
+				else if (cur_session->state != tcp_syn_sent) { // not a client?
+					DOLOG(ll_debug, "%s: unexpected SYN\n", pkt->get_log_prefix().c_str());
+				}
+			}
+
+			if (flag_ack && !delete_entry) {
+				if (cur_session->state == tcp_syn_sent) { // new session from a client
+					cur_session->initial_their_seq_nr = their_seq_nr;
+					cur_session->their_seq_nr = their_seq_nr + 1;
+
+					DOLOG(ll_debug, "%s: received ACK%s: session established, their seq: %u, my seq: %u\n", pkt->get_log_prefix().c_str(), flag_syn ? " and SYN" : "", cur_session->their_seq_nr, cur_session->my_seq_nr);
+
+					send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+
+	//				cur_session->my_seq_nr += 1;
+
+					set_state(cur_session, tcp_established);
+				}
+				// listener (server)
+				else if (cur_session->state == tcp_syn_rcvd) {
+					DOLOG(ll_debug, "%s: received ACK: session is established\n", pkt->get_log_prefix().c_str());
+					set_state(cur_session, tcp_established);
+
+					stats_inc_counter(tcp_succ_estab);
+
+					auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
+
+					if (cb.has_value()) {
+						if (cb.value().new_session && cb.value().new_session(this, cur_session) == false) {
+							DOLOG(ll_debug, "%s: session terminated by layer 7\n", pkt->get_log_prefix().c_str());
+							fail = true;
+						}
+					}
+					else {
+						fail = true;
+					}
+
+					release_listener_lock(false);
+				}
+				else if (cur_session->state == tcp_last_ack) {
+					DOLOG(ll_debug, "%s: received ACK: session is finished\n", pkt->get_log_prefix().c_str());
+					set_state(cur_session, tcp_listen);  // tcp_closed really
+					delete_entry = true;
+				}
+				// opponent acknowledges the reception of a bit of data
+				else if (cur_session->state == tcp_established) {
+					int ack_n = ack_to - cur_session->unacked_start_seq_nr;
+
+					if (ack_n > 0 && cur_session->unacked_size > 0) {
+						DOLOG(ll_debug, "%s: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", pkt->get_log_prefix().c_str(), rel_seqnr(cur_session, true, ack_to), rel_seqnr(cur_session, true, cur_session->my_seq_nr), ack_n, cur_session->unacked_size);
+
+						// delete acked
+						int left_n = cur_session->unacked_size - ack_n;
+						if (left_n > 0)
+							memmove(&cur_session->unacked[0], &cur_session->unacked[ack_n], left_n);
+						else if (left_n < 0) {
+							DOLOG(ll_warning, "%s: ack underrun? %d\n", pkt->get_log_prefix().c_str(), left_n);
+							// terminate this invalid session
+							// can happen for data coming in after finished
+							delete_entry = fail = true;
+						}
+
+						cur_session->unacked_size -= ack_n;
+						cur_session->unacked_start_seq_nr += ack_n;
+
+						DOLOG(ll_debug, "%s: unacked left: %zu, fin after empty: %d\n", pkt->get_log_prefix().c_str(), cur_session->unacked_size, cur_session->fin_after_unacked_empty);
+
+						cur_session->my_seq_nr += ack_n;
+
+						if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
+							DOLOG(ll_debug, "%s: unacked buffer empy, FIN\n", pkt->get_log_prefix().c_str());
+
+							send_segment(cur_session, cur_session->id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+
+							set_state(cur_session, tcp_fin_wait_1);
+						}
+
+						if (cur_session->unacked_size > 0)
+							cur_session->r_last_pkt_ts = cur_session->e_last_pkt_ts;
+					}
+
+					unacked_cv.notify_all();
+				}
+				else {
+					DOLOG(ll_debug, "%s: unexpected ACK\n", pkt->get_log_prefix().c_str());
+				}
+
+				cur_session->data_since_last_ack = 0;
+			}
+
+			if (flag_fin) {
+				if (cur_session->state == tcp_established) {
+					DOLOG(ll_debug, "%s: received FIN\n", pkt->get_log_prefix().c_str());
+
+					DOLOG(ll_debug, "%s: cur_session->their_seq_nr %ld, their: %ld\n", pkt->get_log_prefix().c_str(), cur_session->their_seq_nr, their_seq_nr);
+
+					cur_session->seq_for_fin_when_all_received = their_seq_nr;
+					cur_session->flag_fin_when_all_received    = true;
+
+					cur_session->set_is_terminating();
+
+					set_state(cur_session, tcp_fin_wait_1);
+				}
+				else {
+					DOLOG(ll_debug, "%s: unexpected FIN\n", pkt->get_log_prefix().c_str());
+				}
+			}
+
+			if (cur_session->flag_fin_when_all_received && cur_session->seq_for_fin_when_all_received == cur_session->their_seq_nr) {
+				DOLOG(ll_debug, "%s: ack FIN after all data has been received\n", pkt->get_log_prefix().c_str());
+
+				// send ACK + FIN
+				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+
+				set_state(cur_session, tcp_fin_wait_2);
+
 				delete_entry = true;
-			}		
-			else {
-				DOLOG(ll_debug, "%s: unexpected RST\n", pkt->get_log_prefix().c_str());
 			}
 		}
 
-		if (flag_syn && !delete_entry) {
-			stats_inc_counter(tcp_syn);
+		// process payload
+		int data_len = size - header_size;
+		if (data_len > 0 && fail == false) {
+			DOLOG(ll_debug, "%s: packet len %d, header size: %d, payload size: %d\n", pkt->get_log_prefix().c_str(), size, header_size, data_len);
 
-			// tcp_syn_rcvd: opponent may not have received the syn,ack reply
-			if (cur_session->state == tcp_listen || cur_session->state == tcp_syn_rcvd) {
-				DOLOG(ll_debug, "%s: received SYN, send SYN + ACK\n", pkt->get_log_prefix().c_str());
-				// send SYN + ACK
-				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_SYN | FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+			const uint8_t *data_start = &p[header_size];
 
-				set_state(cur_session, tcp_syn_rcvd);
-			}
-			else if (cur_session->state != tcp_syn_sent) { // not a client?
-				DOLOG(ll_debug, "%s: unexpected SYN\n", pkt->get_log_prefix().c_str());
-			}
-		}
+			// DOLOG(ll_debug, "%s: %s\n", pkt->get_log_prefix().c_str(), std::string((const char *)&p[header_size], data_len).c_str());
 
-		if (flag_ack && !delete_entry) {
-			if (cur_session->state == tcp_syn_sent) { // new session from a client
-				cur_session->initial_their_seq_nr = their_seq_nr;
-				cur_session->their_seq_nr = their_seq_nr + 1;
-
-				DOLOG(ll_debug, "%s: received ACK%s: session established, their seq: %u, my seq: %u\n", pkt->get_log_prefix().c_str(), flag_syn ? " and SYN" : "", cur_session->their_seq_nr, cur_session->my_seq_nr);
-
-				send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
-
-//				cur_session->my_seq_nr += 1;
-
-				set_state(cur_session, tcp_established);
-			}
-			// listener (server)
-			else if (cur_session->state == tcp_syn_rcvd) {
-				DOLOG(ll_debug, "%s: received ACK: session is established\n", pkt->get_log_prefix().c_str());
-				set_state(cur_session, tcp_established);
-
-				stats_inc_counter(tcp_succ_estab);
+			if (their_seq_nr == cur_session->their_seq_nr) {
+				// std::string content = bin_to_text(data_start, data_len, false);
+				// DOLOG(ll_debug, "%s: Received content: %s\n", pkt->get_log_prefix().c_str(), content.c_str());
 
 				auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
 
 				if (cb.has_value()) {
-					if (cb.value().new_session && cb.value().new_session(this, cur_session) == false) {
-						DOLOG(ll_debug, "%s: session terminated by layer 7\n", pkt->get_log_prefix().c_str());
+					if (cb.value().new_data(this, cur_session, buffer_in(data_start, data_len)) == false) {
+						DOLOG(ll_error, "%s: layer 7 indicated an error\n", pkt->get_log_prefix().c_str());
 						fail = true;
 					}
 				}
@@ -491,202 +605,93 @@ void tcp::packet_handler(packet *const pkt)
 				}
 
 				release_listener_lock(false);
-			}
-			else if (cur_session->state == tcp_last_ack) {
-				DOLOG(ll_debug, "%s: received ACK: session is finished\n", pkt->get_log_prefix().c_str());
-				set_state(cur_session, tcp_listen);  // tcp_closed really
-				delete_entry = true;
-			}
-			// opponent acknowledges the reception of a bit of data
-			else if (cur_session->state == tcp_established) {
-				int ack_n = ack_to - cur_session->unacked_start_seq_nr;
 
-				if (ack_n > 0 && cur_session->unacked_size > 0) {
-					DOLOG(ll_debug, "%s: ack to: %u (last seq nr %u), size: %d), unacked currently: %zu\n", pkt->get_log_prefix().c_str(), rel_seqnr(cur_session, true, ack_to), rel_seqnr(cur_session, true, cur_session->my_seq_nr), ack_n, cur_session->unacked_size);
+				if (fail == false) {
+					cur_session->their_seq_nr += data_len;  // TODO handle missing segments
 
-					// delete acked
-					int left_n = cur_session->unacked_size - ack_n;
-					if (left_n > 0)
-						memmove(&cur_session->unacked[0], &cur_session->unacked[ack_n], left_n);
-					else if (left_n < 0) {
-						DOLOG(ll_warning, "%s: ack underrun? %d\n", pkt->get_log_prefix().c_str(), left_n);
-						// terminate this invalid session
-						// can happen for data coming in after finished
-						delete_entry = fail = true;
+					for(;;) {
+						auto it = cur_session->fragments.find(cur_session->their_seq_nr);
+						if (it == cur_session->fragments.end())
+							break;
+
+						DOLOG(ll_debug, "%s: use from fragment cache\n", pkt->get_log_prefix().c_str());
+
+						auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
+
+						if (cb.value().new_data(this, cur_session, buffer_in(it->second.data(), it->second.size())) == false) {
+							DOLOG(ll_error, "%s: layer 7 indicated an error\n", pkt->get_log_prefix().c_str());
+							fail = true;
+						}
+
+						release_listener_lock(false);
+
+						cur_session->their_seq_nr += it->second.size();
+
+						cur_session->fragments.erase(it);
+
+						if (fail)
+							break;
 					}
-
-					cur_session->unacked_size -= ack_n;
-					cur_session->unacked_start_seq_nr += ack_n;
-
-					DOLOG(ll_debug, "%s: unacked left: %zu, fin after empty: %d\n", pkt->get_log_prefix().c_str(), cur_session->unacked_size, cur_session->fin_after_unacked_empty);
-
-					cur_session->my_seq_nr += ack_n;
-
-					if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
-						DOLOG(ll_debug, "%s: unacked buffer empy, FIN\n", pkt->get_log_prefix().c_str());
-
-						send_segment(cur_session, cur_session->id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
-
-						set_state(cur_session, tcp_fin_wait_1);
-					}
-
-					if (cur_session->unacked_size > 0)
-						cur_session->r_last_pkt_ts = cur_session->e_last_pkt_ts;
 				}
 
-				unacked_cv.notify_all();
+				if (fail == false) {
+					// will be acked in the 'unacked_sender'-thread
+					if (cur_session->unacked_size == 0) {
+						DOLOG(ll_debug, "%s: acknowledging received content\n", pkt->get_log_prefix().c_str());
+
+						send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+					}
+				}
 			}
 			else {
-				DOLOG(ll_debug, "%s: unexpected ACK\n", pkt->get_log_prefix().c_str());
+				DOLOG(ll_info, "%s: unexpected sequence nr %u, expected: %u\n", pkt->get_log_prefix().c_str(), rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
+
+				if (their_seq_nr > cur_session->their_seq_nr) {
+					std::vector<uint8_t> fragment(data_start, data_start + data_len);
+
+					cur_session->fragments.insert({ their_seq_nr, std::move(fragment) });
+
+					DOLOG(ll_info, "%s: number of fragments in cache: %zu\n", pkt->get_log_prefix().c_str(), cur_session->fragments.size());
+				}
+
+				const uint32_t ack_to = cur_session->their_seq_nr;
+
+				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 			}
 
-			cur_session->data_since_last_ack = 0;
+			unacked_cv.notify_all();
 		}
 
-		if (flag_fin) {
-			if (cur_session->state == tcp_established) {
-				DOLOG(ll_debug, "%s: received FIN\n", pkt->get_log_prefix().c_str());
-
-				DOLOG(ll_debug, "%s: cur_session->their_seq_nr %ld, their: %ld\n", pkt->get_log_prefix().c_str(), cur_session->their_seq_nr, their_seq_nr);
-
-				cur_session->seq_for_fin_when_all_received = their_seq_nr;
-				cur_session->flag_fin_when_all_received    = true;
-
-				cur_session->set_is_terminating();
-
-				set_state(cur_session, tcp_fin_wait_1);
-			}
-			else {
-				DOLOG(ll_debug, "%s: unexpected FIN\n", pkt->get_log_prefix().c_str());
-			}
-		}
-
-		if (cur_session->flag_fin_when_all_received && cur_session->seq_for_fin_when_all_received == cur_session->their_seq_nr) {
-			DOLOG(ll_debug, "%s: ack FIN after all data has been received\n", pkt->get_log_prefix().c_str());
-
-			// send ACK + FIN
-			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN, cur_session->their_seq_nr + 1, &cur_session->my_seq_nr, nullptr, 0, TSecr);
-
-			set_state(cur_session, tcp_fin_wait_2);
-
-			delete_entry = true;
-		}
-	}
-
-	// process payload
-	int data_len = size - header_size;
-	if (data_len > 0 && fail == false) {
-		DOLOG(ll_debug, "%s: packet len %d, header size: %d, payload size: %d\n", pkt->get_log_prefix().c_str(), size, header_size, data_len);
-
-		const uint8_t *data_start = &p[header_size];
-
-		// DOLOG(ll_debug, "%s: %s\n", pkt->get_log_prefix().c_str(), std::string((const char *)&p[header_size], data_len).c_str());
-
-		if (their_seq_nr == cur_session->their_seq_nr) {
-			// std::string content = bin_to_text(data_start, data_len, false);
-			// DOLOG(ll_debug, "%s: Received content: %s\n", pkt->get_log_prefix().c_str(), content.c_str());
-
+		if (fail) {
 			auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
 
-			if (cb.has_value()) {
-				if (cb.value().new_data(this, cur_session, buffer_in(data_start, data_len)) == false) {
-					DOLOG(ll_error, "%s: layer 7 indicated an error\n", pkt->get_log_prefix().c_str());
-					fail = true;
-				}
-			}
-			else {
-				fail = true;
-			}
+			if (cb.has_value())
+				cb.value().session_closed_1(this, cur_session);
 
 			release_listener_lock(false);
 
-			if (fail == false) {
-				cur_session->their_seq_nr += data_len;  // TODO handle missing segments
+			stats_inc_counter(tcp_errors);
 
-				for(;;) {
-					auto it = cur_session->fragments.find(cur_session->their_seq_nr);
-					if (it == cur_session->fragments.end())
-						break;
+			cur_session->unacked_sent_cv.notify_all();
 
-					DOLOG(ll_debug, "%s: use from fragment cache\n", pkt->get_log_prefix().c_str());
+			delete_entry = true;
 
-					auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
-
-					if (cb.value().new_data(this, cur_session, buffer_in(it->second.data(), it->second.size())) == false) {
-						DOLOG(ll_error, "%s: layer 7 indicated an error\n", pkt->get_log_prefix().c_str());
-						fail = true;
-					}
-
-					release_listener_lock(false);
-
-					cur_session->their_seq_nr += it->second.size();
-
-					cur_session->fragments.erase(it);
-
-					if (fail)
-						break;
-				}
-			}
-
-			if (fail == false) {
-				// will be acked in the 'unacked_sender'-thread
-				if (cur_session->unacked_size == 0) {
-					DOLOG(ll_debug, "%s: acknowledging received content\n", pkt->get_log_prefix().c_str());
-
-					send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
-				}
-			}
-		}
-		else {
-			DOLOG(ll_info, "%s: unexpected sequence nr %u, expected: %u\n", pkt->get_log_prefix().c_str(), rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
-
-			if (their_seq_nr > cur_session->their_seq_nr) {
-				std::vector<uint8_t> fragment(data_start, data_start + data_len);
-
-				cur_session->fragments.insert({ their_seq_nr, std::move(fragment) });
-
-				DOLOG(ll_info, "%s: number of fragments in cache: %zu\n", pkt->get_log_prefix().c_str(), cur_session->fragments.size());
-			}
-
-			const uint32_t ack_to = cur_session->their_seq_nr;
-
-			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
+			DOLOG(ll_info, "%s: sending fail packet [IC]\n", pkt->get_log_prefix().c_str());
+			send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0, TSecr);
 		}
 
-		unacked_cv.notify_all();
+		if (delete_entry)
+			cur_session->set_is_terminating();
+
+		cur_session->tlock.unlock();
 	}
-
-	if (fail) {
-		auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
-
-		if (cb.has_value())
-			cb.value().session_closed_1(this, cur_session);
-
-		release_listener_lock(false);
-
-		stats_inc_counter(tcp_errors);
-
-		cur_session->unacked_sent_cv.notify_all();
-
-		delete_entry = true;
-
-		DOLOG(ll_info, "%s: sending fail packet [IC]\n", pkt->get_log_prefix().c_str());
-		send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_RST | FLAG_ACK, their_seq_nr + 1, nullptr, nullptr, 0, TSecr);
-	}
-
-	if (delete_entry)
-		cur_session->set_is_terminating();
-
-	cur_session->tlock.unlock();
-
-	lck.unlock();
 
 	if (delete_entry) {
 		DOLOG(ll_debug, "%s: cleaning up session\n", pkt->get_log_prefix().c_str());
 
-		lck.lock();
+		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
-		cur_it = sessions.find(id);
+		auto cur_it = sessions.find(id);
 
 		if (cur_it != sessions.end()) {
 			tcp_session *session_pointer = dynamic_cast<tcp_session *>(cur_it->second);
@@ -710,9 +715,6 @@ void tcp::packet_handler(packet *const pkt)
 
 			// clean-up
 			free_tcp_session(session_pointer);
-		}
-		else {
-			lck.unlock();
 		}
 
 		stats_inc_counter(tcp_sessions_rem);
