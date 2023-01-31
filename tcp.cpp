@@ -813,7 +813,7 @@ void tcp::unacked_sender()
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
-		std::unique_lock<std::shared_mutex> lck(sessions_lock);
+		std::shared_lock<std::shared_mutex> lck(sessions_lock);
 		if (unacked_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
 			DOLOG(ll_debug, "TCP[] unack woke-up after ack\n");
 
@@ -854,8 +854,6 @@ void tcp::unacked_sender()
 				s->r_last_pkt_ts = 0;
 			}
 		}
-
-		lck.unlock();
 	}
 }
 
@@ -1027,7 +1025,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 void tcp::close_client_session(const int port)
 {
 	// lock all sessions
-	std::unique_lock<std::shared_mutex> lck(sessions_lock);
+	std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 	// find id of the session
 	auto it_id = tcp_clients.find(port);
@@ -1055,7 +1053,7 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 		DOLOG(ll_debug, "wait_for_client_connected_state: lock all sessions\n");
 
 		// lock all sessions
-		std::unique_lock<std::shared_mutex> lck(sessions_lock);
+		std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 		DOLOG(ll_debug, "wait_for_client_connected_state: find session id for %d\n", local_port);
 
@@ -1113,7 +1111,7 @@ bool tcp::client_session_send_data(const int local_port, const uint8_t *const da
 	DOLOG(ll_debug, "client_session_send_data: lock all sessions\n");
 
 	// lock all sessions
-	std::unique_lock<std::shared_mutex> lck(sessions_lock);
+	std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 	DOLOG(ll_debug, "client_session_send_data: find session id for %d\n", local_port);
 
