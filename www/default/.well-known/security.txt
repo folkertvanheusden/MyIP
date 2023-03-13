@@ -1,5 +1,25 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
 Contact: mailto:mail@vanheusden.com
 Contact: mailto:folkert.mobiel@gmail.com
+Contact: mailto:info@hackerspace-gouda.nl
 Expires: 2036-12-31T23:00:00.000Z
-Encryption: https://vanheusden.com/key.txt
+Encryption: https://hackerspace-gouda.nl/key.txt
 Preferred-Languages: en
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEERCU/j0MkBSbBnbCTa2RV7f7tO9EFAmQPjn8ACgkQa2RV7f7t
+O9H1og/8DwXwz3/yK6OgmD8dgH71FUxMfHFO90m0qTaqcb5gqvJvmvJpKBHdbHvb
+svXfmID7CbeMM0LtjSbygyrtQozdOjPT6goh6t8E3EnGefzgo9I9hWPl9w2edfat
+Cev924r7wl9DW0SiFppLgDp/7dpDBgi8teaYO98lca+i4IMGGQ8534kEk8Eamnpf
+uY20NzU82Yv9vHKWS653001Wq52IW15IZeHnNeuV2wuoQdFCcX9L0jUTq57UeZBD
+iJ5WrCtSSv9MPYkqYOSp0kqX+j6wY5H4FQz7bY+lh8qoMTFzKj/iIAipf9XQJiO5
+f6WtfoAizw7lXHItIOzADpS/Erm8/dpxew1Gj+r/eWaFu8tjtK3TgZeaQl/5mI8M
+bTcNgle5g20GBGizZcO7dOx0tXo+qSucIMw6CT+TxovkXoq90gHjT8cuKG2TAvgT
+p2ErHK/4QiNjqaij7a/sJrzw/4x9Gw+eXvanUykP0i5QNe1mpCMzvT5fX/pUJGc2
+v1/kn2RidDvBVbs3ZpZXGEGa1DUJemDUWKhlsGob9f4wWWyXI431W+1eCFojQx1N
+hvpbazrmFFm0PKw8GPwbmErbFovDxT3psg6lKdksL3Kinz3EjuRnuj3Dr3g07FfF
+BPMmKLxcwNKdgP3tP8UBNaAm1XJKy7J6fRf8BUHQwspkt/pKSSc=
+=pOQ0
+-----END PGP SIGNATURE-----
