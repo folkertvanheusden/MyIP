@@ -23,7 +23,12 @@ static bool mqtt_new_data(pstream *const ps, session *const s, buffer_in data)
 
 static bool mqtt_session_closed_2(pstream *const ps, session *const s)
 {
-	mqtt_client_session_data *t_s = dynamic_cast<mqtt_client_session_data *>(s->get_callback_private_data());
+	auto private_data = s->get_callback_private_data();
+
+	if (!private_data)
+		return true;
+
+	mqtt_client_session_data *t_s = dynamic_cast<mqtt_client_session_data *>(private_data);
 
 	t_s->mc->close_session();
 
