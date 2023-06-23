@@ -544,7 +544,7 @@ void tcp::packet_handler(packet *const pkt)
 						}
 
 						if (cur_session->unacked_size > 0)
-							cur_session->r_last_pkt_ts = cur_session->e_last_pkt_ts;
+							cur_session->r_last_pkt_ts = 0;  // force send asap
 					}
 
 					unacked_cv.notify_all();
@@ -850,7 +850,7 @@ void tcp::unacked_sender()
 				if (notify)
 					s->unacked_sent_cv.notify_one();
 
-				s->r_last_pkt_ts = 0;
+				s->r_last_pkt_ts = now;
 			}
 		}
 	}
