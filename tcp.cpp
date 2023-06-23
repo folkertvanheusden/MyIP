@@ -753,7 +753,7 @@ void tcp::session_cleaner()
 
 			uint64_t age = (now - s->e_last_pkt_ts) / 1000000;
 
-			if (age >= session_timeout || s->state > tcp_established) {
+			if (age >= session_timeout || s->state >= tcp_established) {
 				if (s->state > tcp_established)
 					DOLOG(ll_debug, "%s: session closed (state: %s)\n", log_prefix.c_str(), states[s->state]);
 				else
