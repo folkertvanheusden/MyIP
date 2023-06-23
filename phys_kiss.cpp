@@ -189,8 +189,6 @@ void phys_kiss::operator()()
 
 				DOLOG(ll_error, "failed reading from device");
 
-				free(p);
-
 				break;
 			}
 

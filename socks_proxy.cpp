@@ -218,7 +218,10 @@ static void socks_handler(const int fd, tcp *const t, dns *const dns_)
 			break;
 		}
 
-		t->client_session_send_data(src_port, buffer, n);
+		if (t->client_session_send_data(src_port, buffer, n) == false) {
+			DOLOG(ll_debug, "socks_handler: client_session_send_data failed\n");
+			break;
+		}
 	}
 
 	t->close_client_session(src_port);
