@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <optional>
 #include <signal.h>
+#include <stdexcept>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
