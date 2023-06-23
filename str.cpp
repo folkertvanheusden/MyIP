@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <optional>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string>
 #include <vector>
