@@ -100,7 +100,7 @@ static std::map<std::string, int> get_channel_list()
 {
 	std::map<std::string, int> channels;
 
-	for(auto nick : nicknames) {
+	for(auto & nick : nicknames) {
 		for(auto ch : nick.second.channels) {
 			auto it = channels.find(ch);
 

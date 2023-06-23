@@ -198,10 +198,8 @@ bool snmp::process_BER(const uint8_t *p, const size_t len, oid_req_t *const oids
 			pnt += length;
 		}
 		else if (type == 0x04) {  // octet string
-			std::string v((const char *)pnt, length);
-
 			if (is_top && first_octet_str)
-				oids_req->community = v;
+				oids_req->community = std::string(reinterpret_cast<const char *>(pnt), length);
 
 			first_octet_str = false;
 

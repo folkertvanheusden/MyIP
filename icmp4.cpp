@@ -74,6 +74,7 @@ void icmp4::operator()()
 		else {
 			DOLOG(ll_debug, "ICMP: dropping packet (type %d code %d)\n", p[0], p[1]);
 			delete pkt;
+			delete [] reply;
 			continue;
 		}
 
