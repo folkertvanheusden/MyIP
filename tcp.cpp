@@ -784,21 +784,6 @@ void tcp::session_cleaner()
 
 				free_tcp_session(s);
 			}
-			else if (s->state == tcp_time_wait && age >= 2) {
-				DOLOG(ll_debug, "%s: session clean-up after tcp_time_wait state\n", log_prefix.c_str());
-
-				if (s->is_client) {
-					// forget client session
-					tcp_clients.erase(s->get_my_port());
-				}
-
-				it = sessions.erase(it);
-
-				// clean-up
-				cur_session_lock.unlock();
-
-				free_tcp_session(s);
-			}
 			else if (s->state == tcp_syn_rcvd && age >= 5) {
 				DOLOG(ll_debug, "%s: delete session in SYN state for 5 or more seconds\n", log_prefix.c_str());
 
