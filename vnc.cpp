@@ -376,6 +376,9 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 
 		vsd->prev_zsize = vsd->strm.total_out;
 	}
+	else {
+		DOLOG(ll_error, "VNC: unknown encoding type %d\n", ce);
+	}
 
 	free(temp);
 
@@ -454,6 +457,7 @@ void vnc_thread(session *ts)
 
 	std::vector<int32_t> encodings;
 	encodings.push_back(0);  // at least raw
+
 	int n_encodings = -1;
 	bool continuous_updates = false;
 
