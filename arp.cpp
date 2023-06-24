@@ -81,54 +81,68 @@ void arp::operator()()
 
 		uint16_t request = (p[6] << 8) + p[7];
 
-		if (request == 0x0001 && any_addr(any_addr::ipv4, &p[tpa_offset]) == my_ip)  // am I the target?
-		{
-			DOLOG(ll_debug, "arp::operator: received arp for %s\n", my_ip.to_str().c_str());
+		if (request == 0x0001) {
+			any_addr for_whom(any_addr::ipv4, &p[tpa_offset]);
 
-			stats_inc_counter(arp_for_me);
+			DOLOG(ll_debug, "arp::operator: received arp for %s\n", for_whom.to_str().c_str());
 
-			uint8_t *reply = duplicate(p, size);
+			if (for_whom == my_ip)  // am I the target?
+			{
+				stats_inc_counter(arp_for_me);
 
-			swap_mac(&reply[sha_offset], &reply[tha_offset]); // arp addresses
+				uint8_t *reply = duplicate(p, size);
 
-			// my MAC address
-			if (ether_type == 0x0800)  // ipv4
-				my_mac.get(&reply[sha_offset], 6);
-			else if (ether_type == 0x08ff || ether_type == 0x00cc)  // AX.25
-				my_mac.get(&reply[sha_offset], 7);
-			else
-				DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
+				swap_mac(&reply[sha_offset], &reply[tha_offset]); // arp addresses
 
-			reply[7] = 0x02; // reply
+				// my MAC address
+				if (ether_type == 0x0800)  // ipv4
+					my_mac.get(&reply[sha_offset], 6);
+				else if (ether_type == 0x08ff || ether_type == 0x00cc)  // AX.25
+					my_mac.get(&reply[sha_offset], 7);
+				else
+					DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
 
-			swap_ipv4(&reply[spa_offset], &reply[tpa_offset]);
+				reply[7] = 0x02; // reply
 
-			po.value().interface->transmit_packet(pkt->get_src_addr(), my_mac, 0x0806, reply, size);
+				swap_ipv4(&reply[spa_offset], &reply[tpa_offset]);
 
-			delete [] reply;
+				po.value().interface->transmit_packet(pkt->get_src_addr(), my_mac, 0x0806, reply, size);
+
+				delete [] reply;
+			}
+			else {
+				DOLOG(ll_debug, "ARP: %s not for me\n", for_whom.to_str().c_str());
+			}
 		}
-		else if (request == 0x0002 && pkt->get_dst_addr() == my_mac) {
-			any_addr work_ip (any_addr::ipv4, &p[spa_offset]);
+		else if (request == 0x0002) {
+			auto dst_mac = pkt->get_dst_addr();
 
-			any_addr work_mac;
+			if (dst_mac == my_mac) {
+				any_addr work_ip(any_addr::ipv4, &p[spa_offset]);
 
-			if (ether_type == 0x0800)
-				work_mac = any_addr(any_addr::mac,  &p[sha_offset]);
-			else if (ether_type == 0x08ff || ether_type == 0x00cc)  // AX.25
-				work_mac = any_addr(any_addr::ax25, &p[sha_offset]);
-			else
-				DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
+				any_addr work_mac;
 
-			DOLOG(ll_debug, "arp::operator: received arp-reply for %s (is at %s)\n", work_ip.to_str().c_str(), work_mac.to_str().c_str());
+				if (ether_type == 0x0800)
+					work_mac = any_addr(any_addr::mac,  &p[sha_offset]);
+				else if (ether_type == 0x08ff || ether_type == 0x00cc)  // AX.25
+					work_mac = any_addr(any_addr::ax25, &p[sha_offset]);
+				else
+					DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
 
-			std::unique_lock lck(work_lock);
+				DOLOG(ll_debug, "arp::operator: received arp-reply for %s (is at %s)\n", work_ip.to_str().c_str(), work_mac.to_str().c_str());
 
-			auto it = work.find(work_ip);  // IP to resolve
+				std::unique_lock lck(work_lock);
 
-			if (it != work.end())
-				it->second = mac_resolver_result({ work_mac });
+				auto it = work.find(work_ip);  // IP to resolve
 
-			work_cv.notify_all();
+				if (it != work.end())
+					it->second = mac_resolver_result({ work_mac });
+
+				work_cv.notify_all();
+			}
+			else {
+				DOLOG(ll_debug, "ARP: %s not for me\n", dst_mac.to_str().c_str());
+			}
 		}
 		else {
 			DOLOG(ll_debug, "ARP: not for me? request %04x, ethertype %04x\n", request, ether_type);
@@ -193,6 +207,8 @@ bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 		dest_mac = any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
 	else if (af == any_addr::ax25)
 		dest_mac = ax25_address("QST", 0, true, false).get_any_addr();
+
+	DOLOG(ll_warning, "ARP::send_request: %s -> %s\n", my_mac.to_str().c_str(), dest_mac.to_str().c_str());
 
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, end);
 }
