@@ -672,6 +672,40 @@ int main(int argc, char *argv[])
 			dev->register_protocol(0x0806, lldp_);
 		}
 
+
+		// upstream DNS
+		dns *dns_ = nullptr;
+
+		try {
+			std::string dns_u_ip_str = cfg_str(interface, "upstream-dns", "upstream DNS server", false, "");
+			any_addr upstream_dns_server = parse_address(dns_u_ip_str, 4, ".", 10);
+
+			for(auto & dev : devs) {
+				ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
+				if (!i4)
+					continue;
+
+				udp *const u = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
+				if (!u)
+					continue;
+
+				dns_ = new dns(&s, u, i4->get_addr(), upstream_dns_server);
+
+				u->add_handler(53, std::bind(&dns::input, dns_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+				applications.push_back(dns_);
+
+				if (my_ipv4_address.is_set())
+					dns_instances_4.insert({ my_ipv4_address, dns_ });
+
+				if (my_ipv6_address.is_set())
+					dns_instances_6.insert({ my_ipv6_address, dns_ });
+			}
+		}
+		catch(const libconfig::SettingNotFoundException &nfex) {
+			// just fine
+		}
+
 		// socks proxy
 		try {
 			const libconfig::Setting & socks = interface.lookup("socks");
@@ -687,43 +721,10 @@ int main(int argc, char *argv[])
 			socks_proxy *so = new socks_proxy(interface, port, ipv4_tcp);
 			socks_proxies.push_back(so);
 
-			// DNS
-			try {
-				const libconfig::Setting & s_dns = socks.lookup("dns");
+			if (dns_ == nullptr)
+				error_exit(false, "No DNS found for interface %s (MAC address)", mac.c_str());
 
-				std::string dns_u_ip_str = cfg_str(s_dns, "host", "upstream DNS server", false, "");
-				any_addr upstream_dns_server = parse_address(dns_u_ip_str, 4, ".", 10);
-
-				dns *dns_ = nullptr;
-
-				for(auto & dev : devs) {
-					ipv4 *i4 = dynamic_cast<ipv4 *>(dev->get_protocol(0x0800));
-					if (!i4)
-						continue;
-
-					udp *const u = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
-					if (!u)
-						continue;
-
-					dns_ = new dns(&s, u, i4->get_addr(), upstream_dns_server);
-
-					u->add_handler(53, std::bind(&dns::input, dns_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-
-					applications.push_back(dns_);
-
-					if (my_ipv4_address.is_set())
-						dns_instances_4.insert({ my_ipv4_address, dns_ });
-
-					if (my_ipv6_address.is_set())
-						dns_instances_6.insert({ my_ipv6_address, dns_ });
-				}
-
-				if (dns_)
-					so->register_dns(dns_);
-			}
-			catch(const libconfig::SettingNotFoundException &nfex) {
-				// just fine
-			}
+			so->register_dns(dns_);
 		}
 		catch(const libconfig::SettingNotFoundException &nfex) {
 			// just fine
