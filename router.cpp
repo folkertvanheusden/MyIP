@@ -6,6 +6,7 @@
 #include "any_addr.h"
 #include "arp.h"
 #include "ndp.h"
+#include "net.h"
 #include "phys.h"
 #include "router.h"
 #include "str.h"
@@ -52,41 +53,6 @@ router::~router()
 void router::stop()
 {
 	pkts->interrupt();
-}
-
-bool check_subnet(const any_addr & addr, const any_addr & network, const int cidr)
-{
-	uint8_t addr_bytes[16] { 0 };
-	addr.get(addr_bytes, sizeof addr_bytes);
-
-	uint8_t network_bytes[16] { 0 };
-	network.get(network_bytes, sizeof network_bytes);
-
-	int n_bytes = cidr / 8;
-
-	if (std::equal(addr_bytes, addr_bytes + n_bytes, network_bytes) == false)
-		return false;
-
-	int n_bits = cidr & 7;
-
-	if (n_bits) {
-		int mask = 0xff << (8 - n_bits);
-
-		if ((addr_bytes[n_bytes] & mask) != (network_bytes[n_bytes] & mask))
-			return false;
-	}
-
-	return true;
-}
-
-bool check_subnet(const any_addr & addr, const any_addr & network, const uint8_t netmask[4])
-{
-	for(int i=0; i<4; i++) {
-		if ((addr[i] & netmask[i]) != network[i])
-			return false;
-	}
-
-	return true;
 }
 
 void router::add_router_ipv4(const any_addr & local_ip, const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, const int priority, phys *const interface, arp *const iarp)
