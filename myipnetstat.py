@@ -45,6 +45,7 @@ def help():
     print(' * list-devices  list the physical devices, to be used with start/stop-pcap')
     print(' * start-pcap x  start pcap recording on device x')
     print(' * stop-pcap x   stop pcap recording on device x')
+    print(' * list-arp x    list MAC addresses on device x')
 
 if len(sys.argv) == 1:
     help()
@@ -63,6 +64,9 @@ elif sys.argv[1] == 'start-pcap':
 
 elif sys.argv[1] == 'stop-pcap':
     print(mi.request('stop-pcap|%s' % sys.argv[2]))
+
+elif sys.argv[1] == 'list-arp':
+    print(mi.request('list-arp|%s' % sys.argv[2]))
 
 else:
     help();

@@ -14,14 +14,15 @@
 
 class mac_resolver : public address_cache, public network_layer
 {
-protected:
+public:
 	class mac_resolver_result {
 	public:
 		std::optional<any_addr> mac;
 	};
 
+protected:
 	std::map<any_addr, std::optional<mac_resolver_result> > work;
-	std::mutex work_lock;
+	mutable std::mutex work_lock;
 	std::condition_variable work_cv;
 
 	bool                  stop_flag { false   }; 
@@ -37,6 +38,8 @@ public:
 	virtual ~mac_resolver();
 
 	std::optional<any_addr> get_mac(phys *const interface, const any_addr & ip);
+
+	std::map<any_addr, std::optional<mac_resolver::mac_resolver_result> > dump_state() const;
 
 	any_addr get_addr() const override;
 

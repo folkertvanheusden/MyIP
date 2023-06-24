@@ -7,6 +7,7 @@
 #include <sys/un.h>
 #include <sys/types.h>
 
+#include "arp.h"
 #include "phys.h"
 #include "str.h"
 #include "ud.h"
@@ -146,6 +147,60 @@ void ud_stats::handle_pcap(const int cfd, const std::string & dev_name, const bo
 	WRITE(cfd, reinterpret_cast<const uint8_t *>("FAIL\n"), 5);
 }
 
+void ud_stats::emit_arp(const int cfd, const std::string & dev_name)
+{
+	for(auto & dev : *devs) {
+		if (dev->to_str() == dev_name) {
+			auto nl = dev->get_protocol(0x0806);  // find ARP
+
+			if (!nl)
+				break;
+
+			json_t *out = json_array();
+
+			arp *const a = dynamic_cast<arp *>(nl);
+
+			if (!a)
+				break;
+
+			auto state = a->dump_state();
+
+			for(auto & entry : state) {
+				json_t *record = json_object();
+
+				std::string addr = entry.first.to_str();
+
+				std::string mac;
+
+				if (entry.second.has_value() && entry.second.value().mac.has_value())
+					mac = entry.second.value().mac.value().to_str();
+
+				printf("%s - %s\n", addr.c_str(), mac.c_str());
+
+				json_object_set(record, addr.c_str(), json_string(mac.c_str()));
+
+				json_array_append(out, record);
+			}
+
+			char *temp = json_dumps(out, 0);
+
+			printf("%s\n", temp);
+
+			WRITE(cfd, reinterpret_cast<uint8_t *>(temp), strlen(temp));
+
+			free(temp);
+
+			json_decref(out);
+
+			eol(cfd);
+
+			return;
+		}
+	}
+
+	WRITE(cfd, reinterpret_cast<const uint8_t *>("FAIL\n"), 5);
+}
+
 void ud_stats::handler(const int cfd)
 {
 	for(;;) {
@@ -179,6 +234,8 @@ void ud_stats::handler(const int cfd)
 			handle_pcap(cfd, parts[1], true);
 		else if (parts[0] == "stop-pcap" && parts.size() == 2)
 			handle_pcap(cfd, parts[1], false);
+		else if (parts[0] == "list-arp" && parts.size() == 2)
+			emit_arp(cfd, parts[1]);
 		else
 			WRITE(cfd, reinterpret_cast<const uint8_t *>("???\n"), 4);
 	}

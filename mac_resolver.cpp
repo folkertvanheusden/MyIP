@@ -31,6 +31,15 @@ any_addr mac_resolver::get_addr() const
 	return any_addr();
 }
 
+std::map<any_addr, std::optional<mac_resolver::mac_resolver_result> > mac_resolver::dump_state() const
+{
+	std::unique_lock<std::mutex> lck(work_lock);
+
+	DOLOG(ll_debug, "mac_resolver: returning %zu entries\n", work.size());
+
+	return work;
+}
+
 void mac_resolver::queue_incoming_packet(phys *const interface, packet *p)
 {
 	if (pkts->try_put({ interface, p }) == false) {

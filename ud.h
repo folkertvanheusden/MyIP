@@ -23,6 +23,8 @@ private:
 
 	void handle_pcap  (const int cfd, const std::string & dev, const bool open);
 
+	void emit_arp     (const int cfd, const std::string & dev_name);
+
 public:
 	ud_stats(const std::vector<pstream *> & stream_session_handlers, std::vector<phys *> *const devs, const std::string & socket_path);
 	virtual ~ud_stats();
