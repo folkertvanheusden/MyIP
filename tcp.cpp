@@ -386,6 +386,7 @@ void tcp::packet_handler(packet *const pkt)
 			}
 			else {
 				DOLOG(ll_debug, "%s: new session which does not start with SYN [IC]\n", pkt->get_log_prefix().c_str());
+				send_rst_for_port(pkt, dst_port, src_port);
 				delete pkt;
 				stats_inc_counter(tcp_errors);
 				return;
