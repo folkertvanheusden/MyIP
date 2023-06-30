@@ -84,10 +84,11 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 		return false;
 	}
 
-	DOLOG(ll_debug, "phys_promiscuous: transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
-
 	size_t   out_size = pl_size + 14;
-	uint8_t *out      = new uint8_t[out_size];
+
+	DOLOG(ll_debug, "phys_promiscuous: transmit packet %s -> %s (%zu bytes)\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), out_size);
+
+	uint8_t *out      = new uint8_t[out_size]();
 
 	dst_mac.get(&out[0], 6);
 
