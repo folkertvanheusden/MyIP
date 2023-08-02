@@ -33,6 +33,8 @@ protected:
 
 	virtual std::optional<any_addr> check_special_ip_addresses(const any_addr & ip, const any_addr::addr_family family) = 0;
 
+	void dump_work() const;
+
 public:
 	mac_resolver(stats *const s, router *const r);
 	virtual ~mac_resolver();

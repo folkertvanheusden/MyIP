@@ -1041,6 +1041,8 @@ int main(int argc, char *argv[])
 	DOLOG(ll_info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating fase 1\n");
 
+	exit(0);
+
 	int n_actions = 2;  // 1 for 'us' & router
 
 	r->stop();

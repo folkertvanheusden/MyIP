@@ -63,26 +63,50 @@ int mac_resolver::get_max_packet_size() const
 	return -1;
 }
 
+void mac_resolver::dump_work() const
+{
+	for(auto & e : work) {
+		std::string mac = "?";
+
+		if (e.second.has_value() && e.second.value().mac.has_value())
+			mac = e.second.value().mac.value().to_str();
+
+		DOLOG(ll_debug, "mac_resolver::dump: %s - %s\n", e.first.to_str().c_str(), mac.c_str());
+	}
+
+	DOLOG(ll_debug, "mac_resolver::dump: --- FIN ---\n");
+}
+
 std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_addr & ip)
 {
+	DOLOG(ll_debug, "mac_resolver::get_mac: resolving %s via %s\n", ip.to_str().c_str(), interface->to_str().c_str());
+
 	auto phys_family = interface->get_phys_type();
 
 	auto special_ip_addresses_mac = check_special_ip_addresses(ip, phys_family);
-	if (special_ip_addresses_mac.has_value())
+	if (special_ip_addresses_mac.has_value()) {
+		DOLOG(ll_debug, "mac_resolver::get_mac: %s is special\n", ip.to_str().c_str());
+
 		return special_ip_addresses_mac;
+	}
 
 	auto cache_result = query_cache(ip);
 
 	if (cache_result.first == interface) {
 		any_addr rc = *cache_result.second;
 
+		DOLOG(ll_debug, "mac_resolver::get_mac: %s is at %s\n", ip.to_str().c_str(), rc.to_str().c_str());
+
 		delete cache_result.second;
 
 		return rc;
 	}
 
-	if (!send_request(ip, phys_family))
+	if (!send_request(ip, phys_family)) {
+		DOLOG(ll_debug, "mac_resolver::get_mac: failed to resolve %s: probleming sending request\n", ip.to_str().c_str());
+
 		return { };
+	}
 
 	DOLOG(ll_debug, "mac_resolver::get_mac waiting for %s (on %s)\n", ip.to_str().c_str(), interface->to_str().c_str());
 
@@ -130,6 +154,8 @@ std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_a
 	}
 
 	DOLOG(ll_debug, "mac_resolver: resolve %s timeout\n", ip.to_str().c_str());
+
+	dump_work();
 
 	return { };
 }

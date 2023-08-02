@@ -291,9 +291,9 @@ void http_thread(session *ts)
 
 		http_session_data *hs = dynamic_cast<http_session_data *>(ts->get_callback_private_data());
 
-		for(;hs->terminate == false;) {
-			std::unique_lock<std::mutex> lck(hs->r_lock);
+		std::unique_lock<std::mutex> lck(hs->r_lock);
 
+		for(;hs->terminate == false;) {
 			if (hs->req_data) {
 				char *end_marker = strstr(hs->req_data, "\r\n\r\n");
 				if (end_marker) {
@@ -339,24 +339,26 @@ int sock_read(void *ctx, unsigned char *buf, size_t len)
 {
 	https_ctx *const hc = reinterpret_cast<https_ctx *>(ctx);
 
-	for(;;) {
-		std::unique_lock<std::mutex> lck(hc->hs->r_lock);
+	std::unique_lock<std::mutex> lck(hc->hs->r_lock);
 
-		if (hc->hs->req_len >= len) {
-			memcpy(buf, hc->hs->req_data, len);
+	for(;!hc->s->get_is_terminating();) {
+		if (lck.owns_lock()) {
+			if (hc->hs->req_len >= len) {
+				memcpy(buf, hc->hs->req_data, len);
 
-			size_t left = hc->hs->req_len - len;
+				size_t left = hc->hs->req_len - len;
 
-			if (left > 0)
-				memmove(&hc->hs->req_data[0], &hc->hs->req_data[len], left);
+				if (left > 0)
+					memmove(&hc->hs->req_data[0], &hc->hs->req_data[len], left);
 
-			hc->hs->req_len -= len;
+				hc->hs->req_len -= len;
 
-			return len;
+				return len;
+			}
+
+			if (hc->hs->terminate)
+				break;
 		}
-
-		if (hc->s->get_is_terminating() || hc->hs->terminate)
-			break;
 
 		hc->hs->r_cond.wait_for(lck, 100ms);
 	}
@@ -517,7 +519,7 @@ bool http_new_data(pstream *ps, session *ts, buffer_in b)
 	hs->req_len += data_len;
 	hs->req_data[hs->req_len] = 0x00;
 
-	hs->r_cond.notify_one();
+	hs->r_cond.notify_all();
 
 	return true;
 }

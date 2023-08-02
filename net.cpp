@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
+#include "any_addr.h"
 #include "log.h"
 
 
@@ -77,4 +78,39 @@ std::optional<std::string> get_host_as_text(struct sockaddr *const a)
 	}
 
 	return buffer;
+}
+
+bool check_subnet(const any_addr & addr, const any_addr & network, const int cidr)
+{
+	uint8_t addr_bytes[16] { 0 };
+	addr.get(addr_bytes, sizeof addr_bytes);
+
+	uint8_t network_bytes[16] { 0 };
+	network.get(network_bytes, sizeof network_bytes);
+
+	int n_bytes = cidr / 8;
+
+	if (std::equal(addr_bytes, addr_bytes + n_bytes, network_bytes) == false)
+		return false;
+
+	int n_bits = cidr & 7;
+
+	if (n_bits) {
+		int mask = 0xff << (8 - n_bits);
+
+		if ((addr_bytes[n_bytes] & mask) != (network_bytes[n_bytes] & mask))
+			return false;
+	}
+
+	return true;
+}
+
+bool check_subnet(const any_addr & addr, const any_addr & network, const uint8_t netmask[4])
+{
+	for(int i=0; i<4; i++) {
+		if ((addr[i] & netmask[i]) != network[i])
+			return false;
+	}
+
+	return true;
 }
