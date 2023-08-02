@@ -667,7 +667,7 @@ void tcp::packet_handler(packet *const pkt)
 				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 			}
 
-			unacked_cv.notify_all();
+			unacked_cv.notify_all();  // TODO this "if" doesn't ACK, so do not do this here?
 		}
 
 		if (fail) {
@@ -895,33 +895,41 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, %lu packets\n", ts->id, len, (len + ts->window_size - 1) / ts->window_size);
 
+	std::unique_lock<std::mutex> lck(ts->session_lock);  // try_lock TODO
+
 	for(;;) {
 		// lock for unacked and for my_seq_nr
-		std::unique_lock<std::mutex> lck(ts->session_lock);
+		if (lck.owns_lock()) {
+			if (ts->unacked_size < 1024 * 1024) {  // max 1MB queued
+				if (ts->state == tcp_established) {
+					if (ts->unacked_size == 0)
+						ts->unacked_start_seq_nr = ts->my_seq_nr;
 
-		if (ts->unacked_size < 1024 * 1024) {  // max 1MB queued
-			if (ts->state == tcp_established) {
-				if (ts->unacked_size == 0)
-					ts->unacked_start_seq_nr = ts->my_seq_nr;
+					ts->unacked = reinterpret_cast<uint8_t *>(realloc(ts->unacked, ts->unacked_size + len));
+					memcpy(&ts->unacked[ts->unacked_size], data, len);
+					ts->unacked_size += len;
 
-				ts->unacked = reinterpret_cast<uint8_t *>(realloc(ts->unacked, ts->unacked_size + len));
-				memcpy(&ts->unacked[ts->unacked_size], data, len);
-				ts->unacked_size += len;
+					// new data was added, try sending immediately
+					ts->r_last_pkt_ts = 0;
 
-				unacked_cv.notify_all();
+					unacked_cv.notify_all();
+				}
+
+				break;
 			}
 
-			break;
+			if (ts->state != tcp_established) {
+				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send_data interrupted by session end\n", ts->id);
+				break;
+			}
 		}
 
-		if (ts->state != tcp_established || ts->get_is_terminating()) {
-			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send_data interrupted by session end\n", ts->id);
+		if (ts->get_is_terminating() == false)
 			break;
-		}
-
-		ts->unacked_sent_cv.wait_for(lck, 100ms);
 
 		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unacked-buffer full\n", ts->id);
+
+		ts->unacked_sent_cv.wait_for(lck, 100ms);
 	}
 
 	return true;
