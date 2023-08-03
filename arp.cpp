@@ -81,10 +81,10 @@ void arp::operator()()
 
 		uint16_t request = (p[6] << 8) + p[7];
 
-		if (request == 0x0001) {
+		if (request == 0x0001) {  // request
 			any_addr for_whom(any_addr::ipv4, &p[tpa_offset]);
 
-			DOLOG(ll_debug, "arp::operator: received arp for %s\n", for_whom.to_str().c_str());
+			DOLOG(ll_debug, "arp::operator: request %04x received arp for %s\n", request, for_whom.to_str().c_str());
 
 			if (for_whom == my_ip)  // am I the target?
 			{
@@ -114,12 +114,30 @@ void arp::operator()()
 				DOLOG(ll_debug, "ARP: %s not for me\n", for_whom.to_str().c_str());
 			}
 		}
-		else if (request == 0x0002) {
+		else if (request == 0x0002) {  // reply
 			auto dst_mac = pkt->get_dst_addr();
 
-			if (dst_mac == my_mac) {
-				any_addr work_ip(any_addr::ipv4, &p[spa_offset]);
+			DOLOG(ll_debug, "arp::operator: request %04x received arp for %s\n", request, dst_mac.to_str().c_str());
 
+			DOLOG(ll_debug, "ARP0002: THA: %s, SHA: %s, TPA: %s, SPA: %s\n", 
+					any_addr(any_addr::mac,  &p[tha_offset]).to_str().c_str(),
+					any_addr(any_addr::mac,  &p[sha_offset]).to_str().c_str(),
+					any_addr(any_addr::ipv4, &p[tpa_offset]).to_str().c_str(),
+					any_addr(any_addr::ipv4, &p[spa_offset]).to_str().c_str());
+
+			any_addr work_ip(any_addr::ipv4, &p[spa_offset]);
+
+			// for me?
+			bool use = dst_mac == my_mac;
+
+			// is it a gratuitous arp?
+			if (memcmp(&p[tha_offset], "\xff\xff\xff\xff\xff\xff", 6) == 0 &&  // broadcast
+					work_ip == any_addr(any_addr::ipv4, &p[tpa_offset])) {  // source ip == dest in
+				DOLOG(ll_debug, "arp::operator: gratuitous arp\n");
+				use = true;
+			}
+
+			if (use) {
 				any_addr work_mac;
 
 				if (ether_type == 0x0800)
@@ -207,8 +225,10 @@ bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 		dest_mac = any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
 	else if (af == any_addr::ax25)
 		dest_mac = ax25_address("QST", 0, true, false).get_any_addr();
+	else
+		DOLOG(ll_warning, "ARP::send_request: address family %d unexpected", af);
 
-	DOLOG(ll_warning, "ARP::send_request: %s -> %s\n", my_mac.to_str().c_str(), dest_mac.to_str().c_str());
+	DOLOG(ll_info, "ARP::send_request: %s -> %s (%d bytes)\n", my_mac.to_str().c_str(), dest_mac.to_str().c_str(), end);
 
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, end);
 }
@@ -226,6 +246,7 @@ std::optional<any_addr> arp::check_special_ip_addresses(const any_addr & ip, con
 		}
 	}
 
+	// TODO depending on netmask
 	if (ip[0] == 255 && ip[1] == 255 && ip[2] == 255 && ip[3] == 255)  // broadcast
 		return any_addr(any_addr::mac, std::initializer_list<uint8_t>({ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }).begin());
 
