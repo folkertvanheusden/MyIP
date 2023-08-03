@@ -1096,8 +1096,6 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 		if (++counter == 3) {
 			counter = 0;
 
-			std::unique_lock<std::mutex> lck(cur_session->session_lock);
-
 			send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), 512, FLAG_SYN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, 0);
 		}
 
