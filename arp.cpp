@@ -81,10 +81,15 @@ void arp::operator()()
 
 		uint16_t request = (p[6] << 8) + p[7];
 
+		DOLOG(ll_debug, "ARP%04x: THA: %s, SHA: %s, TPA: %s, SPA: %s\n",
+				request,
+				any_addr(any_addr::mac,  &p[tha_offset]).to_str().c_str(),
+				any_addr(any_addr::mac,  &p[sha_offset]).to_str().c_str(),
+				any_addr(any_addr::ipv4, &p[tpa_offset]).to_str().c_str(),
+				any_addr(any_addr::ipv4, &p[spa_offset]).to_str().c_str());
+
 		if (request == 0x0001) {  // request
 			any_addr for_whom(any_addr::ipv4, &p[tpa_offset]);
-
-			DOLOG(ll_debug, "arp::operator: request %04x received arp for %s\n", request, for_whom.to_str().c_str());
 
 			if (for_whom == my_ip)  // am I the target?
 			{
@@ -110,34 +115,14 @@ void arp::operator()()
 
 				delete [] reply;
 			}
-			else {
-				DOLOG(ll_debug, "ARP: %s not for me\n", for_whom.to_str().c_str());
-			}
 		}
 		else if (request == 0x0002) {  // reply
 			auto dst_mac = pkt->get_dst_addr();
 
-			DOLOG(ll_debug, "arp::operator: request %04x received arp for %s\n", request, dst_mac.to_str().c_str());
-
-			DOLOG(ll_debug, "ARP0002: THA: %s, SHA: %s, TPA: %s, SPA: %s\n", 
-					any_addr(any_addr::mac,  &p[tha_offset]).to_str().c_str(),
-					any_addr(any_addr::mac,  &p[sha_offset]).to_str().c_str(),
-					any_addr(any_addr::ipv4, &p[tpa_offset]).to_str().c_str(),
-					any_addr(any_addr::ipv4, &p[spa_offset]).to_str().c_str());
-
 			any_addr work_ip(any_addr::ipv4, &p[spa_offset]);
 
 			// for me?
-			bool use = dst_mac == my_mac;
-
-			// is it a gratuitous arp?
-			if (memcmp(&p[tha_offset], "\xff\xff\xff\xff\xff\xff", 6) == 0 &&  // broadcast
-					work_ip == any_addr(any_addr::ipv4, &p[tpa_offset])) {  // source ip == dest in
-				DOLOG(ll_debug, "arp::operator: gratuitous arp\n");
-				use = true;
-			}
-
-			if (use) {
+			if (dst_mac == my_mac) {
 				any_addr work_mac;
 
 				if (ether_type == 0x0800)
@@ -158,12 +143,6 @@ void arp::operator()()
 
 				work_cv.notify_all();
 			}
-			else {
-				DOLOG(ll_debug, "ARP: %s not for me\n", dst_mac.to_str().c_str());
-			}
-		}
-		else {
-			DOLOG(ll_debug, "ARP: not for me? request %04x, ethertype %04x\n", request, ether_type);
 		}
 
 		delete pkt;
