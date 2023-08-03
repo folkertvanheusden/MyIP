@@ -1083,6 +1083,7 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 
 		if (cur_session->state >= tcp_established) {
 			DOLOG(ll_debug, "wait_for_client_connected_state: found session-data, data sent\n");
+//			cur_session->my_seq_nr++;
 			break;
 		}
 
@@ -1096,10 +1097,12 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 		if (++counter == 3) {
 			counter = 0;
 
-			send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), 512, FLAG_SYN, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, 0);
+			uint32_t temp = cur_session->my_seq_nr;
+
+			send_segment(cur_session, cur_session->id, cur_session->get_their_addr(), cur_session->get_their_port(), cur_session->get_my_addr(), cur_session->get_my_port(), 512, FLAG_SYN, cur_session->their_seq_nr, &temp, nullptr, 0, 0);
 		}
 
-		DOLOG(ll_debug, "client waiting for 'established': STATE NOW IS %s\n", states[cur_session->state]);
+		DOLOG(ll_debug, "wait_for_client_connected_state: client waiting for 'established': STATE NOW IS %s\n", states[cur_session->state]);
 
 		cur_session->state_changed.wait_for(lck, 500ms);
 		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid as
