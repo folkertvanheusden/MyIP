@@ -99,6 +99,9 @@ void arp::operator()()
 				is_gratuitous ? ", gratuitous" : ""
 				);
 
+		if (is_gratuitous)
+			update_cache(SHA, SPA, interface, false);
+
 		if (request == 0x0001) {  // request
 			any_addr for_whom = TPA;
 
