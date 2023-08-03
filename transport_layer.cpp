@@ -20,7 +20,7 @@ transport_layer::~transport_layer()
 void transport_layer::queue_packet(packet *p)
 {
 	if (pkts->try_put(p) == false) {
-		DOLOG(ll_debug, "IP-Protocol: packet dropped\n");
+		DOLOG(ll_debug, "IP-Protocol: queue full, packet dropped\n");
 
 		delete p;
 	}
