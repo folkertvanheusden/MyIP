@@ -1135,8 +1135,6 @@ bool tcp::client_session_send_data(const int local_port, const uint8_t *const da
 
 	tcp_session *const cur_session = dynamic_cast<tcp_session *>(sd_it->second);
 
-	std::unique_lock<std::mutex> cur_session_lock(cur_session->session_lock);
-
 	bool rc = send_data(cur_session, data, len);
 
 	DOLOG(ll_debug, "client_session_send_data: found session-data, data sent: %d\n", rc);
