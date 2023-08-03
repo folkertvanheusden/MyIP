@@ -81,15 +81,26 @@ void arp::operator()()
 
 		uint16_t request = (p[6] << 8) + p[7];
 
-		DOLOG(ll_debug, "ARP%04x: THA: %s, SHA: %s, TPA: %s, SPA: %s\n",
+		any_addr THA(any_addr::mac,  &p[tha_offset]);
+		any_addr SHA(any_addr::mac,  &p[sha_offset]);
+		any_addr TPA(any_addr::ipv4, &p[tpa_offset]);
+		any_addr SPA(any_addr::ipv4, &p[spa_offset]);
+
+		bool is_gratuitous = (request == 0x0001 || request == 0x0002) &&
+				memcmp(&p[tha_offset], "\xff\xff\xff\xff\xff\xff", 6) == 0 &&
+				TPA == SPA;
+
+		DOLOG(ll_debug, "ARP%04x: THA: %s, SHA: %s, TPA: %s, SPA: %s%s\n",
 				request,
-				any_addr(any_addr::mac,  &p[tha_offset]).to_str().c_str(),
-				any_addr(any_addr::mac,  &p[sha_offset]).to_str().c_str(),
-				any_addr(any_addr::ipv4, &p[tpa_offset]).to_str().c_str(),
-				any_addr(any_addr::ipv4, &p[spa_offset]).to_str().c_str());
+				THA.to_str().c_str(),
+				SHA.to_str().c_str(),
+				TPA.to_str().c_str(),
+				SPA.to_str().c_str(),
+				is_gratuitous ? ", gratuitous" : ""
+				);
 
 		if (request == 0x0001) {  // request
-			any_addr for_whom(any_addr::ipv4, &p[tpa_offset]);
+			any_addr for_whom = TPA;
 
 			if (for_whom == my_ip)  // am I the target?
 			{
@@ -119,7 +130,7 @@ void arp::operator()()
 		else if (request == 0x0002) {  // reply
 			auto dst_mac = pkt->get_dst_addr();
 
-			any_addr work_ip(any_addr::ipv4, &p[spa_offset]);
+			any_addr work_ip = SPA;
 
 			// for me?
 			if (dst_mac == my_mac) {
@@ -207,7 +218,7 @@ bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 	else
 		DOLOG(ll_warning, "ARP::send_request: address family %d unexpected", af);
 
-	DOLOG(ll_info, "ARP::send_request: %s -> %s (%d bytes)\n", my_mac.to_str().c_str(), dest_mac.to_str().c_str(), end);
+	DOLOG(ll_info, "ARP::send_request: %s -> %s to resolve %s (%d bytes)\n", my_mac.to_str().c_str(), dest_mac.to_str().c_str(), ip.to_str().c_str(), end);
 
 	return interface->transmit_packet(dest_mac, my_mac, 0x0806, request, end);
 }
