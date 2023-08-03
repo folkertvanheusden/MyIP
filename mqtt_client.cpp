@@ -11,6 +11,8 @@
 #include "utils.h"
 
 
+using namespace std::chrono_literals;
+
 static bool mqtt_new_data(pstream *const ps, session *const s, buffer_in data)
 {
 	DOLOG(ll_debug, "mqtt_new_data\n");
@@ -102,7 +104,7 @@ bool mqtt_client::read(uint8_t *target, size_t n)
 			n      -= cur_n;
 		}
 		else {
-			cv.wait(lck);  // TODO timeout
+			cv.wait_for(lck, 500ms);  // TODO timeout
 		}
 	}
 
