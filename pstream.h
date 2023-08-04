@@ -12,7 +12,6 @@ class pstream
 {
 protected:
 	mutable std::shared_mutex     sessions_lock;
-	std::condition_variable_any   sessions_cv;
 	// the key is an 'internal id'
 	std::map<uint64_t, session *> sessions;
 

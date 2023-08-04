@@ -744,14 +744,12 @@ void tcp::session_cleaner()
 {
 	set_thread_name("myip-tcp-clnr");
 
-	std::unique_lock<std::shared_mutex> lck(sessions_lock);
-
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
-		// TODO: langere wachttijd en wakker maken elders als state != established gezet wordt
-		if (sessions_cv.wait_for(lck, 1s) == std::cv_status::timeout)
-			DOLOG(ll_debug, "tcp-clnr woke-up after ack\n");
+		myusleep(2500000);
+
+		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 		// find t/o'd sessions
 		uint64_t now = get_us();
@@ -877,8 +875,6 @@ void tcp::operator()()
 		stats_inc_counter(tcp_packets);
 
 		packet_handler(pkt);
-
-		sessions_cv.notify_all();
 
 		uint64_t now_end = get_us();
 		stats_set(tcp_phandle_duration_max, std::max(*tcp_phandle_duration_max, now_end - now_start));
