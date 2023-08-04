@@ -32,6 +32,7 @@ private:
 	uint64_t    n_in { 0       };
 
 	uint64_t   *fifo_n_in_stats { nullptr };
+	uint64_t   *fifo_full_count { nullptr };
 
 public:
 	fifo(stats *const s, const std::string & name, const int n_elements) : n_elements(n_elements)
@@ -39,6 +40,7 @@ public:
 		data = new T[n_elements];
 
 		fifo_n_in_stats = s->register_stat(name + "_n_in");
+		fifo_full_count = s->register_stat(name + "_full");
 
 		fs = new fifo_stats(n_elements);
 		s->register_fifo_stats(name, fs);
@@ -71,6 +73,9 @@ public:
 	{
 		pthread_mutex_lock(&lock);
 
+		if (full)
+			stats_inc_counter(fifo_full_count);
+
 		while(full)
 			pthread_cond_wait(&cond_pull, &lock);
 
@@ -98,7 +103,9 @@ public:
 
 		pthread_mutex_lock(&lock);
 
-		if (!full) {
+		if (full)
+			stats_inc_counter(fifo_full_count);
+		else {
 			data[write_pointer] = element;
 
 			write_pointer++;
