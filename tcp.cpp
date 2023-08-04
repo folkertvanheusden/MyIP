@@ -92,6 +92,7 @@ tcp::tcp(stats *const s, icmp *const icmp_, const int n_threads) : transport_lay
 
 	tcp_unacked_duration_max = s->register_stat("tcp_unack_t_max", "1.3.6.1.4.1.57850.1.14.1");
 	tcp_cleaner_duration_max = s->register_stat("tcp_clean_t_max", "1.3.6.1.4.1.57850.1.14.2");
+	tcp_phandle_duration_max = s->register_stat("tcp_phandle_t_max", "1.3.6.1.4.1.57850.1.14.3");
 
 	for(int i=0; i<n_threads; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
@@ -868,6 +869,8 @@ void tcp::operator()()
 		if (!po.has_value())
 			break;
 
+		uint64_t now_start = get_us();
+
 		packet *pkt = po.value();
 
 		stats_inc_counter(tcp_packets);
@@ -875,6 +878,9 @@ void tcp::operator()()
 		packet_handler(pkt);
 
 		sessions_cv.notify_all();
+
+		uint64_t now_end = get_us();
+		stats_set(tcp_phandle_duration_max, std::max(*tcp_phandle_duration_max, now_end - now_start));
 	}
 }
 

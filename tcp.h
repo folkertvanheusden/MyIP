@@ -115,6 +115,7 @@ private:
 
 	uint64_t *tcp_unacked_duration_max { nullptr };
 	uint64_t *tcp_cleaner_duration_max { nullptr };
+	uint64_t *tcp_phandle_duration_max { nullptr };
 
 	void send_rst_for_port(const packet *const pkt, const int dst_port, const int src_port);
 
