@@ -815,8 +815,6 @@ void tcp::unacked_sender()
 
 			// last packet >= 1s ago?
 			if (now - s->r_last_pkt_ts >= 1000000) {
-				bool notify = false;
-
 				int to_send = std::min(s->window_size - s->data_since_last_ack, s->unacked_size);
 				int packet_size = idev->get_max_packet_size() - (20 + 12 /* timestamp option + padding */);
 
@@ -830,11 +828,9 @@ void tcp::unacked_sender()
 					send_segment(s, s->id, s->get_my_addr(), s->get_my_port(), s->get_their_addr(), s->get_their_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n, 0);
 
 					s->data_since_last_ack += send_n;
-
-					notify = true;
 				}
 
-				if (notify)
+				if (to_send > 0)
 					s->unacked_sent_cv.notify_one();
 
 				s->r_last_pkt_ts = now;
