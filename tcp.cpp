@@ -666,8 +666,6 @@ void tcp::packet_handler(packet *const pkt)
 
 				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 			}
-
-			unacked_cv.notify_all();  // TODO this "if" doesn't ACK, so do not do this here?
 		}
 
 		if (fail) {
@@ -799,12 +797,13 @@ void tcp::unacked_sender()
 {
 	set_thread_name("myip-tcp-us");
 
+	std::shared_lock<std::shared_mutex> lck(sessions_lock);
+
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
-		std::shared_lock<std::shared_mutex> lck(sessions_lock);
-		if (unacked_cv.wait_for(lck, 1s) == std::cv_status::no_timeout)
-			DOLOG(ll_debug, "TCP[] unack woke-up after ack\n");
+		if (unacked_cv.wait_for(lck, 500ms) == std::cv_status::timeout)
+			continue;
 
 		// go through all sessions and find if any has segments to resend
 		uint64_t now = get_us();
