@@ -327,79 +327,77 @@ void tcp::packet_handler(packet *const pkt)
 	std::string flag_str = flags_to_str(p[13]);
 	DOLOG(ll_debug, "%s: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", pkt->get_log_prefix().c_str(), src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str.c_str(), their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
 
-	auto port_record  = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
-	bool has_listener = port_record.has_value();
-	release_listener_lock(false);
+	if (flag_syn) {  // new session
+		auto port_record  = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
+		bool has_listener = port_record.has_value();
+		release_listener_lock(false);
 
-	if (!has_listener) {
-		send_rst_for_port(pkt, dst_port, src_port);
-		delete pkt;
-		return;
-	}
-
-	{
-		if (flag_syn) {  // new session
-			std::unique_lock<std::shared_mutex> lck(sessions_lock);
-
-			// check concuncurrent session count
-			if (sessions.size() >= 128) {
-				DOLOG(ll_warning, "%s: too many TCP sessions (%zu)\n", pkt->get_log_prefix().c_str(), sessions.size());
-				// drop packet
-				delete pkt;
-				return;
-			}
-
-			auto cur_it = sessions.find(id);
-
-			if (cur_it == sessions.end()) {
-				private_data *pd          = port_record.value().pd;
-
-				tcp_session  *new_session = new tcp_session(this, pkt->get_dst_addr(), dst_port, pkt->get_src_addr(), src_port, pd);
-
-				new_session->state        = tcp_listen;
-				new_session->state_since  = 0;
-
-				get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
-				new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
-
-				new_session->initial_their_seq_nr = their_seq_nr;
-				new_session->their_seq_nr         = their_seq_nr + 1;
-
-				new_session->id           = id;
-
-				new_session->is_client    = false;
-
-				new_session->unacked      = nullptr;
-				new_session->unacked_start_seq_nr    = 0;
-				new_session->unacked_size = 0;
-				new_session->fin_after_unacked_empty = false;
-
-				new_session->window_size  = win_size;
-
-				sessions.insert({ id, new_session });
-
-				stats_set(tcp_cur_n_sessions, sessions.size());
-
-				stats_inc_counter(tcp_new_sessions);
-
-				DOLOG(ll_debug, "%s: ...is a new session (initial my seq nr: %u, their: %u)\n", pkt->get_log_prefix().c_str(), new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
-			}
-
+		if (!has_listener) {
+			send_rst_for_port(pkt, dst_port, src_port);
+			delete pkt;
+			return;
 		}
-		else {
-			// existing session
-			std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
-			auto cur_it = sessions.find(id);
+		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
-			// not found? syn missing?
-			if (cur_it == sessions.end()) {
-				DOLOG(ll_debug, "%s: new session which does not start with SYN [IC]\n", pkt->get_log_prefix().c_str());
-				send_rst_for_port(pkt, dst_port, src_port);
-				delete pkt;
-				stats_inc_counter(tcp_errors);
-				return;
-			}
+		// check concuncurrent session count
+		if (sessions.size() >= 128) {
+			DOLOG(ll_warning, "%s: too many TCP sessions (%zu)\n", pkt->get_log_prefix().c_str(), sessions.size());
+			// drop packet
+			delete pkt;
+			return;
+		}
+
+		auto cur_it = sessions.find(id);
+
+		if (cur_it == sessions.end()) {
+			private_data *pd          = port_record.value().pd;
+
+			tcp_session  *new_session = new tcp_session(this, pkt->get_dst_addr(), dst_port, pkt->get_src_addr(), src_port, pd);
+
+			new_session->state        = tcp_listen;
+			new_session->state_since  = 0;
+
+			get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
+			new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
+
+			new_session->initial_their_seq_nr = their_seq_nr;
+			new_session->their_seq_nr         = their_seq_nr + 1;
+
+			new_session->id           = id;
+
+			new_session->is_client    = false;
+
+			new_session->unacked      = nullptr;
+			new_session->unacked_start_seq_nr    = 0;
+			new_session->unacked_size = 0;
+			new_session->fin_after_unacked_empty = false;
+
+			new_session->window_size  = win_size;
+
+			sessions.insert({ id, new_session });
+
+			stats_set(tcp_cur_n_sessions, sessions.size());
+
+			stats_inc_counter(tcp_new_sessions);
+
+			DOLOG(ll_debug, "%s: ...is a new session (initial my seq nr: %u, their: %u)\n", pkt->get_log_prefix().c_str(), new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
+		}
+
+	}
+	else {
+		// existing session
+		std::shared_lock<std::shared_mutex> lck(sessions_lock);
+
+		auto cur_it = sessions.find(id);
+
+		// not found? syn missing?
+		if (cur_it == sessions.end()) {
+			DOLOG(ll_debug, "%s: new session which does not start with SYN [IC]\n", pkt->get_log_prefix().c_str());
+			send_rst_for_port(pkt, dst_port, src_port);
+			delete pkt;
+			stats_inc_counter(tcp_errors);
+			return;
 		}
 	}
 
