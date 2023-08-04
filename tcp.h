@@ -113,6 +113,9 @@ private:
 	uint64_t *tcp_sessions_closed_2 { nullptr };
 	uint64_t *tcp_cur_n_sessions    { nullptr };
 
+	uint64_t *tcp_unacked_duration_max { nullptr };
+	uint64_t *tcp_cleaner_duration_max { nullptr };
+
 	void send_rst_for_port(const packet *const pkt, const int dst_port, const int src_port);
 
 	void send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len, const uint32_t TSencr);

@@ -90,6 +90,9 @@ tcp::tcp(stats *const s, icmp *const icmp_, const int n_threads) : transport_lay
 	tcp_rst               = s->register_stat("tcp_rst");
 	tcp_cur_n_sessions    = s->register_stat("tcp_cur_n_sessions");
 
+	tcp_unacked_duration_max = s->register_stat("tcp_unack_t_max", "1.3.6.1.4.1.57850.1.14.1");
+	tcp_cleaner_duration_max = s->register_stat("tcp_clean_t_max", "1.3.6.1.4.1.57850.1.14.2");
+
 	for(int i=0; i<n_threads; i++)
 		ths.push_back(new std::thread(std::ref(*this)));
 
@@ -795,7 +798,12 @@ void tcp::session_cleaner()
 			}
 		}
 
+		uint64_t end_now = get_us();
+
 		stats_set(tcp_cur_n_sessions, sessions.size());
+
+		// operation is not atomic but the sessions_lock is held
+		stats_set(tcp_cleaner_duration_max, std::max(*tcp_cleaner_duration_max, end_now - now));
 	}
 }
 
@@ -842,6 +850,11 @@ void tcp::unacked_sender()
 				s->r_last_pkt_ts = now;
 			}
 		}
+
+		uint64_t end_now = get_us();
+
+		// operation is not atomic but the sessions_lock is held
+		stats_set(tcp_unacked_duration_max, std::max(*tcp_unacked_duration_max, end_now - now));
 	}
 }
 
