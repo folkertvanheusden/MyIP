@@ -40,6 +40,8 @@ protected:
 
 	const std::string name;
 
+	bool      SIOCGSTAMPNS_OLD_error_emitted = false;
+
 	int       pcap_fd             { -1    };
 	bool      pcap_write_incoming { false };
 	bool      pcap_write_outgoing { false };

@@ -60,7 +60,11 @@ timespec phys::gen_packet_timestamp(const int fd)
 	timespec ts { 0, 0 };
 
 	if (ioctl(fd, SIOCGSTAMPNS_OLD, &ts) == -1) {
-		DOLOG(ll_warning, "ioctl(SIOCGSTAMPNS_OLD) failed: %s\n", strerror(errno));
+		if (SIOCGSTAMPNS_OLD_error_emitted == false) {
+			DOLOG(ll_info, "ioctl(SIOCGSTAMPNS_OLD) failed: %s\n", strerror(errno));
+
+			SIOCGSTAMPNS_OLD_error_emitted = true;
+		}
 
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
 			DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
