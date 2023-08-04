@@ -1,11 +1,11 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <chrono>
 
 #include "transport_layer.h"
 #include "log.h"
 
 
-constexpr size_t pkts_max_size { 256 };
+constexpr size_t pkts_max_size { 1024 };
 
 transport_layer::transport_layer(stats *const s, const std::string & stats_name)
 {

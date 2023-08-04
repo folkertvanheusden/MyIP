@@ -7,7 +7,7 @@
 #include "network_layer.h"
 
 
-constexpr size_t pkts_max_size { 256 };
+constexpr size_t pkts_max_size { 1024 };
 
 network_layer::network_layer(stats *const s, const std::string & stats_name, router *const r) : r(r)
 {
