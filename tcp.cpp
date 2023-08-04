@@ -760,19 +760,6 @@ void tcp::session_cleaner()
 				else
 					DOLOG(ll_debug, "%s: session timed out\n", log_prefix.c_str());
 
-				// call session_closed
-				auto cb = get_lock_listener(s->get_my_port(), log_prefix, false);
-
-				if (cb.has_value()) {  // session not initiated here?
-					if (cb.value().session_closed_1)
-						cb.value().session_closed_1(this, s);
-
-					if (cb.value().session_closed_2)
-						cb.value().session_closed_2(this, s);
-				}
-
-				release_listener_lock(false);
-
 				if (s->is_client)
 					tcp_clients.erase(s->get_my_port());
 
