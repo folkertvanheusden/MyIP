@@ -135,7 +135,7 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str.c_str(), rel_seqnr(ts, false, ack_to), my_seq_nr ? rel_seqnr(ts, true, *my_seq_nr) : -1, data_len);
 
 	if (!idev) {
-		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: Dropping packet, no physical device assigned (yet)\n", session_id);
+		DOLOG(ll_info, "TCP[%012" PRIx64 "]: Dropping packet, no physical device assigned (yet)\n", session_id);
 		return;
 	}
 
@@ -254,7 +254,7 @@ void tcp::set_state(tcp_session *const session, const tcp_state_t new_state)
 void tcp::send_rst_for_port(const packet *const pkt, const int dst_port, const int src_port)
 {
 	if (!idev) {
-		DOLOG(ll_debug, "TCP[]: Dropping packet, no physical device assigned (yet)\n");
+		DOLOG(ll_info, "TCP[]: Dropping packet, no physical device assigned (yet)\n");
 		return;
 	}
 
@@ -338,6 +338,7 @@ void tcp::packet_handler(packet *const pkt)
 
 		if (!has_listener) {
 			send_rst_for_port(pkt, dst_port, src_port);
+			DOLOG(ll_debug, "%s: no listener for %d\n", pkt->get_log_prefix().c_str(), dst_port);
 			delete pkt;
 			return;
 		}
