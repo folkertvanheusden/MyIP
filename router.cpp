@@ -254,7 +254,7 @@ void router::operator()()
 		}
 
 		if (po.value()->src_mac.has_value() == false) {
-			DOLOG(ll_info, "router::operator: src-mac not known yet\n");
+			DOLOG(ll_debug, "router::operator: src-mac not known yet\n");
 
 			// must always succeed, see main where a static rarp is setup
 			po.value()->src_mac = resolve_mac_by_addr(re_src, po.value()->src_ip);
@@ -264,7 +264,7 @@ void router::operator()()
 		}
 
 		if (po.value()->dst_mac.has_value() == false) {
-			DOLOG(ll_info, "router::operator: dst-mac not known yet\n");
+			DOLOG(ll_debug, "router::operator: dst-mac not known yet\n");
 
 			po.value()->dst_mac = resolve_mac_by_addr(re_dst, po.value()->dst_ip);
 
