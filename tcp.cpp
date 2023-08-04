@@ -844,10 +844,11 @@ void tcp::unacked_sender()
 					s->data_since_last_ack += send_n;
 				}
 
-				if (to_send > 0)
+				if (to_send > 0) {
 					s->unacked_sent_cv.notify_one();
 
-				s->r_last_pkt_ts = now;
+					s->r_last_pkt_ts = now;
+				}
 			}
 		}
 
