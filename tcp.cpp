@@ -338,20 +338,20 @@ void tcp::packet_handler(packet *const pkt)
 	}
 
 	{
-		std::unique_lock<std::shared_mutex> lck(sessions_lock);
+		if (flag_syn) {  // new session
+			std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
-		// check concuncurrent session count
-		if (sessions.size() >= 128) {
-			DOLOG(ll_debug, "%s: too many TCP sessions (%zu)\n", pkt->get_log_prefix().c_str(), sessions.size());
-			// drop packet
-			delete pkt;
-			return;
-		}
+			// check concuncurrent session count
+			if (sessions.size() >= 128) {
+				DOLOG(ll_warning, "%s: too many TCP sessions (%zu)\n", pkt->get_log_prefix().c_str(), sessions.size());
+				// drop packet
+				delete pkt;
+				return;
+			}
 
-		auto cur_it = sessions.find(id);
+			auto cur_it = sessions.find(id);
 
-		if (cur_it == sessions.end()) {
-			if (flag_syn) {  // MUST start with SYN
+			if (cur_it == sessions.end()) {
 				private_data *pd          = port_record.value().pd;
 
 				tcp_session  *new_session = new tcp_session(this, pkt->get_dst_addr(), dst_port, pkt->get_src_addr(), src_port, pd);
@@ -384,7 +384,16 @@ void tcp::packet_handler(packet *const pkt)
 
 				DOLOG(ll_debug, "%s: ...is a new session (initial my seq nr: %u, their: %u)\n", pkt->get_log_prefix().c_str(), new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
 			}
-			else {
+
+		}
+		else {
+			// existing session
+			std::shared_lock<std::shared_mutex> lck(sessions_lock);
+
+			auto cur_it = sessions.find(id);
+
+			// not found? syn missing?
+			if (cur_it == sessions.end()) {
 				DOLOG(ll_debug, "%s: new session which does not start with SYN [IC]\n", pkt->get_log_prefix().c_str());
 				send_rst_for_port(pkt, dst_port, src_port);
 				delete pkt;
