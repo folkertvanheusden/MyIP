@@ -390,21 +390,6 @@ void tcp::packet_handler(packet *const pkt)
 		}
 
 	}
-	else {
-		// existing session
-		std::shared_lock<std::shared_mutex> lck(sessions_lock);
-
-		auto cur_it = sessions.find(id);
-
-		// not found? syn missing?
-		if (cur_it == sessions.end()) {
-			DOLOG(ll_debug, "%s: new session which does not start with SYN [IC]\n", pkt->get_log_prefix().c_str());
-			send_rst_for_port(pkt, dst_port, src_port);
-			delete pkt;
-			stats_inc_counter(tcp_errors);
-			return;
-		}
-	}
 
 	bool delete_entry = false;
 
@@ -417,7 +402,12 @@ void tcp::packet_handler(packet *const pkt)
 		if (cur_it == sessions.end()) {
 			delete_entry = true;
 
-			break;
+			DOLOG(ll_debug, "%s: new sessions must start with SYN\n", pkt->get_log_prefix().c_str());
+			send_rst_for_port(pkt, dst_port, src_port);
+			delete pkt;
+			stats_inc_counter(tcp_errors);
+
+			return;
 		}
 
 		// process extra headers
