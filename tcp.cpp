@@ -696,6 +696,8 @@ void tcp::packet_handler(packet *const pkt)
 	if (delete_entry) {
 		DOLOG(ll_debug, "%s: cleaning up session\n", pkt->get_log_prefix().c_str());
 
+		stats_inc_counter(tcp_sessions_rem);
+
 		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 		auto cur_it = sessions.find(id);
@@ -723,8 +725,6 @@ void tcp::packet_handler(packet *const pkt)
 			// clean-up
 			free_tcp_session(session_pointer);
 		}
-
-		stats_inc_counter(tcp_sessions_rem);
 	}
 
 	delete pkt;
