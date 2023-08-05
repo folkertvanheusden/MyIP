@@ -246,7 +246,7 @@ void router::operator()()
 		// when routing to an other physical address family, use for source-mac the local
 		// destination-interface mac as we're a router
 		if (re_src != re_dst) {
-			DOLOG(ll_info, "router::operator: src-route different from dst-route\n");
+			DOLOG(ll_debug, "router::operator: src-route different from dst-route\n");
 
 			re_src = re_dst;
 
