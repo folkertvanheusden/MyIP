@@ -61,15 +61,20 @@ void icmp4::operator()()
 
 			reply[0] = 0; // echo reply
 		}
-		else if (p[0] == 13 && size >= 20) {  // timestamp request
-			reply[0] = 14; // timestamp reply
+		else if (p[0] == 13) {  // timestamp request
+			if (size >= 20) {
+				 reply[0] = 14; // timestamp reply
 
-			uint32_t reply_ts = ms_since_midnight();
+				uint32_t reply_ts = ms_since_midnight();
 
-			reply[12] = reply[16] = reply_ts >> 24;
-			reply[13] = reply[17] = reply_ts >> 16;
-			reply[14] = reply[18] = reply_ts >>  8;
-			reply[15] = reply[19] = reply_ts;
+				reply[12] = reply[16] = reply_ts >> 24;
+				reply[13] = reply[17] = reply_ts >> 16;
+				reply[14] = reply[18] = reply_ts >>  8;
+				reply[15] = reply[19] = reply_ts;
+			}
+			else {
+				DOLOG(ll_debug, "ICMP: timestamp request has invalid size (%d)\n", size);
+			}
 		}
 		else {
 			DOLOG(ll_debug, "ICMP: dropping packet (type %d code %d)\n", p[0], p[1]);
