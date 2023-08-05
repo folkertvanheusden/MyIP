@@ -85,6 +85,15 @@ std::vector<uint8_t> lldp::generate_lldp_packet()
 	std::vector<uint8_t> system_description = str_to_uvec(description);
 	add_tlv(&out, 6, system_description);
 
+	// CAPABILITIES
+	uint16_t capabilities = 0x01 /* other */ | 0x10 /* router */ | 0x80 /* station */;
+	std::vector<uint8_t> caps;
+	caps.push_back(capabilities >> 8);
+	caps.push_back(capabilities);
+	caps.push_back(0);  // reserved
+	caps.push_back(0);
+	add_tlv(&out, 7, caps);
+
 	// MANAGEMENT ADDRESS
 	std::vector<uint8_t> mgmt;
 
