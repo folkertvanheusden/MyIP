@@ -92,10 +92,10 @@ static void unregister_all_topics(mqtt_session_data *const msd)
 
 	topic_lck.lock();
 
-	for(auto it : topic_subscriptions)
+	for(auto & it : topic_subscriptions)
 		it.second.erase(msd);
 
-	for(auto it : topic_wc_subscriptions)
+	for(auto & it : topic_wc_subscriptions)
 		it.second.erase(msd);
 
 	topic_lck.unlock();
@@ -131,7 +131,7 @@ static void publish(mqtt_session_data *const msd, const std::string & topic, con
 
 	topic_lck.lock();
 
-	for(auto t_it : topic_subscriptions) {
+	for(auto & t_it : topic_subscriptions) {
 		if (t_it.first != topic)
 			continue;
 
@@ -146,7 +146,7 @@ static void publish(mqtt_session_data *const msd, const std::string & topic, con
 		}
 	}
 
-	for(auto t_it : topic_wc_subscriptions) {
+	for(auto & t_it : topic_wc_subscriptions) {
 		size_t wc = t_it.first.find('#');
 		assert(wc != std::string::npos);
 
@@ -231,7 +231,7 @@ bool mqtt_get_bytes(session *const ts, mqtt_session_data *const msd, uint8_t *co
 		if (msd->msgs_out.empty() == false) {
 			DOLOG(ll_debug, "MQTT(%s): %zu msgs pending\n", msd->session_name.c_str(), msd->msgs_out.size());
 
-			for (auto it : msd->msgs_out) {
+			for (auto & it : msd->msgs_out) {
 				DOLOG(ll_debug, "MQTT(%s): sending message of %zu bytes length\n", msd->session_name.c_str(), it.second);
 
 				ts->get_stream_target()->send_data(ts, it.first, it.second);
