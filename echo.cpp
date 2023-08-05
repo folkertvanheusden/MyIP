@@ -36,7 +36,7 @@ bool echo_session_closed_2(pstream *const ps, session *const session)
 
 port_handler_t echo_get_handler()
 {
-	port_handler_t meta;
+	port_handler_t meta { 0 };
 
 	meta.init             = echo_init;
 	meta.deinit           = echo_deinit;
