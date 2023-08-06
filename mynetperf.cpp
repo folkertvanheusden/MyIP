@@ -39,7 +39,7 @@ void mynetperf_handle_data(session *const session_in)
 
 			session->req_len = data_keep;
 
-			std::string reply = myformat("{ 'result' : 'ok', 'took': %zu, 'unit': 'us' }\n", now_ts - session->start_ts);
+			std::string reply = myformat("{ \"result\": \"ok\", \"took\": %zu, \"unit\": \"us\" }\n", now_ts - session->start_ts);
 
 			session_in->get_stream_target()->send_data(session_in, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 
@@ -96,7 +96,7 @@ void mynetperf_handle_data(session *const session_in)
 				return;
 			}
 
-			std::string reply = "{ 'result' : 'ok' }\n";
+			std::string reply = "{ \"result\" : \"ok\" }\n";
 
 			session_in->get_stream_target()->send_data(session_in, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 
