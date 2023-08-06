@@ -80,6 +80,10 @@ void ud_stats::emit_sessions(const int cfd)
 
 			json_object_set(record, "created-at", json_integer(ts.tv_sec * 1000000ll + ts.tv_nsec / 1000));
 
+			auto p = session.second->get_stream_target();
+
+			json_object_set(record, "type-specific", p->get_state_json(session.second));
+
 			json_array_append(out, record);
 		}
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <condition_variable>
+#include <jansson.h>
 #include <map>
 #include <shared_mutex>
 #include <stdint.h>
@@ -22,6 +23,8 @@ public:
 	virtual bool send_data(session *const s, const uint8_t *const data, const size_t len) = 0;
 
 	virtual void end_session(session *const ts) = 0;
+
+	virtual json_t *get_state_json(session *const ts) = 0;
 
 	auto get_sessions_locked() const { sessions_lock.lock_shared(); return &sessions; }
 

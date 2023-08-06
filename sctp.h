@@ -107,6 +107,8 @@ public:
 	sctp(stats *const s, icmp *const icmp_, const int n_threads);
 	virtual ~sctp();
 
+	json_t *get_state_json(session *const ts) override;
+
 	void add_handler(const int port, port_handler_t & sph);
 
 	bool send_data(session *const s, buffer_in & payload);

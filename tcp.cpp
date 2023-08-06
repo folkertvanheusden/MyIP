@@ -1139,3 +1139,29 @@ bool tcp::client_session_send_data(const int local_port, const uint8_t *const da
 
 	return rc;
 }
+
+json_t *tcp::get_state_json(session *const ts_in)
+{
+	tcp_session *const ts = dynamic_cast<tcp_session *>(ts_in);
+
+	json_t *out = json_object();
+
+	json_object_set(out, "state", json_string(ts->get_state_name().c_str()));
+	json_object_set(out, "state-duration", json_integer(time(nullptr) - ts->state_since));
+
+	json_object_set(out, "unacked_size", json_integer(ts->unacked_size));
+	json_object_set(out, "unacked_start_seq_nr", json_integer(ts->unacked_start_seq_nr));
+	json_object_set(out, "unacked_time_pending", json_real((get_us() - ts->r_last_pkt_ts) / 1000.));
+        json_object_set(out, "data_since_last_ack", json_integer(ts->data_since_last_ack));
+        json_object_set(out, "fin_after_unacked_empty", json_string(ts->fin_after_unacked_empty ? "true" : "false"));
+
+        json_object_set(out, "seq_for_fin_when_all_received", json_integer(ts->seq_for_fin_when_all_received));
+        json_object_set(out, "flag_fin_when_all_received", json_string(ts->flag_fin_when_all_received ? "true" : "false"));
+
+        json_object_set(out, "my_rel_sequence_nr", json_integer(rel_seqnr(ts, true, ts->my_seq_nr)));
+        json_object_set(out, "opp_rel_sequence_nr", json_integer(rel_seqnr(ts, false, ts->their_seq_nr)));
+
+        json_object_set(out, "n_fragments", json_integer(ts->fragments.size()));
+
+	return out;
+}

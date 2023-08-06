@@ -1,9 +1,10 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <condition_variable>
 #include <deque>
 #include <functional>
+#include <jansson.h>
 #include <map>
 #include <mutex>
 #include <shared_mutex>
@@ -136,6 +137,8 @@ private:
 public:
 	tcp(stats *const s, icmp *const icmp_, const int n_threads);
 	virtual ~tcp();
+
+	json_t *get_state_json(session *const ts) override;
 
 	void add_handler(const int port, port_handler_t & tph);
 

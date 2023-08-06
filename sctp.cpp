@@ -628,3 +628,14 @@ void sctp::end_session(session *const s_in)
 	if (transmit_packet(s->get_their_addr(), s->get_my_addr(), out.get_content(), out.get_size()) == false)
 		DOLOG(ll_info, "SCTP[%lx]: failed to transmit shutdown packet\n", s->get_hash());
 }
+
+json_t *sctp::get_state_json(session *const ts_in)
+{
+	sctp_session *const ts = dynamic_cast<sctp_session *>(ts_in);
+
+	json_t *out = json_object();
+
+	json_object_set(out, "state", json_string(ts->get_state_name().c_str()));
+
+	return out;
+}
