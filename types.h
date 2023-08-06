@@ -112,6 +112,28 @@ public:
 	size_t   req_len  { 0       };
 };
 
+class echo_session_data : public session_data
+{
+public:
+	~echo_session_data() {
+		if (th) {
+			terminate = true;
+
+			th->join();
+			delete th;
+		}
+	}
+
+	std::thread     *th        { nullptr };
+	std::atomic_bool terminate { false   };
+
+        std::condition_variable r_cond;
+        mutable std::mutex      r_lock;
+
+	uint8_t *req_data { nullptr };
+	size_t   req_len  { 0       };
+};
+
 typedef struct _vnc_thread_work_t_ {
 	// nullptr if update requested
 	packet *pkt;
