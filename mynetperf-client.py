@@ -20,19 +20,23 @@ def recv_reply(s: socket) -> str:
 
     return reply
 
+work = bytearray(131072)
+
 while True:
     bs = 512
-
-    block = bytearray(bs)
 
     command = { "mode": "receive", "block_size": bs }
     s.send(json.dumps(command).encode('ascii'))
     s.send('\n'.encode('ascii'))
 
+    if json.loads(recv_reply(s))['result'] != 'ok':
+        break
+
+    while bs > 0:
+        cur_bs = min(bs, len(work))
+
+        s.send(work[0:cur_bs])
+
+        bs -= cur_bs
+
     print(recv_reply(s))
-
-    s.send(block)
-
-    print(recv_reply(s))
-
-    break
