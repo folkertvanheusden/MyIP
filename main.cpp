@@ -28,6 +28,7 @@
 #include "log.h"
 #include "arp.h"
 #include "mdns.h"
+#include "mynetperf.h"
 #include "ndp.h"
 #include "sip.h"
 #include "udp.h"
@@ -990,6 +991,13 @@ int main(int argc, char *argv[])
 	register_tcp_service(&devs, irc_sph, 6667);
 
 	register_sctp_service(&devs, irc_sph, 6667);
+
+	// mynetperf
+	port_handler_t mnp_sph = mynetperf_get_handler();
+
+	register_tcp_service(&devs, mnp_sph, 55201);
+
+	register_sctp_service(&devs, mnp_sph, 55201);
 
 	// SYSLOG
 	try {

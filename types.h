@@ -90,10 +90,10 @@ public:
 	size_t req_len { 0       };
 };
 
-class nrpe_session_data : public session_data
+class echo_session_data : public session_data
 {
 public:
-	~nrpe_session_data() {
+	virtual ~echo_session_data() {
 		if (th) {
 			terminate = true;
 
@@ -112,26 +112,19 @@ public:
 	size_t   req_len  { 0       };
 };
 
-class echo_session_data : public session_data
+class nrpe_session_data : public echo_session_data
+{
+};
+
+class mynetperf_session_data : public echo_session_data
 {
 public:
-	~echo_session_data() {
-		if (th) {
-			terminate = true;
+	uint64_t block_size;
+	uint8_t *buffer;
+	enum    { mnp_receive, mnp_send, mnp_command } state;
 
-			th->join();
-			delete th;
-		}
-	}
-
-	std::thread     *th        { nullptr };
-	std::atomic_bool terminate { false   };
-
-        std::condition_variable r_cond;
-        mutable std::mutex      r_lock;
-
-	uint8_t *req_data { nullptr };
-	size_t   req_len  { 0       };
+	uint64_t data_received;
+	uint64_t start_ts;
 };
 
 typedef struct _vnc_thread_work_t_ {

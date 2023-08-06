@@ -42,6 +42,7 @@ add_executable(myip
 	mdns.cpp
 	mqtt.cpp
 	mqtt_client.cpp
+	mynetperf.cpp
 	ndp.cpp
 	net.cpp
 	network_layer.cpp
