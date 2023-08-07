@@ -40,14 +40,12 @@ void nrpe_thread(session *t_s)
 	std::unique_lock<std::mutex> lck(ts->r_lock);
 
         for(;ts->terminate == false;) {
-		if (lck.owns_lock()) {
-			if (ts->req_data) {
-				if (ts->req_len >= 16) {
-					int32_t buffer_length = (ts->req_data[12] << 24) | (ts->req_data[13] << 16) | (ts->req_data[14] << 8) | ts->req_data[15];
+		if (ts->req_data) {
+			if (ts->req_len >= 16) {
+				int32_t buffer_length = (ts->req_data[12] << 24) | (ts->req_data[13] << 16) | (ts->req_data[14] << 8) | ts->req_data[15];
 
-					if (ts->req_len >= size_t(16 + buffer_length) && buffer_length > 0)
-						send_response(t_s, ts->req_data, buffer_length);
-				}
+				if (ts->req_len >= size_t(16 + buffer_length) && buffer_length > 0)
+					send_response(t_s, ts->req_data, buffer_length);
 			}
 		}
 

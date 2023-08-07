@@ -135,7 +135,7 @@ void mynetperf_thread(session *session_in)
         std::unique_lock<std::mutex> lck(session->r_lock);
 
         for(;session->terminate == false;) {
-                if (lck.owns_lock() && session->req_data != nullptr)
+                if (session->req_data != nullptr)
 			mynetperf_handle_data(session_in);
 
                 session->r_cond.wait_for(lck, 500ms);

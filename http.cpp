@@ -342,23 +342,21 @@ int sock_read(void *ctx, unsigned char *buf, size_t len)
 	std::unique_lock<std::mutex> lck(hc->hs->r_lock);
 
 	for(;!hc->s->get_is_terminating();) {
-		if (lck.owns_lock()) {
-			if (hc->hs->req_len >= len) {
-				memcpy(buf, hc->hs->req_data, len);
+		if (hc->hs->req_len >= len) {
+			memcpy(buf, hc->hs->req_data, len);
 
-				size_t left = hc->hs->req_len - len;
+			size_t left = hc->hs->req_len - len;
 
-				if (left > 0)
-					memmove(&hc->hs->req_data[0], &hc->hs->req_data[len], left);
+			if (left > 0)
+				memmove(&hc->hs->req_data[0], &hc->hs->req_data[len], left);
 
-				hc->hs->req_len -= len;
+			hc->hs->req_len -= len;
 
-				return len;
-			}
-
-			if (hc->hs->terminate)
-				break;
+			return len;
 		}
+
+		if (hc->hs->terminate)
+			break;
 
 		hc->hs->r_cond.wait_for(lck, 100ms);
 	}
