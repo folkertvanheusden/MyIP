@@ -1129,7 +1129,7 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 
 		DOLOG(ll_debug, "wait_for_client_connected_state: client waiting for 'established': STATE NOW IS %s\n", states[cur_session->state]);
 
-		cur_session->state_changed.wait_for(lck, 600ms);
+		cur_session->state_changed.wait_for(cur_session_lock, 600ms);
 		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid as
 		// lck gets unlocked by the wait_for
 	}
