@@ -393,10 +393,10 @@ void tcp::packet_handler(packet *const pkt)
 
 	bool delete_entry = false;
 
-	bool notify_unacked_cv = false;
-
 	do
 	{
+		bool notify_unacked_cv = false;
+
 		std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 		auto cur_it = sessions.find(id);
@@ -692,6 +692,12 @@ void tcp::packet_handler(packet *const pkt)
 
 		if (delete_entry)
 			cur_session->set_is_terminating();
+
+		if (notify_unacked_cv) {
+			unacked_cv_mem = true;
+
+			unacked_cv.notify_one();
+		}
 	}
 	while(0);
 
@@ -730,11 +736,6 @@ void tcp::packet_handler(packet *const pkt)
 	}
 
 	delete pkt;
-
-	if (notify_unacked_cv) {
-		unacked_cv_mem = true;
-		unacked_cv.notify_one();
-	}
 }
 
 void tcp::session_cleaner()
