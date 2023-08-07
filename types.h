@@ -123,7 +123,7 @@ public:
 	uint8_t *buffer;
 	enum    { mnp_receive, mnp_send, mnp_command } state;
 
-	uint64_t data_received;
+	uint64_t data_transferred;
 	uint64_t start_ts;
 };
 

@@ -23,41 +23,6 @@ void mynetperf_handle_data(session *const session_in)
 {
         mynetperf_session_data *session = dynamic_cast<mynetperf_session_data *>(session_in->get_callback_private_data());
 
-	if (session->state == mynetperf_session_data::mnp_receive) { 
-		uint64_t now_ts = get_us();
-
-		uint64_t data_left = session->block_size - session->data_received;
-
-		if (data_left <= session->req_len) {
-			int64_t data_keep = session->req_len - data_left;
-
-			if (data_keep > 0)
-				memmove(&session->req_data[0], &session->req_data[data_left], data_keep);
-
-			session->data_received = 0;
-			session->block_size    = 0;
-
-			session->req_len = data_keep;
-
-			std::string reply = myformat("{ \"result\": \"ok\", \"took\": %zu, \"unit\": \"us\" }\n", now_ts - session->start_ts);
-
-			session_in->get_stream_target()->send_data(session_in, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
-
-			session->state = mynetperf_session_data::mnp_command;
-
-			DOLOG(ll_debug, "mynetperf_handle_data: block receive succeeded\n");
-		}
-		else
-		{
-			session->data_received += session->req_len;
-
-			session->req_len = 0;
-
-			free(session->req_data);
-			session->req_data = nullptr;
-		}
-	}
-
 	if (session->state == mynetperf_session_data::mnp_command) {
 		const uint8_t *lf = reinterpret_cast<const uint8_t *>(memchr(session->req_data, '\n', session->req_len));
 
@@ -85,6 +50,7 @@ void mynetperf_handle_data(session *const session_in)
 			session->block_size = json_integer_value(rc1);
 
 			std::string mode = json_string_value(rc2);
+
 			if (mode == "receive")
 				session->state = mynetperf_session_data::mnp_receive;
 			else if (mode == "send")
@@ -100,6 +66,8 @@ void mynetperf_handle_data(session *const session_in)
 
 			session_in->get_stream_target()->send_data(session_in, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
 
+			DOLOG(ll_info, "mynetperf_handle_data: command \"%s\" received for %zu bytes\n", mode.c_str(), size_t(session->block_size));
+
 			json_decref(command);
 
 			free(session->req_data);
@@ -107,9 +75,7 @@ void mynetperf_handle_data(session *const session_in)
 
 			session->req_len = 0;
 
-			session->data_received = 0;
-
-			DOLOG(ll_info, "mynetperf_handle_data: command %s received for %zu bytes\n", mode.c_str(), size_t(session->block_size));
+			session->data_transferred = 0;
 
 			session->start_ts = get_us();
 		}
@@ -121,6 +87,74 @@ void mynetperf_handle_data(session *const session_in)
 
 			session->terminate = true;
 		}
+	}
+
+	if (session->state == mynetperf_session_data::mnp_receive) {
+		uint64_t now_ts = get_us();
+
+		uint64_t data_left = session->block_size - session->data_transferred;
+
+		DOLOG(ll_debug, "mynetperf_handle_data: transfer (receive) requested for %zu bytes\n", size_t(data_left));
+
+		if (data_left <= session->req_len) {
+			int64_t data_keep = session->req_len - data_left;
+
+			if (data_keep > 0)
+				memmove(&session->req_data[0], &session->req_data[data_left], data_keep);
+
+			session->data_transferred = 0;
+			session->block_size       = 0;
+
+			session->req_len = data_keep;
+
+			std::string reply = myformat("{ \"result\": \"ok\", \"took\": %zu, \"unit\": \"us\" }\n", size_t(now_ts - session->start_ts));
+
+			session_in->get_stream_target()->send_data(session_in, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
+
+			session->state = mynetperf_session_data::mnp_command;
+
+			DOLOG(ll_debug, "mynetperf_handle_data: block receive succeeded\n");
+		}
+		else {
+			session->data_transferred += session->req_len;
+
+			session->req_len = 0;
+
+			free(session->req_data);
+			session->req_data = nullptr;
+		}
+	}
+
+	if (session->state == mynetperf_session_data::mnp_send) {
+		uint64_t now_ts = get_us();
+
+		uint64_t data_left = session->block_size - session->data_transferred;
+
+		DOLOG(ll_debug, "mynetperf_handle_data: transfer (send) requested for %zu bytes\n", size_t(data_left));
+
+		const uint64_t max_block_size = 65536;  // largest possible mtu on ethernet? (TODO)
+
+		uint8_t *data = reinterpret_cast<uint8_t *>(malloc(max_block_size));
+
+		while(data_left > 0) {
+			uint64_t cur_block_size = std::min(max_block_size, data_left);
+
+			session->data_transferred += cur_block_size;
+
+			data_left -= cur_block_size;
+
+			session_in->get_stream_target()->send_data(session_in, data, cur_block_size);
+		}
+
+		free(data);
+
+		std::string reply = myformat("{ \"result\": \"ok\", \"took\": %zu, \"unit\": \"us\" }\n", size_t(now_ts - session->start_ts));
+
+		session_in->get_stream_target()->send_data(session_in, reinterpret_cast<const uint8_t *>(reply.c_str()), reply.size());
+
+		session->state = mynetperf_session_data::mnp_command;
+
+		DOLOG(ll_debug, "mynetperf_handle_data: block transmit succeeded\n");
 	}
 }
 
@@ -156,7 +190,7 @@ bool mynetperf_new_session(pstream *const ps, session *const session)
 	ts->block_size = 0;
 	ts->state      = mynetperf_session_data::mnp_command;
 	//
-	ts->data_received = 0;
+	ts->data_transferred = 0;
 
         any_addr src_addr = session->get_their_addr();
         ts->client_addr   = src_addr.to_str();

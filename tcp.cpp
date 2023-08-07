@@ -913,6 +913,11 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 
 				// new data was added, try sending immediately
 				ts->r_last_pkt_ts = 0;
+
+				lck.unlock();
+
+				std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
+				unacked_cv.notify_all();
 			}
 
 			break;
@@ -920,22 +925,19 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 
 		if (ts->state != tcp_established) {
 			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send_data interrupted by session end\n", ts->id);
+			lck.unlock();
 			break;
 		}
 
-		if (ts->get_is_terminating() == false)
+		if (ts->get_is_terminating() == false) {
+			lck.unlock();
 			break;
+		}
 
 		DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unacked-buffer full\n", ts->id);
 
 		ts->unacked_sent_cv.wait_for(lck, 100ms);
 	}
-
-	lck.unlock();
-
-	std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
-	unacked_cv.notify_all();
-	lck_s.unlock();
 
 	return true;
 }
