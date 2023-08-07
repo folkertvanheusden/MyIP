@@ -128,6 +128,8 @@ try:
 except KeyboardInterrupt as ki:
     pass
 
+print()
+
 if n > 0:
     median.sort()
 
