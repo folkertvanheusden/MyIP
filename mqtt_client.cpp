@@ -250,6 +250,8 @@ void mqtt_client::operator()()
 {
 	set_thread_name("myip-mqtt-client");
 
+	DOLOG(ll_info, "Starting mqtt client\n");
+
 	std::optional<any_addr> addr;
 
 	while(!stop_flag) {
