@@ -733,8 +733,6 @@ void tcp::packet_handler(packet *const pkt)
 
 	if (notify_unacked_cv) {
 		unacked_cv_mem = true;
-
-		std::shared_lock<std::shared_mutex> lck_s(sessions_lock);
 		unacked_cv.notify_one();
 	}
 }
@@ -918,8 +916,6 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 				lck.unlock();
 
 				unacked_cv_mem = true;
-
-				std::shared_lock<std::shared_mutex> lck_s(sessions_lock);
 				unacked_cv.notify_one();
 			}
 
