@@ -732,9 +732,10 @@ void tcp::packet_handler(packet *const pkt)
 	delete pkt;
 
 	if (notify_unacked_cv) {
-		std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
+		unacked_cv_mem = true;
 
-		unacked_cv.notify_all();
+		std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
+		unacked_cv.notify_one();
 	}
 }
 
@@ -814,7 +815,7 @@ void tcp::unacked_sender()
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
-		if (unacked_cv.wait_for(lck, 500ms) == std::cv_status::timeout)
+		if (unacked_cv_mem.exchange(false) == false && unacked_cv.wait_for(lck, 500ms) == std::cv_status::timeout)
 			continue;
 
 		// go through all sessions and find if any has segments to resend
@@ -916,8 +917,10 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 
 				lck.unlock();
 
-				std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
-				unacked_cv.notify_all();
+				unacked_cv_mem = true;
+
+				std::shared_lock<std::shared_mutex> lck_s(sessions_lock);
+				unacked_cv.notify_one();
 			}
 
 			break;

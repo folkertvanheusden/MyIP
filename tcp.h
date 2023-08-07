@@ -93,6 +93,7 @@ private:
 	std::thread *th_cleaner        { nullptr };
 
 	std::condition_variable_any   unacked_cv;
+	std::atomic_bool unacked_cv_mem { false  };
 
 	// listen port -> handler
 	std::shared_mutex             listeners_lock;
