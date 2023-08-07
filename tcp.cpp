@@ -734,7 +734,7 @@ void tcp::packet_handler(packet *const pkt)
 	if (notify_unacked_cv) {
 		unacked_cv_mem = true;
 
-		std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
+		std::shared_lock<std::shared_mutex> lck_s(sessions_lock);
 		unacked_cv.notify_one();
 	}
 }
