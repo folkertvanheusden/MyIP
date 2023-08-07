@@ -26,21 +26,18 @@ void echo_thread(session *session_in)
         std::unique_lock<std::mutex> lck(session->r_lock);
 
         for(;session->terminate == false;) {
-                if (lck.owns_lock()) {
-                        if (session->req_data) {
-				session_in->get_stream_target()->send_data(session_in, session->req_data, session->req_len);
+		if (session->req_data) {
+			session_in->get_stream_target()->send_data(session_in, session->req_data, session->req_len);
 
-				free(session->req_data);
+			free(session->req_data);
 
-				session->req_data = nullptr;
-				session->req_len  = 0;
-                        }
-                }
+			session->req_data = nullptr;
+			session->req_len  = 0;
+		}
 
                 session->r_cond.wait_for(lck, 500ms);
         }
 }
-
 
 bool echo_new_session(pstream *const ps, session *const session)
 {
