@@ -813,14 +813,11 @@ void tcp::unacked_sender()
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
-		if (unacked_cv_mem.exchange(false) == false) {
-			if (unacked_cv.wait_for(lck, 500ms) == std::cv_status::timeout)
-				continue;
-			// lck is locked here
-		}
-		else {
+		if (unacked_cv_mem.exchange(false) == false && unacked_cv.wait_for(lck, 500ms) == std::cv_status::timeout)
+			continue;
+
+		if (lck.owns_lock() == false)  // because of the unacked_cv_mem check
 			lck.lock();
-		}
 
 		// go through all sessions and find if any has segments to resend
 		uint64_t now = get_us();
