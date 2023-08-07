@@ -1,8 +1,30 @@
 #! /usr/bin/python3
 
+import getopt
 import json
 import math
 import socket
+import sys
+
+
+host = '192.168.3.2'
+port = 55201
+
+work_bs = 65536
+
+opts, args = getopt.getopt(sys.argv[1:], 'H:p:b:')
+
+for o, a in opts:
+    if o == '-H':
+        host = a
+
+    elif o == '-p':
+        port = int(a)
+
+    elif o == '-b':
+        work_bs = int(a)
+
+work = bytearray(work_bs)
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(('192.168.3.2', 55201))
@@ -26,10 +48,6 @@ max_speed = -math.inf
 n = 0
 total = 0
 median = []
-
-work = bytearray(131072)
-
-work_bs = 65536
 
 try:
     while True:
