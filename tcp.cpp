@@ -855,6 +855,8 @@ void tcp::session_ender()
 
 		tcp_session *session = reinterpret_cast<tcp_session *>(es.value());
 
+		DOLOG(ll_debug, "tcp::session_ender: ending \"%s\"\n", session->to_str().c_str());
+
 		// call session_closed_2
 		int close_port       = session->get_my_port();
 
