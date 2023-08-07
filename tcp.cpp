@@ -414,10 +414,10 @@ void tcp::packet_handler(packet *const pkt)
 
 	bool delete_entry = false;
 
+	bool notify_unacked_cv = false;
+
 	do
 	{
-		bool notify_unacked_cv = false;
-
 		std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 		auto cur_it = sessions.find(id);
@@ -713,9 +713,6 @@ void tcp::packet_handler(packet *const pkt)
 
 		if (delete_entry)
 			cur_session->set_is_terminating();
-
-		if (notify_unacked_cv)
-			unacked_cv.notify_one();
 	}
 	while(0);
 
@@ -735,6 +732,12 @@ void tcp::packet_handler(packet *const pkt)
 
 			stats_set(tcp_cur_n_sessions, sessions.size());
 		}
+	}
+
+	if (notify_unacked_cv) {
+		std::unique_lock<std::shared_mutex> lck(sessions_lock);
+
+		unacked_cv.notify_one();
 	}
 
 	delete pkt;
@@ -797,7 +800,7 @@ void tcp::unacked_sender()
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
-		if (unacked_cv.wait_for(lck, 500ms) == std::cv_status::timeout)
+		if (unacked_cv.wait_for(lck, 800ms) == std::cv_status::timeout)
 			continue;
 
 		// go through all sessions and find if any has segments to resend
@@ -929,7 +932,7 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 
 				lck.unlock();
 
-				std::shared_lock<std::shared_mutex> lck_s(sessions_lock);
+				std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
 				unacked_cv.notify_one();
 			}
 
@@ -1126,7 +1129,7 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 
 		DOLOG(ll_debug, "wait_for_client_connected_state: client waiting for 'established': STATE NOW IS %s\n", states[cur_session->state]);
 
-		cur_session->state_changed.wait_for(lck, 500ms);
+		cur_session->state_changed.wait_for(lck, 600ms);
 		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid as
 		// lck gets unlocked by the wait_for
 	}
