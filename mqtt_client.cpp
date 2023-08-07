@@ -420,7 +420,7 @@ fifo<std::string> * mqtt_client::subscribe(const std::string & topic)
 			return nullptr;
 	}
 
-	auto f = new fifo<std::string>(s, "mqtt-" + topic, 16);
+	auto f = new fifo<std::string>(s, "mqtt-" + topic, 128);
 
 	topics.insert({ topic, f });
 
