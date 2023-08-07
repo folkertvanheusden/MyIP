@@ -79,7 +79,7 @@ public:
 		while(full)
 			pthread_cond_wait(&cond_pull, &lock);
 
-		data[write_pointer] = *element;
+		data[write_pointer] = element;
 
 		write_pointer++;
 		write_pointer %= n_elements;

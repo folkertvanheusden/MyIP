@@ -90,6 +90,10 @@ private:
 	icmp        *const icmp_       { nullptr };
 
 	std::thread *th_unacked_sender { nullptr };
+
+	fifo<session *> *ending_sessions     { nullptr };
+	std::vector<std::thread *> th_enders { nullptr };
+
 	std::thread *th_cleaner        { nullptr };
 
 	std::condition_variable_any   unacked_cv;
@@ -116,7 +120,6 @@ private:
 	uint64_t *tcp_cur_n_sessions    { nullptr };
 
 	uint64_t *tcp_unacked_duration_max { nullptr };
-	uint64_t *tcp_cleaner_duration_max { nullptr };
 	uint64_t *tcp_phandle_duration_max { nullptr };
 
 	void send_rst_for_port(const packet *const pkt, const int dst_port, const int src_port);
@@ -127,6 +130,7 @@ private:
 	void cleanup_session_helper(std::map<uint64_t, tcp_session *>::iterator *it);
 	void session_cleaner();
 	void unacked_sender();
+	void session_ender();
 
 	void set_state(tcp_session *const session, const tcp_state_t new_state);
 
