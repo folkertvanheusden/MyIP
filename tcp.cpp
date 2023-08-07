@@ -393,6 +393,8 @@ void tcp::packet_handler(packet *const pkt)
 
 	bool delete_entry = false;
 
+	bool notify_unacked_cv = false;
+
 	do
 	{
 		std::shared_lock<std::shared_mutex> lck(sessions_lock);
@@ -550,7 +552,7 @@ void tcp::packet_handler(packet *const pkt)
 							cur_session->r_last_pkt_ts = 0;  // force send asap
 					}
 
-					unacked_cv.notify_all();
+					notify_unacked_cv = true;
 				}
 				else {
 					DOLOG(ll_debug, "%s: unexpected ACK\n", pkt->get_log_prefix().c_str());
@@ -728,6 +730,12 @@ void tcp::packet_handler(packet *const pkt)
 	}
 
 	delete pkt;
+
+	if (notify_unacked_cv) {
+		std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
+
+		unacked_cv.notify_all();
+	}
 }
 
 void tcp::session_cleaner()
@@ -890,33 +898,29 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, %lu packets\n", ts->id, len, (len + ts->window_size - 1) / ts->window_size);
 
-	std::unique_lock<std::mutex> lck(ts->session_lock);  // try_lock TODO
+	std::unique_lock<std::mutex> lck(ts->session_lock);
 
 	for(;;) {
 		// lock for unacked and for my_seq_nr
-		if (lck.owns_lock()) {
-			if (ts->unacked_size < 1024 * 1024) {  // max 1MB queued
-				if (ts->state == tcp_established) {
-					if (ts->unacked_size == 0)
-						ts->unacked_start_seq_nr = ts->my_seq_nr;
+		if (ts->unacked_size < 1024 * 1024) {  // max 1MB queued
+			if (ts->state == tcp_established) {
+				if (ts->unacked_size == 0)
+					ts->unacked_start_seq_nr = ts->my_seq_nr;
 
-					ts->unacked = reinterpret_cast<uint8_t *>(realloc(ts->unacked, ts->unacked_size + len));
-					memcpy(&ts->unacked[ts->unacked_size], data, len);
-					ts->unacked_size += len;
+				ts->unacked = reinterpret_cast<uint8_t *>(realloc(ts->unacked, ts->unacked_size + len));
+				memcpy(&ts->unacked[ts->unacked_size], data, len);
+				ts->unacked_size += len;
 
-					// new data was added, try sending immediately
-					ts->r_last_pkt_ts = 0;
-
-					unacked_cv.notify_all();
-				}
-
-				break;
+				// new data was added, try sending immediately
+				ts->r_last_pkt_ts = 0;
 			}
 
-			if (ts->state != tcp_established) {
-				DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send_data interrupted by session end\n", ts->id);
-				break;
-			}
+			break;
+		}
+
+		if (ts->state != tcp_established) {
+			DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send_data interrupted by session end\n", ts->id);
+			break;
 		}
 
 		if (ts->get_is_terminating() == false)
@@ -926,6 +930,12 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 
 		ts->unacked_sent_cv.wait_for(lck, 100ms);
 	}
+
+	lck.unlock();
+
+	std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
+	unacked_cv.notify_all();
+	lck_s.unlock();
 
 	return true;
 }
