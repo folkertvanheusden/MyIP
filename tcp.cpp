@@ -1034,6 +1034,8 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 
 	send_segment(new_session, id, new_session->get_my_addr(), new_session->get_my_port(), new_session->get_their_addr(), new_session->get_their_port(), 512, FLAG_SYN, new_session->their_seq_nr, &new_session->my_seq_nr, nullptr, 0, 0);
 
+	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: SYN sent\n");
+
 	return local_port;
 }
 
@@ -1093,10 +1095,8 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 
 		if (cur_session->state >= tcp_established) {
 			DOLOG(ll_debug, "wait_for_client_connected_state: found session-data, data sent\n");
-//			cur_session->my_seq_nr++;
 			break;
 		}
-
 
 		if (time(nullptr) - cur_session->state_since >= 30) {
 			end_session(sd_it->second);
@@ -1105,6 +1105,8 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 		}
 
 		if (++counter == 3) {
+			DOLOG(ll_debug, "wait_for_client_connected_state: re-send SYN\n");
+
 			counter = 0;
 
 			uint32_t temp = cur_session->my_seq_nr;
@@ -1118,6 +1120,8 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid as
 		// lck gets unlocked by the wait_for
 	}
+
+	DOLOG(ll_debug, "tcp::wait_for_client_connected_state: finished/end\n");
 
 	return true;
 }
