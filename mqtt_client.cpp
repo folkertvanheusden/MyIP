@@ -250,6 +250,8 @@ void mqtt_client::operator()()
 {
 	set_thread_name("myip-mqtt-client");
 
+	DOLOG(ll_info, "Starting mqtt client\n");
+
 	std::optional<any_addr> addr;
 
 	while(!stop_flag) {
@@ -418,7 +420,7 @@ fifo<std::string> * mqtt_client::subscribe(const std::string & topic)
 			return nullptr;
 	}
 
-	auto f = new fifo<std::string>(s, "mqtt-" + topic, 256);
+	auto f = new fifo<std::string>(s, "mqtt-" + topic, 16);
 
 	topics.insert({ topic, f });
 

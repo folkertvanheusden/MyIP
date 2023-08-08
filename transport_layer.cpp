@@ -5,7 +5,7 @@
 #include "log.h"
 
 
-constexpr size_t pkts_max_size { 1024 };
+constexpr size_t pkts_max_size { 128 };
 
 transport_layer::transport_layer(stats *const s, const std::string & stats_name)
 {

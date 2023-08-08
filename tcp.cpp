@@ -18,6 +18,8 @@
 
 using namespace std::chrono_literals;
 
+constexpr size_t pkts_max_size { 256 };
+
 constexpr const char *const states[] = { "closed", "listen", "syn_rcvd", "syn_sent", "established", "fin_wait_1", "fin_wait_2", "close_wait", "last_ack", "closing", "time_wait", "rst_act" };
 
 #define FLAG_CWR (1 << 7)
@@ -91,15 +93,19 @@ tcp::tcp(stats *const s, icmp *const icmp_, const int n_threads) : transport_lay
 	tcp_cur_n_sessions    = s->register_stat("tcp_cur_n_sessions");
 
 	tcp_unacked_duration_max = s->register_stat("tcp_unack_t_max", "1.3.6.1.4.1.57850.1.14.1");
-	tcp_cleaner_duration_max = s->register_stat("tcp_clean_t_max", "1.3.6.1.4.1.57850.1.14.2");
 	tcp_phandle_duration_max = s->register_stat("tcp_phandle_t_max", "1.3.6.1.4.1.57850.1.14.3");
 
+	ending_sessions = new fifo<session *>(s, "tcp-ending-sessions", pkts_max_size);
+
 	for(int i=0; i<n_threads; i++)
-		ths.push_back(new std::thread(std::ref(*this)));
+		th_enders.push_back(new std::thread(&tcp::session_ender, this));
 
 	th_cleaner = new std::thread(&tcp::session_cleaner, this);
 
 	th_unacked_sender = new std::thread(&tcp::unacked_sender, this);
+
+	for(int i=0; i<n_threads; i++)
+		ths.push_back(new std::thread(std::ref(*this)));
 }
 
 tcp::~tcp()
@@ -119,6 +125,21 @@ tcp::~tcp()
 
 	th_cleaner->join();
 	delete th_cleaner;
+
+	for(auto & th : th_enders) {
+		th->join();
+
+		delete th;
+	}
+
+	for(;;) {
+		auto session = ending_sessions->get(1);
+
+		if (session.has_value() == false)
+			break;
+
+		delete session.value();
+	}
 
 	for(auto & s : sessions)
 		free_tcp_session(dynamic_cast<tcp_session *>(s.second));
@@ -393,10 +414,10 @@ void tcp::packet_handler(packet *const pkt)
 
 	bool delete_entry = false;
 
+	bool notify_unacked_cv = false;
+
 	do
 	{
-		bool notify_unacked_cv = false;
-
 		std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 		auto cur_it = sessions.find(id);
@@ -692,9 +713,6 @@ void tcp::packet_handler(packet *const pkt)
 
 		if (delete_entry)
 			cur_session->set_is_terminating();
-
-		if (notify_unacked_cv)
-			unacked_cv.notify_one();
 	}
 	while(0);
 
@@ -705,31 +723,21 @@ void tcp::packet_handler(packet *const pkt)
 
 		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
-		auto cur_it = sessions.find(id);
-
-		if (cur_it != sessions.end()) {
+		if (auto cur_it = sessions.find(id); cur_it != sessions.end()) {
 			tcp_session *session_pointer = dynamic_cast<tcp_session *>(cur_it->second);
 
+			ending_sessions->put(session_pointer);
+
 			sessions.erase(cur_it);
+
 			stats_set(tcp_cur_n_sessions, sessions.size());
-
-			lck.unlock();
-
-			// call session_closed_2
-			int close_port       = session_pointer->get_my_port();
-
-			auto cb_org          = get_lock_listener(close_port, pkt->get_log_prefix(), false);
-
-			if (cb_org.has_value())  // is session initiated here?
-				cb_org.value().session_closed_2(this, session_pointer);
-			else
-				DOLOG(ll_info, "%s: port %d not known\n", pkt->get_log_prefix().c_str(), close_port);
-
-			release_listener_lock(false);
-
-			// clean-up
-			free_tcp_session(session_pointer);
 		}
+	}
+
+	if (notify_unacked_cv) {
+		std::unique_lock<std::shared_mutex> lck(sessions_lock);
+
+		unacked_cv.notify_one();
 	}
 
 	delete pkt;
@@ -746,7 +754,6 @@ void tcp::session_cleaner()
 
 		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
-		// find t/o'd sessions
 		uint64_t now = get_us();
 
 		for(auto it = sessions.cbegin(); it != sessions.cend();) {
@@ -758,47 +765,29 @@ void tcp::session_cleaner()
 
 			uint64_t age = (now - s->e_last_pkt_ts) / 1000000;
 
-			if (age >= session_timeout || s->state > tcp_established) {
+			if (age >= session_timeout || s->state > tcp_established || (s->state == tcp_syn_rcvd && age >= 5)) {
 				if (s->state > tcp_established)
 					DOLOG(ll_debug, "%s: session closed (state: %s)\n", log_prefix.c_str(), states[s->state]);
-				else
+				else if (s->state > tcp_established)
 					DOLOG(ll_debug, "%s: session timed out\n", log_prefix.c_str());
-
-				if (s->is_client)
-					tcp_clients.erase(s->get_my_port());
-
-				it = sessions.erase(it);
+				else
+					DOLOG(ll_debug, "%s: delete session in SYN state for 5 or more seconds\n", log_prefix.c_str());
 
 				stats_inc_counter(tcp_sessions_to);
 
-				// clean-up
-				cur_session_lock.unlock();
-
-				free_tcp_session(s);
-			}
-			else if (s->state == tcp_syn_rcvd && age >= 5) {
-				DOLOG(ll_debug, "%s: delete session in SYN state for 5 or more seconds\n", log_prefix.c_str());
-
 				if (s->is_client)
 					tcp_clients.erase(s->get_my_port());
 
+				ending_sessions->put(it->second);
+
 				it = sessions.erase(it);
-
-				cur_session_lock.unlock();
-
-				free_tcp_session(s);
 			}
 			else {
 				++it;
 			}
 		}
 
-		uint64_t end_now = get_us();
-
 		stats_set(tcp_cur_n_sessions, sessions.size());
-
-		// operation is not atomic but the sessions_lock is held
-		stats_set(tcp_cleaner_duration_max, std::max(*tcp_cleaner_duration_max, end_now - now));
 	}
 }
 
@@ -811,7 +800,7 @@ void tcp::unacked_sender()
 	while(!stop_flag) {
 		using namespace std::chrono_literals;
 
-		if (unacked_cv.wait_for(lck, 500ms) == std::cv_status::timeout)
+		if (unacked_cv.wait_for(lck, 800ms) == std::cv_status::timeout)
 			continue;
 
 		// go through all sessions and find if any has segments to resend
@@ -851,6 +840,36 @@ void tcp::unacked_sender()
 
 		// operation is not atomic but the sessions_lock is held
 		stats_set(tcp_unacked_duration_max, std::max(*tcp_unacked_duration_max, end_now - now));
+	}
+}
+
+void tcp::session_ender()
+{
+	set_thread_name("myip-tcp-end");
+
+	for(;;) {
+		auto es = ending_sessions->get();
+		if (!es.has_value())
+			break;
+
+		tcp_session *session = reinterpret_cast<tcp_session *>(es.value());
+
+		DOLOG(ll_debug, "tcp::session_ender: ending \"%s\"\n", session->to_str().c_str());
+
+		// call session_closed_2
+		int close_port       = session->get_my_port();
+
+		auto cb_org          = get_lock_listener(close_port, "tcp::session_ender", false);
+
+		if (cb_org.has_value())  // is session initiated here?
+			cb_org.value().session_closed_2(this, session);
+		else
+			DOLOG(ll_info, "tcp::session_ender: port %d not known\n", close_port);
+
+		release_listener_lock(false);
+
+		// clean-up
+		free_tcp_session(session);
 	}
 }
 
@@ -913,7 +932,7 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 
 				lck.unlock();
 
-				std::shared_lock<std::shared_mutex> lck_s(sessions_lock);
+				std::unique_lock<std::shared_mutex> lck_s(sessions_lock);
 				unacked_cv.notify_one();
 			}
 
@@ -1110,7 +1129,7 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 
 		DOLOG(ll_debug, "wait_for_client_connected_state: client waiting for 'established': STATE NOW IS %s\n", states[cur_session->state]);
 
-		cur_session->state_changed.wait_for(lck, 500ms);
+		cur_session->state_changed.wait_for(lck, 600ms);
 		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid as
 		// lck gets unlocked by the wait_for
 	}
