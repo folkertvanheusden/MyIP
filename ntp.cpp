@@ -126,9 +126,9 @@ void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 void ntp::operator()()
 {
-	uint64_t prev = 0;
-
 	set_thread_name("myip-ntp");
+
+	uint64_t prev = 0;
 
 	for(;;) {
 		// send a packet each 64s

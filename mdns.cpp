@@ -241,6 +241,8 @@ void mdns::add_protocol(udp *const interface, const int port, const std::string 
 
 void mdns::operator()()
 {
+	set_thread_name("mdns");
+
 	for(;;) {
 		if (stop_flag.sleep(5000))
 			break;

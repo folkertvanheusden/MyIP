@@ -887,6 +887,8 @@ bool sip::send_REGISTER(const std::string & call_id, const std::string & authori
 
 void sip::register_thread()
 {
+	set_thread_name("myip_register_thread");
+
 	myusleep(2500000);
 
 	bool stop = false;

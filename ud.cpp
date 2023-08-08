@@ -207,6 +207,8 @@ void ud_stats::emit_arp(const int cfd, const std::string & dev_name)
 
 void ud_stats::handler(const int cfd)
 {
+	set_thread_name("myip_ud_stats");
+
 	for(;;) {
 		std::string cmd;
 
