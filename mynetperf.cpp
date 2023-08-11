@@ -70,10 +70,21 @@ void mynetperf_handle_data(session *const session_in, std::unique_lock<std::mute
 
 			json_decref(command);
 
-			free(session->req_data);
-			session->req_data = nullptr;
+			uint64_t bytes_processed = (lf - session->req_data) + 1;
 
-			session->req_len = 0;
+			int64_t bytes_left = session->req_len - bytes_processed;
+
+			if (bytes_left > 0) {
+				memmove(&session->req_data[0], &session->req_data[bytes_processed], bytes_left);
+
+				session->req_len = bytes_left;
+			}
+			else {
+				free(session->req_data);
+				session->req_data = nullptr;
+
+				session->req_len = 0;
+			}
 
 			session->data_transferred = 0;
 
@@ -99,6 +110,8 @@ void mynetperf_handle_data(session *const session_in, std::unique_lock<std::mute
 		if (data_left <= session->req_len) {
 			int64_t data_keep = session->req_len - data_left;
 
+			DOLOG(ll_debug, "mynetperf_handle_data: receive has %zd bytes overshoot\n", size_t(data_keep));
+
 			if (data_keep > 0)
 				memmove(&session->req_data[0], &session->req_data[data_left], data_keep);
 
@@ -117,6 +130,8 @@ void mynetperf_handle_data(session *const session_in, std::unique_lock<std::mute
 		}
 		else {
 			session->data_transferred += session->req_len;
+
+			DOLOG(ll_debug, "mynetperf_handle_data: stored %zu bytes in buffer, %zu left\n", session->req_len, size_t(session->block_size - session->data_transferred));
 
 			session->req_len = 0;
 
