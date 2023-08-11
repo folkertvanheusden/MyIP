@@ -19,7 +19,7 @@ void mynetperf_deinit()
 {
 }
 
-void mynetperf_handle_data(session *const session_in)
+void mynetperf_handle_data(session *const session_in, std::unique_lock<std::mutex> *const lck)
 {
         mynetperf_session_data *session = dynamic_cast<mynetperf_session_data *>(session_in->get_callback_private_data());
 
@@ -144,6 +144,11 @@ void mynetperf_handle_data(session *const session_in)
 			data_left -= cur_block_size;
 
 			session_in->get_stream_target()->send_data(session_in, data, cur_block_size);
+
+			// yield the lock
+			lck->unlock();
+			std::this_thread::yield();
+			lck->lock();
 		}
 
 		free(data);
@@ -170,7 +175,7 @@ void mynetperf_thread(session *session_in)
 
         for(;session->terminate == false;) {
                 if (session->req_data != nullptr)
-			mynetperf_handle_data(session_in);
+			mynetperf_handle_data(session_in, &lck);
 
                 session->r_cond.wait_for(lck, 500ms);
         }
