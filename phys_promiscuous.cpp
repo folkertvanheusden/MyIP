@@ -144,7 +144,8 @@ void phys_promiscuous::operator()()
 
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
-	uint8_t *buffer = new uint8_t[mtu_size];
+	// unfortunately the MTU gives no guarantees about the size of received packets
+	uint8_t buffer[65536];
 
 	while(!stop_flag) {
 		int rc = poll(fds, 1, 150);
@@ -159,7 +160,7 @@ void phys_promiscuous::operator()()
 		if (rc == 0)
 			continue;
 
-		int size = read(fd, reinterpret_cast<char *>(buffer), mtu_size);
+		int size = read(fd, reinterpret_cast<char *>(buffer), sizeof buffer);
 
 		auto ts = gen_packet_timestamp(fd);
 
@@ -196,8 +197,6 @@ void phys_promiscuous::operator()()
 
 		it->second->queue_incoming_packet(this, p);
 	}
-
-	delete [] buffer;
 
 	DOLOG(ll_info, "phys_promiscuous: thread stopped\n");
 }

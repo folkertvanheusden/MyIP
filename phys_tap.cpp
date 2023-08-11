@@ -153,7 +153,7 @@ void phys_tap::operator()()
 
 	struct pollfd fds[] = { { fd, POLLIN, 0 } };
 
-	uint8_t *buffer = new uint8_t[mtu_size];
+	uint8_t buffer[65536];
 
 	while(!stop_flag) {
 		int rc = poll(fds, 1, 150);
@@ -168,7 +168,7 @@ void phys_tap::operator()()
 		if (rc == 0)
 			continue;
 
-		int size = read(fd, reinterpret_cast<char *>(buffer), mtu_size);
+		int size = read(fd, reinterpret_cast<char *>(buffer), sizeof buffer);
 
 		auto ts = gen_packet_timestamp(fd);
 
@@ -205,8 +205,6 @@ void phys_tap::operator()()
 
 		it->second->queue_incoming_packet(this, p);
 	}
-
-	delete [] buffer;
 
 	DOLOG(ll_info, "phys_tap: thread stopped\n");
 }
