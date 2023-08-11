@@ -15,7 +15,7 @@ mode = None
 
 work_bs = 65536
 
-opts, args = getopt.getopt(sys.argv[1:], 'H:p:b:m:')
+opts, args = getopt.getopt(sys.argv[1:], 'H:p:b:m:h')
 
 for o, a in opts:
     if o == '-H':
@@ -29,6 +29,13 @@ for o, a in opts:
 
     elif o == '-m':
         mode = True if a == 'send' else False
+
+    elif o == '-h':
+        print('-H x   host')
+        print('-p x   port (default: 55201)')
+        print('-b x   block size (default: %d)' % work_bs)
+        print('-m x   mode: send or receive')
+        sys.exit(0)
 
 print('send mode' if mode else 'receive mode')
 
