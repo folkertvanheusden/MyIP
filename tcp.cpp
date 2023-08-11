@@ -1182,8 +1182,16 @@ json_t *tcp::get_state_json(session *const ts_in)
 	json_object_set(out, "state-duration", json_integer(time(nullptr) - ts->state_since));
 
 	json_object_set(out, "unacked_size", json_integer(ts->unacked_size));
-	json_object_set(out, "unacked_start_seq_nr", json_integer(ts->unacked_start_seq_nr));
-	json_object_set(out, "unacked_time_pending", json_real((get_us() - ts->r_last_pkt_ts) / 1000.));
+
+	if (ts->unacked_size) {
+		json_object_set(out, "unacked_start_seq_nr", json_integer(ts->unacked_start_seq_nr));
+		json_object_set(out, "unacked_time_pending", json_real((get_us() - ts->r_last_pkt_ts) / 1000.));
+	}
+	else {
+		json_object_set(out, "unacked_start_seq_nr", json_integer(0));
+		json_object_set(out, "unacked_time_pending", json_real(0.));
+	}
+
         json_object_set(out, "data_since_last_ack", json_integer(ts->data_since_last_ack));
         json_object_set(out, "fin_after_unacked_empty", json_string(ts->fin_after_unacked_empty ? "true" : "false"));
 
