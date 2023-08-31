@@ -150,14 +150,14 @@ int rel_seqnr(const tcp_session *const ts, const bool mine, const uint32_t nr)
 	return mine ? nr - ts->initial_my_seq_nr : nr - ts->initial_their_seq_nr;
 }
 
-void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len, const uint32_t TSecr)
+bool tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len, const uint32_t TSecr)
 {
 	std::string flag_str = flags_to_str(flags);
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu)\n", session_id, flags, flag_str.c_str(), rel_seqnr(ts, false, ack_to), my_seq_nr ? rel_seqnr(ts, true, *my_seq_nr) : -1, data_len);
 
 	if (!idev) {
 		DOLOG(ll_info, "TCP[%012" PRIx64 "]: Dropping packet, no physical device assigned (yet)\n", session_id);
-		return;
+		return false;
 	}
 
 	size_t temp_len = 20 + 12 + data_len;
@@ -217,7 +217,10 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 	temp[16] = checksum >> 8;
 	temp[17] = checksum;
 
-	idev->transmit_packet({ }, peer_addr, my_addr, 0x06, temp, temp_len, nullptr);
+	bool rc = idev->transmit_packet({ }, peer_addr, my_addr, 0x06, temp, temp_len, nullptr);
+
+	if (!rc)
+		DOLOG(ll_info, "TCP[%012" PRIx64 "]: Sending segment (flags: %02x (%s)), ack to: %u, my seq: %u, len: %zu) FAILED\n", session_id, flags, flag_str.c_str(), rel_seqnr(ts, false, ack_to), my_seq_nr ? rel_seqnr(ts, true, *my_seq_nr) : -1, data_len);
 
 	delete [] temp;
 
@@ -229,6 +232,8 @@ void tcp::send_segment(tcp_session *const ts, const uint64_t session_id, const a
 	}
 
 	ts->e_last_pkt_ts = get_us();
+
+	return rc;
 }
 
 std::optional<port_handler_t> tcp::get_lock_listener(const int dst_port, const std::string & log_prefix, const bool write_lock)
@@ -353,6 +358,8 @@ void tcp::packet_handler(packet *const pkt)
 	DOLOG(ll_debug, "%s: packet [%s]:%d->[%s]:%d, flags: %02x (%s), their seq: %u, ack to: %u, chksum: 0x%04x, size: %d\n", pkt->get_log_prefix().c_str(), src.to_str().c_str(), src_port, pkt->get_dst_addr().to_str().c_str(), dst_port, p[13], flag_str.c_str(), their_seq_nr, ack_to, (p[16] << 8) | p[17], size);
 
 	if (flag_syn) {  // new session
+		uint64_t start = get_us();
+
 		auto port_record  = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
 		bool has_listener = port_record.has_value();
 		release_listener_lock(false);
@@ -361,8 +368,13 @@ void tcp::packet_handler(packet *const pkt)
 			send_rst_for_port(pkt, dst_port, src_port);
 			DOLOG(ll_debug, "%s: no listener for %d\n", pkt->get_log_prefix().c_str(), dst_port);
 			delete pkt;
+			new_session_handling1.insert(get_us() - start);
 			return;
 		}
+
+		new_session_handling1.insert(get_us() - start);
+
+		start = get_us();
 
 		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
@@ -371,8 +383,13 @@ void tcp::packet_handler(packet *const pkt)
 			DOLOG(ll_warning, "%s: too many TCP sessions (%zu)\n", pkt->get_log_prefix().c_str(), sessions.size());
 			// drop packet
 			delete pkt;
+			new_session_handling2.insert(get_us() - start);
 			return;
 		}
+
+		new_session_handling2.insert(get_us() - start);
+
+		start = get_us();
 
 		auto cur_it = sessions.find(id);
 
@@ -410,6 +427,7 @@ void tcp::packet_handler(packet *const pkt)
 			DOLOG(ll_debug, "%s: ...is a new session (initial my seq nr: %u, their: %u)\n", pkt->get_log_prefix().c_str(), new_session->initial_my_seq_nr, new_session->initial_their_seq_nr);
 		}
 
+		new_session_handling3.insert(get_us() - start);
 	}
 
 	bool delete_entry = false;
@@ -418,6 +436,8 @@ void tcp::packet_handler(packet *const pkt)
 
 	do
 	{
+		uint64_t start = get_us();
+
 		std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 		auto cur_it = sessions.find(id);
@@ -429,7 +449,7 @@ void tcp::packet_handler(packet *const pkt)
 			send_rst_for_port(pkt, dst_port, src_port);
 			delete pkt;
 			stats_inc_counter(tcp_errors);
-
+			main_packet_handling.insert(get_us() - start);
 			return;
 		}
 
@@ -562,7 +582,7 @@ void tcp::packet_handler(packet *const pkt)
 						cur_session->my_seq_nr += ack_n;
 
 						if (cur_session->unacked_size == 0 && cur_session->fin_after_unacked_empty) {
-							DOLOG(ll_debug, "%s: unacked buffer empy, FIN\n", pkt->get_log_prefix().c_str());
+							DOLOG(ll_debug, "%s: unacked buffer empty, FIN\n", pkt->get_log_prefix().c_str());
 
 							send_segment(cur_session, cur_session->id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK | FLAG_FIN /* ACK, FIN */, cur_session->their_seq_nr, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 
@@ -713,11 +733,13 @@ void tcp::packet_handler(packet *const pkt)
 
 		if (delete_entry)
 			cur_session->set_is_terminating();
+
+		main_packet_handling.insert(get_us() - start);
 	}
 	while(0);
 
 	if (delete_entry) {
-		DOLOG(ll_debug, "%s: cleaning up session\n", pkt->get_log_prefix().c_str());
+		uint64_t start = get_us();
 
 		stats_inc_counter(tcp_sessions_rem);
 
@@ -726,18 +748,28 @@ void tcp::packet_handler(packet *const pkt)
 		if (auto cur_it = sessions.find(id); cur_it != sessions.end()) {
 			tcp_session *session_pointer = dynamic_cast<tcp_session *>(cur_it->second);
 
-			ending_sessions->put(session_pointer);
+			if (session_pointer->in_init == false) {
+				DOLOG(ll_debug, "%s: cleaning up session\n", pkt->get_log_prefix().c_str());
 
-			sessions.erase(cur_it);
+				ending_sessions->put(session_pointer);
 
-			stats_set(tcp_cur_n_sessions, sessions.size());
+				sessions.erase(cur_it);
+
+				stats_set(tcp_cur_n_sessions, sessions.size());
+			}
 		}
+
+		delete_session.insert(get_us() - start);
 	}
 
 	if (notify_unacked_cv) {
+		uint64_t start = get_us();
+
 		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 		unacked_cv.notify_one();
+
+		notify_unacked.insert(get_us() - start);
 	}
 
 	delete pkt;
@@ -752,6 +784,8 @@ void tcp::session_cleaner()
 
 		myusleep(2500000);
 
+		uint64_t start = get_us();
+
 		std::unique_lock<std::shared_mutex> lck(sessions_lock);
 
 		uint64_t now = get_us();
@@ -760,6 +794,10 @@ void tcp::session_cleaner()
 			tcp_session *const s = dynamic_cast<tcp_session *>(it->second);
 
 			std::unique_lock<std::mutex> cur_session_lock(s->session_lock);
+
+			// client sessions take care of cleaning-up themselves during session setup
+			if (s->in_init)
+				continue;
 
 			std::string log_prefix = myformat("TCP[%012" PRIx64 "]", it->first);
 
@@ -788,6 +826,8 @@ void tcp::session_cleaner()
 		}
 
 		stats_set(tcp_cur_n_sessions, sessions.size());
+
+		session_cleaner_de.insert(get_us() - start);
 	}
 }
 
@@ -811,6 +851,8 @@ void tcp::unacked_sender()
 
 			std::unique_lock<std::mutex> cur_session_lock(s->session_lock);
 
+			uint64_t now_send_unacked = get_us();
+
 			// last packet >= 1s ago?
 			if (now - s->r_last_pkt_ts >= 1000000) {
 				int to_send = std::min(s->window_size - s->data_since_last_ack, s->unacked_size);
@@ -823,7 +865,10 @@ void tcp::unacked_sender()
 
 					DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unack SEND %zu bytes for sequence nr %u (win size: %d, unacked: %zu, data since ack: %ld)\n", it->first, send_n, rel_seqnr(s, true, s->my_seq_nr), s->window_size, s->unacked_size, s->data_since_last_ack);
 
-					send_segment(s, s->id, s->get_my_addr(), s->get_my_port(), s->get_their_addr(), s->get_their_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n, 0);
+					if (send_segment(s, s->id, s->get_my_addr(), s->get_my_port(), s->get_their_addr(), s->get_their_port(), 0, FLAG_ACK, s->their_seq_nr, &resend_nr, &s->unacked[i], send_n, 0) == false) {
+						DOLOG(ll_debug, "TCP[%012" PRIx64 "]: unack SEND %zu bytes for sequence nr %u FAILED\n", it->first, send_n, rel_seqnr(s, true, s->my_seq_nr));
+						break;
+					}
 
 					s->data_since_last_ack += send_n;
 				}
@@ -834,12 +879,16 @@ void tcp::unacked_sender()
 					s->r_last_pkt_ts = now;
 				}
 			}
+
+			send_segment_de.insert(get_us() - now_send_unacked);
 		}
 
 		uint64_t end_now = get_us();
 
 		// operation is not atomic but the sessions_lock is held
 		stats_set(tcp_unacked_duration_max, std::max(*tcp_unacked_duration_max, end_now - now));
+
+		unacked_sender_de.insert(get_us() - now);
 	}
 }
 
@@ -851,6 +900,8 @@ void tcp::session_ender()
 		auto es = ending_sessions->get();
 		if (!es.has_value())
 			break;
+
+		uint64_t start = get_us();
 
 		tcp_session *session = reinterpret_cast<tcp_session *>(es.value());
 
@@ -870,6 +921,8 @@ void tcp::session_ender()
 
 		// clean-up
 		free_tcp_session(session);
+
+		session_ender_de.insert(get_us() - start);
 	}
 }
 
@@ -910,6 +963,8 @@ void tcp::add_handler(const int port, port_handler_t & tph)
 
 bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_t len)
 {
+	uint64_t start = get_us();
+
 	tcp_session *const ts = dynamic_cast<tcp_session *>(ts_in);
 
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: send frame, %zu bytes, %lu packets\n", ts->id, len, (len + ts->window_size - 1) / ts->window_size);
@@ -955,12 +1010,16 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 		ts->unacked_sent_cv.wait_for(lck, 100ms);
 	}
 
+	send_data_de.insert(get_us() - start);
+
 	return true;
 }
 
 // this method requires tcp_session to be already locked
 void tcp::end_session(session *const ts_in)
 {
+	uint64_t start = get_us();
+
 	tcp_session *const ts = dynamic_cast<tcp_session *>(ts_in);
 
 	if (ts->unacked_size == 0) {
@@ -975,10 +1034,14 @@ void tcp::end_session(session *const ts_in)
 
 		ts->fin_after_unacked_empty = true;
 	}
+
+	end_session_de.insert(get_us() - start);
 }
 
 int tcp::allocate_client_session(const std::function<bool(pstream *const ps, session *const s, buffer_in data)> & new_data, const std::function<bool(pstream *const ps, session *const s)> & session_closed_2, const any_addr & dst_addr, const int dst_port, session_data *const sd)
 {
+	uint64_t start = get_us();
+
 	port_handler_t handler { 0 };
 	handler.new_data         = new_data;
 	handler.pd               = nullptr;
@@ -1010,6 +1073,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	new_session->state_since = time(nullptr);
 
 	new_session->is_client   = true;
+	new_session->in_init     = true;
 
 	get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
 	new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
@@ -1038,8 +1102,6 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 
 	add_handler(local_port, handler);
 
-	lck.unlock();
-
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: new client session, my seq nr: %u, local port: %d, destination port: %d\n", id, new_session->initial_my_seq_nr, local_port, dst_port);
 
 	// start session
@@ -1049,23 +1111,31 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 
 	DOLOG(ll_debug, "TCP[%012" PRIx64 "]: SYN sent\n");
 
+	allocate_client.insert(get_us() - start);
+
 	return local_port;
 }
 
 void tcp::close_client_session(const int port)
 {
+	uint64_t start = get_us();
+
 	// lock all sessions
 	std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 	// find id of the session
 	auto it_id = tcp_clients.find(port);
-	if (it_id == tcp_clients.end())
+	if (it_id == tcp_clients.end()) {
+		close_client.insert(get_us() - start);
 		return;
+	}
 
 	// find session data
 	auto sd_it = sessions.find(it_id->second);
-	if (sd_it == sessions.end())
+	if (sd_it == sessions.end()) {
+		close_client.insert(get_us() - start);
 		return;
+	}
 
 	// send FIN
 	tcp_session *const s = dynamic_cast<tcp_session *>(sd_it->second);
@@ -1073,36 +1143,41 @@ void tcp::close_client_session(const int port)
 	std::unique_lock<std::mutex> cur_session_lock(s->session_lock);
 
 	end_session(s);
+
+	close_client.insert(get_us() - start);
 }
 
 bool tcp::wait_for_client_connected_state(const int local_port)
 {
-	int counter = 0;
+	bool rc      = true;
+	int  counter = 0;
+
+	// lock all sessions
+	std::shared_lock<std::shared_mutex> lck(sessions_lock);
+
+	DOLOG(ll_debug, "wait_for_client_connected_state: find session id for %d\n", local_port);
+
+	// find id of the session
+	auto it_id = tcp_clients.find(local_port);
+	if (it_id == tcp_clients.end()) {
+		DOLOG(ll_debug, "wait_for_client_connected_state: session id not found\n");
+		return false;
+	}
+
+	DOLOG(ll_debug, "wait_for_client_connected_state: session id: [%012" PRIx64 "]\n", it_id->second);
+
+	auto sd_it = sessions.find(it_id->second);
+	if (sd_it == sessions.end())
+		return false;
+
+	DOLOG(ll_debug, "wait_for_client_connected_state: found session-data, send_data\n");
+
+	tcp_session *const cur_session = dynamic_cast<tcp_session *>(sd_it->second);
+
+	lck.unlock();
 
 	while(!stop_flag) {
 		DOLOG(ll_debug, "wait_for_client_connected_state: lock all sessions\n");
-
-		// lock all sessions
-		std::shared_lock<std::shared_mutex> lck(sessions_lock);
-
-		DOLOG(ll_debug, "wait_for_client_connected_state: find session id for %d\n", local_port);
-
-		// find id of the session
-		auto it_id = tcp_clients.find(local_port);
-		if (it_id == tcp_clients.end()) {
-			DOLOG(ll_debug, "wait_for_client_connected_state: session id not found\n");
-			return false;
-		}
-
-		DOLOG(ll_debug, "wait_for_client_connected_state: session id: [%012" PRIx64 "]\n", it_id->second);
-
-		auto sd_it = sessions.find(it_id->second);
-		if (sd_it == sessions.end())
-			return false;
-
-		DOLOG(ll_debug, "wait_for_client_connected_state: found session-data, send_data\n");
-
-		tcp_session *const cur_session = dynamic_cast<tcp_session *>(sd_it->second);
 
 		std::unique_lock<std::mutex> cur_session_lock(cur_session->session_lock);
 
@@ -1112,9 +1187,9 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 		}
 
 		if (time(nullptr) - cur_session->state_since >= 30) {
-			end_session(sd_it->second);
 			DOLOG(ll_debug, "wait_for_client_connected_state: session setup time-out\n");
-			return false;
+			rc = false;
+			break;
 		}
 
 		if (++counter == 3) {
@@ -1130,13 +1205,15 @@ bool tcp::wait_for_client_connected_state(const int local_port)
 		DOLOG(ll_debug, "wait_for_client_connected_state: client waiting for 'established': STATE NOW IS %s\n", states[cur_session->state]);
 
 		cur_session->state_changed.wait_for(cur_session_lock, 600ms);
-		// NOTE: after the wait_for, the 'cur_session' pointer may be invalid as
-		// lck gets unlocked by the wait_for
 	}
 
 	DOLOG(ll_debug, "tcp::wait_for_client_connected_state: finished/end\n");
 
-	return true;
+	// from here on, it can be purged by the t/o thread etc
+	lck.lock();
+	cur_session->in_init = false;
+
+	return rc;
 }
 
 bool tcp::client_session_send_data(const int local_port, const uint8_t *const data, const size_t len)

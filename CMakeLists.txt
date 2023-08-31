@@ -24,6 +24,7 @@ add_executable(myip
 	buffer_in.cpp
 	buffer_out.cpp
 	dns.cpp
+	duration_events.cpp
 	echo.cpp
 	fifo_stats.cpp
 	font.cpp

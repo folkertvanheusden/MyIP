@@ -11,6 +11,7 @@
 
 #include "any_addr.h"
 #include "application.h"
+#include "duration_events.h"
 #include "transport_layer.h"
 #include "packet.h"
 #include "pstream.h"
@@ -30,7 +31,8 @@ typedef enum { tcp_closed, tcp_listen, tcp_syn_rcvd, tcp_syn_sent, tcp_establish
 class tcp_session : public session
 {
 public:
-	bool is_client       { false };
+	bool     is_client   { false };
+	bool     in_init     { false };
 
 	uint64_t id          { 0 };
 
@@ -121,9 +123,24 @@ private:
 	uint64_t *tcp_unacked_duration_max { nullptr };
 	uint64_t *tcp_phandle_duration_max { nullptr };
 
+	duration_events new_session_handling1 { "new session1",    8 };
+	duration_events new_session_handling2 { "new session2",    8 };
+	duration_events new_session_handling3 { "new session3",    8 };
+	duration_events main_packet_handling  { "main packet",     8 };
+	duration_events delete_session        { "delete session",  8 };
+	duration_events notify_unacked        { "notify unacked",  8 };
+	duration_events session_cleaner_de    { "session cleaner", 8 };
+	duration_events unacked_sender_de     { "unacked sender",  8 };
+	duration_events session_ender_de      { "session ender",   8 };
+	duration_events send_data_de          { "send data",       8 };
+	duration_events end_session_de        { "end session",     8 };
+	duration_events allocate_client       { "allocate client", 8 };
+	duration_events close_client          { "close client",    8 };
+	duration_events send_segment_de       { "send segment",    8 };
+
 	void send_rst_for_port(const packet *const pkt, const int dst_port, const int src_port);
 
-	void send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len, const uint32_t TSencr);
+	bool send_segment(tcp_session *const ts, const uint64_t session_id, const any_addr & my_addr, const int my_port, const any_addr & peer_addr, const int peer_port, const int org_len, const uint8_t flags, const uint32_t ack_to, uint32_t *const my_seq_nr, const uint8_t *const data, const size_t data_len, const uint32_t TSencr);
 
 	void packet_handler(packet *const pkt);
 	void cleanup_session_helper(std::map<uint64_t, tcp_session *>::iterator *it);

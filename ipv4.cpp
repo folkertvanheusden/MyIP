@@ -47,6 +47,8 @@ ipv4::~ipv4()
 
 bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_addr & dst_ip, const any_addr & src_ip, const uint8_t protocol, const uint8_t *payload, const size_t pl_size, const uint8_t *const header_template)
 {
+	uint64_t start = get_us();
+
 	assert(dst_ip.get_family() == any_addr::ipv4);
 	assert(src_ip.get_family() == any_addr::ipv4);
 
@@ -102,6 +104,8 @@ bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 
 	delete [] out;
 
+	transmit_packet_de.insert(get_us() - start);
+
 	return rc;
 }
 
@@ -113,6 +117,8 @@ void ipv4::operator()()
 		auto po = pkts->get();
 		if (!po.has_value())
 			break;
+		
+		uint64_t start = get_us();
 
 		packet *pkt = po.value().p;
 
@@ -122,6 +128,7 @@ void ipv4::operator()()
 		if (size < 20) {
 			DOLOG(ll_info, "IPv4: not an IPv4 packet (size: %d)\n", size);
 			delete pkt;
+			receive_packet_de.insert(get_us() - start);
 			continue;
 		}
 
@@ -140,6 +147,7 @@ void ipv4::operator()()
 			stats_inc_counter(ip_n_disc);
 			DOLOG(ll_info, "%s: not an IPv4 packet (version: %d)\n", pkt->get_log_prefix().c_str(), version);
 			delete pkt;
+			receive_packet_de.insert(get_us() - start);
 			continue;
 		}
 
@@ -160,6 +168,8 @@ void ipv4::operator()()
 			stats_inc_counter(ip_n_disc);
 			stats_inc_counter(ipv4_ttl_ex);
 
+			receive_packet_de.insert(get_us() - start);
+
 			continue;
 		}
 
@@ -171,6 +181,7 @@ void ipv4::operator()()
 			DOLOG(ll_info, "%s: size (%d) > Ethernet size (%d)\n", pkt->get_log_prefix().c_str(), ip_size, size);
 			delete pkt;
 			stats_inc_counter(ip_n_disc);
+			receive_packet_de.insert(get_us() - start);
 			continue;
 		}
 
@@ -181,6 +192,7 @@ void ipv4::operator()()
 			DOLOG(ll_info, "%s: Header size (%d) > size (%d)\n", pkt->get_log_prefix().c_str(), header_size, size);
 			delete pkt;
 			stats_inc_counter(ip_n_disc);
+			receive_packet_de.insert(get_us() - start);
 			continue;
 		}
 
@@ -194,6 +206,7 @@ void ipv4::operator()()
 			delete pkt;
 			stats_inc_counter(ipv4_unk_prot);
 			stats_inc_counter(ip_n_disc);
+			receive_packet_de.insert(get_us() - start);
 			continue;
 		}
 
@@ -215,6 +228,7 @@ void ipv4::operator()()
 
 			delete pkt;
 
+			receive_packet_de.insert(get_us() - start);
 			continue;
 		}
 
@@ -227,6 +241,8 @@ void ipv4::operator()()
 		stats_inc_counter(ip_n_del);
 
 		delete pkt;
+
+		receive_packet_de.insert(get_us() - start);
 	}
 }
 

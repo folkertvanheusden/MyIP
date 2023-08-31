@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <atomic>
@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "duration_events.h"
 #include "network_layer.h"
 #include "phys.h"
 #include "router.h"
@@ -38,6 +39,9 @@ private:
 	uint64_t *ipv4_unk_prot { nullptr };
 	uint64_t *ipv4_n_tx     { nullptr };
 	uint64_t *ipv4_tx_err   { nullptr };
+
+	duration_events transmit_packet_de { "ipv4: transmit packet", 8 };
+	duration_events receive_packet_de  { "ipv4: receive packet", 8 };
 
 	void send_ttl_exceeded(const packet *const pkt) const;
 
