@@ -87,20 +87,11 @@ bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 
 	any_addr q_addr = override_ip ? myip : src_ip;
 
-	auto src_mac = iarp->query_cache(q_addr);
-
-	bool rc = false;
-
 	uint16_t ip_id = (out[4] << 8) | out[5];
 
 	DOLOG(ll_debug, "IPv4[%04x]: transmit packet %s -> %s\n", ip_id, src_ip.to_str().c_str(), dst_ip.to_str().c_str());
 
-	if (src_mac.second)
-		rc = r->route_packet(dst_mac, 0x0800, dst_ip, *src_mac.second, q_addr, out, out_size);
-	else
-		DOLOG(ll_debug, "IPv4[%04x]: source mac not known\n", ip_id);
-
-	delete src_mac.second;
+	bool rc = r->route_packet(dst_mac, 0x0800, dst_ip, { }, q_addr, out, out_size);
 
 	delete [] out;
 

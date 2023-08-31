@@ -129,7 +129,7 @@ void router::add_router_ipv6(const any_addr & local_ip, const any_addr & network
 	}
 }
 
-bool router::route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const any_addr & src_mac, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size)
+bool router::route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const std::optional<any_addr> & src_mac, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size)
 {
 	queued_packet *qp = new queued_packet(payload, pl_size);
 

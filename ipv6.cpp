@@ -75,11 +75,7 @@ bool ipv6::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 	if (pl_size)
 		memcpy(&out[40], payload, pl_size);
 
-	auto src_mac = indp->query_cache(src_ip);
-
-	bool rc = r->route_packet(dst_mac, 0x86dd, dst_ip, *src_mac.second, src_ip, out, out_size);
-
-	delete src_mac.second;
+	bool rc = r->route_packet(dst_mac, 0x86dd, dst_ip, { }, src_ip, out, out_size);
 
 	delete [] out;
 
