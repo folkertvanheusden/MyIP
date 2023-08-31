@@ -305,7 +305,7 @@ void tcp::send_rst_for_port(const packet *const pkt, const int dst_port, const i
 	temp[11] = new_ack_nr;
 
 	temp[12] = 5 << 4;  // header length
-	temp[13] = FLAG_RST | FLAG_ACK;
+	temp[13] = FLAG_RST;
 
 	uint16_t checksum = tcp_udp_checksum(pkt->get_src_addr(), pkt->get_dst_addr(), true, temp, temp_len);
 
