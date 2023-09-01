@@ -138,6 +138,7 @@ bool router::route_packet(const std::optional<any_addr> & override_dst_mac, cons
 	assert(override_dst_mac.has_value() == false || override_dst_mac.value().get_family() == any_addr::mac);
 	qp->dst_mac    = override_dst_mac;
 
+	assert(src_mac.has_value() == false || src_mac.value().get_family() == any_addr::mac);
 	qp->src_mac    = src_mac;
 
 	assert(dst_ip.get_family() == any_addr::ipv4 || dst_ip.get_family() == any_addr::ipv6);
