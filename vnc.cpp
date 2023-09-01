@@ -257,6 +257,76 @@ void frame_buffer_thread(frame_buffer_t *fb_work)
 	fb_work->buffer = nullptr;
 }
 
+inline void encode_pixel(uint8_t *const out, int *const o, const int depth, const uint8_t r, const uint8_t g, const uint8_t b)
+{
+	if (depth == 32 || depth == 24) {
+		out[(*o)++] = b;  // blue
+		out[(*o)++] = g;  // green
+		out[(*o)++] = r;  // red
+		out[(*o)++] = 255;  // alpha
+	}
+	else if (depth == 8) {
+		out[(*o)++] = (r & 0xe0) |  // red
+			((g >> 3) & 0x1c) |  // green
+			(b >> 6);  // blue
+	}
+}
+
+// assumes w & h multiples of 16
+void hextile(uint8_t *const out, int *const o, const uint8_t *const in, const int w, const int h, const int depth)
+{
+	for(int y=0; y<h; y += 16) {
+		for(int x=0; x<w; x += 16) {
+			// see if solid color
+			uint8_t sr = in[y * w * 3 + x * 3 + 0];  // solid rgb
+			uint8_t sg = in[y * w * 3 + x * 3 + 1];
+			uint8_t sb = in[y * w * 3 + x * 3 + 2];
+
+			bool different = false;
+			for(int ty=0; ty<16; ty++) {
+				int y_offset = (y + ty) * w * 3;
+
+				for(int tx=0; tx<16; tx++) {
+					int x_offset = (x + tx) * 3;
+
+					uint8_t csr = in[y_offset + x_offset + 0];  // current solid rgb
+					uint8_t csg = in[y_offset + x_offset + 1];
+					uint8_t csb = in[y_offset + x_offset + 2];
+
+					if (csr != sr || csg != sg || csb != sb) {
+						different = true;
+						goto finish_tile_scan;
+					}
+				}
+			}
+		finish_tile_scan:
+
+			if (different) {
+				out[(*o)++] = 1;  // raw
+
+				for(int ty=0; ty<16; ty++) {
+					int y_offset = (y + ty) * w * 3;
+
+					for(int tx=0; tx<16; tx++) {
+						int x_offset = (x + tx) * 3;
+
+						uint8_t csr = in[y_offset + x_offset + 0];  // current solid rgb
+						uint8_t csg = in[y_offset + x_offset + 1];
+						uint8_t csb = in[y_offset + x_offset + 2];
+
+						encode_pixel(out, o, depth, csr, csg, csb);
+					}
+				}
+			}
+			else {
+				out[(*o)++] = 2;  // background color specified
+
+				encode_pixel(out, o, depth, sr, sg, sb);
+			}
+		}
+	}
+}
+
 void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, bool incremental, int x, int y, int w, int h, uint8_t depth, uint8_t **message, size_t *message_len, vnc_private_data *vpd, vnc_session_data *const vsd)
 {
 	if (fb->w < x + w || fb->h < y + h)
@@ -264,6 +334,11 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 
 	int32_t ce = 0;  // RAW is default
 	for(int32_t e : encodings) {
+		if (e == 5) {  // Hextile
+			ce = e;
+			DOLOG(ll_debug, "VNC: hextile encoding\n");
+		}
+
 		if (e == 6) {  // ZLIB
 			ce = e;
 			DOLOG(ll_debug, "VNC: zlib encoding\n");
@@ -300,62 +375,66 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	(*message)[14] = ce >>  8;
 	(*message)[15] = ce;
 
-	uint8_t *temp = (uint8_t *)malloc(w * h * 3 * 2);
+	uint8_t *temp = nullptr;
 	int otemp = 0;
 
-	if (depth == 32 || depth == 24) {
-		for(int yo=y; yo<y + h; yo++) {
-			for(int xo=x; xo<x + w; xo++) {
-				int offset = yo * w * 3 + xo * 3;
+	if (ce != 5 && ce != 21) {
+		temp = (uint8_t *)malloc(w * h * 3 * 2);
 
-				temp[otemp++] = fb->buffer[offset + 2];  // blue
-				temp[otemp++] = fb->buffer[offset + 1];  // green
-				temp[otemp++] = fb->buffer[offset + 0];  // red
-				temp[otemp++] = 255;  // alpha
-			}
-		}
-	}
-	else if (depth == 8) {
-		for(int yo=y; yo<y + h; yo++) {
-			for(int xo=x; xo<x + w; xo++) {
-				int offset = yo * w * 3 + xo * 3;
+		if (depth == 32 || depth == 24) {
+			for(int yo=y; yo<y + h; yo++) {
+				for(int xo=x; xo<x + w; xo++) {
+					int offset = yo * w * 3 + xo * 3;
 
-				temp[otemp++] = (fb->buffer[offset + 0] & 0xe0) |  // red
-						((fb->buffer[offset + 1] >> 3) & 0x1c) |  // green
-						(fb->buffer[offset + 2] >> 6);  // blue
-			}
-		}
-	}
-	else if (depth == 1) {
-		uint8_t b_out = 0, b_n = 0;
-
-		for(int yo=y; yo<y + h; yo++) {
-			for(int xo=x; xo<x + w; xo++) {
-				int offset = yo * w * 3 + xo * 3;
-
-				int gray = (fb->buffer[offset + 0] + fb->buffer[offset + 1] + fb->buffer[offset + 2]) / 3;
-				uint8_t bit = gray >= 128;
-
-				b_out <<= 1;
-				b_out |= bit;
-				b_n++;
-
-				if (b_n == 8) {
-					temp[otemp++] = b_out;
-					b_n = 0;
+					temp[otemp++] = fb->buffer[offset + 2];  // blue
+					temp[otemp++] = fb->buffer[offset + 1];  // green
+					temp[otemp++] = fb->buffer[offset + 0];  // red
+					temp[otemp++] = 255;  // alpha
 				}
 			}
 		}
+		else if (depth == 8) {
+			for(int yo=y; yo<y + h; yo++) {
+				for(int xo=x; xo<x + w; xo++) {
+					int offset = yo * w * 3 + xo * 3;
 
-		if (b_n) {
-			DOLOG(ll_error, "VNC: BITS LEFT: %d\n", b_n);
+					temp[otemp++] = (fb->buffer[offset + 0] & 0xe0) |  // red
+							((fb->buffer[offset + 1] >> 3) & 0x1c) |  // green
+							(fb->buffer[offset + 2] >> 6);  // blue
+				}
+			}
+		}
+		else if (depth == 1) {
+			uint8_t b_out = 0, b_n = 0;
+
+			for(int yo=y; yo<y + h; yo++) {
+				for(int xo=x; xo<x + w; xo++) {
+					int offset = yo * w * 3 + xo * 3;
+
+					int gray = (fb->buffer[offset + 0] + fb->buffer[offset + 1] + fb->buffer[offset + 2]) / 3;
+					uint8_t bit = gray >= 128;
+
+					b_out <<= 1;
+					b_out |= bit;
+					b_n++;
+
+					if (b_n == 8) {
+						temp[otemp++] = b_out;
+						b_n = 0;
+					}
+				}
+			}
+
+			if (b_n) {
+				DOLOG(ll_error, "VNC: BITS LEFT: %d\n", b_n);
+				stats_inc_counter(vpd->vnc_err);
+			}
+		}
+		else {
+			DOLOG(ll_info, "VNC: depth=%d not supported\n", depth);
+
 			stats_inc_counter(vpd->vnc_err);
 		}
-	}
-	else {
-		DOLOG(ll_info, "VNC: depth=%d not supported\n", depth);
-
-		stats_inc_counter(vpd->vnc_err);
 	}
 
 	int o = 16;
@@ -363,6 +442,9 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	if (ce == 0) {  // raw
 		memcpy(&(*message)[o], temp, otemp);
 		o += otemp;
+	}
+	else if (ce == 5) {  // Hextile
+		hextile(*message, &o, fb->buffer, w, h, depth);
 	}
 	else if (ce == 6) {  // zlib
 		vsd->strm.next_in = temp;
