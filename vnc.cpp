@@ -337,6 +337,7 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 		if (e == 5) {  // Hextile
 			ce = e;
 			DOLOG(ll_debug, "VNC: hextile encoding\n");
+			break;
 		}
 
 		if (e == 6) {  // ZLIB
@@ -348,6 +349,7 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 		if (e == 21) {   // JPEG
 			ce = e;
 			DOLOG(ll_debug, "VNC: jpeg encoding\n");
+			break;
 		}
 	}
 
