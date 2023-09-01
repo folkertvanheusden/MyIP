@@ -26,6 +26,7 @@ Make sure you have the following packages installed:
 * libconfig++-dev
 * libspeex-dev
 * libsamplerate0-dev
+* libturbojpeg0-dev
 * zlib1g-dev
 * libjansson-dev
 * libsndfile1-dev

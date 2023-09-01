@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string>
 #include <string.h>
+#include <turbojpeg.h>
 #include <unistd.h>
 #include <zlib.h>
 
@@ -261,11 +262,17 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 	if (fb->w < x + w || fb->h < y + h)
 		return;
 
-	uint32_t ce = 0;  // RAW is default
+	int32_t ce = 0;  // RAW is default
 	for(int32_t e : encodings) {
 		if (e == 6) {  // ZLIB
 			ce = e;
 			DOLOG(ll_debug, "VNC: zlib encoding\n");
+			break;
+		}
+
+		if (e == 21) {   // JPEG
+			ce = e;
+			DOLOG(ll_debug, "VNC: jpeg encoding\n");
 		}
 	}
 
@@ -375,6 +382,23 @@ void calculate_fb_update(frame_buffer_t *fb, std::vector<int32_t> & encodings, b
 		o += size + 4;
 
 		vsd->prev_zsize = vsd->strm.total_out;
+	}
+	else if (ce == 21) {   // jpeg
+		tjhandle jpegCompressor = tjInitCompress();  // make thread-local and do only once TODO
+
+		uint8_t *out = nullptr;
+		unsigned long int len = 0;
+		// use fb as there's RGB encoding there while temp can point to anything
+		if (tjCompress2(jpegCompressor, fb->buffer, w, 0, h, TJPF_RGB, &out, &len, TJSAMP_444, 75, TJFLAG_FASTDCT) == -1)
+			DOLOG(ll_warning, "VNC: Failed compressing JPEG frame: %s (%dx%d @ %d)", tjGetErrorStr(), w, h, 75);
+
+		memcpy(&(*message)[o], out, len);
+
+		free(out);
+
+		o += len;
+
+		tjDestroy(jpegCompressor);
 	}
 	else {
 		DOLOG(ll_error, "VNC: unknown encoding type %d\n", ce);
