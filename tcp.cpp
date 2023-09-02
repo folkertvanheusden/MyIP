@@ -459,8 +459,8 @@ void tcp::packet_handler(packet *const pkt)
 
 		uint32_t TSecr = 0;  // TSecr that will be returned if ACK flag is set
 
-		while(extra_headers_end - cur_extra_headers_p >= 2) {
-			if (cur_extra_headers_p[0] == 8 && flag_ack) {
+		while(extra_headers_end - 2 >= cur_extra_headers_p) {
+			if (cur_extra_headers_p[0] == 8 && flag_ack && extra_headers_end - cur_extra_headers_p >= 6) {
 				TSecr = (cur_extra_headers_p[2] << 24) | (cur_extra_headers_p[3] << 16) | (cur_extra_headers_p[4] << 8) | cur_extra_headers_p[5];
 
 				DOLOG(ll_debug, "%s: will set TSecr to %08x\n", pkt->get_log_prefix().c_str(), TSecr);
