@@ -660,27 +660,56 @@ void tcp::packet_handler(packet *const pkt)
 				release_listener_lock(false);
 
 				if (fail == false) {
-					cur_session->their_seq_nr += data_len;  // TODO handle missing segments
+					cur_session->their_seq_nr += data_len;
 
 					for(;;) {
-						auto it = cur_session->fragments.find(cur_session->their_seq_nr);
-						if (it == cur_session->fragments.end())
+						std::optional<size_t> use;
+
+						// find a fragment
+						size_t i = 0;
+						while(i < cur_session->fragments.size()) {
+							auto & element = cur_session->fragments.at(i);
+
+							if (element.first <= cur_session->their_seq_nr) {
+								if (element.first + element.second.size() <= cur_session->their_seq_nr)
+									cur_session->fragments.erase(cur_session->fragments.begin() + i);
+								else {
+									use = i;
+									break;
+								}
+							}
+							else {
+								i++;
+							}
+						}
+
+						if (use.has_value() == false)  // no fragment found
 							break;
 
-						DOLOG(ll_debug, "%s: use from fragment cache\n", pkt->get_log_prefix().c_str());
+						// get fragment
+						auto & element = cur_session->fragments.at(use.value());
+
+						// determine from what position in this fragment the data can be used
+						size_t offset = cur_session->their_seq_nr - element.first;
+
+						DOLOG(ll_debug, "%s: use from fragment cache, offset %zu\n", pkt->get_log_prefix().c_str());
 
 						auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
 
-						if (cb.value().new_data(this, cur_session, buffer_in(it->second.data(), it->second.size())) == false) {
+						buffer_in fragment(element.second.data() + offset, element.second.size() - offset);
+
+						// update sequence number
+						cur_session->their_seq_nr += fragment.get_size();
+
+						// erase fragment from store
+						cur_session->fragments.erase(cur_session->fragments.begin() + use.value());
+
+						if (cb.value().new_data(this, cur_session, fragment) == false) {
 							DOLOG(ll_error, "%s: layer 7 indicated an error\n", pkt->get_log_prefix().c_str());
 							fail = true;
 						}
 
 						release_listener_lock(false);
-
-						cur_session->their_seq_nr += it->second.size();
-
-						cur_session->fragments.erase(it);
 
 						if (fail)
 							break;
@@ -702,7 +731,7 @@ void tcp::packet_handler(packet *const pkt)
 				if (their_seq_nr > cur_session->their_seq_nr) {
 					std::vector<uint8_t> fragment(data_start, data_start + data_len);
 
-					cur_session->fragments.insert({ their_seq_nr, std::move(fragment) });
+					cur_session->fragments.emplace_back(their_seq_nr, std::move(fragment));
 
 					DOLOG(ll_info, "%s: number of fragments in cache: %zu\n", pkt->get_log_prefix().c_str(), cur_session->fragments.size());
 				}
