@@ -89,6 +89,9 @@ bool mqtt_client::read(uint8_t *target, size_t n)
 	while(n) {
 		DOLOG(ll_debug, "mqtt_client::read %zu bytes, have: %zu\n", n, n_data_in);
 
+		if (state == mc_disconnect || stop_flag)
+			return false;
+
 		if (n_data_in) {
 			size_t cur_n = std::min(n, n_data_in);
 
