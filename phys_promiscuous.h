@@ -7,6 +7,7 @@
 #include <thread>
 
 #include "any_addr.h"
+#include "duration_events.h"
 #include "phys.h"
 #include "network_layer.h"
 #include "stats.h"
@@ -19,6 +20,8 @@ private:
 	int ifr_index { -1 };
 
 	any_addr my_mac;
+
+	duration_events transmit_packet_de { "transmit packet", 8 };
 
 public:
 	phys_promiscuous(const size_t dev_index, stats *const s, const std::string & dev_name);

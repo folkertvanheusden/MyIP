@@ -21,6 +21,7 @@
 #include "phys_promiscuous.h"
 #include "packet.h"
 #include "str.h"
+#include "time.h"
 #include "utils.h"
 
 
@@ -78,6 +79,8 @@ phys_promiscuous::~phys_promiscuous()
 
 bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
+	uint64_t start_ts = get_us();
+
 	if (dst_mac == my_mac) {
 		DOLOG(ll_debug, "phys_promiscuous::transmit_packet: dropping packet to myself (%s)\n", dst_mac.to_str().c_str());
 
@@ -132,6 +135,8 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 	}
 
 	delete [] out;
+
+	transmit_packet_de.insert(get_us() - start_ts);
 
 	return ok;
 }
