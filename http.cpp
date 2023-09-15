@@ -363,7 +363,7 @@ int sock_read(void *ctx, unsigned char *buf, size_t len)
 		hc->hs->r_cond.wait_for(lck, 250ms);
 	}
 
-	DOLOG(ll_debug, "sock_read fail return");
+	DOLOG(ll_debug, "sock_read fail return\n");
 
 	return -1;
 }
