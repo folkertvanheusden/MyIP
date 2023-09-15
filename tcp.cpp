@@ -662,61 +662,6 @@ void tcp::packet_handler(packet *const pkt)
 				if (fail == false) {
 					cur_session->their_seq_nr += data_len;
 
-					for(;;) {
-						std::optional<size_t> use;
-
-						// find a fragment
-						size_t i = 0;
-						while(i < cur_session->fragments.size()) {
-							auto & element = cur_session->fragments.at(i);
-
-							if (element.first <= cur_session->their_seq_nr) {
-								if (element.first + element.second.size() <= cur_session->their_seq_nr)
-									cur_session->fragments.erase(cur_session->fragments.begin() + i);
-								else {
-									use = i;
-									break;
-								}
-							}
-							else {
-								i++;
-							}
-						}
-
-						if (use.has_value() == false)  // no fragment found
-							break;
-
-						// get fragment
-						auto & element = cur_session->fragments.at(use.value());
-
-						// determine from what position in this fragment the data can be used
-						size_t offset = cur_session->their_seq_nr - element.first;
-
-						DOLOG(ll_debug, "%s: use from fragment cache, offset %zu\n", pkt->get_log_prefix().c_str());
-
-						auto cb = get_lock_listener(dst_port, pkt->get_log_prefix(), false);
-
-						buffer_in fragment(element.second.data() + offset, element.second.size() - offset);
-
-						// update sequence number
-						cur_session->their_seq_nr += fragment.get_size();
-
-						// erase fragment from store
-						cur_session->fragments.erase(cur_session->fragments.begin() + use.value());
-
-						if (cb.value().new_data(this, cur_session, fragment) == false) {
-							DOLOG(ll_error, "%s: layer 7 indicated an error\n", pkt->get_log_prefix().c_str());
-							fail = true;
-						}
-
-						release_listener_lock(false);
-
-						if (fail)
-							break;
-					}
-				}
-
-				if (fail == false) {
 					// will be acked in the 'unacked_sender'-thread
 					if (cur_session->unacked_size == 0) {
 						DOLOG(ll_debug, "%s: acknowledging received content\n", pkt->get_log_prefix().c_str());
@@ -728,15 +673,15 @@ void tcp::packet_handler(packet *const pkt)
 			else {
 				DOLOG(ll_info, "%s: unexpected sequence nr %u, expected: %u\n", pkt->get_log_prefix().c_str(), rel_seqnr(cur_session, false, their_seq_nr), rel_seqnr(cur_session, false, cur_session->their_seq_nr));
 
-				if (their_seq_nr > cur_session->their_seq_nr) {
-					std::vector<uint8_t> fragment(data_start, data_start + data_len);
+				uint32_t ack_to = 0;
 
-					cur_session->fragments.emplace_back(their_seq_nr, std::move(fragment));
-
-					DOLOG(ll_info, "%s: number of fragments in cache: %zu\n", pkt->get_log_prefix().c_str(), cur_session->fragments.size());
+				if (their_seq_nr > cur_session->their_seq_nr)
+					ack_to = cur_session->their_seq_nr;
+				else if (their_seq_nr < cur_session->their_seq_nr)
+					ack_to = their_seq_nr;
+				else {
+					// internal error
 				}
-
-				const uint32_t ack_to = cur_session->their_seq_nr;
 
 				send_segment(cur_session, id, cur_session->get_my_addr(), cur_session->get_my_port(), cur_session->get_their_addr(), cur_session->get_their_port(), win_size, FLAG_ACK, ack_to, &cur_session->my_seq_nr, nullptr, 0, TSecr);
 			}
@@ -1105,6 +1050,7 @@ int tcp::allocate_client_session(const std::function<bool(pstream *const ps, ses
 	new_session->in_init     = true;
 
 	get_random((uint8_t *)&new_session->my_seq_nr, sizeof new_session->my_seq_nr);
+	new_session->my_seq_nr &= 0x7fffffff;
 	new_session->initial_my_seq_nr = new_session->my_seq_nr; // for logging relative(!) sequence numbers
 
 	new_session->initial_their_seq_nr = 0;
@@ -1306,8 +1252,6 @@ json_t *tcp::get_state_json(session *const ts_in)
 
         json_object_set(out, "my_rel_sequence_nr", json_integer(rel_seqnr(ts, true, ts->my_seq_nr)));
         json_object_set(out, "opp_rel_sequence_nr", json_integer(rel_seqnr(ts, false, ts->their_seq_nr)));
-
-        json_object_set(out, "n_fragments", json_integer(ts->fragments.size()));
 
 	return out;
 }

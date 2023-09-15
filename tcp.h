@@ -40,8 +40,6 @@ public:
 	tcp_state_t state    { tcp_closed };
 	time_t state_since   { 0 };
 
-	std::vector<std::pair<uint32_t, std::vector<uint8_t> > > fragments;
-
 	std::condition_variable_any state_changed;
 	uint64_t e_last_pkt_ts{ 0 };  // ts of last packet (transmitted or received)
 	uint64_t r_last_pkt_ts{ 0 };  // ts of last received packet
