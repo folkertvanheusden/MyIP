@@ -342,7 +342,7 @@ int sock_read(void *ctx, unsigned char *buf, size_t len)
 	std::unique_lock<std::mutex> lck(hc->hs->r_lock);
 
 	while(!hc->s->get_is_terminating()) {
-		if (hc->hs->req_len >= 0) {
+		if (hc->hs->req_len > 0) {
 			size_t n_todo = std::min(len, hc->hs->req_len);
 
 			memcpy(buf, hc->hs->req_data, n_todo);
@@ -360,8 +360,10 @@ int sock_read(void *ctx, unsigned char *buf, size_t len)
 		if (hc->hs->terminate)
 			break;
 
-		hc->hs->r_cond.wait_for(lck, 100ms);
+		hc->hs->r_cond.wait_for(lck, 250ms);
 	}
+
+	DOLOG(ll_debug, "sock_read fail return");
 
 	return -1;
 }
