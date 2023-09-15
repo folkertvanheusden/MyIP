@@ -29,6 +29,8 @@ protected:
 
 	std::atomic_bool is_terminating { false };
 
+	int            session_timeout { 300 };
+
 	session(pstream *const t, const any_addr & my_addr, const int my_port, const any_addr & their_addr, const int their_port, private_data *const application_private_data);
 
 public:
@@ -66,4 +68,8 @@ public:
 	private_data *get_application_private_data() { return application_private_data; }
 
 	virtual std::string get_state_name() const = 0;
+
+	void set_session_timeout(const int duration) { session_timeout = duration; }
+
+	int get_session_timeout() const { return session_timeout; }
 };

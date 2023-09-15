@@ -832,10 +832,10 @@ void tcp::session_cleaner()
 
 			uint64_t age = (now - s->e_last_pkt_ts) / 1000000;
 
-			if (age >= session_timeout || s->state > tcp_established || (s->state == tcp_syn_rcvd && age >= 5)) {
+			if (age >= s->get_session_timeout() || s->state > tcp_established || (s->state == tcp_syn_rcvd && age >= 5)) {
 				if (s->state > tcp_established)
 					DOLOG(ll_debug, "%s: session closed (state: %s)\n", log_prefix.c_str(), states[s->state]);
-				else if (s->state > tcp_established)
+				else if (age >= s->get_session_timeout())
 					DOLOG(ll_debug, "%s: session timed out\n", log_prefix.c_str());
 				else
 					DOLOG(ll_debug, "%s: delete session in SYN state for 5 or more seconds\n", log_prefix.c_str());

@@ -487,6 +487,8 @@ bool http_new_session(pstream *const t, session *ts)
 
 	ts->set_callback_private_data(hs);
 
+	ts->set_session_timeout(5);  // 5 seconds should be enough to transmit the request
+
 	stats_inc_counter(dynamic_cast<http_private_data *>(ts->get_application_private_data())->http_requests);
 
 	http_private_data *hpd = dynamic_cast<http_private_data *>(ts->get_application_private_data());
