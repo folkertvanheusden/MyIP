@@ -13,9 +13,13 @@ port = 55201
 
 mode = None
 
+n_todo = None
+
+json_results = False
+
 work_bs = 65536
 
-opts, args = getopt.getopt(sys.argv[1:], 'H:p:b:m:h')
+opts, args = getopt.getopt(sys.argv[1:], 'H:p:b:m:n:jh')
 
 for o, a in opts:
     if o == '-H':
@@ -30,14 +34,23 @@ for o, a in opts:
     elif o == '-m':
         mode = True if a == 'send' else False
 
+    elif o == '-n':
+        n_todo = int(a)
+
+    elif o == '-j':
+        json_results = True
+
     elif o == '-h':
         print('-H x   host')
         print('-p x   port (default: 55201)')
         print('-b x   block size (default: %d)' % work_bs)
         print('-m x   mode: send or receive')
+        print('-n x   limit to x exchanges')
+        print('-j     only print results in json format')
         sys.exit(0)
 
-print('send mode' if mode else 'receive mode')
+if not json_results:
+    print('send mode' if mode else 'receive mode')
 
 work = bytearray(work_bs)
 
@@ -66,7 +79,7 @@ median = []
 
 try:
     if mode:
-        while True:
+        while n_todo is None or n < n_todo:
             bs = work_bs
 
             command = { "mode": "receive", "block_size": bs }
@@ -95,10 +108,11 @@ try:
             min_speed = min(min_speed, speed)
             max_speed = max(max_speed, speed)
 
-            print(j, f"{math.floor(speed)} kB/s")
+            if not json_results:
+                print(j, f"{math.floor(speed)} kB/s")
 
     else:
-        while True:
+        while n_todo is None or n < n_todo:
             command = { "mode": "send", "block_size": work_bs }
             s.send(json.dumps(command).encode('ascii'))
             s.send('\n'.encode('ascii'))
@@ -129,17 +143,33 @@ try:
             min_speed = min(min_speed, speed)
             max_speed = max(max_speed, speed)
 
-            print(f"{math.floor(speed)} kB/s")
+            if not json_results:
+                print(f"{math.floor(speed)} kB/s")
 
 
 except KeyboardInterrupt as ki:
     pass
 
-print()
+if not json_results:
+    print()
 
 if n > 0:
     median.sort()
 
     median_val = median[n // 2] if (n & 1) else (median[n // 2] + median[n // 2 + 1]) / 2
 
-    print(f"{n} transfers, average: {total/n:.3f} kB/s, median: {median_val:.3f} kB/s, minimum: {min_speed:.0f} kB/s, maximum: {max_speed:.0f} kB/s")
+    if json_results:
+        results = {
+                'n': n,
+                'average': total / n * 1024,
+                'median': median_val * 1024,
+                'min': min_speed * 1024,
+                'max': max_speed * 1024,
+                'units': 'bytes',
+                'block-size': work_bs
+                }
+
+        print(json.dumps(results))
+
+    else:
+        print(f"{n} transfers, average: {total/n:.3f} kB/s, median: {median_val:.3f} kB/s, minimum: {min_speed:.0f} kB/s, maximum: {max_speed:.0f} kB/s")
