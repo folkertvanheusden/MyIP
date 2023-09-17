@@ -130,10 +130,7 @@ bool send_topic(session *const tcp_session, const std::string & channel)
 {
 	std::string topic_line = ": TOPIC " + channel + " :" + get_topic(channel) + "\r\n";
 
-	if (transmit_to_client(tcp_session, topic_line) == false)
-		return false;
-
-	return true;
+	return transmit_to_client(tcp_session, topic_line);
 }
 
 static bool process_line(session *const tcp_session, bool *const seen_nick, bool *const seen_user, const std::string & line)
@@ -150,7 +147,7 @@ static bool process_line(session *const tcp_session, bool *const seen_nick, bool
 
 	irc_session_data *isd = dynamic_cast<irc_session_data *>(tcp_session->get_callback_private_data());
 
-	if (parts.at(0) == "NICK" && parts.size() == 2) {  // ignoring hop count
+	if (parts.at(0) == "NICK" && parts.size() >= 2) {  // ignoring hop count
 		std::unique_lock<std::shared_mutex> lck(nicknames_lock);
 
 		auto new_nick = str_tolower(parts.at(1));
