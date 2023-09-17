@@ -424,6 +424,8 @@ void irc_thread(session *const tcp_session)
 	bool seen_nick = false;
 	bool seen_user = false;
 
+	uint64_t last_msg = 0;
+
         for(;isd->terminate == false;) {
 		std::unique_lock<std::mutex> lck(isd->r_lock);
 
@@ -441,8 +443,21 @@ void irc_thread(session *const tcp_session)
 
 				break;
 			}
+
+			last_msg = get_ms();
 		}
 		else {
+			uint64_t now = get_ms();
+
+			if (seen_user && seen_nick && now - last_msg > 5000) {
+				last_msg = now;
+
+				std::string msg = "PING :" + local_host + "\r\n";
+
+				if (transmit_to_client(tcp_session, msg) == false)
+					break;
+			}
+
 			isd->r_cond.wait_for(lck, 500ms);
 		}
 	}
