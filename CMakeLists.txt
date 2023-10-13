@@ -74,6 +74,7 @@ add_executable(myip
 	str.cpp
 	syslog.cpp
 	tcp.cpp
+	tcp_proxy.cpp
 	tcp_udp_fw.cpp
 	time.cpp
 	transport_layer.cpp

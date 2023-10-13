@@ -878,9 +878,9 @@ int main(int argc, char *argv[])
 		if (it_dns == dns_instances_4.end())
 			error_exit(false, "%s has no DNS bound to it", bind_to_str.c_str());
 
-//		mqtt_client *mc = new mqtt_client(t, it_dns->second, "vps001.vanheusden.com", 1883, &s);
+		mqtt_client *mc = new mqtt_client(t, it_dns->second, "vps001.vanheusden.com", 1883, &s);
 
-//		vnc_set_mqtt_client(mc);
+		vnc_set_mqtt_client(mc);
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine
@@ -1034,6 +1034,21 @@ int main(int argc, char *argv[])
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
 		// just fine
+	}
+
+	/// tcp proxy interfaces
+	try {
+		const libconfig::Setting &tcp_proxies = root["tcp-proxy"];
+		size_t n_tcp_proxies = tcp_proxies.getLength();
+
+		for(size_t i=0; i<n_tcp_proxies; i++) {
+			const libconfig::Setting &tcp_proxy = tcp_proxies[i];
+
+			// TODO
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex2) {
+		// ok
 	}
 
 	ud_stats *us = unix_domain_socket.empty() ? nullptr : new ud_stats(stream_session_handlers, &devs, unix_domain_socket);

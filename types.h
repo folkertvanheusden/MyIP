@@ -59,6 +59,13 @@ class mqtt_private_data : public private_data
 {
 };
 
+class tcp_proxy_private_data : public private_data
+{
+public:
+	any_addr dest_ip;
+	int      dest_port;
+};
+
 class session_data
 {
 public:
@@ -230,4 +237,13 @@ public:
 
 	std::string username;
 	std::string nick;
+};
+
+class tcp_proxy_session_data : public session_data
+{
+public:
+	std::thread     *th          { nullptr };
+	std::atomic_bool terminate   { false   };
+
+	int              client_port { 0 };
 };
