@@ -39,6 +39,7 @@
 #include "sctp.h"
 #include "tcp.h"
 #include "tcp_udp_fw.h"
+#include "tcp_proxy.h"
 #include "http.h"
 #include "nrpe.h"
 #include "vnc.h"
@@ -77,6 +78,24 @@ log_level_t parse_ll(const std::string & ll)
 
 void ss(int s)
 {
+}
+
+phys * find_phys_for_ipv4(const std::vector<phys *> & devs, const any_addr & a)
+{
+	for(auto & dev : devs) {
+		network_layer *nl = dev->get_protocol(0x0800);  // IPv4
+		if (!nl)
+			continue;
+
+		transport_layer *tl = nl->get_transport_layer(0x06);  // TCP
+		if (!tl)
+			continue;
+
+		if (tl->get_ip_address() == a)
+			return dev;
+	}
+
+	return nullptr;
 }
 
 std::string cfg_str(const libconfig::Setting & cfg, const std::string & key, const char *descr, const bool optional, const std::string & def)
@@ -1038,13 +1057,24 @@ int main(int argc, char *argv[])
 
 	/// tcp proxy interfaces
 	try {
-		const libconfig::Setting &tcp_proxies = root["tcp-proxy"];
-		size_t n_tcp_proxies = tcp_proxies.getLength();
+		const libconfig::Setting & tcp_proxies   = root["tcp-proxy"];
+		size_t                     n_tcp_proxies = tcp_proxies.getLength();
 
 		for(size_t i=0; i<n_tcp_proxies; i++) {
-			const libconfig::Setting &tcp_proxy = tcp_proxies[i];
+			const libconfig::Setting & tcp_proxy = tcp_proxies[i];
 
-			// TODO
+			// bind to
+			int         bind_to_port = cfg_int(tcp_proxy, "bind-to-port", "TCP port to listen on", true, 23);
+
+			// redirect to
+			std::string redirect_to_str  = cfg_str(tcp_proxy, "redirect-to-address", "IP address to redirect to", false, "");
+			any_addr    redirect_to      = parse_address(redirect_to_str, 4, ".", 10);
+
+			int         redirect_to_port = cfg_int(tcp_proxy, "redirect-to-port", "TCP port to connect to", true, 23);
+
+			auto handlers = tcp_proxy_get_handler(&s, redirect_to, redirect_to_port);
+
+			register_tcp_service(&devs, handlers, bind_to_port);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex2) {
