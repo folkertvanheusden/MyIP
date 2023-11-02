@@ -43,9 +43,10 @@ void escape_put(uint8_t **p, int *len, uint8_t c)
 	}
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign) :
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text) :
 	phys(dev_index, s, "kiss-" + dev_file),
-	my_callsign(my_callsign)
+	my_callsign(my_callsign),
+	beacon_text(beacon_text)
 {
 	fd = open(dev_file.c_str(), O_RDWR | O_NOCTTY);
 
@@ -87,11 +88,78 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 		error_exit(true, "phys_kiss: tcsetattr failed");
 
 	th = new std::thread(std::ref(*this));
+
+	if (beacon_text.has_value())
+		th_beacon = new std::thread(&phys_kiss::send_beacon, this);
 }
 
 phys_kiss::~phys_kiss()
 {
 	close(fd);
+
+	if (th_beacon) {
+		th_beacon->join();
+		delete th_beacon;
+	}
+}
+
+bool phys_kiss::transmit_ax25(const ax25_packet & a)
+{
+	auto     packet  = a.generate_packet();
+
+	int      max_len = packet.second * 2 + 3;
+	uint8_t *out     = reinterpret_cast<uint8_t *>(malloc(max_len));
+	int      offset  = 0;
+
+	constexpr uint8_t  cmd     = 0;
+	constexpr uint8_t  channel = 0;
+
+	assert(cmd < 16);
+	assert(channel < 16);
+
+	out[offset++] = FEND;
+
+	escape_put(&out, &offset, (channel << 4) | cmd);
+
+	for(size_t i=0; i<packet.second; i++)
+		escape_put(&out, &offset, packet.first[i]);
+
+	out[offset++] = FEND;
+
+	send_lock.lock();
+
+	ssize_t rc = WRITE(fd, out, offset);
+
+	send_lock.unlock();
+
+	free(out);
+
+	if (rc != offset) {
+		DOLOG(ll_error, "failed writing to kiss device");
+
+		return false;
+	}
+
+	return true;
+}
+
+void phys_kiss::send_beacon()
+{
+	sleep(2);
+
+	while(!stop_flag) {
+		ax25_packet a;
+		a.set_from   (my_callsign);
+		a.set_to     ("IDENT", '0', true, false);
+		a.set_control(0x03);  // unnumbered information/frame
+		a.set_data   (reinterpret_cast<const uint8_t *>(beacon_text.value().c_str()), beacon_text.value().size());
+		a.set_pid(0xf0);  // beacon
+
+		DOLOG(ll_debug, "transmit beacon: \"%s\"\n", beacon_text.value().c_str());
+		transmit_ax25(a);
+
+		sleep(30);  // TODO configurable
+	}
 }
 
 bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload_in, const size_t pl_size_in)
@@ -116,38 +184,7 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 		return false;
 	}
 
-	auto     packet  = a.generate_packet();
-
-	int      max_len = packet.second * 2 + 3;
-	uint8_t *out     = reinterpret_cast<uint8_t *>(malloc(max_len));
-	int      offset  = 0;
-
-	uint8_t  cmd     = 0;
-	uint8_t  channel = 0;
-
-	assert(cmd < 16);
-	assert(channel < 16);
-
-	out[offset++] = FEND;
-
-	escape_put(&out, &offset, (channel << 4) | cmd);
-
-	for(size_t i=0; i<packet.second; i++)
-		escape_put(&out, &offset, packet.first[i]);
-
-	out[offset++] = FEND;
-
-	ssize_t rc = WRITE(fd, out, offset);
-
-	free(out);
-
-	if (rc != offset) {
-		DOLOG(ll_error, "failed writing to kiss device");
-
-		return false;
-	}
-
-	return true;
+	return transmit_ax25(a);
 }
 
 void phys_kiss::operator()()
@@ -261,7 +298,7 @@ void phys_kiss::operator()()
 
 		if (ok) {
 			std::vector<uint8_t> payload_v(p, p + len);
-			ax25_packet ap(payload_v);
+			ax25_packet          ap(payload_v);
 
 			int pid = ap.get_pid().has_value() ? ap.get_pid().value() : -1;
 

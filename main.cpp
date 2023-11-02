@@ -405,11 +405,16 @@ int main(int argc, char *argv[])
 
 			int         baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
 
+			std::string beacon   = cfg_str(interface, "beacon", "beacon to send every 30s", false, "");
+			std::optional<std::string> beacon_option;
+			if (beacon.empty() == false)
+				beacon_option = beacon;
+
 			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_file);  // name
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP kiss device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac);
+			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac, beacon_option);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
