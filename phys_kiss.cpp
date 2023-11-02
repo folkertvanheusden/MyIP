@@ -66,6 +66,9 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 	if (tty_bps == 9600) {
 		// default
 	}
+	else if (tty_bps == 19200) {
+		speed = B19200;
+	}
 	else if (tty_bps == 115200) {
 		speed = B115200;
 	}
