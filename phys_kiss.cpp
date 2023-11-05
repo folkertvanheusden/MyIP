@@ -1,10 +1,11 @@
-// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pty.h>
 #include <stdio.h>
 #include <string.h>
 #include <termios.h>
@@ -43,52 +44,72 @@ void escape_put(uint8_t **p, int *len, uint8_t c)
 	}
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text) :
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text, const bool is_server) :
 	phys(dev_index, s, "kiss-" + dev_file),
 	my_callsign(my_callsign),
 	beacon_text(beacon_text)
 {
-	fd = open(dev_file.c_str(), O_RDWR | O_NOCTTY);
+	if (is_server) {
+		int  master = 0;
+		int  slave  = 0;
+		char name[256] { 0 };
 
-	if (fd == -1)
-		error_exit(true, "phys_kiss: Failed to open tty (%s)", dev_file.c_str());
+		if (openpty(&master, &slave, name, nullptr, nullptr) == -1)
+			error_exit(true, "phys_kiss_server: openpty failed");
 
-	termios tty     { 0 };
-	termios tty_old { 0 };
+		fd = master;
 
-	if (tcgetattr(fd, &tty) == -1)
-		error_exit(true, "phys_kiss: tcgetattr failed");
+		DOLOG(ll_info, "phys_kiss_server: created pty %s which will be linked to \"%s\"\n", name, dev_file.c_str());
 
-	tty_old = tty;
+		if (unlink(dev_file.c_str()) == -1 && errno != ENOENT)
+			error_exit(true, "Failed to remove \"%s\" from filesystem", dev_file.c_str());
 
-	speed_t speed = B9600;
-
-	if (tty_bps == 9600) {
-		// default
+		if (symlink(name, dev_file.c_str()) == -1)
+			error_exit(true, "Failed to create symlink from %s to \"%s\"", name, dev_file.c_str());
 	}
-	else if (tty_bps == 19200) {
-		speed = B19200;
+	else {
+		fd = open(dev_file.c_str(), O_RDWR | O_NOCTTY);
+
+		if (fd == -1)
+			error_exit(true, "phys_kiss: Failed to open tty (%s)", dev_file.c_str());
+
+		termios tty     { 0 };
+		termios tty_old { 0 };
+
+		if (tcgetattr(fd, &tty) == -1)
+			error_exit(true, "phys_kiss: tcgetattr failed");
+
+		tty_old = tty;
+
+		speed_t speed = B9600;
+
+		if (tty_bps == 9600) {
+			// default
+		}
+		else if (tty_bps == 19200) {
+			speed = B19200;
+		}
+		else if (tty_bps == 115200) {
+			speed = B115200;
+		}
+
+		cfsetospeed(&tty, speed);
+
+		tty.c_cflag &= ~PARENB;           // 8N1
+		tty.c_cflag &= ~CSTOPB;
+		tty.c_cflag &= ~CSIZE;
+		tty.c_cflag |=  CS8;
+
+		tty.c_cflag &= ~CRTSCTS;         // no flow control
+		tty.c_cflag |=  CREAD | CLOCAL;  // ignore control lines
+
+		cfmakeraw(&tty);
+
+		tcflush(fd, TCIFLUSH);
+
+		if (tcsetattr(fd, TCSANOW, &tty) != 0)
+			error_exit(true, "phys_kiss: tcsetattr failed");
 	}
-	else if (tty_bps == 115200) {
-		speed = B115200;
-	}
-
-	cfsetospeed(&tty, speed);
-
-	tty.c_cflag &= ~PARENB;           // 8N1
-	tty.c_cflag &= ~CSTOPB;
-	tty.c_cflag &= ~CSIZE;
-	tty.c_cflag |=  CS8;
-
-	tty.c_cflag &= ~CRTSCTS;         // no flow control
-	tty.c_cflag |=  CREAD | CLOCAL;  // ignore control lines
-
-	cfmakeraw(&tty);
-
-	tcflush(fd, TCIFLUSH);
-
-	if (tcsetattr(fd, TCSANOW, &tty) != 0)
-		error_exit(true, "phys_kiss: tcsetattr failed");
 
 	th = new std::thread(std::ref(*this));
 

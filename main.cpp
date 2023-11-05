@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
 		std::string type = cfg_str(interface, "type", "network interface type (e.g. \"ethernet\", \"ppp\" or \"slip\")", true, "ethernet");
 
 		std::string mac = cfg_str(interface, "mac-address", "MAC address", true, "52:34:84:16:44:22");
-		any_addr my_mac = type == "kiss-client" ? ax25_address(mac.c_str(), true, false).get_any_addr() : parse_address(mac, 6, ":", 16);
+		any_addr my_mac = type == "kiss" ? ax25_address(mac.c_str(), true, false).get_any_addr() : parse_address(mac, 6, ":", 16);
 
 		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
 
@@ -400,7 +400,7 @@ int main(int argc, char *argv[])
 
 			//dev->start_pcap("test-prom.pcap", true, true);
 		}
-		else if (type == "kiss-client") {
+		else if (type == "kiss") {
 			std::string dev_file = cfg_str(interface, "serial-dev", "device file (/dev/tty-something usuaully)", false, "");
 
 			int         baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
@@ -410,11 +410,13 @@ int main(int argc, char *argv[])
 			if (beacon.empty() == false)
 				beacon_option = beacon;
 
+			bool        is_tnc   = cfg_bool(interface, "emulate-tnc", "Set to true if MyIP should emulate a TNC. Set to false if it should connect to a TNC itself.", true, false);
+
 			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_file);  // name
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP kiss device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac, beacon_option);
+			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac, beacon_option, is_tnc);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
