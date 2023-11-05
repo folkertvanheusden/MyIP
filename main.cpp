@@ -12,7 +12,7 @@
 #include "any_addr.h"
 #include "ax25.h"
 #include "stats.h"
-#include "phys_kiss_client.h"
+#include "phys_kiss.h"
 #include "phys_tap.h"
 #include "phys_promiscuous.h"
 #include "phys_ppp.h"
@@ -414,7 +414,7 @@ int main(int argc, char *argv[])
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP kiss device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_kiss_client(i + 1, &s, dev_file, baudrate, my_mac, beacon_option);
+			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac, beacon_option);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");
