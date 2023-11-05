@@ -44,7 +44,7 @@ phys_promiscuous::phys_promiscuous(const size_t dev_index, stats *const s, const
 		error_exit(true, "phys_promiscuous: ioctl(SIOCGIFMTU) failed");
 
 	mtu_size = ifr.ifr_mtu;
-	CDOLOG(ll_debug, "prom", "MTU size: %d\n", mtu_size);
+	CDOLOG(ll_debug, "[prom]", "MTU size: %d\n", mtu_size);
 
 	if (ioctl(fd, SIOCGIFHWADDR, &ifr) == -1)
 		error_exit(true, "ioctl(SIOCGIFHWADDR) failed");
@@ -82,7 +82,7 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 	uint64_t start_ts = get_us();
 
 	if (dst_mac == my_mac) {
-		CDOLOG(ll_debug, "prom", "transmit_packet: dropping packet to myself (%s)\n", dst_mac.to_str().c_str());
+		CDOLOG(ll_debug, "[prom]", "transmit_packet: dropping packet to myself (%s)\n", dst_mac.to_str().c_str());
 
 		return false;
 	}
@@ -92,7 +92,7 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 	if (out_size < 60)
 		out_size = 60;
 
-	CDOLOG(ll_debug, "prom", "transmit packet %s -> %s (%zu bytes)\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), out_size);
+	CDOLOG(ll_debug, "[prom]", "transmit packet %s -> %s (%zu bytes)\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), out_size);
 
 	uint8_t *out      = new uint8_t[out_size]();
 
@@ -107,7 +107,7 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 
 	timespec ts { 0, 0 };
 	if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-		CDOLOG(ll_warning, "prom", "clock_gettime failed: %s", strerror(errno));
+		CDOLOG(ll_warning, "[prom]", "clock_gettime failed: %s", strerror(errno));
 
 	pcap_write_packet_outgoing(ts, out, out_size);
 
@@ -126,10 +126,10 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 	int rc = sendto(fd, out, out_size, 0, reinterpret_cast<const sockaddr *>(&socket_address), sizeof socket_address);
 
 	if (size_t(rc) != out_size) {
-		CDOLOG(ll_error, "prom", "problem sending packet (%d for %zu bytes)\n", rc, out_size);
+		CDOLOG(ll_error, "[prom]", "problem sending packet (%d for %zu bytes)\n", rc, out_size);
 
 		if (rc == -1)
-			CDOLOG(ll_error, "prom", "%s\n", strerror(errno));
+			CDOLOG(ll_error, "[prom]", "%s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -143,7 +143,7 @@ bool phys_promiscuous::transmit_packet(const any_addr & dst_mac, const any_addr 
 
 void phys_promiscuous::operator()()
 {
-	CDOLOG(ll_debug, "prom", "thread started\n");
+	CDOLOG(ll_debug, "[prom]", "thread started\n");
 
 	set_thread_name("myip-phys_promiscuous");
 
@@ -158,7 +158,7 @@ void phys_promiscuous::operator()()
 			if (errno == EINTR)
 				continue;
 
-			CDOLOG(ll_error, "prom", "poll: %s", strerror(errno));
+			CDOLOG(ll_error, "[prom]", "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -185,7 +185,7 @@ void phys_promiscuous::operator()()
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
-			CDOLOG(ll_info, "prom", "dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
+			CDOLOG(ll_info, "[prom]", "dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
 			stats_inc_counter(phys_ign_frame);
 			continue;
 		}
@@ -194,7 +194,7 @@ void phys_promiscuous::operator()()
 
 		any_addr src_mac(any_addr::mac, &buffer[6]);
 
-		CDOLOG(ll_debug, "prom", "queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
+		CDOLOG(ll_debug, "[prom]", "queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
 		std::string log_prefix = myformat("[MAC:%02x%02x%02x%02x%02x%02x]", buffer[6], buffer[7], buffer[8], buffer[9], buffer[10], buffer[11]);
 
@@ -203,5 +203,5 @@ void phys_promiscuous::operator()()
 		it->second->queue_incoming_packet(this, p);
 	}
 
-	CDOLOG(ll_info, "prom", "thread stopped\n");
+	CDOLOG(ll_info, "[prom]", "thread stopped\n");
 }

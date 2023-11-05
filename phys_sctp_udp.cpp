@@ -42,7 +42,7 @@ phys_sctp_udp::~phys_sctp_udp()
 
 bool phys_sctp_udp::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	CDOLOG(ll_debug, "sctp-udp", "transmit packet (%zu bytes) %s -> %s\n", pl_size, src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	CDOLOG(ll_debug, "[sctp-udp]", "transmit packet (%zu bytes) %s -> %s\n", pl_size, src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	stats_add_counter(phys_ifOutOctets, pl_size);
 	stats_add_counter(phys_ifHCOutOctets, pl_size);
@@ -51,7 +51,7 @@ bool phys_sctp_udp::transmit_packet(const any_addr & dst_mac, const any_addr & s
 	size_t header_size = (pl_size ? payload[0] & 0x0f : 0) * 4;
 
 	if (pl_size < header_size) {
-		CDOLOG(ll_error, "sctp-udp", "packet is unexpectedly small (%zu bytes)\n", pl_size);
+		CDOLOG(ll_error, "[sctp-udp]", "packet is unexpectedly small (%zu bytes)\n", pl_size);
 
 		return false;
 	}
@@ -68,10 +68,10 @@ bool phys_sctp_udp::transmit_packet(const any_addr & dst_mac, const any_addr & s
 	int rc = sendto(fd, &payload[header_size], pl_size - header_size, 0, reinterpret_cast<sockaddr *>(&to), sizeof to);
 
 	if (size_t(rc) != pl_size - header_size) {
-		CDOLOG(ll_error, "sctp-udp", "problem sending packet (%d for %zu bytes)\n", rc, pl_size - header_size);
+		CDOLOG(ll_error, "[sctp-udp]", "problem sending packet (%d for %zu bytes)\n", rc, pl_size - header_size);
 
 		if (rc == -1)
-			CDOLOG(ll_error, "sctp-udp", "%s\n", strerror(errno));
+			CDOLOG(ll_error, "[sctp-udp]", "%s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -81,7 +81,7 @@ bool phys_sctp_udp::transmit_packet(const any_addr & dst_mac, const any_addr & s
 
 void phys_sctp_udp::operator()()
 {
-	CDOLOG(ll_debug, "sctp-udp", "thread started\n");
+	CDOLOG(ll_debug, "[sctp-udp]", "thread started\n");
 
 	set_thread_name("myip-phys_sctp_udp");
 
@@ -93,7 +93,7 @@ void phys_sctp_udp::operator()()
 			if (errno == EINTR)
 				continue;
 
-			CDOLOG(ll_error, "sctp-udp", "poll: %s", strerror(errno));
+			CDOLOG(ll_error, "[sctp-udp]", "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -108,7 +108,7 @@ void phys_sctp_udp::operator()()
 
 	        struct timespec ts { 0, 0 };
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-			CDOLOG(ll_warning, "sctp-udp", "clock_gettime failed: %s", strerror(errno));
+			CDOLOG(ll_warning, "[sctp-udp]", "clock_gettime failed: %s", strerror(errno));
 
 		auto    host = get_host_as_text(reinterpret_cast<sockaddr *>(&addr));
 
@@ -129,7 +129,7 @@ void phys_sctp_udp::operator()()
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
-			CDOLOG(ll_info, "sctp-udp", "dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
+			CDOLOG(ll_info, "[sctp-udp]", "dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
 			stats_inc_counter(phys_ign_frame);
 			continue;
 		}
@@ -137,7 +137,7 @@ void phys_sctp_udp::operator()()
 		uint8_t dummy_src_mac[6] { 0, 0, 0, 0, uint8_t(addr.sin_port >> 8), uint8_t(addr.sin_port) };
 		any_addr src_mac(any_addr::mac, dummy_src_mac);
 
-		CDOLOG(ll_debug, "sctp-udp", "queing packet from %s (%s) to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), host.value().c_str(), my_mac.to_str().c_str(), ether_type, size);
+		CDOLOG(ll_debug, "[sctp-udp]", "queing packet from %s (%s) to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), host.value().c_str(), my_mac.to_str().c_str(), ether_type, size);
 
 		uint8_t ip_buffer[1620] { 0 };
 
@@ -165,5 +165,5 @@ void phys_sctp_udp::operator()()
 		it->second->queue_incoming_packet(this, p);
 	}
 
-	CDOLOG(ll_info, "sctp-udp", "thread stopped\n");
+	CDOLOG(ll_info, "[sctp-udp]", "thread stopped\n");
 }

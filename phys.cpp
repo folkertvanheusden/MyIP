@@ -62,13 +62,13 @@ timespec phys::gen_packet_timestamp(const int fd)
 
 	if (ioctl(fd, SIOCGSTAMPNS_OLD, &ts) == -1) {
 		if (SIOCGSTAMPNS_OLD_error_emitted == false) {
-			CDOLOG(ll_info, "phys", "ioctl(SIOCGSTAMPNS_OLD) failed: %s\n", strerror(errno));
+			CDOLOG(ll_info, "[phys]", "ioctl(SIOCGSTAMPNS_OLD) failed: %s\n", strerror(errno));
 
 			SIOCGSTAMPNS_OLD_error_emitted = true;
 		}
 
 		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-			CDOLOG(ll_warning, "phys", "clock_gettime failed: %s", strerror(errno));
+			CDOLOG(ll_warning, "[phys]", "clock_gettime failed: %s", strerror(errno));
 	}
 
 	return ts;
@@ -77,7 +77,7 @@ timespec phys::gen_packet_timestamp(const int fd)
 void phys::start_pcap(const std::string & pcap_file, const bool in, const bool out)
 {
 	if (pcap_fd != -1) {
-		CDOLOG(ll_error, "phys", "pcap already running\n");
+		CDOLOG(ll_error, "[phys]", "pcap already running\n");
 
 		close(pcap_fd);
 	}
@@ -99,7 +99,7 @@ void phys::start_pcap(const std::string & pcap_file, const bool in, const bool o
 	pcap_write_outgoing = out;
 
 	if (WRITE(pcap_fd, header.get_content(), header.get_size()) != header.get_size())
-		CDOLOG(ll_error, "phys", "cannot write to pcap file (header)\n");
+		CDOLOG(ll_error, "[phys]", "cannot write to pcap file (header)\n");
 }
 
 void phys::stop_pcap()
@@ -121,7 +121,7 @@ void phys::pcap_write_packet(const timespec & ts, const uint8_t *const data, con
 	record.add_buffer(data, n);
 
 	if (WRITE(pcap_fd, record.get_content(), record.get_size()) != record.get_size())
-		CDOLOG(ll_error, "phys", "cannot write to pcap file (record)\n");
+		CDOLOG(ll_error, "[phys]", "cannot write to pcap file (record)\n");
 }
 
 void phys::pcap_write_packet_incoming(const timespec & ts, const uint8_t *const data, const size_t n)
@@ -159,5 +159,5 @@ bool phys::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, c
 
 void phys::operator()()
 {
-	CDOLOG(ll_info, "phys", "thread stopped\n");
+	CDOLOG(ll_info, "[phys]", "thread stopped\n");
 }

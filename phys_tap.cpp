@@ -33,12 +33,12 @@ phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & d
 	phys(dev_index, s, "tap-" + dev_name)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
-		CDOLOG(ll_error, "tap", "open /dev/net/tun: %s\n", strerror(errno));
+		CDOLOG(ll_error, "[tap]", "open /dev/net/tun: %s\n", strerror(errno));
 		exit(1);
 	}
 
 	if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
-		CDOLOG(ll_error, "tap", "fcntl(FD_CLOEXEC): %s\n", strerror(errno));
+		CDOLOG(ll_error, "[tap]", "fcntl(FD_CLOEXEC): %s\n", strerror(errno));
 		exit(1);
 	}
 
@@ -51,23 +51,23 @@ phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & d
 	set_ifr_name(&ifr_tap1, dev_name);
 
 	if (ioctl(fd, TUNSETIFF, &ifr_tap1) == -1) {
-		CDOLOG(ll_error, "tap", "ioctl TUNSETIFF (%s): %s\n", dev_name.c_str(), strerror(errno));
+		CDOLOG(ll_error, "[tap]", "ioctl TUNSETIFF (%s): %s\n", dev_name.c_str(), strerror(errno));
 		exit(1);
 	}
 
 	// myip calcs checksums by itself
 	if (ioctl(fd, TUNSETNOCSUM, 1) == -1) {
-		CDOLOG(ll_error, "tap", "ioctl TUNSETNOCSUM: %s\n", strerror(errno));
+		CDOLOG(ll_error, "[tap]", "ioctl TUNSETNOCSUM: %s\n", strerror(errno));
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETGROUP, gid) == -1) {
-		CDOLOG(ll_error, "tap", "ioctl TUNSETGROUP: %s\n", strerror(errno));
+		CDOLOG(ll_error, "[tap]", "ioctl TUNSETGROUP: %s\n", strerror(errno));
 		exit(1);
 	}
 
 	if (ioctl(fd, TUNSETOWNER, uid) == -1) {
-		CDOLOG(ll_error, "tap", "ioctl TUNSETOWNER: %s\n", strerror(errno));
+		CDOLOG(ll_error, "[tap]", "ioctl TUNSETOWNER: %s\n", strerror(errno));
 		exit(1);
 	}
 
@@ -81,7 +81,7 @@ phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & d
 	ifr_tap2.ifr_mtu            = mtu_size;
 
 	if (ioctl(fd_sock, SIOCSIFMTU, &ifr_tap2) == -1) {
-		CDOLOG(ll_error, "tap", "ioctl SIOCSIFMTU(%d): %s\n", mtu_size, strerror(errno));
+		CDOLOG(ll_error, "[tap]", "ioctl SIOCSIFMTU(%d): %s\n", mtu_size, strerror(errno));
 		exit(1);
 	}
 
@@ -97,7 +97,7 @@ phys_tap::~phys_tap()
 
 bool phys_tap::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	CDOLOG(ll_debug, "tap", "transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	CDOLOG(ll_debug, "[tap]", "transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	size_t out_size = pl_size + 14;
 
@@ -123,7 +123,7 @@ bool phys_tap::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 
 	timespec ts { 0, 0 };
 	if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-		CDOLOG(ll_warning, "tap", "clock_gettime failed: %s\n", strerror(errno));
+		CDOLOG(ll_warning, "[tap]", "clock_gettime failed: %s\n", strerror(errno));
 
 	pcap_write_packet_outgoing(ts, out, out_size);
 
@@ -132,10 +132,10 @@ bool phys_tap::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 	int rc = write(fd, out, out_size);
 
 	if (size_t(rc) != out_size) {
-		CDOLOG(ll_error, "tap", "problem sending packet (%d for %zu bytes)\n", rc, out_size);
+		CDOLOG(ll_error, "[tap]", "problem sending packet (%d for %zu bytes)\n", rc, out_size);
 
 		if (rc == -1)
-			CDOLOG(ll_error, "tap", "%s\n", strerror(errno));
+			CDOLOG(ll_error, "[tap]", "%s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -147,7 +147,7 @@ bool phys_tap::transmit_packet(const any_addr & dst_mac, const any_addr & src_ma
 
 void phys_tap::operator()()
 {
-	CDOLOG(ll_debug, "tap", "thread started\n");
+	CDOLOG(ll_debug, "[tap]", "thread started\n");
 
 	set_thread_name("myip-phys_tap");
 
@@ -161,7 +161,7 @@ void phys_tap::operator()()
 			if (errno == EINTR)
 				continue;
 
-			CDOLOG(ll_error, "tap", "poll: %s", strerror(errno));
+			CDOLOG(ll_error, "[tap]", "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -188,7 +188,7 @@ void phys_tap::operator()()
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {
-			CDOLOG(ll_info, "tap", "dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
+			CDOLOG(ll_info, "[tap]", "dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
 			stats_inc_counter(phys_ign_frame);
 			continue;
 		}
@@ -197,7 +197,7 @@ void phys_tap::operator()()
 
 		any_addr src_mac(any_addr::mac, &buffer[6]);
 
-		CDOLOG(ll_debug, "tap", "queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
+		CDOLOG(ll_debug, "[tap]", "queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
 
 		std::string log_prefix = myformat("[MAC:%02x%02x%02x%02x%02x%02x]", buffer[6], buffer[7], buffer[8], buffer[9], buffer[10], buffer[11]);
 
@@ -206,5 +206,5 @@ void phys_tap::operator()()
 		it->second->queue_incoming_packet(this, p);
 	}
 
-	CDOLOG(ll_info, "tap", "thread stopped\n");
+	CDOLOG(ll_info, "[tap]", "thread stopped\n");
 }

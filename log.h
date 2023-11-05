@@ -24,6 +24,6 @@ void dolog(const log_level_t ll, const char *fmt, ...);
 								\
 	if (ll >= log_level_file || ll >= log_level_screen) {	\
 		std::string __log_temp = myformat(fmt, ##__VA_ARGS__);\
-		dolog(ll, "[%s] %s", context, __log_temp.c_str()); \
+		dolog(ll, "%s %s", context, __log_temp.c_str()); \
 	}							\
 } while(0)

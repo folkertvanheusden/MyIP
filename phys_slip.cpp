@@ -40,7 +40,7 @@ void phys_slip::start()
 
 bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	CDOLOG(ll_debug, "slip", "transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+	CDOLOG(ll_debug, "[slip]", "transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	size_t out_size = pl_size * 2 + 2;
 	uint8_t *out = new uint8_t[out_size];
@@ -71,10 +71,10 @@ bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	int rc = write(fd, out, out_o);
 
 	if (size_t(rc) != out_o) {
-		CDOLOG(ll_error, "slip", "problem sending packet (%d for %zu bytes)\n", rc, out_o);
+		CDOLOG(ll_error, "[slip]", "problem sending packet (%d for %zu bytes)\n", rc, out_o);
 
 		if (rc == -1)
-			CDOLOG(ll_error, "slip", "%s\n", strerror(errno));
+			CDOLOG(ll_error, "[slip]", "%s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -86,7 +86,7 @@ bool phys_slip::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 
 void phys_slip::operator()()
 {
-	CDOLOG(ll_debug, "slip", "thread started\n");
+	CDOLOG(ll_debug, "[slip]", "thread started\n");
 
 	set_thread_name("myip-phys_slip");
 
@@ -102,7 +102,7 @@ void phys_slip::operator()()
 			if (errno == EINTR)
 				continue;
 
-			CDOLOG(ll_error, "slip", "poll: %s", strerror(errno));
+			CDOLOG(ll_error, "[slip]", "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -120,7 +120,7 @@ void phys_slip::operator()()
 
 		if (packet_buffer.empty()) {
 			if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-				CDOLOG(ll_warning, "slip", "clock_gettime failed: %s", strerror(errno));
+				CDOLOG(ll_warning, "[slip]", "clock_gettime failed: %s", strerror(errno));
 		}
 
 		if (buffer == 0xdb) {
@@ -136,7 +136,7 @@ void phys_slip::operator()()
 			stats_inc_counter(phys_recv_frame);
 
 			if (packet_buffer.size() < 20) {
-				CDOLOG(ll_debug, "slip", "invalid packet, size %zu\n", packet_buffer.size());
+				CDOLOG(ll_debug, "[slip]", "invalid packet, size %zu\n", packet_buffer.size());
 
 				if (size)
 					stats_inc_counter(phys_invl_frame);
@@ -148,11 +148,11 @@ void phys_slip::operator()()
 
 			any_addr src_mac(any_addr::mac, (const uint8_t *)"\0\0\0\0\0\1");
 
-			CDOLOG(ll_debug, "slip", "queing packet, size %zu\n", packet_buffer.size());
+			CDOLOG(ll_debug, "[slip]", "queing packet, size %zu\n", packet_buffer.size());
 
 			auto it = prot_map.find(0x800);  // assuming IPv4
 			if (it == prot_map.end())
-				CDOLOG(ll_warning, "slip", "no IPv4 stack attached to SLIP device (yet)\n");
+				CDOLOG(ll_warning, "[slip]", "no IPv4 stack attached to SLIP device (yet)\n");
 			else {
 				packet *p = new packet(ts, src_mac, my_mac, packet_buffer.data(), packet_buffer.size(), NULL, 0, "SLIP[]");
 
@@ -166,5 +166,5 @@ void phys_slip::operator()()
 		}
 	}
 
-	CDOLOG(ll_info, "slip", "thread stopped\n");
+	CDOLOG(ll_info, "[slip]", "thread stopped\n");
 }
