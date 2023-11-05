@@ -116,6 +116,15 @@ void set_thread_name(std::string name)
 	pthread_setname_np(pthread_self(), name.c_str());
 }
 
+std::string get_thread_name()
+{
+	char buffer[17] { 0 };
+
+	pthread_getname_np(pthread_self(), buffer, sizeof buffer);
+
+	return buffer;
+}
+
 bool file_exists(const std::string & file, size_t *const file_size)
 {
 	struct stat st { 0 };

@@ -12,6 +12,7 @@ void get_random(uint8_t *tgt, size_t n);
 uint8_t * get_from_buffer(uint8_t **p, size_t *len, size_t get_len);
 
 void set_thread_name(std::string name);
+std::string get_thread_name();
 bool file_exists(const std::string & file, size_t *const file_size = nullptr);
 void run(const std::string & what);
 

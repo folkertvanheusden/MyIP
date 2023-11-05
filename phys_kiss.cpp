@@ -55,11 +55,11 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 		char name[256] { 0 };
 
 		if (openpty(&master, &slave, name, nullptr, nullptr) == -1)
-			error_exit(true, "phys_kiss_server: openpty failed");
+			error_exit(true, "openpty failed");
 
 		fd = master;
 
-		DOLOG(ll_info, "phys_kiss_server: created pty %s which will be linked to \"%s\"\n", name, dev_file.c_str());
+		CDOLOG(ll_info, "kiss", "created pty %s which will be linked to \"%s\"\n", name, dev_file.c_str());
 
 		if (unlink(dev_file.c_str()) == -1 && errno != ENOENT)
 			error_exit(true, "Failed to remove \"%s\" from filesystem", dev_file.c_str());
@@ -71,13 +71,13 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 		fd = open(dev_file.c_str(), O_RDWR | O_NOCTTY);
 
 		if (fd == -1)
-			error_exit(true, "phys_kiss: Failed to open tty (%s)", dev_file.c_str());
+			error_exit(true, "Failed to open tty (%s)", dev_file.c_str());
 
 		termios tty     { 0 };
 		termios tty_old { 0 };
 
 		if (tcgetattr(fd, &tty) == -1)
-			error_exit(true, "phys_kiss: tcgetattr failed");
+			error_exit(true, "tcgetattr failed");
 
 		tty_old = tty;
 
@@ -108,7 +108,7 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 		tcflush(fd, TCIFLUSH);
 
 		if (tcsetattr(fd, TCSANOW, &tty) != 0)
-			error_exit(true, "phys_kiss: tcsetattr failed");
+			error_exit(true, "tcsetattr failed");
 	}
 
 	th = new std::thread(std::ref(*this));
@@ -159,7 +159,7 @@ bool phys_kiss::transmit_ax25(const ax25_packet & a)
 	free(out);
 
 	if (rc != offset) {
-		DOLOG(ll_error, "failed writing to kiss device");
+		CDOLOG(ll_error, "kiss", "failed writing to kiss device");
 
 		return false;
 	}
@@ -179,7 +179,7 @@ void phys_kiss::send_beacon()
 		a.set_data   (reinterpret_cast<const uint8_t *>(beacon_text.value().c_str()), beacon_text.value().size());
 		a.set_pid(0xf0);  // beacon
 
-		DOLOG(ll_debug, "transmit beacon: \"%s\"\n", beacon_text.value().c_str());
+		CDOLOG(ll_debug, "kiss", "transmit beacon: \"%s\"\n", beacon_text.value().c_str());
 		transmit_ax25(a);
 
 		sleep(30);  // TODO configurable
@@ -188,7 +188,7 @@ void phys_kiss::send_beacon()
 
 bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload_in, const size_t pl_size_in)
 {
-	DOLOG(ll_debug, "phys_kiss::transmit_packet: %s => %s, ethertype: %04x, %zu bytes\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, pl_size_in);
+	CDOLOG(ll_debug, "kiss", "transmit_packet: %s => %s, ethertype: %04x, %zu bytes\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, pl_size_in);
 
 	assert(src_mac.get_family() == any_addr::ax25);
 	assert(dst_mac.get_family() == any_addr::ax25);
@@ -204,7 +204,7 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	else if (ether_type == 0x0806)
 		a.set_pid(0xcd);  // ARPA Adress Resolving Protocol (IPv4)
 	else {
-		DOLOG(ll_info, "phys_kiss::transmit_packet: cannot transmit ethertype %04x over AX.25\n", ether_type);
+		CDOLOG(ll_info, "kiss", "transmit_packet: cannot transmit ethertype %04x over AX.25\n", ether_type);
 		return false;
 	}
 
@@ -213,7 +213,7 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 
 void phys_kiss::operator()()
 {
-	DOLOG(ll_debug, "phys_kiss: thread started\n");
+	CDOLOG(ll_debug, "kiss", "thread started\n");
 
 	set_thread_name("myip-phys_kiss");
 
@@ -227,7 +227,7 @@ void phys_kiss::operator()()
 			if (errno == EINTR)
 				continue;
 
-			DOLOG(ll_error, "poll: %s", strerror(errno));
+			CDOLOG(ll_error, "kiss", "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -248,7 +248,7 @@ void phys_kiss::operator()()
 				if (errno == EINTR)
 					continue;
 
-				DOLOG(ll_error, "failed reading from device");
+				CDOLOG(ll_error, "kiss", "failed reading from device");
 
 				break;
 			}
@@ -263,7 +263,7 @@ void phys_kiss::operator()()
 				else if (buffer == TFESC)
 					p[len++] = FESC;
 				else
-					DOLOG(ll_error, "unexpected escape %02x", buffer);
+					CDOLOG(ll_error, "kiss", "unexpected escape %02x", buffer);
 
 				escape = false;
 			}
@@ -277,7 +277,7 @@ void phys_kiss::operator()()
 				// otherwise: first FEND, ignore
 
 				if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-					DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
+					CDOLOG(ll_warning, "kiss", "clock_gettime failed: %s", strerror(errno));
 			}
 			else if (buffer == FESC)
 				escape = true;
@@ -297,22 +297,22 @@ void phys_kiss::operator()()
 		{
 			int cmd = p[0] & 0x0f;
 
-			DOLOG(ll_debug, "port: %d, cmd: %d, len: %d\n", (p[0] >> 4) & 0x0f, cmd, len);
+			CDOLOG(ll_debug, "kiss", "port: %d, cmd: %d, len: %d\n", (p[0] >> 4) & 0x0f, cmd, len);
 
 			if (cmd == 1)
-				DOLOG(ll_debug, "TX delay: %d", p[1] * 10);
+				CDOLOG(ll_debug, "kiss", "TX delay: %d", p[1] * 10);
 			else if (cmd == 2)
-				DOLOG(ll_debug, "persistance: %d", p[1] * 256 - 1);
+				CDOLOG(ll_debug, "kiss", "persistance: %d", p[1] * 256 - 1);
 			else if (cmd == 3)
-				DOLOG(ll_debug, "slot time: %dms", p[1] * 10);
+				CDOLOG(ll_debug, "kiss", "slot time: %dms", p[1] * 10);
 			else if (cmd == 4)
-				DOLOG(ll_debug, "txtail: %dms", p[1] * 10);
+				CDOLOG(ll_debug, "kiss", "txtail: %dms", p[1] * 10);
 			else if (cmd == 5)
-				DOLOG(ll_debug, "full duplex: %d", p[1]);
+				CDOLOG(ll_debug, "kiss", "full duplex: %d", p[1]);
 			else if (cmd == 6)
-				DOLOG(ll_debug, "set hardware");
+				CDOLOG(ll_debug, "kiss", "set hardware");
 			else if (cmd == 15)
-				DOLOG(ll_info, "kernel asked for shutdown");
+				CDOLOG(ll_info, "kiss", "kernel asked for shutdown");
 
 			len--;
 
@@ -331,7 +331,7 @@ void phys_kiss::operator()()
 			if (ap.get_valid()) {
 				log_prefix = myformat("KISS[%s]", ap.get_from().get_any_addr().to_str().c_str());
 
-				DOLOG(ll_info, "phys_kiss(%s -> %s): received packet of %d bytes\n",
+				CDOLOG(ll_info, "kiss", "%s -> %s: received packet of %d bytes\n",
 						ap.get_from().get_any_addr().to_str().c_str(),
 						ap.get_to  ().get_any_addr().to_str().c_str(),
 						len);
@@ -350,7 +350,7 @@ void phys_kiss::operator()()
 			else if (pid == 0xf0) {  // usually beacons etc
 				std::string payload_str = bin_to_text(p, len, true);
 
-				DOLOG(ll_info, "phys_kiss(): pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
+				CDOLOG(ll_info, "kiss", "pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
 			}
 			else if (ap.get_valid() && pid == 0xcd) {  // check for valid ARP payload
 				auto payload = ap.get_data();
@@ -365,12 +365,12 @@ void phys_kiss::operator()()
 			else {
 				std::string payload_str = bin_to_text(p, len, true);
 
-				DOLOG(ll_info, "phys_kiss(): don't know how to handle pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
+				CDOLOG(ll_info, "kiss", "don't know how to handle pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
 			}
 		}
 
 		free(p);
 	}
 
-	DOLOG(ll_info, "phys_kiss: thread stopped\n");
+	CDOLOG(ll_info, "kiss", "thread stopped\n");
 }

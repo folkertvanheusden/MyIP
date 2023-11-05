@@ -43,10 +43,10 @@ bool phys_ppp::transmit_low(const std::vector<uint8_t> & payload, const uint16_t
 	send_lock.unlock();
 
 	if (size_t(rc) != out_wrapped.size()) {
-		DOLOG(ll_error, "phys_ppp: problem sending packet (%d for %zu bytes): %s\n", rc, out_wrapped.size(), strerror(errno));
+		CDOLOG(ll_error, "ppp", "problem sending packet (%d for %zu bytes): %s\n", rc, out_wrapped.size(), strerror(errno));
 
 		if (rc == -1)
-			DOLOG(ll_error, "phys_ppp: %s\n", strerror(errno));
+			CDOLOG(ll_error, "%s\n", strerror(errno));
 
 		ok = false;
 	}
@@ -56,7 +56,7 @@ bool phys_ppp::transmit_low(const std::vector<uint8_t> & payload, const uint16_t
 
 void phys_ppp::operator()()
 {
-	DOLOG(ll_debug, "phys_ppp: thread started\n");
+	CDOLOG(ll_debug, "ppp", "thread started\n");
 
 	set_thread_name("myip-phys_ppp");
 
@@ -75,7 +75,7 @@ void phys_ppp::operator()()
 			if (errno == EINTR)
 				continue;
 
-			DOLOG(ll_error, "poll: %s", strerror(errno));
+			CDOLOG(ll_error, "ppp", "poll: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -89,7 +89,7 @@ void phys_ppp::operator()()
 
 		if (buffer == 0x7e) {
 			if (packet_buffer.empty() == false) {  // START/END of packet
-				DOLOG(ll_error, "received ppp frame\n");
+				CDOLOG(ll_error, "ppp", "received ppp frame\n");
 
 				auto unwrapped = unwrap_ppp_frame(packet_buffer, ACCM_rx);
 
@@ -108,7 +108,7 @@ void phys_ppp::operator()()
 			}
 			else {  // start of packet
 				if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-					DOLOG(ll_warning, "clock_gettime failed: %s", strerror(errno));
+					CDOLOG(ll_warning, "ppp", "clock_gettime failed: %s", strerror(errno));
 			}
 		}
 		else {
@@ -122,18 +122,18 @@ void phys_ppp::operator()()
 					modem += (char)buffer;
 
 					if (modem.find("ATDT") != std::string::npos) {
-						DOLOG(ll_debug, "ATDT -> CONNECT (%s)\n", modem.c_str());
+						CDOLOG(ll_debug, "ppp", "ATDT -> CONNECT (%s)\n", modem.c_str());
 						write(fd, "CONNECT\r\n", 9);
 						modem.clear();
 					}
 					else if (modem.find("AT") != std::string::npos) {
-						DOLOG(ll_debug, "AT -> OK (%s)\n", modem.c_str());
+						CDOLOG(ll_debug, "ppp", "AT -> OK (%s)\n", modem.c_str());
 						write(fd, "OK\r\n", 4);
 						modem.clear();
 					}
 					else if (modem.find("CLIENT") != std::string::npos) {
 						// Windows XP direction PPP connection
-						DOLOG(ll_debug, "CLIENT -> SERVER\n");
+						CDOLOG(ll_debug, "ppp", "CLIENT -> SERVER\n");
 						write(fd, "SERVER\r\n", 7);
 						modem.clear();
 					}
@@ -142,5 +142,5 @@ void phys_ppp::operator()()
 		}
 	}
 
-	DOLOG(ll_info, "phys_ppp: thread stopped\n");
+	CDOLOG(ll_info, "ppp", "thread stopped\n");
 }
