@@ -89,7 +89,7 @@ bool ipv4::transmit_packet(const std::optional<any_addr> & dst_mac, const any_ad
 
 	uint16_t ip_id = (out[4] << 8) | out[5];
 
-	DOLOG(ll_debug, "IPv4[%04x]: transmit packet %s -> %s\n", ip_id, src_ip.to_str().c_str(), dst_ip.to_str().c_str());
+	DOLOG(ll_debug, "[IPv4:%04x]: transmit packet %s -> %s\n", ip_id, src_ip.to_str().c_str(), dst_ip.to_str().c_str());
 
 	bool rc = r->route_packet(dst_mac, 0x0800, dst_ip, { }, q_addr, out, out_size);
 
@@ -145,7 +145,7 @@ void ipv4::operator()()
 		any_addr pkt_dst(any_addr::ipv4, &payload_header[16]);
 		any_addr pkt_src(any_addr::ipv4, &payload_header[12]);
 
-		pkt->add_to_log_prefix(myformat("IPv4[%s]", pkt_src.to_str().c_str()));
+		pkt->add_to_log_prefix(myformat("[IPv4:%s]", pkt_src.to_str().c_str()));
 
 		iarp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 

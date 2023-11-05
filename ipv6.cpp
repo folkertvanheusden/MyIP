@@ -122,7 +122,7 @@ void ipv6::operator()()
 		any_addr pkt_dst(any_addr::ipv6, &payload_header[24]);
 		any_addr pkt_src(any_addr::ipv6, &payload_header[8]);
 
-		pkt->add_to_log_prefix(myformat("IPv6[%s]", pkt_src.to_str().c_str()));
+		pkt->add_to_log_prefix(myformat("[IPv6:%s]", pkt_src.to_str().c_str()));
 
 		CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "packet %s => %s\n", pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
