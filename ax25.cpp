@@ -1,4 +1,4 @@
-// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <chrono>
 #include <stdint.h>
@@ -10,6 +10,7 @@
 #include "log.h"
 #include "phys.h"
 #include "router.h"
+#include "str.h"
 #include "time.h"
 #include "utils.h"
 
@@ -314,4 +315,9 @@ std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 	memcpy(&out[offset], data.get_bytes(data_size), data_size);
 
 	return { out, data_size + offset };
+}
+
+std::string ax25_packet::to_str() const
+{
+	return myformat("valid:%d, from:%s, to:%s control:%02x", valid, from.get_address().c_str(), to.get_address().c_str(), control);
 }

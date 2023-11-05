@@ -182,7 +182,7 @@ void phys_kiss::send_beacon()
 		a.set_data   (reinterpret_cast<const uint8_t *>(beacon_text.value().c_str()), beacon_text.value().size());
 		a.set_pid(0xf0);  // beacon
 
-		CDOLOG(ll_debug, "[kiss]", "transmit beacon: \"%s\"\n", beacon_text.value().c_str());
+		CDOLOG(ll_debug, "[kiss]", "transmit beacon: \"%s\" (%s)\n", beacon_text.value().c_str(), a.to_str().c_str());
 		transmit_ax25(a);
 
 		sleep(30);  // TODO configurable
@@ -336,10 +336,8 @@ void phys_kiss::operator()()
 			if (ap.get_valid()) {
 				log_prefix = myformat("KISS[%s]", ap.get_from().get_any_addr().to_str().c_str());
 
-				CDOLOG(ll_info, "[kiss]", "%s -> %s: received packet of %d bytes\n",
-						ap.get_from().get_any_addr().to_str().c_str(),
-						ap.get_to  ().get_any_addr().to_str().c_str(),
-						len);
+				CDOLOG(ll_info, "[kiss]", "%s: received packet of %d bytes\n",
+						ap.to_str().c_str(), len);
 			}
 
 			if (ap.get_valid() && pid == 0xcc) {  // check for valid IPv4 payload

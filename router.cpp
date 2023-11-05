@@ -234,8 +234,14 @@ void router::operator()()
 			phys *interface { nullptr };
 
 			auto route = ax25_table.find(po.value()->dst_mac.value());
-			if (route == ax25_table.end())
+			if (route == ax25_table.end()) {
 				interface = ax25_default_interface;
+
+				DOLOG(ll_debug, "router::operator: routing packet (%s) via default interface\n", po.value()->to_str().c_str());
+			}
+			else {
+				DOLOG(ll_debug, "router::operator: routing packet (%s) via %s\n", po.value()->to_str().c_str(), interface->to_str().c_str());
+			}
 
 			if (interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
 				DOLOG(ll_debug, "router::operator: cannot transmit_packet via AX.25 (%s)\n", po.value()->to_str().c_str());
