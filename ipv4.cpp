@@ -136,7 +136,7 @@ void ipv4::operator()()
 		uint8_t version = payload_header[0] >> 4;
 		if (version != 0x04) {
 			stats_inc_counter(ip_n_disc);
-			DOLOG(ll_info, "%s: not an IPv4 packet (version: %d)\n", pkt->get_log_prefix().c_str(), version);
+			CDOLOG(ll_info, pkt->get_log_prefix().c_str(), "not an IPv4 packet (version: %d)\n", version);
 			delete pkt;
 			receive_packet_de.insert(get_us() - start);
 			continue;
@@ -149,10 +149,10 @@ void ipv4::operator()()
 
 		iarp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 
-		DOLOG(ll_debug, "%s: packet %s => %s\n", pkt->get_log_prefix().c_str(), pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
+		CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "packet %s => %s\n", pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
 		if (payload_header[8] <= 1) {  // TTL exceeded?
-			DOLOG(ll_debug, "%s: TTL exceeded\n", pkt->get_log_prefix().c_str());
+			CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "TTL exceeded\n");
 
 			delete pkt;
 
@@ -166,10 +166,10 @@ void ipv4::operator()()
 
 		int header_size = (payload_header[0] & 15) * 4;
 		int ip_size     = (payload_header[2] << 8) | payload_header[3];
-		DOLOG(ll_debug, "%s: total packet size: %d, IP header says: %d, header size: %d\n", pkt->get_log_prefix().c_str(), size, ip_size, header_size);
+		CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "total packet size: %d, IP header says: %d, header size: %d\n", size, ip_size, header_size);
 
 		if (ip_size > size) {
-			DOLOG(ll_info, "%s: size (%d) > Ethernet size (%d)\n", pkt->get_log_prefix().c_str(), ip_size, size);
+			CDOLOG(ll_info, pkt->get_log_prefix().c_str(), "size (%d) > Ethernet size (%d)\n", ip_size, size);
 			delete pkt;
 			stats_inc_counter(ip_n_disc);
 			receive_packet_de.insert(get_us() - start);
@@ -180,7 +180,7 @@ void ipv4::operator()()
 		size = ip_size;
 
 		if (header_size > size) {
-			DOLOG(ll_info, "%s: Header size (%d) > size (%d)\n", pkt->get_log_prefix().c_str(), header_size, size);
+			CDOLOG(ll_info, pkt->get_log_prefix().c_str(), "Header size (%d) > size (%d)\n", header_size, size);
 			delete pkt;
 			stats_inc_counter(ip_n_disc);
 			receive_packet_de.insert(get_us() - start);
@@ -193,7 +193,7 @@ void ipv4::operator()()
 
 		auto it = prot_map.find(protocol);
 		if (it == prot_map.end()) {
-			DOLOG(ll_debug, "%s: dropping packet %02x (= unknown protocol) and size %d\n", pkt->get_log_prefix().c_str(), protocol, size);
+			CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "dropping packet %02x (= unknown protocol) and size %d\n", protocol, size);
 			delete pkt;
 			stats_inc_counter(ipv4_unk_prot);
 			stats_inc_counter(ip_n_disc);
@@ -205,12 +205,12 @@ void ipv4::operator()()
 
 		if (pkt_dst != myip) {
 			if (forward) {
-				DOLOG(ll_debug, "%s: forwarding packet to router\n", pkt->get_log_prefix().c_str());
+				CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "forwarding packet to router\n");
 
 				r->route_packet({ }, 0x0800, pkt_dst, pkt->get_src_mac_addr(), pkt_src, p, size);
 			}
 			else {
-				DOLOG(ll_debug, "%s: dropping packet (not forwarding)\n", pkt->get_log_prefix().c_str());
+				CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "dropping packet (not forwarding)\n");
 
 				stats_inc_counter(ip_n_disc);
 			}
@@ -225,7 +225,7 @@ void ipv4::operator()()
 
 		packet *ip_p = new packet(pkt->get_recv_ts(), pkt->get_src_mac_addr(), pkt_src, pkt_dst, payload_data, payload_size, payload_header, header_size, pkt->get_log_prefix());
 
-		DOLOG(ll_debug, "%s: queing packet protocol %02x and size %d\n", pkt->get_log_prefix().c_str(), protocol, payload_size);
+		CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "queing packet protocol %02x and size %d\n", protocol, payload_size);
 
 		it->second->queue_packet(ip_p);
 
