@@ -4,7 +4,8 @@ This is an implementation of an IP-stack (IPv4/IPv6).
 It will listen on a tap-, promiscuous, slip or ppp device for network
 frames containg e.g. ARP-requests, IP packets, ICMP(6), UDP and even
 NTP, VNC, SIP, MQTT and HTTP requests. Also LLDP, NDP, Socks, syslog,
-PPP, SLIP, NRPE, DNS (client), SCTP, MDNS, IRC (server) and SNMP.
+PPP, SLIP, NRPE, DNS (client), SCTP, MDNS, IRC (server), SNMP and
+AX.25.
 When multiple interfaces are configured, it can also route between
 them.
 
