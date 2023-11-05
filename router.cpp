@@ -135,10 +135,10 @@ bool router::route_packet(const std::optional<any_addr> & override_dst_mac, cons
 
 	qp->ether_type = ether_type;
 
-	assert(override_dst_mac.has_value() == false || override_dst_mac.value().get_family() == any_addr::mac);
+	assert(override_dst_mac.has_value() == false || override_dst_mac.value().get_family() == any_addr::mac || override_dst_mac.value().get_family() == any_addr::ax25);
 	qp->dst_mac    = override_dst_mac;
 
-	assert(src_mac.has_value() == false || src_mac.value().get_family() == any_addr::mac);
+	assert(src_mac.has_value() == false || src_mac.value().get_family() == any_addr::mac || src_mac.value().get_family() == any_addr::ax25);
 	qp->src_mac    = src_mac;
 
 	if (ether_type != 0x08FF) {  // unofficial AX.25 ethertype

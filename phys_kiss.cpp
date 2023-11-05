@@ -44,7 +44,7 @@ void escape_put(uint8_t **p, int *len, uint8_t c)
 	}
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text, const bool is_server, router *const r) :
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text, const bool is_server, router *const r, const bool init_tty) :
 	phys(dev_index, s, "kiss-" + dev_file),
 	my_callsign(my_callsign),
 	beacon_text(beacon_text),
@@ -74,42 +74,44 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 		if (fd == -1)
 			error_exit(true, "Failed to open tty (%s)", dev_file.c_str());
 
-		termios tty     { 0 };
-		termios tty_old { 0 };
+		if (init_tty) {
+			termios tty     { 0 };
+			termios tty_old { 0 };
 
-		if (tcgetattr(fd, &tty) == -1)
-			error_exit(true, "tcgetattr failed");
+			if (tcgetattr(fd, &tty) == -1)
+				error_exit(true, "tcgetattr failed");
 
-		tty_old = tty;
+			tty_old = tty;
 
-		speed_t speed = B9600;
+			speed_t speed = B9600;
 
-		if (tty_bps == 9600) {
-			// default
+			if (tty_bps == 9600) {
+				// default
+			}
+			else if (tty_bps == 19200) {
+				speed = B19200;
+			}
+			else if (tty_bps == 115200) {
+				speed = B115200;
+			}
+
+			cfsetospeed(&tty, speed);
+
+			tty.c_cflag &= ~PARENB;           // 8N1
+			tty.c_cflag &= ~CSTOPB;
+			tty.c_cflag &= ~CSIZE;
+			tty.c_cflag |=  CS8;
+
+			tty.c_cflag &= ~CRTSCTS;         // no flow control
+			tty.c_cflag |=  CREAD | CLOCAL;  // ignore control lines
+
+			cfmakeraw(&tty);
+
+			tcflush(fd, TCIFLUSH);
+
+			if (tcsetattr(fd, TCSANOW, &tty) != 0)
+				error_exit(true, "tcsetattr failed");
 		}
-		else if (tty_bps == 19200) {
-			speed = B19200;
-		}
-		else if (tty_bps == 115200) {
-			speed = B115200;
-		}
-
-		cfsetospeed(&tty, speed);
-
-		tty.c_cflag &= ~PARENB;           // 8N1
-		tty.c_cflag &= ~CSTOPB;
-		tty.c_cflag &= ~CSIZE;
-		tty.c_cflag |=  CS8;
-
-		tty.c_cflag &= ~CRTSCTS;         // no flow control
-		tty.c_cflag |=  CREAD | CLOCAL;  // ignore control lines
-
-		cfmakeraw(&tty);
-
-		tcflush(fd, TCIFLUSH);
-
-		if (tcsetattr(fd, TCSANOW, &tty) != 0)
-			error_exit(true, "tcsetattr failed");
 	}
 
 	th = new std::thread(std::ref(*this));
@@ -366,9 +368,16 @@ void phys_kiss::operator()()
 					it->second->queue_incoming_packet(this, p);
 			}
 			else {
-				std::string payload_str = bin_to_text(p, len, true);
+				auto payload = ap.get_data();
+				int  pl_size = payload.get_n_bytes_left();
 
 				CDOLOG(ll_info, "[kiss]", "don't know how to handle pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
+
+				if (r->route_packet(ap.get_to().get_any_addr(), 0x08FF, { }, ap.get_from().get_any_addr(), { }, payload.get_bytes(pl_size), pl_size) == false) {
+					std::string payload_str = bin_to_text(p, len, true);
+
+					CDOLOG(ll_warning, "[kiss]", "failed routing! pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
+				}
 			}
 		}
 
