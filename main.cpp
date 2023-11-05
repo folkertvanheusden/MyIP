@@ -404,6 +404,7 @@ int main(int argc, char *argv[])
 			std::string dev_file = cfg_str(interface, "serial-dev", "device file (/dev/tty-something usuaully)", false, "");
 
 			int         baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
+			bool        init_tty = cfg_bool(interface, "init-tty", "Set to true if MyIP should configure the serial port.", true, true);
 
 			std::string beacon   = cfg_str(interface, "beacon", "beacon to send every 30s", false, "");
 			std::optional<std::string> beacon_option;
@@ -418,7 +419,7 @@ int main(int argc, char *argv[])
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP kiss device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac, beacon_option, is_tnc, r);
+			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac, beacon_option, is_tnc, r, init_tty);
 
 			if (is_default_interface)
 				r->set_default_ax25_interface(dev);
