@@ -92,4 +92,6 @@ public:
 	bool         get_valid() const { return valid; }
 
 	std::pair<uint8_t *, size_t> generate_packet() const;
+
+	std::string  to_str() const;
 };
