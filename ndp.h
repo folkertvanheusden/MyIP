@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <optional>
@@ -9,11 +9,6 @@
 
 
 class icmp6;
-
-typedef struct {
-	uint64_t ts;
-	any_addr addr;
-} ndp_entry_t;
 
 class ndp : public mac_resolver
 {

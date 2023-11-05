@@ -1,4 +1,4 @@
-// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
 #pragma once
 #include <atomic>
@@ -19,6 +19,10 @@ private:
 	const any_addr & my_callsign;
 	std::optional<std::string> beacon_text;
 
+	// the physical device needs to have the router to be able
+	// to update the 'seen'-table
+	router          *const r     { nullptr };
+
 	int              fd          { -1      };
 	std::thread     *th_beacon   { nullptr };
 
@@ -26,7 +30,7 @@ private:
 	void send_beacon();
 
 public:
-	phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text, const bool is_server);
+	phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text, const bool is_server, router *const r);
 	phys_kiss(const phys_kiss &) = delete;
 	virtual ~phys_kiss();
 

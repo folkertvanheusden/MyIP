@@ -412,11 +412,16 @@ int main(int argc, char *argv[])
 
 			bool        is_tnc   = cfg_bool(interface, "emulate-tnc", "Set to true if MyIP should emulate a TNC. Set to false if it should connect to a TNC itself.", true, false);
 
+			bool is_default_interface = cfg_bool(interface, "default-interface", "Use this interface when no route is known.", true, false);
+
 			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_file);  // name
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP kiss device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac, beacon_option, is_tnc);
+			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac, beacon_option, is_tnc, r);
+
+			if (is_default_interface)
+				r->set_default_ax25_interface(dev);
 		}
 		else if (type == "slip" || type == "ppp") {
 			std::string dev_name = cfg_str(interface, "serial-dev", "serial port device node", false, "/dev/ttyS0");

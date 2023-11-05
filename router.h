@@ -19,7 +19,7 @@ class phys;
 class router
 {
 private:
-	class router_entry {
+	class ip_router_entry {
 	public:
 		any_addr local_ip;
 
@@ -45,10 +45,18 @@ private:
 		std::string to_str();
 	};
 
-	phys                     *default_interface { nullptr };
+	class ax25_router_entry {
+	public:
+		phys    *interface;
 
-	std::shared_mutex         table_lock;
-	std::vector<router_entry> table;
+		std::string to_str();
+	};
+
+	std::shared_mutex            table_lock;
+	std::vector<ip_router_entry> ip_table;
+	std::map<any_addr, ax25_router_entry> ax25_table;
+
+	phys                        *ax25_default_interface { nullptr };
 
 	class queued_packet {
 	public:
@@ -57,8 +65,8 @@ private:
 
 		uint16_t ether_type { 0 };
 
-		any_addr dst_ip;
-		any_addr src_ip;
+		std::optional<any_addr> dst_ip;
+		std::optional<any_addr> src_ip;
 
 		uint8_t *data     { nullptr };
 		size_t   data_len { 0       };
@@ -76,7 +84,10 @@ private:
 			std::string dst_mac_str = dst_mac.has_value() ? " (" + dst_mac.value().to_str() + ")" : "";
 			std::string src_mac_str = src_mac.has_value() ? " (" + src_mac.value().to_str() + ")" : "";
 
-			return src_ip.to_str() + src_mac_str + " -> " + dst_ip.to_str() + dst_mac_str;
+			if (ether_type == 0x08FF)
+				return src_mac_str + " -> " + dst_mac_str;
+
+			return src_ip.value().to_str() + src_mac_str + " -> " + dst_ip.value().to_str() + dst_mac_str;
 		}
 	};
 
@@ -86,9 +97,9 @@ private:
 
 	std::atomic_bool stop_flag { false };
 
-	router_entry *find_route(const std::optional<any_addr> & mac, const any_addr & ip);
+	ip_router_entry *find_route(const std::optional<any_addr> & mac, const any_addr & ip);
 
-	std::optional<any_addr> resolve_mac_by_addr(router_entry *const re, const any_addr & addr);
+	std::optional<any_addr> resolve_mac_by_addr(ip_router_entry *const re, const any_addr & addr);
 
 public:
 	router(stats *const s, const int n_threads);
@@ -96,10 +107,11 @@ public:
 
 	void stop();
 
+	void set_default_ax25_interface(phys *const ax25_default_interface) { this->ax25_default_interface = ax25_default_interface; }
+
+	void add_ax25_route(const any_addr & callsign, phys *const interface);
 	void add_router_ipv4(const any_addr & local_ip, const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, const int priority, phys *const interface, arp *const iarp);
 	void add_router_ipv6(const any_addr & local_ip, const any_addr & network, const int cidr, const int priority, phys *const interface, ndp *const indp);
-
-	void set_default_interface(phys *const default_interface) { this->default_interface = default_interface; }
 
 	bool route_packet(const std::optional<any_addr> & override_dst_mac, const uint16_t ether_type, const any_addr & dst_ip, const std::optional<any_addr> & src_mac, const any_addr & src_ip, const uint8_t *const payload, const size_t pl_size);
 
