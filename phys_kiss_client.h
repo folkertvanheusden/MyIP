@@ -11,7 +11,7 @@
 #include "network_layer.h"
 #include "stats.h"
 
-class phys_kiss : public phys
+class phys_kiss_client : public phys
 {
 private:
 	std::mutex       send_lock;
@@ -26,9 +26,9 @@ private:
 	void send_beacon();
 
 public:
-	phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text);
-	phys_kiss(const phys_kiss &) = delete;
-	virtual ~phys_kiss();
+	phys_kiss_client(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text);
+	phys_kiss_client(const phys_kiss_client &) = delete;
+	virtual ~phys_kiss_client();
 
 	bool transmit_packet(const any_addr & dest_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size) override;
 

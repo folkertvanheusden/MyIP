@@ -52,7 +52,7 @@ add_executable(myip
 	packet.cpp
 	phys.cpp
 	phys_gen_ppp.cpp
-	phys_kiss.cpp
+	phys_kiss_client.cpp
 	phys_ppp.cpp
 	phys_promiscuous.cpp
 	phys_sctp_udp.cpp
