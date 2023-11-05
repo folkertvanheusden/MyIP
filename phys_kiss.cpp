@@ -44,10 +44,11 @@ void escape_put(uint8_t **p, int *len, uint8_t c)
 	}
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text, const bool is_server) :
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text, const bool is_server, router *const r) :
 	phys(dev_index, s, "kiss-" + dev_file),
 	my_callsign(my_callsign),
-	beacon_text(beacon_text)
+	beacon_text(beacon_text),
+	r(r)
 {
 	if (is_server) {
 		int  master = 0;
@@ -323,6 +324,8 @@ void phys_kiss::operator()()
 		if (ok) {
 			std::vector<uint8_t> payload_v(p, p + len);
 			ax25_packet          ap(payload_v);
+
+			r->add_ax25_route(ap.get_from().get_any_addr(), this);
 
 			int pid = ap.get_pid().has_value() ? ap.get_pid().value() : -1;
 

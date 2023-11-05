@@ -14,7 +14,7 @@
 
 constexpr size_t pkts_max_size { 256 };
 
-std::string router::router_entry::to_str()
+std::string router::ip_router_entry::to_str()
 {
 	std::string mask_str = "-";
 
@@ -59,7 +59,7 @@ void router::add_router_ipv4(const any_addr & local_ip, const any_addr & network
 {
 	assert(network.get_family() == any_addr::ipv4);
 
-	router_entry re;
+	ip_router_entry re;
 
 	re.local_ip             = local_ip;
 	re.network_address      = network;
@@ -75,7 +75,7 @@ void router::add_router_ipv4(const any_addr & local_ip, const any_addr & network
 	std::unique_lock<std::shared_mutex> lck(table_lock);
 
 	bool found = false;
-	for(auto & e: table) {
+	for(auto & e: ip_table) {
 		if (re.network_address == e.network_address && memcmp(re.mask.ipv4_netmask, e.mask.ipv4_netmask, 4) == 0 && e.interface == interface) {
 			DOLOG(ll_debug, "router::add_router_ipv4: updated %s/%d.%d.%d.%d to gateway %s via %s\n", re.network_address.to_str().c_str(),
 					netmask[0], netmask[1], netmask[2], netmask[3], gateway.has_value() ? gateway.value().to_str().c_str() : "-",
@@ -94,7 +94,7 @@ void router::add_router_ipv4(const any_addr & local_ip, const any_addr & network
 				netmask[0], netmask[1], netmask[2], netmask[3], gateway.has_value() ? gateway.value().to_str().c_str() : "-",
 				interface->to_str().c_str());
 
-		table.push_back(re);
+		ip_table.push_back(re);
 	}
 }
 
@@ -102,7 +102,7 @@ void router::add_router_ipv6(const any_addr & local_ip, const any_addr & network
 {
 	assert(network.get_family() == any_addr::ipv6);
 
-	router_entry re;
+	ip_router_entry re;
 
 	re.local_ip                = local_ip;
 	re.network_address         = network;
@@ -114,7 +114,7 @@ void router::add_router_ipv6(const any_addr & local_ip, const any_addr & network
 	std::unique_lock<std::shared_mutex> lck(table_lock);
 
 	bool found = false;
-	for(auto & e : table) {
+	for(auto & e : ip_table) {
 		if (e.network_address == re.network_address && e.mask.ipv6_prefix_length == re.mask.ipv6_prefix_length) {
 			found = true;
 			break;
@@ -125,7 +125,7 @@ void router::add_router_ipv6(const any_addr & local_ip, const any_addr & network
 		DOLOG(ll_debug, "router::add_router_ipv6: added route %s/%d via interface %s\n", re.network_address.to_str().c_str(),
 				cidr, interface->to_str().c_str());
 
-		table.push_back(re);
+		ip_table.push_back(re);
 	}
 }
 
@@ -141,11 +141,13 @@ bool router::route_packet(const std::optional<any_addr> & override_dst_mac, cons
 	assert(src_mac.has_value() == false || src_mac.value().get_family() == any_addr::mac);
 	qp->src_mac    = src_mac;
 
-	assert(dst_ip.get_family() == any_addr::ipv4 || dst_ip.get_family() == any_addr::ipv6);
-	qp->dst_ip     = dst_ip;
+	if (ether_type != 0x08FF) {  // unofficial AX.25 ethertype
+		assert(dst_ip.get_family() == any_addr::ipv4 || dst_ip.get_family() == any_addr::ipv6);
+		qp->dst_ip     = dst_ip;
 
-	assert(src_ip.get_family() == any_addr::ipv4 || src_ip.get_family() == any_addr::ipv6);
-	qp->src_ip     = src_ip;
+		assert(src_ip.get_family() == any_addr::ipv4 || src_ip.get_family() == any_addr::ipv6);
+		qp->src_ip     = src_ip;
+	}
 
 	return pkts->try_put(qp);
 }
@@ -154,15 +156,20 @@ void router::dump()
 {
 	std::set<phys *> interfaces;
 
-	DOLOG(ll_debug, "routing table:\n");
+	DOLOG(ll_debug, "routing tables (IP):\n");
 
 	std::shared_lock<std::shared_mutex> lck(table_lock);
 
-	for(auto & entry : table) {
+	for(auto & entry : ip_table) {
 		DOLOG(ll_debug, ("| " + entry.to_str() + "\n").c_str());
 
 		interfaces.insert(entry.interface);
 	}
+
+	DOLOG(ll_debug, "routing tables (AX.25):\n");
+
+	for(auto & entry : ax25_table)
+		DOLOG(ll_debug, ("| " + entry.first.to_str() + " -> " + entry.second.interface->to_str() + "\n").c_str());
 
 	DOLOG(ll_debug, "arp tables:\n");
 
@@ -172,11 +179,11 @@ void router::dump()
 	DOLOG(ll_debug, "-----\n");
 }
 
-router::router_entry *router::find_route(const std::optional<any_addr> & mac, const any_addr & ip)
+router::ip_router_entry *router::find_route(const std::optional<any_addr> & mac, const any_addr & ip)
 {
-	router_entry *re = nullptr;
+	ip_router_entry *re = nullptr;
 
-	for(auto & entry : table) {
+	for(auto & entry : ip_table) {
 		if (entry.network_address.get_family() != ip.get_family())
 			continue;
 
@@ -203,7 +210,7 @@ router::router_entry *router::find_route(const std::optional<any_addr> & mac, co
 	return re;
 }
 
-std::optional<any_addr> router::resolve_mac_by_addr(router_entry *const re, const any_addr & addr)
+std::optional<any_addr> router::resolve_mac_by_addr(ip_router_entry *const re, const any_addr & addr)
 {
 	if (re->network_address.get_family() == any_addr::ipv4)
 		return re->mac_lookup.iarp->get_mac(re->interface, addr);
@@ -223,10 +230,26 @@ void router::operator()()
 		if (!po.has_value())
 			break;
 
+		if (po.value()->ether_type == 0x08FF) {  // AX.25; route by MAC-address/Callsign
+			phys *interface { nullptr };
+
+			auto route = ax25_table.find(po.value()->dst_mac.value());
+			if (route == ax25_table.end())
+				interface = ax25_default_interface;
+
+			if (interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
+				DOLOG(ll_debug, "router::operator: cannot transmit_packet via AX.25 (%s)\n", po.value()->to_str().c_str());
+			}
+
+			delete po.value();
+
+			continue;
+		}
+
 		std::shared_lock<std::shared_mutex> lck(table_lock);
 
 		// also required: for MAC lookups
-		router_entry *re_src = find_route(po.value()->src_mac, po.value()->src_ip);
+		ip_router_entry *re_src = find_route(po.value()->src_mac, po.value()->src_ip.value());
 
 		if (!re_src) {
 			DOLOG(ll_debug, "router::operator: no route for source (%s)\n", po.value()->to_str().c_str());
@@ -235,7 +258,7 @@ void router::operator()()
 
 		DOLOG(ll_debug, "router::operator: selected source routing entry: %s\n", re_src->to_str().c_str());
 
-		router_entry *re_dst = find_route(po.value()->dst_mac, po.value()->dst_ip);
+		ip_router_entry *re_dst = find_route(po.value()->dst_mac, po.value()->dst_ip.value());
 
 		if (!re_dst) {
 			DOLOG(ll_debug, "router::operator: no route for destination (%s)\n", po.value()->to_str().c_str());
@@ -258,7 +281,7 @@ void router::operator()()
 			DOLOG(ll_debug, "router::operator: src-mac not known yet\n");
 
 			// must always succeed, see main where a static rarp is setup
-			po.value()->src_mac = resolve_mac_by_addr(re_src, po.value()->src_ip);
+			po.value()->src_mac = resolve_mac_by_addr(re_src, po.value()->src_ip.value());
 
 			if (po.value()->src_mac.has_value() == false)
 				DOLOG(ll_info, "router::operator: cannot determine mac for source (%s)\n", po.value()->src_mac.value().to_str().c_str());
@@ -267,16 +290,16 @@ void router::operator()()
 		if (po.value()->dst_mac.has_value() == false) {
 			DOLOG(ll_debug, "router::operator: dst-mac not known yet\n");
 
-			po.value()->dst_mac = resolve_mac_by_addr(re_dst, po.value()->dst_ip);
+			po.value()->dst_mac = resolve_mac_by_addr(re_dst, po.value()->dst_ip.value());
 
 			// not found? try the default gateway
 			if (po.value()->dst_mac.has_value() == false && re_dst->default_gateway.has_value()) {
-				DOLOG(ll_debug, "router::operator: MAC for %s not found, resolving default gateway (%s)\n", po.value()->dst_ip.to_str().c_str(), re_dst->default_gateway.value().to_str().c_str());
+				DOLOG(ll_debug, "router::operator: MAC for %s not found, resolving default gateway (%s)\n", po.value()->dst_ip.value().to_str().c_str(), re_dst->default_gateway.value().to_str().c_str());
 
 				po.value()->dst_mac = resolve_mac_by_addr(re_dst, re_dst->default_gateway.value());
 
 				if (po.value()->dst_mac.has_value())
-					DOLOG(ll_debug, "router::operator: default gateway (%s) can be reached via %s\n", po.value()->dst_ip.to_str().c_str(), re_dst->default_gateway.value().to_str().c_str(), po.value()->dst_mac.value().to_str().c_str());
+					DOLOG(ll_debug, "router::operator: default gateway (%s) can be reached via %s\n", po.value()->dst_ip.value().to_str().c_str(), re_dst->default_gateway.value().to_str().c_str(), po.value()->dst_mac.value().to_str().c_str());
 			}
 		}
 
@@ -294,8 +317,8 @@ void router::operator()()
 
 		if (ok) {
 			DOLOG(ll_debug, "router::operator: transmit packet from %s (%s) to %s (%s) via %s\n",
-					po.value()->src_ip.to_str().c_str(), po.value()->src_mac.value().to_str().c_str(),
-					po.value()->dst_ip.to_str().c_str(), po.value()->dst_mac.value().to_str().c_str(),
+					po.value()->src_ip.value().to_str().c_str(), po.value()->src_mac.value().to_str().c_str(),
+					po.value()->dst_ip.value().to_str().c_str(), po.value()->dst_mac.value().to_str().c_str(),
 					re_dst->interface->to_str().c_str());
 
 			if (re_dst->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
@@ -308,4 +331,12 @@ void router::operator()()
 
 		delete po.value();
 	}
+}
+
+void router::add_ax25_route(const any_addr & callsign, phys *const interface)
+{
+	ax25_router_entry re;
+	re.interface = interface;
+
+	ax25_table.insert_or_assign(callsign, std::move(re));
 }
