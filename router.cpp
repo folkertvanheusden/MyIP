@@ -240,6 +240,7 @@ void router::operator()()
 				DOLOG(ll_debug, "router::operator: routing packet (%s) via default interface\n", po.value()->to_str().c_str());
 			}
 			else {
+				interface = route->second.interface;
 				DOLOG(ll_debug, "router::operator: routing packet (%s) via %s\n", po.value()->to_str().c_str(), interface->to_str().c_str());
 			}
 
