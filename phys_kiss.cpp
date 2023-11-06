@@ -369,11 +369,11 @@ void phys_kiss::operator()()
 				auto payload = ap.get_data();
 				int  pl_size = payload.get_n_bytes_left();
 
+				std::string payload_str = bin_to_text(p, len, true);
+
 				CDOLOG(ll_info, "[kiss]", "don't know how to handle pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
 
 				if (r->route_packet(ap.get_to().get_any_addr(), 0x08FF, { }, ap.get_from().get_any_addr(), { }, payload.get_bytes(pl_size), pl_size) == false) {
-					std::string payload_str = bin_to_text(p, len, true);
-
 					CDOLOG(ll_warning, "[kiss]", "failed routing! pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
 				}
 			}
