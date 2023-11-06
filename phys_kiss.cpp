@@ -303,19 +303,19 @@ void phys_kiss::operator()()
 			CDOLOG(ll_debug, "[kiss]", "port: %d, cmd: %d, len: %d\n", (p[0] >> 4) & 0x0f, cmd, len);
 
 			if (cmd == 1)
-				CDOLOG(ll_debug, "[kiss]", "TX delay: %d", p[1] * 10);
+				CDOLOG(ll_debug, "[kiss]", "TX delay: %d\n", p[1] * 10);
 			else if (cmd == 2)
-				CDOLOG(ll_debug, "[kiss]", "persistance: %d", p[1] * 256 - 1);
+				CDOLOG(ll_debug, "[kiss]", "persistance: %d\n", p[1] * 256 - 1);
 			else if (cmd == 3)
-				CDOLOG(ll_debug, "[kiss]", "slot time: %dms", p[1] * 10);
+				CDOLOG(ll_debug, "[kiss]", "slot time: %dms\n", p[1] * 10);
 			else if (cmd == 4)
-				CDOLOG(ll_debug, "[kiss]", "txtail: %dms", p[1] * 10);
+				CDOLOG(ll_debug, "[kiss]", "txtail: %dms\n", p[1] * 10);
 			else if (cmd == 5)
-				CDOLOG(ll_debug, "[kiss]", "full duplex: %d", p[1]);
+				CDOLOG(ll_debug, "[kiss]", "full duplex: %d\n", p[1]);
 			else if (cmd == 6)
-				CDOLOG(ll_debug, "[kiss]", "set hardware");
+				CDOLOG(ll_debug, "[kiss]", "set hardware\n");
 			else if (cmd == 15)
-				CDOLOG(ll_info, "[kiss]", "kernel asked for shutdown");
+				CDOLOG(ll_info, "[kiss]", "kernel asked for shutdown\n");
 
 			len--;
 
