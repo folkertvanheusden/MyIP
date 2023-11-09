@@ -405,8 +405,12 @@ int main(int argc, char *argv[])
 
 			std::optional<std::pair<std::string, int> > beacon_option;
 			std::string beacon   = cfg_str(interface, "beacon", "beacon text to send", true, "");
-			if (beacon.empty() == false)
+			if (beacon.empty() == false) {
 				beacon_option = { beacon, cfg_int(interface, "beacon-interval", "beacon transmit interval", true, 300) };
+
+				if (beacon_option.value().second <= 0)
+					error_exit(false, "beacon-interval must be >= 1");
+			}
 
 			bool is_default_interface = cfg_bool(interface, "default-interface", "Use this interface when no route is known.", true, false);
 
