@@ -213,9 +213,13 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 		fd = connect_to(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
 		if (fd == -1)
 			error_exit(false, "phys_kiss: failed to connect TCP socket");
+
+		CDOLOG(ll_error, "[kiss]", "TCP socket connected (client)\n");
 	}
 	else if (parts.at(0) == "tcp-server") {
 		fd = accept_socket(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
+
+		CDOLOG(ll_error, "[kiss]", "TCP socket connected (server)\n");
 	}
 
 	th = new std::thread(std::ref(*this));
