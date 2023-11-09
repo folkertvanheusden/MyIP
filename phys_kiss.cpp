@@ -355,7 +355,7 @@ void phys_kiss::operator()()
 				if (errno == EINTR)
 					continue;
 
-				CDOLOG(ll_error, "[kiss]", "failed reading from device");
+				CDOLOG(ll_error, "[kiss]", "failed reading from device\n");
 
 				break;
 			}
@@ -370,7 +370,7 @@ void phys_kiss::operator()()
 				else if (buffer == TFESC)
 					p[len++] = FESC;
 				else
-					CDOLOG(ll_error, "[kiss]", "unexpected escape %02x", buffer);
+					CDOLOG(ll_error, "[kiss]", "unexpected escape %02x\n", buffer);
 
 				escape = false;
 			}
@@ -384,7 +384,7 @@ void phys_kiss::operator()()
 				// otherwise: first FEND, ignore
 
 				if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-					CDOLOG(ll_warning, "[kiss]", "clock_gettime failed: %s", strerror(errno));
+					CDOLOG(ll_warning, "[kiss]", "clock_gettime failed: %s\n", strerror(errno));
 			}
 			else if (buffer == FESC)
 				escape = true;
