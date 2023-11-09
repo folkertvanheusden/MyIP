@@ -346,14 +346,24 @@ void phys_kiss::operator()()
 
 				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0, log_prefix);
 
-				// this will break if IPv7/8/9/etc is released
-				uint16_t ether_type = (p->get_data()[0] >> 4) == 4 ? 0x0800 : 0x86dd;
+				int ip_version = p->get_data()[0] >> 4;
 
-				auto it = prot_map.find(ether_type);
-				if (it != prot_map.end())
-					it->second->queue_incoming_packet(this, p);
+				std::optional<uint16_t> ether_type;
+
+				if (ip_version == 4)
+					ether_type = 0x0800;
+				else if (ip_version == 6)
+					ether_type = 0x86dd;
 				else
-					CDOLOG(ll_info, "[kiss]", "pid %02x (%d bytes): ether_type %04x not supported\n", pid, len, ether_type);
+					CDOLOG(ll_info, "[kiss]", "pid %02x (%d bytes): IP version %d not supported\n", pid, len, ip_version);
+
+				if (ether_type.has_value()) {
+					auto it = prot_map.find(ether_type.value());
+					if (it != prot_map.end())
+						it->second->queue_incoming_packet(this, p);
+					else
+						CDOLOG(ll_info, "[kiss]", "pid %02x (%d bytes): ether_type %04x not supported\n", pid, len, ether_type.value());
+				}
 			}
 			else if (pid == 0xf0) {  // usually beacons etc
 				std::string payload_str = bin_to_text(p, len, true);
