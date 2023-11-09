@@ -406,10 +406,10 @@ int main(int argc, char *argv[])
 			int         baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
 			bool        init_tty = cfg_bool(interface, "init-tty", "Set to true if MyIP should configure the serial port.", true, true);
 
-			std::string beacon   = cfg_str(interface, "beacon", "beacon to send every 30s", false, "");
-			std::optional<std::string> beacon_option;
+			std::optional<std::pair<std::string, int> > beacon_option;
+			std::string beacon   = cfg_str(interface, "beacon", "beacon text to send", true, "");
 			if (beacon.empty() == false)
-				beacon_option = beacon;
+				beacon_option = { beacon, cfg_int(interface, "beacon-interval", "beacon transmit interval", true, 300) };
 
 			bool        is_tnc   = cfg_bool(interface, "emulate-tnc", "Set to true if MyIP should emulate a TNC. Set to false if it should connect to a TNC itself.", true, false);
 

@@ -44,10 +44,10 @@ void escape_put(uint8_t **p, int *len, uint8_t c)
 	}
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::string> & beacon_text, const bool is_server, router *const r, const bool init_tty) :
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, const bool is_server, router *const r, const bool init_tty) :
 	phys(dev_index, s, "kiss-" + dev_file),
 	my_callsign(my_callsign),
-	beacon_text(beacon_text),
+	beacon(beacon),
 	r(r)
 {
 	if (is_server) {
@@ -116,7 +116,7 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 
 	th = new std::thread(std::ref(*this));
 
-	if (beacon_text.has_value())
+	if (beacon.has_value())
 		th_beacon = new std::thread(&phys_kiss::send_beacon, this);
 }
 
@@ -179,13 +179,13 @@ void phys_kiss::send_beacon()
 		a.set_from   (my_callsign);
 		a.set_to     ("IDENT", '0', true, false);
 		a.set_control(0x03);  // unnumbered information/frame
-		a.set_data   (reinterpret_cast<const uint8_t *>(beacon_text.value().c_str()), beacon_text.value().size());
+		a.set_data   (reinterpret_cast<const uint8_t *>(beacon.value().first.c_str()), beacon.value().first.size());
 		a.set_pid(0xf0);  // beacon
 
-		CDOLOG(ll_debug, "[kiss]", "transmit beacon: \"%s\" (%s)\n", beacon_text.value().c_str(), a.to_str().c_str());
+		CDOLOG(ll_debug, "[kiss]", "transmit beacon: \"%s\" (%s)\n", beacon.value().first.c_str(), a.to_str().c_str());
 		transmit_ax25(a);
 
-		sleep(30);  // TODO configurable
+		sleep(beacon.value().second);
 	}
 }
 
