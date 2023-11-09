@@ -30,7 +30,7 @@ private:
 	void send_beacon();
 
 public:
-	phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, const bool is_server, router *const r, const bool init_tty);
+	phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r);
 	phys_kiss(const phys_kiss &) = delete;
 	virtual ~phys_kiss();
 

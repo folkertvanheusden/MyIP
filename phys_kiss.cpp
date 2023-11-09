@@ -4,13 +4,18 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <poll.h>
 #include <pty.h>
 #include <stdio.h>
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -44,13 +49,103 @@ void escape_put(uint8_t **p, int *len, uint8_t c)
 	}
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & dev_file, const int tty_bps, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, const bool is_server, router *const r, const bool init_tty) :
-	phys(dev_index, s, "kiss-" + dev_file),
+void set_nodelay(int fd)
+{
+        int on = 1;
+        if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *) &on, sizeof(int)) == -1)
+                error_exit(true, "set_nodelay: TCP_NODELAY failed");
+}
+
+int connect_to(const char *host, const int portnr)
+{
+        struct addrinfo hints = { 0 };
+        hints.ai_family = AF_UNSPEC;    // Allow IPv4 or IPv6
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = AI_PASSIVE;    // For wildcard IP address
+        hints.ai_protocol = 0;          // Any protocol
+        hints.ai_canonname = nullptr;
+        hints.ai_addr = nullptr;
+        hints.ai_next = nullptr;
+
+        char portnr_str[8] = { 0 };
+        snprintf(portnr_str, sizeof portnr_str, "%d", portnr);
+
+        struct addrinfo *result = nullptr;
+        int rc = getaddrinfo(host, portnr_str, &hints, &result);
+        if (rc != 0)
+                error_exit(false, "connect_to: problem resolving %s: %s", host, gai_strerror(rc));
+
+        for(struct addrinfo *rp = result; rp != nullptr; rp = rp->ai_next) {
+                int fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+                if (fd == -1)
+                        continue;
+
+                if (connect(fd, rp->ai_addr, rp->ai_addrlen) == 0) {
+                        freeaddrinfo(result);
+
+			set_nodelay(fd);
+
+                        return fd;
+                }
+
+                close(fd);
+        }
+
+        freeaddrinfo(result);
+
+        return -1;
+}
+
+int accept_socket(const std::string & listen_addr, const int listen_port)
+{
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (fd == -1)
+		error_exit(true, "accept_socket: failed to create socket: %s", strerror(errno));
+
+	int reuse_addr = 1;
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse_addr, sizeof(reuse_addr)) == -1)
+		error_exit(true, "accept_socket: failed to set \"re-use address\": %s", strerror(errno));
+
+	struct sockaddr_in servaddr { 0 };
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_port = htons(listen_port);
+
+	if (inet_aton(listen_addr.c_str(), &servaddr.sin_addr) == -1)
+		error_exit(true, "accept_socket: problem interpreting \"%s\": %s", listen_addr.c_str(), strerror(errno));
+
+	if (bind(fd, reinterpret_cast<sockaddr *>(&servaddr), sizeof(servaddr)) == -1)
+		error_exit(true, "accept_socket: failed to bind to [%s]:%d: %s", listen_addr.c_str(), listen_port, strerror(errno));
+
+	if (listen(fd, SOMAXCONN) == -1)
+		error_exit(true, "accept_socket: failed to listen on socket: %s", strerror(errno));
+
+	int qlen = SOMAXCONN;
+	if (setsockopt(fd, SOL_TCP, TCP_FASTOPEN, &qlen, sizeof(qlen)) == -1)
+		error_exit(true, "accept_socket: failed to enable \"tcp fastopen\": %s", strerror(errno));
+
+	CDOLOG(ll_info, "[kiss]", "listening on [%s]:%d\n", listen_addr.c_str(), listen_port);
+
+	for(;;) {
+		int cfd = accept(fd, nullptr, nullptr);
+
+		if (cfd != -1)
+			return cfd;
+
+		CDOLOG(ll_info, "[kiss]", "accept failed: %s\n", strerror(errno));
+	}
+
+	return -1;
+}
+
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r) :
+	phys(dev_index, s, "kiss-" + descr),
 	my_callsign(my_callsign),
 	beacon(beacon),
 	r(r)
 {
-	if (is_server) {
+	auto parts = split(descr, ":");
+
+	if (parts.at(0) == "pty-master") {
 		int  master = 0;
 		int  slave  = 0;
 		char name[256] { 0 };
@@ -60,30 +155,31 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 
 		fd = master;
 
-		CDOLOG(ll_info, "[kiss]", "created pty %s which will be linked to \"%s\"\n", name, dev_file.c_str());
+		CDOLOG(ll_info, "[kiss]", "created pty %s which will be linked to \"%s\"\n", name, parts.at(1).c_str());
 
-		if (unlink(dev_file.c_str()) == -1 && errno != ENOENT)
-			error_exit(true, "Failed to remove \"%s\" from filesystem", dev_file.c_str());
+		if (unlink(parts.at(1).c_str()) == -1 && errno != ENOENT)
+			error_exit(true, "Failed to remove \"%s\" from filesystem", parts.at(1).c_str());
 
-		if (symlink(name, dev_file.c_str()) == -1)
-			error_exit(true, "Failed to create symlink from %s to \"%s\"", name, dev_file.c_str());
+		if (symlink(name, parts.at(1).c_str()) == -1)
+			error_exit(true, "Failed to create symlink from %s to \"%s\"", name, parts.at(1).c_str());
 	}
-	else {
-		fd = open(dev_file.c_str(), O_RDWR | O_NOCTTY);
+	else if (parts.at(0) == "tty" || parts.at(0) == "pty-client") {
+		fd = open(parts.at(1).c_str(), O_RDWR | O_NOCTTY);
 
 		if (fd == -1)
-			error_exit(true, "Failed to open tty (%s)", dev_file.c_str());
+			error_exit(true, "Failed to open tty (%s)", parts.at(1).c_str());
 
-		if (init_tty) {
+		if (parts.at(0) == "tty") {
 			termios tty     { 0 };
 			termios tty_old { 0 };
 
 			if (tcgetattr(fd, &tty) == -1)
-				error_exit(true, "tcgetattr failed");
+				error_exit(true, "phys_kiss: tcgetattr failed");
 
 			tty_old = tty;
 
-			speed_t speed = B9600;
+			int     tty_bps = atoi(parts.at(2).c_str());
+			speed_t speed   = B9600;
 
 			if (tty_bps == 9600) {
 				// default
@@ -110,8 +206,16 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 			tcflush(fd, TCIFLUSH);
 
 			if (tcsetattr(fd, TCSANOW, &tty) != 0)
-				error_exit(true, "tcsetattr failed");
+				error_exit(true, "phys_kiss: tcsetattr failed");
 		}
+	}
+	else if (parts.at(0) == "tcp-client") {
+		fd = connect_to(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
+		if (fd == -1)
+			error_exit(false, "phys_kiss: failed to connect TCP socket");
+	}
+	else if (parts.at(0) == "tcp-server") {
+		fd = accept_socket(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
 	}
 
 	th = new std::thread(std::ref(*this));

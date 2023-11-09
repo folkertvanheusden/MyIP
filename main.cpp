@@ -401,25 +401,20 @@ int main(int argc, char *argv[])
 			//dev->start_pcap("test-prom.pcap", true, true);
 		}
 		else if (type == "kiss") {
-			std::string dev_file = cfg_str(interface, "serial-dev", "device file (/dev/tty-something usuaully)", false, "");
-
-			int         baudrate = cfg_int(interface, "baudrate", "serial port baudrate", true, 115200);
-			bool        init_tty = cfg_bool(interface, "init-tty", "Set to true if MyIP should configure the serial port.", true, true);
+			std::string descr    = cfg_str(interface, "descriptor", "pty-master:dev-file, pty-client:dev-file, tty:dev-file:baudrate, tcp-client:host:port, tcp-server:listen-addr:port", false, "");
 
 			std::optional<std::pair<std::string, int> > beacon_option;
 			std::string beacon   = cfg_str(interface, "beacon", "beacon text to send", true, "");
 			if (beacon.empty() == false)
 				beacon_option = { beacon, cfg_int(interface, "beacon-interval", "beacon transmit interval", true, 300) };
 
-			bool        is_tnc   = cfg_bool(interface, "emulate-tnc", "Set to true if MyIP should emulate a TNC. Set to false if it should connect to a TNC itself.", true, false);
-
 			bool is_default_interface = cfg_bool(interface, "default-interface", "Use this interface when no route is known.", true, false);
 
-			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_file);  // name
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), descr);  // name
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP kiss device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_kiss(i + 1, &s, dev_file, baudrate, my_mac, beacon_option, is_tnc, r, init_tty);
+			dev = new phys_kiss(i + 1, &s, descr, my_mac, beacon_option, r);
 
 			if (is_default_interface)
 				r->set_default_ax25_interface(dev);
