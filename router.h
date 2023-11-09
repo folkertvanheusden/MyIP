@@ -47,7 +47,8 @@ private:
 
 	class ax25_router_entry {
 	public:
-		phys    *interface;
+		std::optional<phys *>   interface;
+		std::optional<any_addr> via;
 
 		std::string to_str();
 	};
@@ -109,7 +110,7 @@ public:
 
 	void set_default_ax25_interface(phys *const ax25_default_interface) { this->ax25_default_interface = ax25_default_interface; }
 
-	void add_ax25_route(const any_addr & callsign, phys *const interface);
+	void add_ax25_route(const any_addr & callsign, std::optional<phys *> interface, std::optional<any_addr> via);
 	void add_router_ipv4(const any_addr & local_ip, const any_addr & network, const uint8_t netmask[4], const std::optional<any_addr> & gateway, const int priority, phys *const interface, arp *const iarp);
 	void add_router_ipv6(const any_addr & local_ip, const any_addr & network, const int cidr, const int priority, phys *const interface, ndp *const indp);
 

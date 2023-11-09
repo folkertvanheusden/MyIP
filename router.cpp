@@ -168,8 +168,13 @@ void router::dump()
 
 	DOLOG(ll_debug, "routing tables (AX.25):\n");
 
-	for(auto & entry : ax25_table)
-		DOLOG(ll_debug, ("| " + entry.first.to_str() + " -> " + entry.second.interface->to_str() + "\n").c_str());
+	for(auto & entry : ax25_table) {
+		if (entry.second.interface.has_value())
+			DOLOG(ll_debug, ("| " + entry.first.to_str() + " -> " + entry.second.interface.value()->to_str() + "\n").c_str());
+
+		if (entry.second.via.has_value())
+			DOLOG(ll_debug, ("| " + entry.first.to_str() + " -> " + entry.second.via.value().to_str() + "\n").c_str());
+	}
 
 	DOLOG(ll_debug, "arp tables:\n");
 
@@ -240,12 +245,22 @@ void router::operator()()
 				DOLOG(ll_debug, "router::operator: routing packet (%s) via default interface\n", po.value()->to_str().c_str());
 			}
 			else {
-				interface = route->second.interface;
-				DOLOG(ll_debug, "router::operator: routing packet (%s) via %s\n", po.value()->to_str().c_str(), interface->to_str().c_str());
+				if (route->second.interface.has_value()) {
+					interface = route->second.interface.value();
+					DOLOG(ll_debug, "router::operator: routing packet (%s) via %s\n", po.value()->to_str().c_str(), interface->to_str().c_str());
+				}
+				else {  // TODO find via
+					// TODO build new packet with via-path
+				}
 			}
 
-			if (interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
-				DOLOG(ll_debug, "router::operator: cannot transmit_packet via AX.25 (%s)\n", po.value()->to_str().c_str());
+			if (interface) {
+				if (interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
+					DOLOG(ll_debug, "router::operator: cannot transmit_packet via AX.25 (%s)\n", po.value()->to_str().c_str());
+				}
+			}
+			else {
+				DOLOG(ll_debug, "router::operator: no (AX.25) path found (%s)\n", po.value()->to_str().c_str());
 			}
 
 			delete po.value();
@@ -340,10 +355,11 @@ void router::operator()()
 	}
 }
 
-void router::add_ax25_route(const any_addr & callsign, phys *const interface)
+void router::add_ax25_route(const any_addr & callsign, std::optional<phys *> interface, std::optional<any_addr> via)
 {
 	ax25_router_entry re;
 	re.interface = interface;
+	re.via       = via;
 
 	ax25_table.insert_or_assign(callsign, std::move(re));
 }

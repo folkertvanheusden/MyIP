@@ -327,7 +327,7 @@ void phys_kiss::operator()()
 			std::vector<uint8_t> payload_v(p, p + len);
 			ax25_packet          ap(payload_v);
 
-			r->add_ax25_route(ap.get_from().get_any_addr(), this);
+			r->add_ax25_route(ap.get_from().get_any_addr(), { this }, { });
 
 			int pid = ap.get_pid().has_value() ? ap.get_pid().value() : -1;
 
