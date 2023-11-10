@@ -207,13 +207,7 @@ ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 	}
 
 	uint8_t control = in[offset++];
-
-	uint8_t type    = control & 3;
-
-	if (type == 0 || type == 1)  // I or S
-		msg_nr = in[offset++];
-
-	if (type == 0 || type == 3)  // I or U
+	if ((control & 1) == 0)  // I
 		pid = in[offset++];
 
 	if (offset < in.size())
