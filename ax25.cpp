@@ -319,5 +319,5 @@ std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 
 std::string ax25_packet::to_str() const
 {
-	return myformat("valid:%d, from:%s, to:%s control:%02x", valid, from.get_address().c_str(), to.get_address().c_str(), control);
+	return myformat("valid:%d, from:%s-%c, to:%s-%c control:%02x", valid, from.get_address().c_str(), from.get_ssid(), to.get_address().c_str(), to.get_ssid(), control);
 }
