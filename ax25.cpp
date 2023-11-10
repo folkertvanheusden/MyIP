@@ -216,7 +216,7 @@ ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 	if (type == 0 || type == 3)  // I or U
 		pid = in[offset++];
 
-	if (offset < in.size() - 1)
+	if (offset < in.size())
 		data = buffer_in(in.data() + offset, in.size() - offset);
 
 	valid = true;
