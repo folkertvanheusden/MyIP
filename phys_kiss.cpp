@@ -139,11 +139,27 @@ int accept_socket(const std::string & listen_addr, const int listen_port)
 
 phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r) :
 	phys(dev_index, s, "kiss-" + descr),
+	descriptor(descr),
 	my_callsign(my_callsign),
 	beacon(beacon),
 	r(r)
 {
-	auto parts = split(descr, ":");
+	reconnect();
+
+	th = new std::thread(std::ref(*this));
+
+	if (beacon.has_value())
+		th_beacon = new std::thread(&phys_kiss::send_beacon, this);
+}
+
+void phys_kiss::reconnect()
+{
+	if (fd != -1) {
+		close(fd);
+		fd = -1;
+	}
+
+	auto parts = split(descriptor, ":");
 
 	if (parts.at(0) == "pty-master") {
 		int  master = 0;
@@ -221,11 +237,9 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 
 		CDOLOG(ll_error, "[kiss]", "TCP socket connected (server)\n");
 	}
-
-	th = new std::thread(std::ref(*this));
-
-	if (beacon.has_value())
-		th_beacon = new std::thread(&phys_kiss::send_beacon, this);
+	else {
+		error_exit(false, "\"phys-kiss\" mode %s not understood", parts.at(0).c_str());
+	}
 }
 
 phys_kiss::~phys_kiss()
@@ -271,6 +285,8 @@ bool phys_kiss::transmit_ax25(const ax25_packet & a)
 
 	if (rc != offset) {
 		CDOLOG(ll_error, "[kiss]", "failed writing to kiss device");
+
+		reconnect();
 
 		return false;
 	}
@@ -339,7 +355,8 @@ void phys_kiss::operator()()
 				continue;
 
 			CDOLOG(ll_error, "[kiss]", "poll: %s", strerror(errno));
-			exit(1);
+			reconnect();
+			continue;
 		}
 
 		if (rc == 0)
@@ -360,7 +377,8 @@ void phys_kiss::operator()()
 					continue;
 
 				CDOLOG(ll_error, "[kiss]", "failed reading from device\n");
-
+				len = 0;
+				reconnect();
 				break;
 			}
 
