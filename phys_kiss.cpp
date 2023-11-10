@@ -320,22 +320,32 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	assert(src_mac.get_family() == any_addr::ax25);
 	assert(dst_mac.get_family() == any_addr::ax25);
 
-	ax25_packet a;
-	a.set_from   (src_mac);
-	a.set_to     (dst_mac);
-	a.set_control(0x03);  // unnumbered information/frame
-	a.set_data   (payload_in, pl_size_in);
+	ax25_packet *a = new ax25_packet();
+	a->set_from   (src_mac);
+	a->set_to     (dst_mac);
+	a->set_control(0x03);  // unnumbered information/frame
+	a->set_data   (payload_in, pl_size_in);
 
 	if (ether_type == 0x0800 || ether_type == 0x86dd)
-		a.set_pid(0xcc);  // ARPA Internet Protocol (IPv4/IPv6)
+		a->set_pid(0xcc);  // ARPA Internet Protocol (IPv4/IPv6)
 	else if (ether_type == 0x0806)
-		a.set_pid(0xcd);  // ARPA Adress Resolving Protocol (IPv4)
+		a->set_pid(0xcd);  // ARPA Adress Resolving Protocol (IPv4)
+	else if (ether_type == 0x08ff) {
+		delete a;
+
+		// it looks like BPQ frames (AX.25 over Ethernet) are regular Ethernet frames with
+		// ether-type 0x08ff, then for the payload a 0x00 and then the whole AX.25 packet
+		// (without HDLC framing)
+		a = new ax25_packet(std::vector<uint8_t>(payload_in + 1, payload_in + pl_size_in - 1));
+	}
 	else {
 		CDOLOG(ll_info, "[kiss]", "transmit_packet: cannot transmit ethertype %04x over AX.25\n", ether_type);
 		return false;
 	}
 
-	return transmit_ax25(a);
+	bool rc = transmit_ax25(*a);
+	delete a;
+	return rc;
 }
 
 void phys_kiss::operator()()
@@ -507,16 +517,18 @@ void phys_kiss::operator()()
 					it->second->queue_incoming_packet(this, p);
 			}
 			else {
-				auto payload = ap.get_data();
-				int  pl_size = payload.get_n_bytes_left();
+				uint8_t *work = new uint8_t[len + 1]();
+				memcpy(&work[1], p, len);
 
 				std::string payload_str = bin_to_text(p, len, true);
 
-				CDOLOG(ll_info, "[kiss]", "don't know how to handle pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
+				CDOLOG(ll_info, "[kiss]", "don't know how to handle pid %02x (%d bytes): %s, routing it\n", pid, len, payload_str.c_str());
 
-				if (r->route_packet(ap.get_to().get_any_addr(), 0x08FF, { }, ap.get_from().get_any_addr(), { }, payload.get_bytes(pl_size), pl_size) == false) {
+				if (r->route_packet(ap.get_to().get_any_addr(), 0x08ff, { }, ap.get_from().get_any_addr(), { }, work, len + 1) == false) {
 					CDOLOG(ll_warning, "[kiss]", "failed routing! pid %02x (%d bytes): %s\n", pid, len, payload_str.c_str());
 				}
+
+				delete [] work;
 			}
 		}
 
