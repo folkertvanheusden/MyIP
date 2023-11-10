@@ -15,6 +15,8 @@
 #define SIOCGSTAMPNS_OLD SIOCGSTAMPNS
 #endif
 
+class router;
+
 class phys
 {
 protected:
@@ -34,6 +36,7 @@ protected:
 
 	int       mtu_size         { 0 };
 
+	router   *const r;
 	std::map<uint16_t, network_layer *> prot_map;
 
 	const size_t dev_index     { 0 };
@@ -53,7 +56,7 @@ private:
 	void pcap_write_packet(const timespec & ts, const uint8_t *const data, const size_t n);
 
 public:
-	phys(const size_t dev_index, stats *const s, const std::string & name);
+	phys(const size_t dev_index, stats *const s, const std::string & name, router *const r);
 	phys(const phys &) = delete;
 	virtual ~phys();
 

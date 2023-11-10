@@ -1,4 +1,4 @@
-// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <atomic>
@@ -9,6 +9,7 @@
 #include "any_addr.h"
 #include "duration_events.h"
 #include "phys.h"
+#include "phys_kiss.h"
 #include "network_layer.h"
 #include "stats.h"
 
@@ -24,7 +25,7 @@ private:
 	duration_events transmit_packet_de { "transmit packet", 8 };
 
 public:
-	phys_promiscuous(const size_t dev_index, stats *const s, const std::string & dev_name);
+	phys_promiscuous(const size_t dev_index, stats *const s, const std::string & dev_name, router *const r);
 	phys_promiscuous(const phys_promiscuous &) = delete;
 	virtual ~phys_promiscuous();
 

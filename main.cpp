@@ -385,7 +385,7 @@ int main(int argc, char *argv[])
 
 			int         mtu_size = cfg_int(interface, "mtu-size", "MTU size", true, 1520);
 
-			dev = new phys_tap(i + 1, &s, dev_name, uid, gid, mtu_size);
+			dev = new phys_tap(i + 1, &s, dev_name, uid, gid, mtu_size, r);
 
 			//dev->start_pcap("test-tap.pcap", true, true);
 		}
@@ -396,7 +396,7 @@ int main(int argc, char *argv[])
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP Ethernet device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_promiscuous(i + 1, &s, dev_name);
+			dev = new phys_promiscuous(i + 1, &s, dev_name, r);
 
 			//dev->start_pcap("test-prom.pcap", true, true);
 		}
@@ -440,14 +440,14 @@ int main(int argc, char *argv[])
 				error_exit(false, "\"%d\" cannot be configured", baudrate);
 
 			if (type == "slip")
-				dev = new phys_slip(i + 1, &s, dev_name, bps_setting, my_mac);
+				dev = new phys_slip(i + 1, &s, dev_name, bps_setting, my_mac, r);
 			else if (type == "ppp") {
 				bool emulate_modem_xp = cfg_bool(interface, "emulate-modem-xp", "emulate AT-set modem / XP direct link", true, false);
 
 				std::string oa_str = cfg_str(interface, "opponent-address", "opponent IPv4 address", false, "192.168.3.2");
 				any_addr opponent_address = parse_address(oa_str, 4, ".", 10);
 
-				dev = new phys_ppp(i + 1, &s, dev_name, bps_setting, my_mac, emulate_modem_xp, opponent_address);
+				dev = new phys_ppp(i + 1, &s, dev_name, bps_setting, my_mac, emulate_modem_xp, opponent_address, r);
 
 				static_mappings.push_back({ gen_opponent_mac(my_mac), opponent_address });
 			}
@@ -465,7 +465,7 @@ int main(int argc, char *argv[])
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP UDP device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			dev = new phys_sctp_udp(i + 1, &s, my_mac, local_addr, port);
+			dev = new phys_sctp_udp(i + 1, &s, my_mac, local_addr, port, r);
 		}
 		else {
 			error_exit(false, "\"%s\" is an unknown network interface type", type.c_str());

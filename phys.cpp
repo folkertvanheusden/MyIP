@@ -19,7 +19,8 @@
 #include "str.h"
 
 
-phys::phys(const size_t dev_index, stats *const s, const std::string & name) :
+phys::phys(const size_t dev_index, stats *const s, const std::string & name, router *const r) :
+	r(r),
 	dev_index(dev_index),  // used for SNMP
 	name(name)
 {

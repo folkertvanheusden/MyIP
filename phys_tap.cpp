@@ -1,4 +1,5 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+
 #include <algorithm>
 #include <errno.h>
 #include <fcntl.h>
@@ -14,6 +15,7 @@
 #include <sys/types.h>
 
 #include "log.h"
+#include "phys_kiss.h"
 #include "phys_tap.h"
 #include "packet.h"
 #include "str.h"
@@ -29,8 +31,8 @@ void set_ifr_name(struct ifreq *ifr, const std::string & dev_name)
 	ifr->ifr_name[copy_name_n] = 0x00;
 }
 
-phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid, const int mtu_size) :
-	phys(dev_index, s, "tap-" + dev_name)
+phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid, const int mtu_size, router *const r) :
+	phys(dev_index, s, "tap-" + dev_name, r)
 {
 	if ((fd = open("/dev/net/tun", O_RDWR)) == -1) {
 		CDOLOG(ll_error, "[tap]", "open /dev/net/tun: %s\n", strerror(errno));
@@ -185,6 +187,11 @@ void phys_tap::operator()()
 		}
 
 		uint16_t ether_type = (buffer[12] << 8) | buffer[13];
+
+		if (ether_type == 0x08ff) {  // special case for BPQ
+			process_kiss_packet(ts, std::vector<uint8_t>(&buffer[14], buffer + size), &prot_map, r, this);
+			continue;
+		}
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {

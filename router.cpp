@@ -235,6 +235,7 @@ void router::operator()()
 		if (!po.has_value())
 			break;
 
+		// TODO: generic; if not ip, then this (layer 2 routing)
 		if (po.value()->ether_type == 0x08FF) {  // AX.25; route by MAC-address/Callsign
 			phys *interface { nullptr };
 

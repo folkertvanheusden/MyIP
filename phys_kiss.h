@@ -7,6 +7,7 @@
 #include <thread>
 
 #include "any_addr.h"
+#include "ax25.h"
 #include "phys.h"
 #include "network_layer.h"
 #include "stats.h"
@@ -17,12 +18,8 @@ private:
 	std::mutex       send_lock;
 
 	const std::string & descriptor;
-	const any_addr & my_callsign;
+	const any_addr    & my_callsign;
 	std::optional<std::pair<std::string, int> > beacon;
-
-	// the physical device needs to have the router to be able
-	// to update the 'seen'-table
-	router          *const r     { nullptr };
 
 	int              fd          { -1      };
 	std::thread     *th_beacon   { nullptr };
@@ -42,3 +39,5 @@ public:
 
 	void operator()() override;
 };
+
+bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, std::map<uint16_t, network_layer *> *const prot_map, router *const r, phys *const source_phys);

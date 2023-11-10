@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <atomic>
@@ -21,7 +21,7 @@ private:
 	int            fd      { -1 };
 
 public:
-	phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const any_addr & my_addr, const int port);
+	phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const any_addr & my_addr, const int port, router *const r);
 	phys_sctp_udp(const phys_sctp_udp &) = delete;
 	virtual ~phys_sctp_udp();
 

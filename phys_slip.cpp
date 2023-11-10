@@ -1,4 +1,5 @@
-// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
@@ -19,8 +20,8 @@
 #include "utils.h"
 
 
-phys_slip::phys_slip(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac) :
-	phys(dev_index, s, "slip-" + dev_name),
+phys_slip::phys_slip(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, router *const r) :
+	phys(dev_index, s, "slip-" + dev_name, r),
 	my_mac(my_mac)
 {
 	assert(my_mac.get_len() == 6);

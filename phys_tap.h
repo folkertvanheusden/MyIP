@@ -1,6 +1,6 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
-#pragma once
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
+#pragma once
 #include <atomic>
 #include <map>
 #include <string>
@@ -18,7 +18,7 @@ private:
 	int fd { -1 };
 
 public:
-	phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid, const int mtu_size);
+	phys_tap(const size_t dev_index, stats *const s, const std::string & dev_name, const int uid, const int gid, const int mtu_size, router *const r);
 	phys_tap(const phys_tap &) = delete;
 	virtual ~phys_tap();
 

@@ -1,4 +1,4 @@
-// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
 #include <algorithm>
 #include <errno.h>
@@ -25,8 +25,8 @@
 #include "utils.h"
 
 
-phys_promiscuous::phys_promiscuous(const size_t dev_index, stats *const s, const std::string & dev_name) :
-	phys(dev_index, s, "promiscuous-" + dev_name)
+phys_promiscuous::phys_promiscuous(const size_t dev_index, stats *const s, const std::string & dev_name, router *const r) :
+	phys(dev_index, s, "promiscuous-" + dev_name, r)
 {
 	fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (fd == -1)
@@ -182,6 +182,11 @@ void phys_promiscuous::operator()()
 		}
 
 		uint16_t ether_type = (buffer[12] << 8) | buffer[13];
+
+		if (ether_type == 0x08ff) {  // special case for BPQ
+			process_kiss_packet(ts, std::vector<uint8_t>(&buffer[14], buffer + size), &prot_map, r, this);
+			continue;
+		}
 
 		auto it = prot_map.find(ether_type);
 		if (it == prot_map.end()) {

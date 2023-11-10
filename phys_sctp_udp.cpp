@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
 // https://datatracker.ietf.org/doc/html/rfc6951
 
@@ -26,8 +26,8 @@
 
 
 // port is usually 9899
-phys_sctp_udp::phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const any_addr & my_addr, const int port) :
-	phys(dev_index, s, myformat("sctp(udp)-%d", port)),
+phys_sctp_udp::phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const any_addr & my_addr, const int port, router *const r) :
+	phys(dev_index, s, myformat("sctp(udp)-%d", port), r),
 	my_mac(my_mac), my_addr(my_addr)
 {
 	fd = create_datagram_socket(port);

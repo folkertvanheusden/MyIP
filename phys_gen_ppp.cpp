@@ -1,4 +1,4 @@
-// (C) 2022-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2022-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
@@ -29,8 +29,8 @@ any_addr gen_opponent_mac(const any_addr & my_mac)
 	return any_addr(any_addr::mac, src_mac_bin);
 }
 
-phys_gen_ppp::phys_gen_ppp(const size_t dev_index, stats *const s, const std::string & name, const any_addr & my_mac, const any_addr & opponent_address) :
-	phys(dev_index, s, "ppp-" + name),
+phys_gen_ppp::phys_gen_ppp(const size_t dev_index, stats *const s, const std::string & name, const any_addr & my_mac, const any_addr & opponent_address, router *const r) :
+	phys(dev_index, s, "ppp-" + name, r),
 	my_mac(my_mac),
 	opponent_address(opponent_address)
 {

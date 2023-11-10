@@ -1,4 +1,5 @@
-// (C) 2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+
 #pragma once
 #include <atomic>
 #include <map>
@@ -18,7 +19,7 @@ protected:
 	int fd { -1 };
 
 public:
-	phys_slip(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac);
+	phys_slip(const size_t dev_index, stats *const s, const std::string & dev_name, const int bps, const any_addr & my_mac, router *const r);
 	phys_slip(const phys_slip &) = delete;
 	virtual ~phys_slip();
 
