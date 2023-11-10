@@ -307,10 +307,10 @@ std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 	uint8_t type  = control & 3;
 
 	if (type == 0 || type == 1)  // I or S
-		out[offset++] = msg_nr.value();
+		out[offset++] = msg_nr.has_value() ? msg_nr.value() : 0;  // TODO handle this more gracefully
 
 	if (type == 0 || type == 3)  // I or U
-		out[offset++] = pid.value();
+		out[offset++] = pid.has_value() ? pid.value() : 0; // TODO ^
 
 	memcpy(&out[offset], data.get_bytes(data_size), data_size);
 
