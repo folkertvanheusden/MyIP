@@ -306,7 +306,7 @@ void router::operator()()
 			po.value()->src_mac = resolve_mac_by_addr(re_src, po.value()->src_ip.value());
 
 			if (po.value()->src_mac.has_value() == false)
-				DOLOG(ll_info, "router::operator: cannot determine mac for source (%s)\n", po.value()->src_mac.value().to_str().c_str());
+				DOLOG(ll_info, "router::operator: cannot determine mac for source\n");
 		}
 
 		if (po.value()->dst_mac.has_value() == false) {
