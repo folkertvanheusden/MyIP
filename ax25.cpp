@@ -206,7 +206,7 @@ ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 		seen_by.push_back(a);
 	}
 
-	uint8_t control = in[offset++];
+	control = in[offset++];
 	if ((control & 1) == 0)  // I
 		pid = in[offset++];
 
