@@ -217,10 +217,10 @@ ssize_t WRITE(int fd, const uint8_t *whereto, size_t len)
 
 		if (rc == -1)
 		{
-			if (errno == EINTR || errno == EAGAIN) {
-				DOLOG(ll_debug, "EINTR/EAGAIN %d", errno);
+			DOLOG(ll_debug, "WRITE problem: %s\n", strerror(errno));
+
+			if (errno == EINTR || errno == EAGAIN)
 				continue;
-			}
 
 			return -1;
 		}

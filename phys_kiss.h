@@ -15,14 +15,14 @@
 class phys_kiss : public phys
 {
 private:
-	std::mutex       send_lock;
+	std::mutex        send_lock;
 
-	const std::string & descriptor;
-	const any_addr    & my_callsign;
+	const std::string descriptor;
+	const any_addr    my_callsign;
 	std::optional<std::pair<std::string, int> > beacon;
 
-	int              fd          { -1      };
-	std::thread     *th_beacon   { nullptr };
+	int               fd          { -1      };
+	std::thread      *th_beacon   { nullptr };
 
 	void reconnect();
 	bool transmit_ax25(const ax25_packet & a);

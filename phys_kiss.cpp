@@ -179,7 +179,6 @@ void phys_kiss::reconnect()
 	}
 	else if (parts.at(0) == "tty" || parts.at(0) == "pty-client") {
 		fd = open(parts.at(1).c_str(), O_RDWR | O_NOCTTY);
-
 		if (fd == -1)
 			error_exit(true, "Failed to open tty (%s)", parts.at(1).c_str());
 
@@ -282,7 +281,7 @@ bool phys_kiss::transmit_ax25(const ax25_packet & a)
 	free(out);
 
 	if (rc != offset) {
-		CDOLOG(ll_error, "[kiss]", "failed writing to kiss device");
+		CDOLOG(ll_error, "[kiss]", "failed writing to kiss device (%zd of %d sent)\n", rc, offset);
 
 		reconnect();
 
