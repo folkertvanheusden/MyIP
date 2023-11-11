@@ -144,41 +144,10 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 {
 	auto parts = split(descriptor, ":");
 
-	if (parts.at(0) == "tcp-server")
+	if (parts.at(0) == "tcp-server") {
 		th_kiss_tcp = new std::thread(&phys_kiss::tcp_kiss_server, this);
-
-	reconnect();
-
-	th = new std::thread(std::ref(*this));
-
-	if (beacon.has_value())
-		th_beacon = new std::thread(&phys_kiss::send_beacon, this);
-}
-
-void phys_kiss::tcp_kiss_server()
-{
-	auto parts = split(descriptor, ":");
-
-	while(!stop_flag) {
-		int cfd = accept_socket(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
-
-		std::thread th(&phys_kiss::handle_kiss, this, cfd);
-		th.detach();
-
-		CDOLOG(ll_error, "[kiss]", "TCP socket connected (server)\n");
 	}
-}
-
-void phys_kiss::reconnect()
-{
-	if (fd != -1) {
-		close(fd);
-		fd = -1;
-	}
-
-	auto parts = split(descriptor, ":");
-
-	if (parts.at(0) == "pty-master") {
+	else if (parts.at(0) == "pty-master") {
 		int  master = 0;
 		int  slave  = 0;
 		char name[256] { 0 };
@@ -241,19 +210,55 @@ void phys_kiss::reconnect()
 				error_exit(true, "phys_kiss: tcsetattr failed");
 		}
 	}
-	else if (parts.at(0) == "tcp-client") {
-		fd = connect_to(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
-		if (fd == -1)
-			error_exit(false, "phys_kiss: failed to connect TCP socket");
 
-		CDOLOG(ll_error, "[kiss]", "TCP socket connected (client)\n");
+	(void)reconnect();
+
+	th = new std::thread(std::ref(*this));
+
+	if (beacon.has_value())
+		th_beacon = new std::thread(&phys_kiss::send_beacon, this);
+}
+
+void phys_kiss::tcp_kiss_server()
+{
+	auto parts = split(descriptor, ":");
+
+	while(!stop_flag) {
+		int cfd = accept_socket(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
+
+		std::thread th(&phys_kiss::handle_kiss, this, cfd);
+		th.detach();
+
+		CDOLOG(ll_error, "[kiss]", "TCP socket connected (server)\n");
 	}
-	else if (parts.at(0) == "tcp-server") {
-		// handled in constructor
+}
+
+bool phys_kiss::reconnect()
+{
+	auto parts = split(descriptor, ":");
+
+	if (parts.at(0) == "tcp-client") {
+		for(;;) {
+			if (fd != -1) {
+				close(fd);
+				fd = -1;
+			}
+
+			fd = connect_to(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
+
+			if (fd != -1) {
+				CDOLOG(ll_error, "[kiss]", "TCP socket connected (client)\n");
+
+				return true;
+			}
+
+			CDOLOG(ll_error, "[kiss]", "TCP socket connected (client) failed\n");
+
+			sleep(1);
+		}
 	}
-	else {
-		error_exit(false, "\"phys-kiss\" mode %s not understood", parts.at(0).c_str());
-	}
+
+	return false;
 }
 
 phys_kiss::~phys_kiss()
@@ -300,7 +305,7 @@ bool phys_kiss::transmit_ax25(const ax25_packet & a)
 	if (rc != offset) {
 		CDOLOG(ll_error, "[kiss]", "failed writing to kiss device (%zd of %d sent)\n", rc, offset);
 
-		reconnect();
+		(void)reconnect();
 
 		return false;
 	}
@@ -470,7 +475,9 @@ void phys_kiss::handle_kiss(const int cfd)
 				continue;
 
 			CDOLOG(ll_error, "[kiss]", "poll: %s", strerror(errno));
-			reconnect();
+
+			if (reconnect() == false)
+				break;
 			continue;
 		}
 
@@ -493,7 +500,7 @@ void phys_kiss::handle_kiss(const int cfd)
 
 				CDOLOG(ll_error, "[kiss]", "failed reading from device\n");
 				len = 0;
-				reconnect();
+				(void)reconnect();
 				break;
 			}
 

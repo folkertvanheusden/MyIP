@@ -26,7 +26,7 @@ private:
 	std::thread      *th_kiss_tcp { nullptr };
 
 	void tcp_kiss_server();
-	void reconnect();
+	bool reconnect();
 	bool transmit_ax25(const ax25_packet & a);
 	void send_beacon();
 	void handle_kiss(const int fd);
