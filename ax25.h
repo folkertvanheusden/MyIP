@@ -22,6 +22,7 @@ class ax25_address
 {
 private:
 	bool        valid    { false };
+	std::string invalid_reason;
 	std::string address;
 	int         ssid     { 0     };
 	bool        end_mark { false };
@@ -29,28 +30,22 @@ private:
 
 public:
 	ax25_address();
-
 	ax25_address(const std::vector<uint8_t> & from);
-
 	ax25_address(const any_addr & a);
-
 	ax25_address(const ax25_address & a);
-
 	ax25_address(const std::string & a, const int ssid, const bool end_mark, const bool repeated);
-
 	ax25_address(const std::string & a, const bool end_mark, const bool repeated);
-
 	ax25_address & operator=(const ax25_address &);
 
 	bool get_valid()    const { return valid;    }
+	std::string get_invalid_reason() const { return invalid_reason; }
 
 	bool get_end_mark() const { return end_mark; }
-
 	bool get_repeated() const { return repeated; }
 
-	std::string get_address() const { return address;  }
-
-	int         get_ssid()    const { return ssid;     }
+	std::string get_address() const { return address; }
+	std::string to_str()      const { return address + myformat("-%d", ssid); }
+	int         get_ssid()    const { return ssid; }
 
 	void set_address(const std::string & address, const int ssid);
 
@@ -69,7 +64,7 @@ private:
 	std::string               invalid_reason;
 	ax25_address              from;
 	ax25_address              to;
-	std::vector<ax25_address> seen_by;
+	std::vector<ax25_address> repeaters;
 	uint8_t                   control  { 0     };
 	frame_type                type     { TYPE_I };
 	std::optional<uint8_t>    msg_nr   {       };
@@ -92,7 +87,7 @@ public:
 
 	ax25_address get_from() const;
 	ax25_address get_to  () const;
-	std::vector<ax25_address> get_seen_by() const;
+	std::vector<ax25_address> get_repeaters() const;
 	buffer_in    get_data() const;
 	std::optional<uint8_t> get_pid () const;
 	frame_type   get_type() const  { return type;  }

@@ -21,16 +21,20 @@ ax25_address::ax25_address()
 
 ax25_address::ax25_address(const std::vector<uint8_t> & from)
 {
-	if (from.size() < 7)
+	if (from.size() < 7) {
+		invalid_reason = myformat("address too short %zu < 7 ", from.size());
 		return;
+	}
 
 	bool end = false;
 
 	for(int i=0; i<6; i++) {
 		uint8_t b = from[i];
 
-		if (b & 1)
+		if ((b & 1) && i != 5) {
+			invalid_reason = myformat("byte %d has msb set (%s)", i, bin_to_text(from.data(), 6, false).c_str());
 			return;
+		}
 
 		char    c = char(b >> 1);
 
@@ -40,7 +44,7 @@ ax25_address::ax25_address(const std::vector<uint8_t> & from)
 			address += c;
 	}
 
-	end_mark = from[6] & 1;
+	end_mark = from[5] & 1;
 	repeated = (from[6] & 128) == 128;
 	ssid     = (from[6] >> 1) & 0x0f;
 
@@ -174,21 +178,21 @@ ax25_packet::ax25_packet()
 ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 {
 	if (in.size() < 14) {
-		invalid_reason = "packet too short";
+		invalid_reason = myformat("packet too short (%zu bytes)", in.size());
 		return;
 	}
 
 	to     = ax25_address(std::vector<uint8_t>(in.begin() + 0, in.begin() + 7));
 
 	if (!to.get_valid()) {
-		invalid_reason = "to invalid";
+		invalid_reason = "to invalid: " + to.get_invalid_reason();
 		return;
 	}
 
 	from   = ax25_address(std::vector<uint8_t>(in.begin() + 7, in.begin() + 14));
 
 	if (!from.get_valid()) {
-		invalid_reason = "from invalid";
+		invalid_reason = "from invalid: " + from.get_invalid_reason();
 		return;
 	}
 
@@ -203,11 +207,11 @@ ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 		end_mark = a.get_end_mark();
 
 		if (!a.get_valid()) {
-			invalid_reason = "via invalid";
+			invalid_reason = "via invalid: " + a.get_invalid_reason();
 			return;
 		}
 
-		seen_by.push_back(a);
+		repeaters.push_back(a);
 	}
 
 	control = in[offset++];
@@ -242,9 +246,9 @@ ax25_address ax25_packet::get_to() const
 	return to;
 }
 
-std::vector<ax25_address> ax25_packet::get_seen_by() const
+std::vector<ax25_address> ax25_packet::get_repeaters() const
 {
-	return seen_by;
+	return repeaters;
 }
 
 buffer_in ax25_packet::get_data() const
@@ -331,5 +335,14 @@ std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 
 std::string ax25_packet::to_str() const
 {
-	return myformat("valid:%d, from:%s-%d, to:%s-%d control:%02x", valid, from.get_address().c_str(), from.get_ssid(), to.get_address().c_str(), to.get_ssid(), control);
+	std::string repeaters_str;
+
+	for(auto & repeater : repeaters) {
+		if (repeaters_str.empty() == false)
+			repeaters_str += " / ";
+
+		repeaters_str += repeater.to_str();
+	}
+
+	return myformat("valid:%d, from:%s, to:%s, repeaters:%s control:%02x", valid, from.to_str().c_str(), to.to_str().c_str(), repeaters_str.c_str(), control);
 }
