@@ -82,13 +82,13 @@ private:
 		}
 
 		std::string to_str() {
-			std::string dst_mac_str = dst_mac.has_value() ? " (" + dst_mac.value().to_str() + ")" : "";
-			std::string src_mac_str = src_mac.has_value() ? " (" + src_mac.value().to_str() + ")" : "";
+			std::string dst_mac_str = dst_mac.has_value() ? dst_mac.value().to_str() : "";
+			std::string src_mac_str = src_mac.has_value() ? src_mac.value().to_str() : "";
 
 			if (ether_type == 0x08FF)
 				return src_mac_str + " -> " + dst_mac_str;
 
-			return src_ip.value().to_str() + src_mac_str + " -> " + dst_ip.value().to_str() + dst_mac_str;
+			return src_ip.value().to_str() + " (" + src_mac_str + ") -> " + dst_ip.value().to_str() + " (" + dst_mac_str + ")";
 		}
 	};
 
