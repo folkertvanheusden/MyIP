@@ -54,7 +54,7 @@ public:
 
 	void set_address(const std::string & address, const int ssid);
 
-	std::pair<uint8_t *, size_t> generate_address() const;
+	std::vector<uint8_t> generate_address() const;
 
 	any_addr    get_any_addr() const;
 };

@@ -141,9 +141,9 @@ void ax25_address::set_address(const std::string & address, const int ssid)
 	this->ssid    = ssid;
 }
 
-std::pair<uint8_t *, size_t> ax25_address::generate_address() const
+std::vector<uint8_t> ax25_address::generate_address() const
 {
-	uint8_t *out = reinterpret_cast<uint8_t *>(calloc(1, 7));
+	std::vector<uint8_t> out(7);
 
 	size_t put_n = std::min(size_t(6), address.size());
 
@@ -155,16 +155,14 @@ std::pair<uint8_t *, size_t> ax25_address::generate_address() const
 
 	out[6] = (ssid << 1) | end_mark | (repeated ? 128 : 0);
 
-	return { out, 7 };
+	return out;
 }
 
 any_addr ax25_address::get_any_addr() const
 {
 	auto addr = generate_address();
 
-	any_addr out(any_addr::ax25, addr.first);
-
-	free(addr.first);
+	any_addr out(any_addr::ax25, addr.data());
 
 	return out;
 }
@@ -307,12 +305,10 @@ std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 	uint8_t *out       = reinterpret_cast<uint8_t *>(calloc(1, data_size + 1024 /* more than enough for an ax.25 header */));
 
 	auto addr_to       = to  .generate_address();
-	memcpy(&out[0], addr_to  .first, 7);
-	free(addr_to  .first);
+	memcpy(&out[0], addr_to  .data(), 7);
 
 	auto addr_from     = from.generate_address();
-	memcpy(&out[7], addr_from.first, 7);
-	free(addr_from.first);
+	memcpy(&out[7], addr_from.data(), 7);
 
 	int offset = 14;
 
