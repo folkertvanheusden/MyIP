@@ -138,7 +138,7 @@ void ud_stats::handle_pcap(const int cfd, const std::string & dev_name, const bo
 	for(auto & dev : *devs) {
 		if (dev->to_str() == dev_name) {
 			if (open)
-				dev->start_pcap(gen_pcap_name(), true, true);
+				dev->start_pcap(gen_pcap_name(), true, true, 1);
 			else
 				dev->stop_pcap();
 

@@ -62,7 +62,7 @@ public:
 
 	void ask_to_stop();
 
-	void start_pcap(const std::string & pcap_file, const bool in, const bool out);
+	void start_pcap(const std::string & pcap_file, const bool in, const bool out, const uint32_t link_type);
 	void stop_pcap();
 
 	virtual void start();

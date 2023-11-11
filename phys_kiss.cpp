@@ -525,8 +525,7 @@ void phys_kiss::handle_kiss(const int cfd)
 		uint8_t *p      = reinterpret_cast<uint8_t *>(malloc(MAX_PACKET_SIZE));
 		size_t   len    = 0;
 
-		for(;!stop_flag;)
-		{
+		for(;!stop_flag;) {
 			uint8_t buffer = 0;
 
 			int rc = read(cfd, &buffer, 1);
@@ -615,6 +614,8 @@ void phys_kiss::handle_kiss(const int cfd)
 			CDOLOG(ll_debug, "[kiss]", "packet received\n");
 
 			std::vector<uint8_t> payload_v(p, p + len);
+
+			pcap_write_packet_incoming(ts, p, len);
 
 			ok = process_kiss_packet(ts, payload_v, &prot_map, r, this);
 		}
