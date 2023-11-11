@@ -75,7 +75,7 @@ timespec phys::gen_packet_timestamp(const int fd)
 	return ts;
 }
 
-void phys::start_pcap(const std::string & pcap_file, const bool in, const bool out)
+void phys::start_pcap(const std::string & pcap_file, const bool in, const bool out, const uint32_t link_type)
 {
 	if (pcap_fd != -1) {
 		CDOLOG(ll_error, "[phys]", "pcap already running\n");
@@ -88,13 +88,13 @@ void phys::start_pcap(const std::string & pcap_file, const bool in, const bool o
 		error_exit(true, "phys: canot create \"%s\"", pcap_file.c_str());
 
 	buffer_out header;
-	header.add_net_long(0xA1B23C4D);  // magic
+	header.add_net_long(0xA1B2C3D4);  // magic
 	header.add_net_short(2);  // major
 	header.add_net_short(4);  // minor
 	header.add_net_long(0);  // reserved1
 	header.add_net_long(0);  // reserved2
 	header.add_net_long(mtu_size);  // snaplen
-	header.add_net_long(1);  // linktype
+	header.add_net_long(link_type);  // linktype
 
 	pcap_write_incoming = in;
 	pcap_write_outgoing = out;
@@ -114,9 +114,15 @@ void phys::stop_pcap()
 
 void phys::pcap_write_packet(const timespec & ts, const uint8_t *const data, const size_t n)
 {
+	if (n < 10)  // smaller confuses wireshark
+		return;
+
+	if (n > mtu_size)
+		return;
+
 	buffer_out record;
 	record.add_net_long(ts.tv_sec); // timestamp seconds
-	record.add_net_long(ts.tv_nsec); // timestamp nano seconds
+	record.add_net_long(ts.tv_nsec / 1000); // timestamp microseconds
 	record.add_net_long(n);  // captured packet length
 	record.add_net_long(n);  // original packet length
 	record.add_buffer(data, n);
