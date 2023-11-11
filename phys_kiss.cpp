@@ -210,10 +210,16 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 				error_exit(true, "phys_kiss: tcsetattr failed");
 		}
 	}
+	else if (parts.at(0) == "file") {
+		fd = open(parts.at(1).c_str(), O_RDONLY);
+		if (fd == -1)
+			error_exit(true, "Failed to open file (%s)", parts.at(1).c_str());
+	}
 
 	(void)reconnect();
 
-	th = new std::thread(std::ref(*this));
+	if (parts.at(0) != "tcp-server")
+		th = new std::thread(std::ref(*this));
 
 	if (beacon.has_value())
 		th_beacon = new std::thread(&phys_kiss::send_beacon, this);
@@ -466,23 +472,37 @@ void phys_kiss::handle_kiss(const int cfd)
 {
 	timespec ts { 0, 0 };
 
+	struct stat fd_stat { 0 };
+	if (fstat(cfd, &fd_stat) == -1) {
+		CDOLOG(ll_error, "[kiss]", "fstat failed: %s\n", strerror(errno));
+		return;
+	}
+
+	bool is_a_file = (fd_stat.st_mode & S_IFMT) == S_IFREG;
+
+	if (is_a_file)
+		CDOLOG(ll_info, "[kiss]", "Input is a file\n");
+
 	pollfd fds[] = { { cfd, POLLIN, 0 } };
 
 	while(!stop_flag) {
-		int rc = poll(fds, 1, 150);
-		if (rc == -1) {
-			if (errno == EINTR)
+		// TODO: move into next for-loop
+		if (!is_a_file) {
+			int rc = poll(fds, 1, 150);
+			if (rc == -1) {
+				if (errno == EINTR)
+					continue;
+
+				CDOLOG(ll_error, "[kiss]", "poll: %s\n", strerror(errno));
+
+				if (reconnect() == false)
+					break;
 				continue;
+			}
 
-			CDOLOG(ll_error, "[kiss]", "poll: %s", strerror(errno));
-
-			if (reconnect() == false)
-				break;
-			continue;
+			if (rc == 0)
+				continue;
 		}
-
-		if (rc == 0)
-			continue;
 
 		bool     ok     = false;
 		bool     escape = false;
@@ -494,7 +514,8 @@ void phys_kiss::handle_kiss(const int cfd)
 		{
 			uint8_t buffer = 0;
 
-			if (read(cfd, &buffer, 1) == -1) {
+			int rc = read(cfd, &buffer, 1);
+			if (rc == -1) {
 				if (errno == EINTR)
 					continue;
 
@@ -504,8 +525,13 @@ void phys_kiss::handle_kiss(const int cfd)
 				break;
 			}
 
-			if (escape)
-			{
+			if (rc == 0) {
+				if (is_a_file)
+					return;
+				break;
+			}
+
+			if (escape) {
 				if (len == MAX_PACKET_SIZE)
 					break;
 
@@ -518,8 +544,7 @@ void phys_kiss::handle_kiss(const int cfd)
 
 				escape = false;
 			}
-			else if (buffer == FEND)
-			{
+			else if (buffer == FEND) {
 				if (len) {
 					ok = true;
 					break;
@@ -572,6 +597,8 @@ void phys_kiss::handle_kiss(const int cfd)
 		}
 
 		if (ok) {
+			CDOLOG(ll_debug, "[kiss]", "packet received\n");
+
 			std::vector<uint8_t> payload_v(p, p + len);
 
 			ok = process_kiss_packet(ts, payload_v, &prot_map, r, this);
