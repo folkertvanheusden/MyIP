@@ -173,18 +173,24 @@ ax25_packet::ax25_packet()
 
 ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 {
-	if (in.size() < 14)
+	if (in.size() < 14) {
+		invalid_reason = "packet too short";
 		return;
+	}
 
 	to     = ax25_address(std::vector<uint8_t>(in.begin() + 0, in.begin() + 7));
 
-	if (!to.get_valid())
+	if (!to.get_valid()) {
+		invalid_reason = "to invalid";
 		return;
+	}
 
 	from   = ax25_address(std::vector<uint8_t>(in.begin() + 7, in.begin() + 14));
 
-	if (!from.get_valid())
+	if (!from.get_valid()) {
+		invalid_reason = "from invalid";
 		return;
+	}
 
 	bool end_mark = from.get_end_mark();
 
@@ -196,8 +202,10 @@ ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 
 		end_mark = a.get_end_mark();
 
-		if (!a.get_valid())
+		if (!a.get_valid()) {
+			invalid_reason = "via invalid";
 			return;
+		}
 
 		seen_by.push_back(a);
 	}

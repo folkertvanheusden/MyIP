@@ -66,6 +66,7 @@ public:
 
 private:
 	bool                      valid    { false };
+	std::string               invalid_reason;
 	ax25_address              from;
 	ax25_address              to;
 	std::vector<ax25_address> seen_by;
@@ -94,8 +95,9 @@ public:
 	std::vector<ax25_address> get_seen_by() const;
 	buffer_in    get_data() const;
 	std::optional<uint8_t> get_pid () const;
-	bool         get_valid() const { return valid; }
 	frame_type   get_type() const  { return type;  }
+	bool         get_valid() const { return valid; }
+	std::string  get_invalid_reason() const { return invalid_reason; }
 
 	std::pair<uint8_t *, size_t> generate_packet() const;
 

@@ -375,12 +375,11 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 
 bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, std::map<uint16_t, network_layer *> *const prot_map, router *const r, phys *const source_phys)
 {
+	std::string packet_str = bin_to_text(in.data(), in.size(), true);
 	bool        rc = true;
 	ax25_packet ap(in);
 
 	if (ap.get_valid()) {
-		std::string payload_str = bin_to_text(in.data(), in.size(), true);
-
 		bool route_as_is = false;
 
 		if (source_phys)
@@ -424,9 +423,7 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 				}
 			}
 			else if (pid == 0xf0) {  // usually beacons etc
-				std::string payload_str = bin_to_text(in.data(), in.size(), true);
-
-				CDOLOG(ll_info, "[kiss]", "pid %02x (%zu bytes): %s\n", pid, in.size(), payload_str.c_str());
+				CDOLOG(ll_info, "[kiss]", "pid %02x (%zu bytes): %s\n", pid, in.size(), packet_str.c_str());
 			}
 			else if (pid == 0xcd) {  // check for valid ARP payload
 				auto payload = ap.get_data();
@@ -444,7 +441,7 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 				}
 			}
 			else {
-				CDOLOG(ll_info, "[kiss]", "don't know how to handle pid %02x (%zu bytes): %s, routing it\n", pid, in.size(), payload_str.c_str());
+				CDOLOG(ll_info, "[kiss]", "don't know how to handle pid %02x (%zu bytes): %s, routing it\n", pid, in.size(), packet_str.c_str());
 
 				route_as_is = true;
 			}
@@ -459,7 +456,7 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 			memcpy(&work[1], in.data(), in.size());
 
 			if (r->route_packet(ap.get_to().get_any_addr(), 0x08ff, { }, ap.get_from().get_any_addr(), { }, work, bpq_size) == false) {
-				CDOLOG(ll_warning, "[kiss]", "failed routing! %d bytes: %s\n", in.size(), payload_str.c_str());
+				CDOLOG(ll_warning, "[kiss]", "failed routing! %d bytes: %s\n", in.size(), packet_str.c_str());
 
 				rc = false;
 			}
@@ -469,7 +466,7 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 	}
 	else {
 		// TODO: Ethernet-over-AX.25
-		CDOLOG(ll_warning, "[kiss]", "Not a valid AX.25 packet; not processing\n");
+		CDOLOG(ll_warning, "[kiss]", "Not a valid AX.25 packet (%s); not processing - %s\n", ap.get_invalid_reason().c_str(), packet_str.c_str());
 	}
 
 	return rc;
