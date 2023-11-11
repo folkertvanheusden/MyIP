@@ -32,7 +32,7 @@ ax25_address::ax25_address(const std::vector<uint8_t> & from)
 		uint8_t b = from[i];
 
 		if ((b & 1) && i != 5) {
-			invalid_reason = myformat("byte %d has msb set (%s)", i, bin_to_text(from.data(), 6, false).c_str());
+			invalid_reason = myformat("byte %d has lsb set (%s)", i, bin_to_text(from.data(), 6, false).c_str());
 			return;
 		}
 
