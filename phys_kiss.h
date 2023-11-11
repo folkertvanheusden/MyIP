@@ -23,10 +23,13 @@ private:
 
 	int               fd          { -1      };
 	std::thread      *th_beacon   { nullptr };
+	std::thread      *th_kiss_tcp { nullptr };
 
+	void tcp_kiss_server();
 	void reconnect();
 	bool transmit_ax25(const ax25_packet & a);
 	void send_beacon();
+	void handle_kiss(const int fd);
 
 public:
 	phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r);

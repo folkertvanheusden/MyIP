@@ -142,12 +142,31 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 	my_callsign(my_callsign),
 	beacon(beacon)
 {
+	auto parts = split(descriptor, ":");
+
+	if (parts.at(0) == "tcp-server")
+		th_kiss_tcp = new std::thread(&phys_kiss::tcp_kiss_server, this);
+
 	reconnect();
 
 	th = new std::thread(std::ref(*this));
 
 	if (beacon.has_value())
 		th_beacon = new std::thread(&phys_kiss::send_beacon, this);
+}
+
+void phys_kiss::tcp_kiss_server()
+{
+	auto parts = split(descriptor, ":");
+
+	while(!stop_flag) {
+		int cfd = accept_socket(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
+
+		std::thread th(&phys_kiss::handle_kiss, this, cfd);
+		th.detach();
+
+		CDOLOG(ll_error, "[kiss]", "TCP socket connected (server)\n");
+	}
 }
 
 void phys_kiss::reconnect()
@@ -230,9 +249,7 @@ void phys_kiss::reconnect()
 		CDOLOG(ll_error, "[kiss]", "TCP socket connected (client)\n");
 	}
 	else if (parts.at(0) == "tcp-server") {
-		fd = accept_socket(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
-
-		CDOLOG(ll_error, "[kiss]", "TCP socket connected (server)\n");
+		// handled in constructor
 	}
 	else {
 		error_exit(false, "\"phys-kiss\" mode %s not understood", parts.at(0).c_str());
@@ -435,9 +452,16 @@ void phys_kiss::operator()()
 
 	set_thread_name("myip-phys_kiss");
 
+	handle_kiss(fd);
+
+	CDOLOG(ll_info, "[kiss]", "thread stopped\n");
+}
+
+void phys_kiss::handle_kiss(const int cfd)
+{
 	timespec ts { 0, 0 };
 
-	pollfd fds[] = { { fd, POLLIN, 0 } };
+	pollfd fds[] = { { cfd, POLLIN, 0 } };
 
 	while(!stop_flag) {
 		int rc = poll(fds, 1, 150);
@@ -463,7 +487,7 @@ void phys_kiss::operator()()
 		{
 			uint8_t buffer = 0;
 
-			if (read(fd, &buffer, 1) == -1) {
+			if (read(cfd, &buffer, 1) == -1) {
 				if (errno == EINTR)
 					continue;
 
@@ -548,6 +572,4 @@ void phys_kiss::operator()()
 
 		free(p);
 	}
-
-	CDOLOG(ll_info, "[kiss]", "thread stopped\n");
 }
