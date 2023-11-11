@@ -41,12 +41,10 @@ ax25_address::ax25_address(const std::vector<uint8_t> & from)
 	}
 
 	end_mark = from[6] & 1;
+	repeated = (from[6] & 128) == 128;
+	ssid     = (from[6] >> 1) & 0x0f;
 
-	repeated = !!(from[6] & 128);
-
-	ssid = '0' + ((from[6] >> 1) & 0x0f);
-
-	valid = true;
+	valid    = true;
 }
 
 ax25_address::ax25_address(const any_addr & from)
@@ -71,7 +69,7 @@ ax25_address::ax25_address(const any_addr & from)
 
 	repeated = !!(from[6] & 128);
 
-	ssid = '0' + ((from[6] >> 1) & 0x0f);
+	ssid = (from[6] >> 1) & 0x0f;
 
 	valid = true;
 }
@@ -89,7 +87,7 @@ ax25_address::ax25_address(const ax25_address & a)
 	repeated = a.get_repeated();
 }
 
-ax25_address::ax25_address(const std::string & a, const char ssid, const bool end_mark, const bool repeated)
+ax25_address::ax25_address(const std::string & a, const int ssid, const bool end_mark, const bool repeated)
 {
 	this->address  = a;
 
@@ -112,7 +110,7 @@ ax25_address::ax25_address(const std::string & a, const bool end_mark, const boo
 	}
 	else {
 		this->address = a;
-		this->ssid    = '0';
+		this->ssid    = 0;
 	}
 
 	this->end_mark = end_mark;
@@ -137,7 +135,7 @@ ax25_address & ax25_address::operator=(const ax25_address & in)
 	return *this;
 }
 
-void ax25_address::set_address(const std::string & address, const char ssid)
+void ax25_address::set_address(const std::string & address, const int ssid)
 {
 	this->address = address;
 	this->ssid    = ssid;
@@ -248,7 +246,7 @@ buffer_in ax25_packet::get_data() const
 	return data;
 }
 
-void ax25_packet::set_from(const std::string & callsign, const char ssid, const bool end_mark, const bool repeated)
+void ax25_packet::set_from(const std::string & callsign, const int ssid, const bool end_mark, const bool repeated)
 {
 	from = ax25_address(callsign, ssid, end_mark, repeated);
 }
@@ -258,7 +256,7 @@ void ax25_packet::set_from(const any_addr & callsign)
 	from = ax25_address(callsign);
 }
 
-void ax25_packet::set_to(const std::string & callsign, const char ssid, const bool end_mark, const bool repeated)
+void ax25_packet::set_to(const std::string & callsign, const int ssid, const bool end_mark, const bool repeated)
 {
 	to   = ax25_address(callsign, ssid, end_mark, repeated);
 }
@@ -329,5 +327,5 @@ std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 
 std::string ax25_packet::to_str() const
 {
-	return myformat("valid:%d, from:%s-%c, to:%s-%c control:%02x", valid, from.get_address().c_str(), from.get_ssid(), to.get_address().c_str(), to.get_ssid(), control);
+	return myformat("valid:%d, from:%s-%d, to:%s-%d control:%02x", valid, from.get_address().c_str(), from.get_ssid(), to.get_address().c_str(), to.get_ssid(), control);
 }

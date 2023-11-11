@@ -23,7 +23,7 @@ class ax25_address
 private:
 	bool        valid    { false };
 	std::string address;
-	char        ssid     { '0'   };
+	int         ssid     { 0     };
 	bool        end_mark { false };
 	bool        repeated { false };
 
@@ -36,7 +36,7 @@ public:
 
 	ax25_address(const ax25_address & a);
 
-	ax25_address(const std::string & a, const char ssid, const bool end_mark, const bool repeated);
+	ax25_address(const std::string & a, const int ssid, const bool end_mark, const bool repeated);
 
 	ax25_address(const std::string & a, const bool end_mark, const bool repeated);
 
@@ -50,9 +50,9 @@ public:
 
 	std::string get_address() const { return address;  }
 
-	char        get_ssid() const    { return ssid;     }
+	int         get_ssid()    const { return ssid;     }
 
-	void set_address(const std::string & address, const char ssid);
+	void set_address(const std::string & address, const int ssid);
 
 	std::pair<uint8_t *, size_t> generate_address() const;
 
@@ -80,9 +80,9 @@ public:
 	ax25_packet(const std::vector<uint8_t> & in);
 	~ax25_packet();
 
-	void set_from   (const std::string & callsign, const char ssid, const bool end_mark, const bool repeated);
+	void set_from   (const std::string & callsign, const int ssid, const bool end_mark, const bool repeated);
 	void set_from   (const any_addr & callsign);
-	void set_to     (const std::string & callsign, const char ssid, const bool end_mark, const bool repeated);
+	void set_to     (const std::string & callsign, const int ssid, const bool end_mark, const bool repeated);
 	void set_to     (const any_addr & callsign);
 	void set_control(const uint8_t control);
 	void set_pid    (const uint8_t pid    );
