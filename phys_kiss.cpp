@@ -441,7 +441,7 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 				}
 			}
 			else {
-				CDOLOG(ll_info, "[kiss]", "don't know how to handle pid %02x (%zu bytes): %s, routing it\n", pid, in.size(), packet_str.c_str());
+				CDOLOG(ll_info, "[kiss]", "don't know how to handle pid $%02x (%zu bytes): %s, routing it\n", pid, in.size(), packet_str.c_str());
 
 				route_as_is = true;
 			}
