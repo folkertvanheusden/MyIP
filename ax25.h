@@ -61,12 +61,16 @@ public:
 
 class ax25_packet
 {
+public:
+	enum frame_type { TYPE_I, TYPE_S, TYPE_U };
+
 private:
 	bool                      valid    { false };
 	ax25_address              from;
 	ax25_address              to;
 	std::vector<ax25_address> seen_by;
 	uint8_t                   control  { 0     };
+	frame_type                type     { TYPE_I };
 	std::optional<uint8_t>    msg_nr   {       };
 	std::optional<uint8_t>    pid      {       };
 	buffer_in                 data;
@@ -82,6 +86,7 @@ public:
 	void set_to     (const any_addr & callsign);
 	void set_control(const uint8_t control);
 	void set_pid    (const uint8_t pid    );
+	void set_type   (const frame_type f   );
 	void set_data   (const uint8_t *const p, const size_t size);
 
 	ax25_address get_from() const;
@@ -90,6 +95,7 @@ public:
 	buffer_in    get_data() const;
 	std::optional<uint8_t> get_pid () const;
 	bool         get_valid() const { return valid; }
+	frame_type   get_type() const  { return type;  }
 
 	std::pair<uint8_t *, size_t> generate_packet() const;
 

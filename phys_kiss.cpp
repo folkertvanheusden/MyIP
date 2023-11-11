@@ -378,80 +378,98 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 	bool        rc = true;
 	ax25_packet ap(in);
 
-	if (source_phys)
-		r->add_ax25_route(ap.get_from().get_any_addr(), { source_phys }, { });
-
-	int pid = ap.get_pid().has_value() ? ap.get_pid().value() : -1;
-
-	std::string log_prefix;
-
 	if (ap.get_valid()) {
-		log_prefix = myformat("KISS[%s]", ap.get_from().get_any_addr().to_str().c_str());
-
-		CDOLOG(ll_info, "[kiss]", "%s: received packet of %zu bytes\n", ap.to_str().c_str(), in.size());
-	}
-
-	if (ap.get_valid() && pid == 0xcc) {  // check for valid IPv4 payload
-		auto payload = ap.get_data();
-		int  pl_size = payload.get_n_bytes_left();
-
-		packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0, log_prefix);
-
-		int ip_version = p->get_data()[0] >> 4;
-
-		std::optional<uint16_t> ether_type;
-
-		if (ip_version == 4)
-			ether_type = 0x0800;
-		else if (ip_version == 6)
-			ether_type = 0x86dd;
-		else
-			CDOLOG(ll_info, "[kiss]", "pid %02x (%zu bytes): IP version %d not supported\n", pid, in.size(), ip_version);
-
-		if (ether_type.has_value()) {
-			auto it = prot_map->find(ether_type.value());
-			if (it != prot_map->end())
-				it->second->queue_incoming_packet(source_phys, p);
-			else
-				CDOLOG(ll_info, "[kiss]", "pid %02x (%zu bytes): ether_type %04x not supported\n", pid, in.size(), ether_type.value());
-		}
-	}
-	else if (pid == 0xf0) {  // usually beacons etc
 		std::string payload_str = bin_to_text(in.data(), in.size(), true);
 
-		CDOLOG(ll_info, "[kiss]", "pid %02x (%zu bytes): %s\n", pid, in.size(), payload_str.c_str());
-	}
-	else if (ap.get_valid() && pid == 0xcd) {  // check for valid ARP payload
-		auto payload = ap.get_data();
-		int  pl_size = payload.get_n_bytes_left();
+		bool route_as_is = false;
 
-		packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0, log_prefix);
+		if (source_phys)
+			r->add_ax25_route(ap.get_from().get_any_addr(), { source_phys }, { });
 
-		auto it = prot_map->find(0x0806);
-		if (it != prot_map->end())
-			it->second->queue_incoming_packet(source_phys, p);
+		if (ap.get_type() == ax25_packet::frame_type::TYPE_I) {
+			if (ap.get_pid().has_value() == false) {
+				CDOLOG(ll_info, "[kiss]", "PID missing in I-frame\n");
+
+				return false;
+			}
+
+			int pid = ap.get_pid().value();
+
+			std::string log_prefix = myformat("KISS[%s]", ap.get_from().get_any_addr().to_str().c_str());
+			CDOLOG(ll_info, "[kiss]", "%s: received packet of %zu bytes\n", ap.to_str().c_str(), in.size());
+
+			if (pid == 0xcc) {  // check for valid IPv4 payload
+				auto payload = ap.get_data();
+				int  pl_size = payload.get_n_bytes_left();
+
+				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0, log_prefix);
+
+				int ip_version = p->get_data()[0] >> 4;
+
+				std::optional<uint16_t> ether_type;
+
+				if (ip_version == 4)
+					ether_type = 0x0800;
+				else if (ip_version == 6)
+					ether_type = 0x86dd;
+				else
+					CDOLOG(ll_info, "[kiss]", "pid %02x (%zu bytes): IP version %d not supported\n", pid, in.size(), ip_version);
+
+				if (ether_type.has_value()) {
+					auto it = prot_map->find(ether_type.value());
+					if (it != prot_map->end())
+						it->second->queue_incoming_packet(source_phys, p);
+					else
+						CDOLOG(ll_info, "[kiss]", "pid %02x (%zu bytes): ether_type %04x not supported\n", pid, in.size(), ether_type.value());
+				}
+			}
+			else if (pid == 0xf0) {  // usually beacons etc
+				std::string payload_str = bin_to_text(in.data(), in.size(), true);
+
+				CDOLOG(ll_info, "[kiss]", "pid %02x (%zu bytes): %s\n", pid, in.size(), payload_str.c_str());
+			}
+			else if (pid == 0xcd) {  // check for valid ARP payload
+				auto payload = ap.get_data();
+				int  pl_size = payload.get_n_bytes_left();
+
+				packet *p = new packet(ts, ap.get_from().get_any_addr(), ap.get_from().get_any_addr(), ap.get_to().get_any_addr(), payload.get_bytes(pl_size), pl_size, nullptr, 0, log_prefix);
+
+				auto it = prot_map->find(0x0806);
+				if (it != prot_map->end())
+					it->second->queue_incoming_packet(source_phys, p);
+				else {
+					CDOLOG(ll_info, "[kiss]", "No ARP instance available");
+
+					rc = false;
+				}
+			}
+			else {
+				CDOLOG(ll_info, "[kiss]", "don't know how to handle pid %02x (%zu bytes): %s, routing it\n", pid, in.size(), payload_str.c_str());
+
+				route_as_is = true;
+			}
+		}
 		else {
-			CDOLOG(ll_info, "[kiss]", "No ARP instance available");
+			route_as_is = true;
+		}
 
-			rc = false;
+		if (route_as_is) {
+			size_t   bpq_size = in.size() + 1;
+			uint8_t *work = new uint8_t[bpq_size]();
+			memcpy(&work[1], in.data(), in.size());
+
+			if (r->route_packet(ap.get_to().get_any_addr(), 0x08ff, { }, ap.get_from().get_any_addr(), { }, work, bpq_size) == false) {
+				CDOLOG(ll_warning, "[kiss]", "failed routing! %d bytes: %s\n", in.size(), payload_str.c_str());
+
+				rc = false;
+			}
+
+			delete [] work;
 		}
 	}
 	else {
-		size_t   bpq_size = in.size() + 1;
-		uint8_t *work = new uint8_t[bpq_size]();
-		memcpy(&work[1], in.data(), in.size());
-
-		std::string payload_str = bin_to_text(in.data(), in.size(), true);
-
-		CDOLOG(ll_info, "[kiss]", "don't know how to handle pid %02x (%zu bytes): %s, routing it\n", pid, in.size(), payload_str.c_str());
-
-		if (r->route_packet(ap.get_to().get_any_addr(), 0x08ff, { }, ap.get_from().get_any_addr(), { }, work, bpq_size) == false) {
-			CDOLOG(ll_warning, "[kiss]", "failed routing! pid %02x (%d bytes): %s\n", pid, in.size(), payload_str.c_str());
-
-			rc = false;
-		}
-
-		delete [] work;
+		// TODO: Ethernet-over-AX.25
+		CDOLOG(ll_warning, "[kiss]", "Not a valid AX.25 packet; not processing\n");
 	}
 
 	return rc;

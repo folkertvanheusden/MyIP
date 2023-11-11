@@ -207,8 +207,16 @@ ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 	}
 
 	control = in[offset++];
-	if ((control & 1) == 0)  // I
+	if ((control & 1) == 0) {
 		pid = in[offset++];
+		type = TYPE_I;
+	}
+	else {
+		if (control & 2)
+			type = TYPE_U;
+		else
+			type = TYPE_S;
+	}
 
 	if (offset < in.size())
 		data = buffer_in(in.data() + offset, in.size() - offset);
@@ -268,6 +276,20 @@ void ax25_packet::set_data(const uint8_t *const p, const size_t size)
 void ax25_packet::set_control(const uint8_t control)
 {
 	this->control = control;
+}
+
+void ax25_packet::set_type(const frame_type f)
+{
+	if (f == TYPE_I)
+		control &= 254;
+	else {
+		control |= 1;
+
+		if (f == TYPE_S)
+			control &= ~2;
+		else
+			control |= 2;
+	}
 }
 
 void ax25_packet::set_pid(const uint8_t pid)
