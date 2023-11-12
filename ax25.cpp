@@ -246,6 +246,11 @@ std::vector<ax25_address> ax25_packet::get_repeaters() const
 	return repeaters;
 }
 
+void ax25_packet::add_repeater(const any_addr & addr)
+{
+	repeaters.push_back(ax25_address(addr));
+}
+
 buffer_in ax25_packet::get_data() const
 {
 	return data;

@@ -76,14 +76,15 @@ public:
 	ax25_packet(const std::vector<uint8_t> & in);
 	~ax25_packet();
 
-	void set_from   (const std::string & callsign, const int ssid, const bool end_mark, const bool repeated);
-	void set_from   (const any_addr & callsign);
-	void set_to     (const std::string & callsign, const int ssid, const bool end_mark, const bool repeated);
-	void set_to     (const any_addr & callsign);
-	void set_control(const uint8_t control);
-	void set_pid    (const uint8_t pid    );
-	void set_type   (const frame_type f   );
-	void set_data   (const uint8_t *const p, const size_t size);
+	void set_from    (const std::string & callsign, const int ssid, const bool end_mark, const bool repeated);
+	void set_from    (const any_addr & callsign);
+	void set_to      (const std::string & callsign, const int ssid, const bool end_mark, const bool repeated);
+	void set_to      (const any_addr & callsign);
+	void add_repeater(const any_addr & callsign);
+	void set_control (const uint8_t control);
+	void set_pid     (const uint8_t pid    );
+	void set_type    (const frame_type f   );
+	void set_data    (const uint8_t *const p, const size_t size);
 
 	ax25_address get_from() const;
 	ax25_address get_to  () const;
