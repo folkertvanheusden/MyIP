@@ -118,6 +118,8 @@ target_link_libraries(myip -lbearssl)
 
 target_link_libraries(myip -latomic)
 
+target_link_libraries(myip -lpcap)
+
 target_link_libraries(myip -lutil)
 
 include(FindPkgConfig)

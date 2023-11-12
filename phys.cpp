@@ -42,6 +42,8 @@ phys::phys(const size_t dev_index, stats *const s, const std::string & name, rou
 
 phys::~phys()
 {
+	stop_pcap();
+
 	stop_flag = true;
 
 	th->join();
@@ -77,70 +79,52 @@ timespec phys::gen_packet_timestamp(const int fd)
 
 void phys::start_pcap(const std::string & pcap_file, const bool in, const bool out, const uint32_t link_type)
 {
-	if (pcap_fd != -1) {
-		CDOLOG(ll_error, "[phys]", "pcap already running\n");
-
-		close(pcap_fd);
-	}
-
-	pcap_fd = open(pcap_file.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-	if (pcap_fd == -1)
-		error_exit(true, "phys: canot create \"%s\"", pcap_file.c_str());
-
-	buffer_out header;
-	header.add_net_long(0xA1B2C3D4);  // magic
-	header.add_net_short(2);  // major
-	header.add_net_short(4);  // minor
-	header.add_net_long(0);  // reserved1
-	header.add_net_long(0);  // reserved2
-	header.add_net_long(mtu_size);  // snaplen
-	header.add_net_long(link_type);  // linktype
+	if (!ph)
+		ph = pcap_open_dead(link_type, 65536);
 
 	pcap_write_incoming = in;
 	pcap_write_outgoing = out;
 
-	if (WRITE(pcap_fd, header.get_content(), header.get_size()) != header.get_size())
-		CDOLOG(ll_error, "[phys]", "cannot write to pcap file (header)\n");
+	if (pdh)
+		CDOLOG(ll_error, "[phys]", "pcap already running\n");
+	else
+		pdh = pcap_dump_open(ph, pcap_file.c_str());
 }
 
 void phys::stop_pcap()
 {
-	if (pcap_fd != -1) {
-		close(pcap_fd);
-
-		pcap_fd = -1;
-	}
+	if (pdh)
+		pcap_dump_close(pdh);
 }
 
 void phys::pcap_write_packet(const timespec & ts, const uint8_t *const data, const size_t n)
 {
-	if (n < 10)  // smaller confuses wireshark
-		return;
 
-	if (n > mtu_size)
-		return;
-
-	buffer_out record;
-	record.add_net_long(ts.tv_sec); // timestamp seconds
-	record.add_net_long(ts.tv_nsec / 1000); // timestamp microseconds
-	record.add_net_long(n);  // captured packet length
-	record.add_net_long(n);  // original packet length
-	record.add_buffer(data, n);
-
-	if (WRITE(pcap_fd, record.get_content(), record.get_size()) != record.get_size())
 		CDOLOG(ll_error, "[phys]", "cannot write to pcap file (record)\n");
 }
 
 void phys::pcap_write_packet_incoming(const timespec & ts, const uint8_t *const data, const size_t n)
 {
-	if (pcap_write_incoming)
-		pcap_write_packet(ts, data, n);
+	if (pcap_write_incoming) {
+		pcap_pkthdr header { 0 };
+		header.ts.tv_sec  = ts.tv_sec;
+		header.ts.tv_usec = ts.tv_nsec / 1000;
+		header.len        = header.caplen = n;
+
+		pcap_dump(reinterpret_cast<u_char *>(pdh), &header, data);
+	}
 }
 
 void phys::pcap_write_packet_outgoing(const timespec & ts, const uint8_t *const data, const size_t n)
 {
-	if (pcap_write_outgoing)
-		pcap_write_packet(ts, data, n);
+	if (pcap_write_outgoing) {
+		pcap_pkthdr header { 0 };
+		header.ts.tv_sec  = ts.tv_sec;
+		header.ts.tv_usec = ts.tv_nsec / 1000;
+		header.len        = header.caplen = n;
+
+		pcap_dump(reinterpret_cast<u_char *>(pdh), &header, data);
+	}
 }
 
 void phys::register_protocol(const uint16_t ether_type, network_layer *const p)

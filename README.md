@@ -31,6 +31,7 @@ Make sure you have the following packages installed:
 * zlib1g-dev
 * libjansson-dev
 * libsndfile1-dev
+* libpcap-dev
 
 then invoke:
 

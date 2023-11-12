@@ -539,7 +539,6 @@ void phys_kiss::handle_kiss(const int cfd)
 		size_t   len    = 0;
 
 		for(;!stop_flag;) {
-			// TODO: move into next for-loop
 			if (!is_a_file) {
 				int rc = poll(fds, 1, 150);
 				if (rc == -1) {

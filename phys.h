@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <map>
+#include <pcap.h>
 #include <string>
 #include <thread>
 
@@ -45,9 +46,10 @@ protected:
 
 	bool      SIOCGSTAMPNS_OLD_error_emitted = false;
 
-	int       pcap_fd             { -1    };
-	bool      pcap_write_incoming { false };
-	bool      pcap_write_outgoing { false };
+	pcap_t   *ph                  { nullptr };
+	pcap_dumper_t *pdh            { nullptr };
+	bool      pcap_write_incoming { false   };
+	bool      pcap_write_outgoing { false   };
 
 	void pcap_write_packet_incoming(const timespec & ts, const uint8_t *const data, const size_t n);
 	void pcap_write_packet_outgoing(const timespec & ts, const uint8_t *const data, const size_t n);
