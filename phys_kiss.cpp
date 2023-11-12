@@ -155,11 +155,12 @@ int accept_socket(const std::string & listen_addr, const int listen_port)
 	return -1;
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r) :
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r, const bool add_callsign_repeaters) :
 	phys(dev_index, s, "kiss-" + descr, r),
 	descriptor(descr),
 	my_callsign(my_callsign),
-	beacon(beacon)
+	beacon(beacon),
+	add_callsign_repeaters(add_callsign_repeaters)
 {
 	auto parts = split(descriptor, ":");
 
@@ -392,7 +393,7 @@ bool phys_kiss::transmit_packet(const any_addr & dst_mac, const any_addr & src_m
 	return rc;
 }
 
-bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, std::map<uint16_t, network_layer *> *const prot_map, router *const r, phys *const source_phys)
+bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, std::map<uint16_t, network_layer *> *const prot_map, router *const r, phys *const source_phys, const std::optional<any_addr> & add_callsign)
 {
 	std::string packet_str = bin_to_text(in.data(), in.size(), true);
 	bool        rc = true;
@@ -475,9 +476,15 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 		}
 
 		if (route_as_is) {
-			size_t   bpq_size = in.size() + 1;
+			if (add_callsign.has_value())
+				ap.add_repeater(add_callsign.value());
+
+			auto packet_out = ap.generate_packet();
+
+			size_t   bpq_size = packet_out.second + 1;
 			uint8_t *work = new uint8_t[bpq_size]();
-			memcpy(&work[1], in.data(), in.size());
+			memcpy(&work[1], packet_out.first, packet_out.second);
+			free(packet_out.first);
 
 			if (r->route_packet(ap.get_to().get_any_addr(), 0x08ff, { }, ap.get_from().get_any_addr(), { }, work, bpq_size) == false) {
 				CDOLOG(ll_warning, "[kiss]", "failed routing! %d bytes: %s\n", in.size(), packet_str.c_str());
@@ -641,7 +648,10 @@ void phys_kiss::handle_kiss(const int cfd)
 
 			pcap_write_packet_incoming(ts, p, len);
 
-			ok = process_kiss_packet(ts, payload_v, &prot_map, r, this);
+			std::optional<any_addr> add_callsign;
+			if (add_callsign_repeaters)
+				add_callsign = my_callsign;
+			ok = process_kiss_packet(ts, payload_v, &prot_map, r, this, add_callsign);
 		}
 
 		free(p);

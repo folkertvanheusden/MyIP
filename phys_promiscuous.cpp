@@ -184,7 +184,7 @@ void phys_promiscuous::operator()()
 		uint16_t ether_type = (buffer[12] << 8) | buffer[13];
 
 		if (ether_type == 0x08ff) {  // special case for BPQ
-			process_kiss_packet(ts, std::vector<uint8_t>(&buffer[14], buffer + size), &prot_map, r, this);
+			process_kiss_packet(ts, std::vector<uint8_t>(&buffer[14], buffer + size), &prot_map, r, this, { });
 			continue;
 		}
 

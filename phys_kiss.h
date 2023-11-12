@@ -20,6 +20,7 @@ private:
 	const std::string descriptor;
 	const any_addr    my_callsign;
 	std::optional<std::pair<std::string, int> > beacon;
+	const bool        add_callsign_repeaters { false };
 
 	int               fd          { -1      };
 	std::thread      *th_beacon   { nullptr };
@@ -32,7 +33,7 @@ private:
 	void handle_kiss(const int fd);
 
 public:
-	phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r);
+	phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r, const bool add_callsign_repeaters);
 	phys_kiss(const phys_kiss &) = delete;
 	virtual ~phys_kiss();
 
@@ -43,4 +44,4 @@ public:
 	void operator()() override;
 };
 
-bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, std::map<uint16_t, network_layer *> *const prot_map, router *const r, phys *const source_phys);
+bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, std::map<uint16_t, network_layer *> *const prot_map, router *const r, phys *const source_phys, const std::optional<any_addr> & add_callsign);
