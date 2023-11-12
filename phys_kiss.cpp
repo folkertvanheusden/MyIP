@@ -33,6 +33,25 @@
 #define TFEND	0xdc
 #define TFESC	0xdd
 
+const std::map<uint8_t, std::string> pid_names = {
+	{ 0x10, "AX.25 layer 3 implemented" },
+	{ 0x20, "AX.25 layer 3 implemented" },
+	{ 0x01, "ISO 8208/CCiTT X.25 PLP" },
+	{ 0x06, "Compressed TCP/IP packet. Van Jacobson (RFC 1144)" },
+	{ 0x07, "Uncompressed TCP/IP packet. Van Jacobson (RFC 1144)" },
+	{ 0x08, "Segmentation fragment" },
+	{ 0xC3, "TEXNET datagram protocol" },
+	{ 0xC4, "Link Quality Protocol" },
+	{ 0xCA, "Appletalk" },
+	{ 0xCB, "Appletalk ARP" },
+	{ 0xCC, "ARPA Internet Protocol" },
+	{ 0xCD, "ARPA Address resolution" },
+	{ 0xCE, "FlexNet" },
+	{ 0xCF, "Net/ROM" },
+	{ 0xF0, "No layer 3 protocol implemented" },
+	{ 0xFF, "Escape character. Next octet contains more Level 3 protocol" },
+};
+
 void escape_put(uint8_t **p, int *len, uint8_t c)
 {
 	if (c == FEND) {
@@ -394,8 +413,13 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 
 			int pid = ap.get_pid().value();
 
+			std::string pid_descr = myformat("$02x", pid);
+			auto it = pid_names.find(pid);
+			if (it != pid_names.end())
+				pid_descr = it->second;
+
 			std::string log_prefix = myformat("KISS[%s]", ap.get_from().get_any_addr().to_str().c_str());
-			CDOLOG(ll_info, "[kiss]", "%s: received packet of %zu bytes\n", ap.to_str().c_str(), in.size());
+			CDOLOG(ll_info, "[kiss]", "%s: received packet of %zu bytes (%s)\n", ap.to_str().c_str(), in.size(), pid_descr.c_str());
 
 			if (pid == 0xcc) {  // check for valid IPv4 payload
 				auto payload = ap.get_data();
