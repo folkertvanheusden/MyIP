@@ -81,24 +81,21 @@ ax25_address::ax25_address(const any_addr & from)
 ax25_address::ax25_address(const ax25_address & a)
 {
 	valid    = a.get_valid   ();
+	invalid_reason = a.get_invalid_reason();
 
 	address  = a.get_address ();
-
 	ssid     = a.get_ssid    ();
 
 	end_mark = a.get_end_mark();
-
 	repeated = a.get_repeated();
 }
 
 ax25_address::ax25_address(const std::string & a, const int ssid, const bool end_mark, const bool repeated)
 {
 	this->address  = a;
-
 	this->ssid     = ssid;
 
 	this->end_mark = end_mark;
-
 	this->repeated = repeated;
 
 	this->valid    = true;
@@ -118,7 +115,6 @@ ax25_address::ax25_address(const std::string & a, const bool end_mark, const boo
 	}
 
 	this->end_mark = end_mark;
-
 	this->repeated = repeated;
 
 	this->valid    = true;
@@ -127,14 +123,13 @@ ax25_address::ax25_address(const std::string & a, const bool end_mark, const boo
 ax25_address & ax25_address::operator=(const ax25_address & in)
 {
 	address  = in.get_address();
-
 	ssid     = in.get_ssid();
 
 	end_mark = in.get_end_mark();
-
 	repeated = in.get_repeated();
 
-	valid    = true;
+	valid    = in.get_valid();
+	invalid_reason = in.get_invalid_reason();
 
 	return *this;
 }
