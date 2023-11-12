@@ -134,6 +134,20 @@ ax25_address & ax25_address::operator=(const ax25_address & in)
 	return *this;
 }
 
+bool ax25_address::operator==(const ax25_address & other) const
+{
+	if (other.get_valid() != valid)
+		return false;
+
+	if (other.get_address() != address)
+		return false;
+
+	if (other.get_ssid() != ssid)
+		return false;
+
+	return true;
+}
+
 void ax25_address::set_address(const std::string & address, const int ssid)
 {
 	this->address = address;
@@ -248,7 +262,14 @@ std::vector<ax25_address> ax25_packet::get_repeaters() const
 
 void ax25_packet::add_repeater(const any_addr & addr)
 {
-	repeaters.push_back(ax25_address(addr));
+	ax25_address temp(addr);
+
+	for(auto & repeater : repeaters) {
+		if (repeater == temp)
+			return;
+	}
+
+	repeaters.push_back(temp);
 }
 
 buffer_in ax25_packet::get_data() const

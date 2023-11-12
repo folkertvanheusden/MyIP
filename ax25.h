@@ -35,7 +35,9 @@ public:
 	ax25_address(const ax25_address & a);
 	ax25_address(const std::string & a, const int ssid, const bool end_mark, const bool repeated);
 	ax25_address(const std::string & a, const bool end_mark, const bool repeated);
+
 	ax25_address & operator=(const ax25_address &);
+	bool operator==(const ax25_address & other) const;
 
 	bool get_valid()    const { return valid;    }
 	std::string get_invalid_reason() const { return invalid_reason; }
