@@ -31,7 +31,7 @@ ax25_address::ax25_address(const std::vector<uint8_t> & from)
 	for(int i=0; i<6; i++) {
 		uint8_t b = from[i];
 
-		if ((b & 1) && i != 5) {
+		if ((b & 1) && i != 5) {  // why not in byte 5?
 			invalid_reason = myformat("byte %d has lsb set (%s)", i, bin_to_text(from.data(), 6, false).c_str());
 			return;
 		}
@@ -44,7 +44,7 @@ ax25_address::ax25_address(const std::vector<uint8_t> & from)
 			address += c;
 	}
 
-	end_mark = from[5] & 1;
+	end_mark = from[6] & 1;
 	repeated = (from[6] & 128) == 128;
 	ssid     = (from[6] >> 1) & 0x0f;
 
