@@ -532,24 +532,6 @@ void phys_kiss::handle_kiss(const int cfd)
 	pollfd fds[] = { { cfd, POLLIN, 0 } };
 
 	while(!stop_flag) {
-		// TODO: move into next for-loop
-		if (!is_a_file) {
-			int rc = poll(fds, 1, 150);
-			if (rc == -1) {
-				if (errno == EINTR)
-					continue;
-
-				CDOLOG(ll_error, "[kiss]", "poll: %s\n", strerror(errno));
-
-				if (reconnect() == false)
-					break;
-				continue;
-			}
-
-			if (rc == 0)
-				continue;
-		}
-
 		bool     ok     = false;
 		bool     escape = false;
 
@@ -557,8 +539,25 @@ void phys_kiss::handle_kiss(const int cfd)
 		size_t   len    = 0;
 
 		for(;!stop_flag;) {
-			uint8_t buffer = 0;
+			// TODO: move into next for-loop
+			if (!is_a_file) {
+				int rc = poll(fds, 1, 150);
+				if (rc == -1) {
+					if (errno == EINTR)
+						continue;
 
+					CDOLOG(ll_error, "[kiss]", "poll: %s\n", strerror(errno));
+
+					if (reconnect() == false)
+						break;
+					continue;
+				}
+
+				if (rc == 0)
+					continue;
+			}
+
+			uint8_t buffer = 0;
 			int rc = read(cfd, &buffer, 1);
 			if (rc == -1) {
 				if (errno == EINTR)
