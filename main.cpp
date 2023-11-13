@@ -680,6 +680,29 @@ int main(int argc, char *argv[])
 			// just fine
 		}
 
+		try {
+			const libconfig::Setting & routes = interface.lookup("routes-ax25");
+			size_t n_routes = routes.getLength();
+
+			for(size_t i=0; i<n_routes; i++) {
+				const libconfig::Setting & route = routes[i];
+
+				std::string callsign = cfg_str(route, "callsign", "callsign to route", false, "");
+				any_addr callsign_aa = ax25_address(callsign.c_str(), true, false).get_any_addr();
+
+				std::string via_callsign = cfg_str(route, "via-callsign", "route via", false, "");
+				if (via_callsign.empty())
+					r->add_ax25_route(callsign_aa, dev, { });
+				else {
+					any_addr via_callsign_aa = ax25_address(via_callsign.c_str(), true, false).get_any_addr();
+					r->add_ax25_route(callsign_aa, dev, via_callsign_aa);
+				}
+			}
+		}
+		catch(const libconfig::SettingNotFoundException &nfex) {
+			// just fine
+		}
+
 		// LLDP
 		bool enable_lldp = cfg_bool(interface, "enable-lldp", "enable LLDP announcements", true, false);
 		if (enable_lldp) {
