@@ -87,20 +87,18 @@ void phys::start_pcap(const std::string & pcap_file, const bool in, const bool o
 
 	if (pdh)
 		CDOLOG(ll_error, "[phys]", "pcap already running\n");
-	else
+	else if (in || out) {
 		pdh = pcap_dump_open(ph, pcap_file.c_str());
+
+		if (!pdh)
+			error_exit(false, "pcap_dump_open failed: %s", pcap_geterr(ph));
+	}
 }
 
 void phys::stop_pcap()
 {
 	if (pdh)
 		pcap_dump_close(pdh);
-}
-
-void phys::pcap_write_packet(const timespec & ts, const uint8_t *const data, const size_t n)
-{
-
-		CDOLOG(ll_error, "[phys]", "cannot write to pcap file (record)\n");
 }
 
 void phys::pcap_write_packet_incoming(const timespec & ts, const uint8_t *const data, const size_t n)

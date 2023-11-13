@@ -15,6 +15,25 @@
 #include "utils.h"
 
 
+const std::map<uint8_t, std::string> pid_names = {
+	{ 0x10, "AX.25 layer 3 implemented" },
+	{ 0x20, "AX.25 layer 3 implemented" },
+	{ 0x01, "ISO 8208/CCiTT X.25 PLP" },
+	{ 0x06, "Compressed TCP/IP packet. Van Jacobson (RFC 1144)" },
+	{ 0x07, "Uncompressed TCP/IP packet. Van Jacobson (RFC 1144)" },
+	{ 0x08, "Segmentation fragment" },
+	{ 0xC3, "TEXNET datagram protocol" },
+	{ 0xC4, "Link Quality Protocol" },
+	{ 0xCA, "Appletalk" },
+	{ 0xCB, "Appletalk ARP" },
+	{ 0xCC, "ARPA Internet Protocol" },
+	{ 0xCD, "ARPA Address resolution" },
+	{ 0xCE, "FlexNet" },
+	{ 0xCF, "Net/ROM" },
+	{ 0xF0, "No layer 3 protocol implemented" },
+	{ 0xFF, "Escape character. Next octet contains more Level 3 protocol" },
+};
+
 ax25_address::ax25_address()
 {
 }
@@ -378,9 +397,19 @@ std::string ax25_packet::to_str() const
 	for(auto & repeater : repeaters) {
 		if (repeaters_str.empty() == false)
 			repeaters_str += " / ";
+		else
+			repeaters_str += ", repeaters:";
 
 		repeaters_str += repeater.to_str();
 	}
 
-	return myformat("valid:%d, from:%s, to:%s, repeaters:%s control:%02x", valid, from.to_str().c_str(), to.to_str().c_str(), repeaters_str.c_str(), control);
+	std::string pid_str;
+	if (type == ax25_packet::TYPE_I && pid.has_value()) {
+		auto it = pid_names.find(pid.value());
+
+		if (it != pid_names.end())
+			pid_str = ", PID: " + it->second;
+	}
+
+	return myformat("valid:%d, from:%s, to:%s%s control:%02x%s", valid, from.to_str().c_str(), to.to_str().c_str(), repeaters_str.c_str(), control, pid_str.c_str());
 }
