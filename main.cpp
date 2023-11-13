@@ -690,7 +690,7 @@ int main(int argc, char *argv[])
 				std::string callsign = cfg_str(route, "callsign", "callsign to route", false, "");
 				any_addr callsign_aa = ax25_address(callsign.c_str(), true, false).get_any_addr();
 
-				std::string via_callsign = cfg_str(route, "via-callsign", "route via", false, "");
+				std::string via_callsign = cfg_str(route, "via-callsign", "route via", true, "");
 				if (via_callsign.empty())
 					r->add_ax25_route(callsign_aa, dev, { });
 				else {
