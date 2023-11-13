@@ -337,13 +337,30 @@ std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 
 	uint8_t *out       = reinterpret_cast<uint8_t *>(calloc(1, data_size + 1024 /* more than enough for an ax.25 header */));
 
-	auto addr_to       = to  .generate_address();
-	memcpy(&out[0], addr_to  .data(), 7);
+	auto addr_to       = to.generate_address();
+	memcpy(&out[0], addr_to.data(), 7);
 
-	auto addr_from     = from.generate_address();
+	auto copy_from     = from;
+	if (repeaters.empty() == false)
+		copy_from.reset_end_mark();
+
+	auto addr_from     = copy_from.generate_address();
 	memcpy(&out[7], addr_from.data(), 7);
 
 	int offset = 14;
+
+	for(size_t i=0; i<repeaters.size(); i++) {
+		auto copy_repeater = repeaters.at(i);
+
+		if (i != repeaters.size() - 1)
+			copy_repeater.reset_end_mark();
+		else
+			copy_repeater.set_end_mark();
+
+		auto addr_repeater = copy_repeater.generate_address();
+		memcpy(&out[offset], addr_repeater.data(), 7);
+		offset += 7;
+	}
 
 	out[offset++] = control;
 	if ((control & 1) == 0)  // I

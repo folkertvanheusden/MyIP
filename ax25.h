@@ -42,8 +42,10 @@ public:
 	bool get_valid()    const { return valid;    }
 	std::string get_invalid_reason() const { return invalid_reason; }
 
-	bool get_end_mark() const { return end_mark; }
-	bool get_repeated() const { return repeated; }
+	bool get_end_mark()   const { return end_mark;  }
+	bool get_repeated()   const { return repeated;  }
+	void reset_end_mark()       { end_mark = false; }
+	void set_end_mark()         { end_mark = true;  }
 
 	std::string get_address() const { return address; }
 	std::string to_str()      const { return address + myformat("-%d", ssid); }
