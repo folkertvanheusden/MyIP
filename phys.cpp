@@ -46,8 +46,10 @@ phys::~phys()
 
 	stop_flag = true;
 
-	th->join();
-	delete th;
+	if (th) {
+		th->join();
+		delete th;
+	}
 }
 
 void phys::start()
@@ -80,7 +82,7 @@ timespec phys::gen_packet_timestamp(const int fd)
 void phys::start_pcap(const std::string & pcap_file, const bool in, const bool out, const uint32_t link_type)
 {
 	if (!ph)
-		ph = pcap_open_dead(link_type, 65536);
+		ph = pcap_open_dead(link_type, 65535);
 
 	pcap_write_incoming = in;
 	pcap_write_outgoing = out;
