@@ -76,7 +76,7 @@ It also runs all other protocols supported by MyIP.
 
 copyright
 ---------
-(C) 2020-2022 by Folkert van Heusden <mail@vanheusden.com>
+(C) 2020-2023 by Folkert van Heusden <mail@vanheusden.com>
 
 Released under Apache License v2.0
 
