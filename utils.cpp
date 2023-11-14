@@ -248,11 +248,3 @@ int determine_value_size(uint32_t n)
 
 	return count;
 }
-
-void run(const std::string & what)
-{
-	int rc = system(what.c_str());
-
-	if (rc == 127)
-		error_exit(false, "system(%s) failed (%d)", what.c_str(), rc);
-}

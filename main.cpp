@@ -49,6 +49,7 @@
 #include "echo.h"
 #include "lldp.h"
 #include "ud.h"
+#include "proc.h"
 
 
 void free_handler(const port_handler_t & tph)
@@ -308,6 +309,7 @@ int main(int argc, char *argv[])
 	/// environment
 	int uid = 1000, gid = 1000;
 	std::string run_at_started;
+	std::string run_at_terminate;
 	std::string unix_domain_socket;
 
 	int n_router_threads = 0;
@@ -326,7 +328,8 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		run_at_started = cfg_str(environment, "ifup", "program to run when network interfaces are up", true, "");
+		run_at_started   = cfg_str(environment, "ifup", "program to run when network interfaces are up", true, "");
+		run_at_terminate = cfg_str(environment, "ifdown", "program to run when network interfaces are stopped", true, "");
 
 		unix_domain_socket = cfg_str(environment, "stats-socket", "used by myipnetstats", true, "");
 
@@ -1087,6 +1090,9 @@ int main(int argc, char *argv[])
 	DOLOG(ll_info, " *** TERMINATING ***\n");
 	fprintf(stderr, "terminating fase 1\n");
 
+	if (run_at_terminate.empty() == false)
+		run(run_at_terminate);
+
 	exit(0);
 
 	int n_actions = 2;  // 1 for 'us' & router
@@ -1153,10 +1159,6 @@ int main(int argc, char *argv[])
 	tcp_udp_fw *firewall = new tcp_udp_fw(&s, u);
 	u->add_handler(22, std::bind(&tcp_udp_fw::input, firewall, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
-
-	std::string run_at_shutdown = iniparser_getstring(ini, "cfg:ifdown", "");
-	if (run_at_shutdown.empty() == false)
-		run(run_at_shutdown);
 
 	free_handler(http_handler6);
 	free_handler(http_handler);

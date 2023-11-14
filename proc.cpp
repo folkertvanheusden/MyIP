@@ -63,3 +63,20 @@ std::tuple<pid_t, int, int> exec_with_pipe(const std::string & command, const st
 
         return out;
 }
+
+void run(const std::string & what)
+{
+	pid_t child = fork();
+	if (child == -1)
+		error_exit(true, "fork failed");
+
+	if (child == 0) {
+		setsid();
+
+		int rc = system(what.c_str());
+		if (rc == 127)
+			error_exit(false, "system(%s) failed (%d)\n", what.c_str(), rc);
+
+		exit(0);
+	}
+}

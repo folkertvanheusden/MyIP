@@ -13,6 +13,7 @@
 
 #include "hash.h"
 #include "log.h"
+#include "proc.h"
 #include "sip.h"
 #include "str.h"
 #include "time.h"
