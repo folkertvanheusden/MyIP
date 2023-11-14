@@ -243,9 +243,9 @@ ax25_packet::ax25_packet(const std::vector<uint8_t> & in)
 	}
 
 	control = in[offset++];
-	if ((control & 1) == 0) {
+	if ((control & 1) == 0 || (control & 0xef) == 0x03) {
 		pid = in[offset++];
-		type = TYPE_I;
+		type = (control & 0xef) == 0x03 ? TYPE_UI : TYPE_I;
 	}
 	else {
 		if (control & 2)
@@ -362,7 +362,6 @@ std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 	auto copy_from     = from;
 	if (repeaters.empty() == false)
 		copy_from.reset_end_mark();
-
 	auto addr_from     = copy_from.generate_address();
 	memcpy(&out[7], addr_from.data(), 7);
 
@@ -382,7 +381,7 @@ std::pair<uint8_t *, size_t> ax25_packet::generate_packet() const
 	}
 
 	out[offset++] = control;
-	if ((control & 1) == 0)  // I
+	if ((control & 1) == 0 || (control & 0xef) == 0x03)  // I or UI
 		out[offset++] = pid.has_value() ? pid.value() : 0;
 
 	memcpy(&out[offset], data.get_bytes(data_size), data_size);

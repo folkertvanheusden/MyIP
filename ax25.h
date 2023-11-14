@@ -61,7 +61,7 @@ public:
 class ax25_packet
 {
 public:
-	enum frame_type { TYPE_I, TYPE_S, TYPE_U };
+	enum frame_type { TYPE_I, TYPE_S, TYPE_U, TYPE_UI };
 
 private:
 	bool                      valid    { false };
