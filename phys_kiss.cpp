@@ -394,7 +394,7 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 		std::string log_prefix = "KISS[" + ap.get_from().get_any_addr().to_str() + "]";
 		CDOLOG(ll_info, "[kiss]", "%s: received packet of %zu bytes\n", ap.to_str().c_str(), in.size());
 
-		if (ap.get_type() == ax25_packet::frame_type::TYPE_I) {
+		if (ap.get_type() == ax25_packet::frame_type::TYPE_I || ap.get_type() == ax25_packet::frame_type::TYPE_UI) {
 			if (ap.get_pid().has_value() == false) {
 				CDOLOG(ll_info, "[kiss]", "PID missing in I-frame\n");
 
@@ -432,6 +432,8 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 				CDOLOG(ll_info, "[kiss]", "pid %02x (%zu bytes): %s\n", pid, in.size(), packet_str.c_str());
 			}
 			else if (pid == 0xcd) {  // check for valid ARP payload
+				CDOLOG(ll_info, "[kiss]", "ARP request\n");
+
 				auto payload = ap.get_data();
 				int  pl_size = payload.get_n_bytes_left();
 

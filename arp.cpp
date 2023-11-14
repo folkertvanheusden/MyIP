@@ -47,8 +47,8 @@ void arp::operator()()
 
 		stats_inc_counter(arp_requests);
 
-		const uint8_t *const p = pkt->get_data();
-		const int size = pkt->get_size();
+		const uint8_t *const p    = pkt->get_data();
+		const int            size = pkt->get_size();
 
 		if (size < 6) {
 			DOLOG(ll_debug, "ARP: packet too small (%d bytes)\n", size);
