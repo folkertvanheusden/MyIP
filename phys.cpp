@@ -82,7 +82,7 @@ timespec phys::gen_packet_timestamp(const int fd)
 void phys::start_pcap(const std::string & pcap_file, const bool in, const bool out, const uint32_t link_type)
 {
 	if (!ph)
-		ph = pcap_open_dead(link_type, 65535);
+		ph = pcap_open_dead_with_tstamp_precision(link_type, 65535, PCAP_TSTAMP_PRECISION_NANO);
 
 	pcap_write_incoming = in;
 	pcap_write_outgoing = out;
@@ -108,7 +108,7 @@ void phys::pcap_write_packet_incoming(const timespec & ts, const uint8_t *const 
 	if (pcap_write_incoming) {
 		pcap_pkthdr header { 0 };
 		header.ts.tv_sec  = ts.tv_sec;
-		header.ts.tv_usec = ts.tv_nsec / 1000;
+		header.ts.tv_usec = ts.tv_nsec;
 		header.len        = header.caplen = n;
 
 		pcap_dump(reinterpret_cast<u_char *>(pdh), &header, data);
@@ -120,7 +120,7 @@ void phys::pcap_write_packet_outgoing(const timespec & ts, const uint8_t *const 
 	if (pcap_write_outgoing) {
 		pcap_pkthdr header { 0 };
 		header.ts.tv_sec  = ts.tv_sec;
-		header.ts.tv_usec = ts.tv_nsec / 1000;
+		header.ts.tv_usec = ts.tv_nsec;
 		header.len        = header.caplen = n;
 
 		pcap_dump(reinterpret_cast<u_char *>(pdh), &header, data);
