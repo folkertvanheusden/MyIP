@@ -424,7 +424,7 @@ int main(int argc, char *argv[])
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
 			dev = new phys_kiss(i + 1, &s, descr, my_mac, beacon_option, r, add_callsign_repeaters);
-			dev->start_pcap("/tmp/test-tap.pcap", true, true, 3);
+			dev->start_pcap("test-kiss.pcap", true, true, 3);
 
 			if (is_default_interface)
 				r->set_default_ax25_interface(dev);
@@ -1093,8 +1093,6 @@ int main(int argc, char *argv[])
 	if (run_at_terminate.empty() == false)
 		run(run_at_terminate);
 
-	exit(0);
-
 	int n_actions = 2;  // 1 for 'us' & router
 
 	r->stop();
@@ -1122,6 +1120,7 @@ int main(int argc, char *argv[])
 	progress(n_actions_done++, n_actions);
 	delete us;
 
+#if 0
 	for(auto & s : socks_proxies) {
 		progress(n_actions_done++, n_actions);
 		delete s;
@@ -1144,7 +1143,7 @@ int main(int argc, char *argv[])
 		progress(n_actions_done++, n_actions);
 		delete p;
 	}
-
+#endif
 	for(auto & d : devs) {
 		progress(n_actions_done++, n_actions);
 		delete d;
