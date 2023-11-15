@@ -1,5 +1,6 @@
 // (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <errno.h>
+#include <getopt.h>
 #include <libconfig.h++>
 #include <signal.h>
 #include <stdio.h>
@@ -20,6 +21,7 @@
 #include "phys_slip.h"
 #include "arp.h"
 #include "dns.h"
+#include "graphviz.h"
 #include "ipv4.h"
 #include "ipv6.h"
 #include "icmp4.h"
@@ -250,12 +252,37 @@ void progress(const int cur, const int total)
 	fflush(nullptr);
 }
 
+void help()
+{
+	printf("-c x   configuration file\n");
+	printf("-d x   graphviz map (optional)\n");
+	printf("-h     this help\n");
+}
+
 int main(int argc, char *argv[])
 {
-	if (argc != 2) {
+	std::string cfg_file;
+	std::string graph_file;
+	int c = -1;
+
+	while((c = getopt(argc, argv, "c:d:h")) != -1) {
+		if (c == 'c')
+			cfg_file = optarg;
+		else if (c == 'd')
+			graph_file = optarg;
+		else if (c == 'h') {
+			help();
+			return 0;
+		}
+	}
+
+	if (cfg_file.empty()) {
 		fprintf(stderr, "File name of configuration cfg-file missing\n");
+		help();
 		return 1;
 	}
+
+	graphviz *g = new graphviz(graph_file);
 
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGPIPE, SIG_IGN);
@@ -263,10 +290,10 @@ int main(int argc, char *argv[])
 	libconfig::Config lc_cfg;
 
 	try {
-		lc_cfg.readFile(argv[1]);
+		lc_cfg.readFile(cfg_file.c_str());
 	}
 	catch(const libconfig::FileIOException &fioex) {
-		fprintf(stderr, "I/O error while reading configuration file %s\n", argv[1]);
+		fprintf(stderr, "I/O error while reading configuration file %s\n", cfg_file.c_str());
 		return 1;
 	}
 	catch(const libconfig::ParseException &pex) {
@@ -367,6 +394,8 @@ int main(int argc, char *argv[])
 
 		std::string mac = cfg_str(interface, "mac-address", "MAC address", true, "52:34:84:16:44:22");
 		any_addr my_mac = type == "kiss" ? ax25_address(mac.c_str(), true, false).get_any_addr() : parse_address(mac, 6, ":", 16);
+
+		g->add_node(mac, type + " " + mac);
 
 		printf("%zu] Will listen on MAC address: %s\n", i, my_mac.to_str().c_str());
 
@@ -492,18 +521,23 @@ int main(int argc, char *argv[])
 			const libconfig::Setting & ipv4_ = interface.lookup("ipv4");
 
 			std::string ma_str = cfg_str(ipv4_, "my-address", "IPv4 address", false, "192.168.3.2");
-
 			my_ipv4_address = parse_address(ma_str, 4, ".", 10);
-
 			mgmt_addr = my_ipv4_address;
 
 			printf("%zu] Will listen on IPv4 address: %s\n", i, my_ipv4_address.to_str().c_str());
 
+			g->add_node(ma_str, "IPv4 " + ma_str);
+			g->add_connection(ma_str, mac);
+
 			a = new arp(&s, dev, my_mac, my_ipv4_address);
 			a->add_static_entry(dev, my_mac, my_ipv4_address);
 
-			for(auto & se : static_mappings)
+			for(auto & se : static_mappings) {
 				a->add_static_entry(dev, se.first, se.second);
+
+				g->add_connection(se.second.to_str(), se.first.to_str());
+				g->add_connection(se.first.to_str(), my_ipv4_address.to_str());
+			}
 
 			dev->register_protocol(0x0806, a);
 
@@ -525,6 +559,8 @@ int main(int argc, char *argv[])
 				// rather ugly but that's how IP works
 				ipv4_instance->register_icmp(icmp_);
 
+				g->add_connection(g->add_node("icmp " + my_ipv4_address.to_str(), "ICMP"), ma_str);
+
 				transport_layers.push_back(icmp_);
 			}
 
@@ -534,6 +570,8 @@ int main(int argc, char *argv[])
 
 				tcp *t = new tcp(&s, icmp_, n_threads);
 				ipv4_instance->register_protocol(0x06, t);
+
+				g->add_connection(g->add_node("tcp " + my_ipv4_address.to_str(), "TCP"), ma_str);
 
 				ipv4_tcp = t;
 
@@ -548,6 +586,8 @@ int main(int argc, char *argv[])
 
 				int n_threads = cfg_int(ipv4_, "n-sctp-threads", "number of sctp threads", true, 8);
 
+				g->add_connection(g->add_node("sctp " + my_ipv4_address.to_str(), "SCTP"), ma_str);
+
 				sctp *sctp_ = new sctp(&s, icmp_, n_threads);
 				ipv4_instance->register_protocol(0x84, sctp_);
 
@@ -559,6 +599,8 @@ int main(int argc, char *argv[])
 			bool use_udp = cfg_bool(ipv4_, "use-udp", "wether to enable udp", true, true);
 			if (use_udp) {
 				int n_threads = cfg_int(ipv4_, "n-udp-threads", "number of udp threads", true, 8);
+
+				g->add_connection(g->add_node("udp " + my_ipv4_address.to_str(), "UDP"), ma_str);
 
 				udp *u = new udp(&s, icmp_, n_threads);
 				ipv4_instance->register_protocol(0x11, u);
@@ -589,9 +631,14 @@ int main(int argc, char *argv[])
 
 			printf("%zu] Will listen on IPv6 address: %s\n", i, my_ipv6_address.to_str().c_str());
 
+			g->add_node(ma_str, "IPv6 " + ma_str);
+			g->add_connection(ma_str, mac);
+
 			ndp_ = new ndp(&s);
 			ndp_->add_static_entry(dev, my_mac, my_ipv6_address);
 			protocols.push_back(ndp_);
+
+			g->add_connection(my_mac.to_str(), my_ipv6_address.to_str());
 
 			int n_ipv6_threads = cfg_int(ipv6_, "n-ipv6-threads", "number of ipv6 threads", true, 4);
 
@@ -611,6 +658,8 @@ int main(int argc, char *argv[])
 				ipv6_instance->register_protocol(0x3a, icmp6_);  // 58
 				ipv6_instance->register_icmp(icmp6_);
 
+				g->add_connection(g->add_node("icmp " + my_ipv6_address.to_str(), "ICMP"), ma_str);
+
 				ndp_->register_icmp6(icmp6_);
 			}
 
@@ -622,6 +671,8 @@ int main(int argc, char *argv[])
 				ipv6_instance->register_protocol(0x06, t6);  // TCP
 				transport_layers.push_back(t6);
 
+				g->add_connection(g->add_node("tcp " + my_ipv6_address.to_str(), "TCP"), ma_str);
+
 				stream_session_handlers.push_back(t6);
 			}
 
@@ -631,6 +682,8 @@ int main(int argc, char *argv[])
 
 				udp *u = new udp(&s, icmp6_, n_threads);
 				ipv6_instance->register_protocol(0x11, u);
+
+				g->add_connection(g->add_node("udp " + my_ipv6_address.to_str(), "UDP"), ma_str);
 
 				transport_layers.push_back(u);
 			}
@@ -664,6 +717,10 @@ int main(int argc, char *argv[])
 					if (gateway_str.empty() == false)
 						gateway = parse_address(gateway_str, 4, ".", 10);
 
+					g->add_connection(g->add_node("network " + network_str, network_str + "/" + netmask_str), my_ipv4_address.to_str());
+					if (gateway_str.empty() == false)
+						g->add_connection(gateway_str, my_ipv4_address.to_str());
+
 					r->add_router_ipv4(my_ipv4_address, network, netmask_bytes, gateway, priority, dev, a);
 				}
 				else if (ip_family == "ipv6") {
@@ -671,6 +728,9 @@ int main(int argc, char *argv[])
 					any_addr network = parse_address(network_str, 16, ":", 16);
 
 					int cidr = cfg_int(route, "cidr", "cidr", false, 0);
+
+					std::string graphviz_name = network_str + "/" + myformat("%d", cidr);
+					g->add_connection(g->add_node("network " + graphviz_name, graphviz_name), my_ipv4_address.to_str());
 
 					r->add_router_ipv6(my_ipv6_address, network, cidr, priority, dev, ndp_);
 				}
@@ -694,11 +754,15 @@ int main(int argc, char *argv[])
 				any_addr callsign_aa = ax25_address(callsign.c_str(), true, false).get_any_addr();
 
 				std::string via_callsign = cfg_str(route, "via-callsign", "route via", true, "");
-				if (via_callsign.empty())
+				if (via_callsign.empty()) {
 					r->add_ax25_route(callsign_aa, dev, { });
+					g->add_connection(g->add_node("AX.25 " + callsign, callsign), mac);
+				}
 				else {
 					any_addr via_callsign_aa = ax25_address(via_callsign.c_str(), true, false).get_any_addr();
 					r->add_ax25_route(callsign_aa, dev, via_callsign_aa);
+					g->add_connection(g->add_node("AX.25 " + via_callsign_aa.to_str(), via_callsign_aa.to_str()), mac);
+					g->add_connection(g->add_node("AX.25 " + callsign_aa.to_str(), callsign_aa.to_str()), via_callsign_aa.to_str());
 				}
 			}
 		}
@@ -712,6 +776,8 @@ int main(int argc, char *argv[])
 			lldp *lldp_ = new lldp(&s, my_mac, mgmt_addr, i + 1, r);
 			protocols.push_back(lldp_);
 			dev->register_protocol(0x0806, lldp_);
+
+			g->add_connection(g->add_node("lldp " + mac, "LLDP"), mac);
 		}
 
 
@@ -737,11 +803,17 @@ int main(int argc, char *argv[])
 
 				applications.push_back(dns_);
 
-				if (my_ipv4_address.is_set())
+				if (my_ipv4_address.is_set()) {
 					dns_instances_4.insert({ my_ipv4_address, dns_ });
 
-				if (my_ipv6_address.is_set())
+					g->add_connection(g->add_node("upstreamdns " + dns_u_ip_str, "upstream DNS " + dns_u_ip_str), my_ipv4_address.to_str());
+				}
+
+				if (my_ipv6_address.is_set()) {
 					dns_instances_6.insert({ my_ipv6_address, dns_ });
+
+					g->add_connection(g->add_node("upstreamdns " + dns_u_ip_str, "upstream DNS " + dns_u_ip_str), my_ipv6_address.to_str());
+				}
 			}
 		}
 		catch(const libconfig::SettingNotFoundException &nfex) {
@@ -813,6 +885,7 @@ int main(int argc, char *argv[])
 			ntp *ntp_ = new ntp(&s, u, i4->get_addr(), upstream_ntp_server, broadcast);
 
 			u->add_handler(port, std::bind(&ntp::input, ntp_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+			g->add_connection(g->add_node("NTP " + ntp_u_ip_str, "NTP " + ntp_u_ip_str), i4->get_addr().to_str());
 
 			applications.push_back(ntp_);
 		}
@@ -970,6 +1043,8 @@ int main(int argc, char *argv[])
 					u4->add_handler(port, std::bind(&sip::input, sip_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 					applications.push_back(sip_);
+
+					g->add_connection(g->add_node("SIP " + upstream_sip_server, "SIP " + upstream_sip_server), "udp " + i4->get_addr().to_str());
 				}
 			}
 
@@ -999,6 +1074,7 @@ int main(int argc, char *argv[])
 
 			snmp *snmp_4 = new snmp(&sd, &s, u4);
 			u4->add_handler(port, std::bind(&snmp::input, snmp_4, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+			applications.push_back(snmp_4);
 
 			ipv6 *i6 = dynamic_cast<ipv6 *>(dev->get_protocol(0x86dd));
 			if (!i6)
@@ -1011,7 +1087,6 @@ int main(int argc, char *argv[])
 			snmp *snmp_6 = new snmp(&sd, &s, u6);
 			u6->add_handler(port, std::bind(&snmp::input, snmp_6, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
-			applications.push_back(snmp_4);
 			applications.push_back(snmp_6);
 		}
 	}
@@ -1080,6 +1155,8 @@ int main(int argc, char *argv[])
 	ud_stats *us = unix_domain_socket.empty() ? nullptr : new ud_stats(stream_session_handlers, &devs, unix_domain_socket);
 
 	r->dump();
+
+	delete g;
 
 	DOLOG(ll_debug, "*** STARTED ***\n");
 	printf("*** STARTED ***\n");

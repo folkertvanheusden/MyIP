@@ -28,6 +28,7 @@ add_executable(myip
 	echo.cpp
 	fifo_stats.cpp
 	font.cpp
+	graphviz.cpp
 	hash.cpp
 	http.cpp
 	icmp.cpp
