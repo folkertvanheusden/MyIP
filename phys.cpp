@@ -81,8 +81,10 @@ timespec phys::gen_packet_timestamp(const int fd)
 
 void phys::start_pcap(const std::string & pcap_file, const bool in, const bool out, const uint32_t link_type)
 {
+	std::unique_lock<std::mutex> lck(pcap_lock);
+
 	if (!ph)
-		ph = pcap_open_dead_with_tstamp_precision(link_type, 65535, PCAP_TSTAMP_PRECISION_NANO);
+		ph = pcap_open_dead_with_tstamp_precision(link_type, 65535, PCAP_TSTAMP_PRECISION_MICRO);
 
 	pcap_write_incoming = in;
 	pcap_write_outgoing = out;
@@ -99,8 +101,10 @@ void phys::start_pcap(const std::string & pcap_file, const bool in, const bool o
 
 void phys::stop_pcap()
 {
-	if (pdh)
+	if (pdh) {
+		std::unique_lock<std::mutex> lck(pcap_lock);
 		pcap_dump_close(pdh);
+	}
 }
 
 void phys::pcap_write_packet_incoming(const timespec & ts, const uint8_t *const data, const size_t n)
@@ -108,9 +112,10 @@ void phys::pcap_write_packet_incoming(const timespec & ts, const uint8_t *const 
 	if (pcap_write_incoming) {
 		pcap_pkthdr header { 0 };
 		header.ts.tv_sec  = ts.tv_sec;
-		header.ts.tv_usec = ts.tv_nsec;
+		header.ts.tv_usec = ts.tv_nsec / 1000;
 		header.len        = header.caplen = n;
 
+		std::unique_lock<std::mutex> lck(pcap_lock);
 		pcap_dump(reinterpret_cast<u_char *>(pdh), &header, data);
 	}
 }
@@ -120,9 +125,10 @@ void phys::pcap_write_packet_outgoing(const timespec & ts, const uint8_t *const 
 	if (pcap_write_outgoing) {
 		pcap_pkthdr header { 0 };
 		header.ts.tv_sec  = ts.tv_sec;
-		header.ts.tv_usec = ts.tv_nsec;
+		header.ts.tv_usec = ts.tv_nsec / 1000;
 		header.len        = header.caplen = n;
 
+		std::unique_lock<std::mutex> lck(pcap_lock);
 		pcap_dump(reinterpret_cast<u_char *>(pdh), &header, data);
 	}
 }

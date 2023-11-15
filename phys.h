@@ -46,6 +46,7 @@ protected:
 
 	bool      SIOCGSTAMPNS_OLD_error_emitted = false;
 
+	std::mutex pcap_lock;
 	pcap_t   *ph                  { nullptr };
 	pcap_dumper_t *pdh            { nullptr };
 	bool      pcap_write_incoming { false   };
