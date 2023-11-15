@@ -424,7 +424,7 @@ int main(int argc, char *argv[])
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
 			dev = new phys_kiss(i + 1, &s, descr, my_mac, beacon_option, r, add_callsign_repeaters);
-			dev->start_pcap("test-kiss.pcap", true, true, 3);
+			dev->start_pcap("test-kiss-%s.pcap", true, true, 3);
 
 			if (is_default_interface)
 				r->set_default_ax25_interface(dev);

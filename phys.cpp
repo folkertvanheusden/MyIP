@@ -13,6 +13,7 @@
 #include <sys/types.h>
 
 #include "buffer_out.h"
+#include "hash.h"
 #include "log.h"
 #include "packet.h"
 #include "phys.h"
@@ -92,10 +93,10 @@ void phys::start_pcap(const std::string & pcap_file, const bool in, const bool o
 	if (pdh)
 		CDOLOG(ll_error, "[phys]", "pcap already running\n");
 	else if (in || out) {
-		pdh = pcap_dump_open(ph, pcap_file.c_str());
-
+		std::string temp = myformat(pcap_file.c_str(), md5hex(myformat("%s-%zu", name.c_str(), dev_index)).substr(0, 4).c_str());
+		pdh = pcap_dump_open(ph, temp.c_str());
 		if (!pdh)
-			error_exit(false, "pcap_dump_open failed: %s", pcap_geterr(ph));
+			error_exit(false, "pcap_dump_open(%s) failed: %s", temp.c_str(), pcap_geterr(ph));
 	}
 }
 
