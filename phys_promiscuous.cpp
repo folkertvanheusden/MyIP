@@ -19,6 +19,7 @@
 
 #include "log.h"
 #include "phys_promiscuous.h"
+#include "phys_tap.h"
 #include "packet.h"
 #include "str.h"
 #include "time.h"
@@ -181,31 +182,8 @@ void phys_promiscuous::operator()()
 			continue;
 		}
 
-		uint16_t ether_type = (buffer[12] << 8) | buffer[13];
-
-		if (ether_type == 0x08ff) {  // special case for BPQ
-			process_kiss_packet(ts, std::vector<uint8_t>(&buffer[14], buffer + size), &prot_map, r, this, { });
-			continue;
-		}
-
-		auto it = prot_map.find(ether_type);
-		if (it == prot_map.end()) {
-			CDOLOG(ll_info, "[prom]", "dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
-			stats_inc_counter(phys_ign_frame);
-			continue;
-		}
-
-		any_addr dst_mac(any_addr::mac, &buffer[0]);
-
-		any_addr src_mac(any_addr::mac, &buffer[6]);
-
-		CDOLOG(ll_debug, "[prom]", "queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
-
-		std::string log_prefix = myformat("[MAC:%02x%02x%02x%02x%02x%02x]", buffer[6], buffer[7], buffer[8], buffer[9], buffer[10], buffer[11]);
-
-		packet *p = new packet(ts, src_mac, src_mac, dst_mac, &buffer[14], size - 14, &buffer[0], 14, log_prefix);
-
-		it->second->queue_incoming_packet(this, p);
+		if (process_ethernet_frame(ts, std::vector<uint8_t>(buffer, buffer + size), &prot_map, r, this))
+			CDOLOG(ll_info, "[prom]", "failed processing Ethernet frame\n");
 	}
 
 	CDOLOG(ll_info, "[prom]", "thread stopped\n");

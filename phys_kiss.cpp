@@ -21,6 +21,7 @@
 
 #include "log.h"
 #include "phys_kiss.h"
+#include "phys_tap.h"
 #include "packet.h"
 #include "str.h"
 #include "utils.h"
@@ -479,8 +480,17 @@ bool process_kiss_packet(const timespec & ts, const std::vector<uint8_t> & in, s
 		}
 	}
 	else {
-		// TODO: Ethernet-over-AX.25
-		CDOLOG(ll_warning, "[kiss]", "Not a valid AX.25 packet (%s); not processing - %s\n", ap.get_invalid_reason().c_str(), packet_str.c_str());
+		if (in.size() >= 6 + 6 + 2 + 46) {  // could be Ethernet over AX.25 (see eoax)
+			if (process_ethernet_frame(ts, in, prot_map, r, source_phys)) {
+				CDOLOG(ll_info, "[kiss]", "failed processing Ethernet frame\n");
+				rc = false;
+			}
+		}
+		else {
+			// TODO: Ethernet-over-AX.25
+			CDOLOG(ll_warning, "[kiss]", "Not a valid AX.25 packet (%s); not processing - %s\n", ap.get_invalid_reason().c_str(), packet_str.c_str());
+			rc = false;
+		}
 	}
 
 	return rc;

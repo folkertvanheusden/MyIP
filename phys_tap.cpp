@@ -186,32 +186,39 @@ void phys_tap::operator()()
 			continue;
 		}
 
-		uint16_t ether_type = (buffer[12] << 8) | buffer[13];
-
-		if (ether_type == 0x08ff) {  // special case for BPQ
-			process_kiss_packet(ts, std::vector<uint8_t>(&buffer[14], buffer + size), &prot_map, r, this, { });
-			continue;
-		}
-
-		auto it = prot_map.find(ether_type);
-		if (it == prot_map.end()) {
-			CDOLOG(ll_info, "[tap]", "dropping ethernet packet with ether type %04x (= unknown) and size %d\n", ether_type, size);
-			stats_inc_counter(phys_ign_frame);
-			continue;
-		}
-
-		any_addr dst_mac(any_addr::mac, &buffer[0]);
-
-		any_addr src_mac(any_addr::mac, &buffer[6]);
-
-		CDOLOG(ll_debug, "[tap]", "queing packet from %s to %s with ether type %04x and size %d\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, size);
-
-		std::string log_prefix = myformat("[MAC:%02x%02x%02x%02x%02x%02x]", buffer[6], buffer[7], buffer[8], buffer[9], buffer[10], buffer[11]);
-
-		packet *p = new packet(ts, src_mac, src_mac, dst_mac, &buffer[14], size - 14, &buffer[0], 14, log_prefix);
-
-		it->second->queue_incoming_packet(this, p);
+		if (process_ethernet_frame(ts, std::vector<uint8_t>(buffer, buffer + size), &prot_map, r, this))
+			CDOLOG(ll_info, "[tap]", "failed processing Ethernet frame\n");
 	}
 
 	CDOLOG(ll_info, "[tap]", "thread stopped\n");
+}
+
+bool process_ethernet_frame(const timespec & ts, const std::vector<uint8_t> & buffer, std::map<uint16_t, network_layer *> *const prot_map, router *const r, phys *const source_phys)
+{
+	uint16_t ether_type = (buffer[12] << 8) | buffer[13];
+
+	if (ether_type == 0x08ff) {  // special case for BPQ
+		process_kiss_packet(ts, std::vector<uint8_t>(buffer.data() + 14, buffer.data() + buffer.size()), prot_map, r, source_phys, { });
+		return false;
+	}
+
+	auto it = prot_map->find(ether_type);
+	if (it == prot_map->end()) {
+		CDOLOG(ll_info, "[tap]", "dropping ethernet packet with ether type %04x (= unknown) and size %zu\n", ether_type, buffer.size());
+		return false;
+	}
+
+	any_addr dst_mac(any_addr::mac, buffer.data() + 0);
+
+	any_addr src_mac(any_addr::mac, buffer.data() + 6);
+
+	CDOLOG(ll_debug, "[EthernetFrame]", "queing packet from %s to %s with ether type %04x and size %zu\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, buffer.size());
+
+	std::string log_prefix = myformat("[MAC:%02x%02x%02x%02x%02x%02x]", buffer[6], buffer[7], buffer[8], buffer[9], buffer[10], buffer[11]);
+
+	packet *p = new packet(ts, src_mac, src_mac, dst_mac, buffer.data() + 14, buffer.size() - 14, buffer.data(), 14, log_prefix);
+
+	it->second->queue_incoming_packet(source_phys, p);
+
+	return true;
 }
