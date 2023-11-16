@@ -329,7 +329,7 @@ void phys_kiss::send_beacon()
 	while(!stop_flag) {
 		ax25_packet a;
 		a.set_from   (my_callsign);
-		a.set_to     ("IDENT", '0', true, false);
+		a.set_to     ("IDENT", 0, true, false);
 		a.set_control(0x03);  // unnumbered information/frame
 		a.set_data   (reinterpret_cast<const uint8_t *>(beacon.value().first.c_str()), beacon.value().first.size());
 		a.set_pid(0xf0);  // beacon
