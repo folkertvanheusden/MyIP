@@ -97,14 +97,18 @@ void phys::start_pcap(const std::string & pcap_file, const bool in, const bool o
 		pdh = pcap_dump_open(ph, temp.c_str());
 		if (!pdh)
 			error_exit(false, "pcap_dump_open(%s) failed: %s", temp.c_str(), pcap_geterr(ph));
+
+		pcap_dump_flush(pdh);
 	}
 }
 
 void phys::stop_pcap()
 {
 	std::unique_lock<std::mutex> lck(pcap_lock);
-	if (pdh)
+	if (pdh) {
+		pcap_dump_flush(pdh);
 		pcap_dump_close(pdh);
+	}
 }
 
 void phys::pcap_write_packet_incoming(const timespec & ts, const uint8_t *const data, const size_t n)
