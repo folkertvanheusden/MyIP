@@ -102,34 +102,35 @@ void phys::start_pcap(const std::string & pcap_file, const bool in, const bool o
 
 void phys::stop_pcap()
 {
-	if (pdh) {
-		std::unique_lock<std::mutex> lck(pcap_lock);
+	std::unique_lock<std::mutex> lck(pcap_lock);
+	if (pdh)
 		pcap_dump_close(pdh);
-	}
 }
 
 void phys::pcap_write_packet_incoming(const timespec & ts, const uint8_t *const data, const size_t n)
 {
+	std::unique_lock<std::mutex> lck(pcap_lock);
+
 	if (pcap_write_incoming) {
 		pcap_pkthdr header { 0 };
 		header.ts.tv_sec  = ts.tv_sec;
 		header.ts.tv_usec = ts.tv_nsec / 1000;
 		header.len        = header.caplen = n;
 
-		std::unique_lock<std::mutex> lck(pcap_lock);
 		pcap_dump(reinterpret_cast<u_char *>(pdh), &header, data);
 	}
 }
 
 void phys::pcap_write_packet_outgoing(const timespec & ts, const uint8_t *const data, const size_t n)
 {
+	std::unique_lock<std::mutex> lck(pcap_lock);
+
 	if (pcap_write_outgoing) {
 		pcap_pkthdr header { 0 };
 		header.ts.tv_sec  = ts.tv_sec;
 		header.ts.tv_usec = ts.tv_nsec / 1000;
 		header.len        = header.caplen = n;
 
-		std::unique_lock<std::mutex> lck(pcap_lock);
 		pcap_dump(reinterpret_cast<u_char *>(pdh), &header, data);
 	}
 }
