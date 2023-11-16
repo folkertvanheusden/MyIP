@@ -96,7 +96,7 @@ int connect_to(const char *host, const int portnr)
         return -1;
 }
 
-int accept_socket(const std::string & listen_addr, const int listen_port)
+int setup_accept_socket(const std::string & listen_addr, const int listen_port)
 {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd == -1)
@@ -125,16 +125,7 @@ int accept_socket(const std::string & listen_addr, const int listen_port)
 
 	CDOLOG(ll_info, "[kiss]", "listening on [%s]:%d\n", listen_addr.c_str(), listen_port);
 
-	for(;;) {
-		int cfd = accept(fd, nullptr, nullptr);
-
-		if (cfd != -1)
-			return cfd;
-
-		CDOLOG(ll_info, "[kiss]", "accept failed: %s\n", strerror(errno));
-	}
-
-	return -1;
+	return fd;
 }
 
 phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r, const bool add_callsign_repeaters) :
@@ -230,14 +221,19 @@ phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string &
 void phys_kiss::tcp_kiss_server()
 {
 	auto parts = split(descriptor, ":");
+	int  sfd   = setup_accept_socket(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
 
 	while(!stop_flag) {
-		int cfd = accept_socket(parts.at(1).c_str(), atoi(parts.at(2).c_str()));
+		int cfd = accept(sfd, nullptr, nullptr);
+		if (cfd == -1) {
+			CDOLOG(ll_info, "[kiss]", "accept failed: %s\n", strerror(errno));
+			continue;
+		}
 
 		std::thread th(&phys_kiss::handle_kiss, this, cfd);
 		th.detach();
 
-		CDOLOG(ll_error, "[kiss]", "TCP socket connected (server)\n");
+		CDOLOG(ll_info, "[kiss]", "TCP socket connected (server)\n");
 	}
 }
 
