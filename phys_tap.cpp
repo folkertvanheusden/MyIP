@@ -186,7 +186,7 @@ void phys_tap::operator()()
 			continue;
 		}
 
-		if (process_ethernet_frame(ts, std::vector<uint8_t>(buffer, buffer + size), &prot_map, r, this))
+		if (process_ethernet_frame(ts, std::vector<uint8_t>(buffer, buffer + size), &prot_map, r, this) == false)
 			CDOLOG(ll_info, "[tap]", "failed processing Ethernet frame\n");
 	}
 
