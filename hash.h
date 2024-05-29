@@ -1,6 +1,6 @@
-
 #include <stdint.h>
 #include <string>
+#include <openssl/md5.h>
 
 
 uint64_t MurmurHash64A(const void *const key, const int len, const uint64_t seed);
