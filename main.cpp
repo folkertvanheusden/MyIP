@@ -442,7 +442,7 @@ int main(int argc, char *argv[])
 			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP Ethernet device");  // description
 			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
 
-			auto vpn_dev = new phys_vpn_insertion_point(i + 1, &s, dev_name, r);
+			auto vpn_dev = new phys_vpn_insertion_point(i + 1, &s, dev_name, r, my_mac);
 			dev = vpn_dev;
 
 			vpns.insert({ dev_name, vpn_dev });

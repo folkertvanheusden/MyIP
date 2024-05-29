@@ -14,14 +14,16 @@
 #include <sys/types.h>
 
 #include "log.h"
+#include "net.h"
 #include "phys_vpn_insertion_point.h"
 #include "packet.h"
 #include "tty.h"
 #include "utils.h"
 
 
-phys_vpn_insertion_point::phys_vpn_insertion_point(const size_t dev_index, stats *const s, const std::string & dev_name, router *const r):
-	phys(dev_index, s, "vpn-" + dev_name, r)
+phys_vpn_insertion_point::phys_vpn_insertion_point(const size_t dev_index, stats *const s, const std::string & dev_name, router *const r, const any_addr & my_mac):
+	phys(dev_index, s, "vpn-" + dev_name, r),
+	my_mac(my_mac)
 {
 }
 
@@ -70,13 +72,7 @@ bool phys_vpn_insertion_point::insert_packet(const uint16_t ether_type, const ui
                 return false;
         }
 
-	const uint8_t dst_mac_bytes[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 };
-        any_addr dst_mac(any_addr::mac, dst_mac_bytes);
-
-	const uint8_t src_mac_bytes[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x02 };
-        any_addr src_mac(any_addr::mac, src_mac_bytes);
-
-        packet *p = new packet(ts, src_mac, src_mac, dst_mac, payload, pl_size, nullptr, 0, "vpn");
+        packet *p = new packet(ts, gen_opponent_mac(my_mac), my_mac, payload, pl_size, nullptr, 0, "vpn");
 
         it->second->queue_incoming_packet(this, p);
 

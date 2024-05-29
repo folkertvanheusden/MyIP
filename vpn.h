@@ -24,6 +24,7 @@ private:
 	DES_key_schedule                sched_encrypt;
 	DES_key_schedule                sched_decrypt;
 	udp                      *const u;
+	const any_addr                  my_mac;
 	const any_addr                  my_ip;
 	const int                       my_port;
 	const any_addr                  peer_ip;

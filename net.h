@@ -14,3 +14,5 @@ std::optional<std::string> get_host_as_text(struct sockaddr *const a);
 
 bool check_subnet(const any_addr & addr, const any_addr & network, const int cidr);
 bool check_subnet(const any_addr & addr, const any_addr & network, const uint8_t netmask[4]);
+
+any_addr gen_opponent_mac(const any_addr & my_mac);

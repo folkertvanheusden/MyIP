@@ -114,3 +114,13 @@ bool check_subnet(const any_addr & addr, const any_addr & network, const uint8_t
 
 	return true;
 }
+
+any_addr gen_opponent_mac(const any_addr & my_mac)
+{
+	uint8_t src_mac_bin[6] { 0 };
+
+	for(int i=0; i<6; i++)
+		src_mac_bin[i] = my_mac[i] ^ ((i & 1) ? 0x55 : 0xaa);
+
+	return any_addr(any_addr::mac, src_mac_bin);
+}
