@@ -58,7 +58,7 @@ bool phys_vpn_insertion_point::transmit_packet(const any_addr & dst_mac, const a
 
 	CDOLOG(ll_debug, "[VPN]", "transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
-	return v->transmit_packet(ether_type, payload, pl_size);
+	return v->transmit_packet(dst_mac, src_mac, ether_type, payload, pl_size);
 }
 
 void phys_vpn_insertion_point::operator()()

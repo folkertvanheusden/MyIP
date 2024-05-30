@@ -42,7 +42,7 @@ public:
 
 	void input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd);
 
-	bool transmit_packet(const uint16_t ether_type, const uint8_t *const payload, const size_t pl_size);
+	bool transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *const payload, const size_t pl_size);
 
 	void operator()();
 };

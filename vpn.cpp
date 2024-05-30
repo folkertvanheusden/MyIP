@@ -65,10 +65,22 @@ void vpn::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
         md5bin(&temp[MD5_DIGEST_LENGTH], pl.second - MD5_DIGEST_LENGTH, md5_compare);
 
 	if (memcmp(md5_compare, temp, MD5_DIGEST_LENGTH) == 0) {
-		uint16_t ether_type = (temp[MD5_DIGEST_LENGTH + 0] << 8) | temp[MD5_DIGEST_LENGTH + 1];
-		uint16_t pl_size    = (temp[MD5_DIGEST_LENGTH + 2] << 8) | temp[MD5_DIGEST_LENGTH + 3];
+		size_t   o          = MD5_DIGEST_LENGTH;
+		uint16_t ether_type = (temp[o + 0] << 8) | temp[o + 1];
+		uint16_t pl_size    = (temp[o + 2] << 8) | temp[o + 3];
+		o += 4;
 
-		if (phys->insert_packet(ether_type, temp, pl_size))
+		any_addr::addr_family dst_family = any_addr::addr_family(temp[o++]);
+		uint8_t  dst_len    = temp[o++];
+		any_addr dst_mac(dst_family, &temp[o]);
+		o += dst_len;
+
+		any_addr::addr_family src_family = any_addr::addr_family(temp[o++]);
+		uint8_t  src_len    = temp[o++];
+		any_addr src_mac(src_family, &temp[o]);
+		o += src_len;
+
+		if (phys->insert_packet(dst_mac, src_mac, ether_type, temp, pl_size))
 			CDOLOG(ll_debug, "[vpn]", "VPN: packet input fail\n");
 	}
 	else {
@@ -83,22 +95,37 @@ void vpn::operator()()
 	set_thread_name("myip-vpn");
 }
 
-bool vpn::transmit_packet(const uint16_t ether_type, const uint8_t *const payload, const size_t pl_size)
+bool vpn::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *const payload, const size_t pl_size)
 {
         // real crypto would pad the packet so that an attacker has no
         // idea of the size which gives hints about its contents
-        size_t   out_len = MD5_DIGEST_LENGTH + 2 + 2 + pl_size;
+        size_t   out_len = MD5_DIGEST_LENGTH + 2 + 2 + 1 + dst_mac.get_len() + 1 + src_mac.get_len() + pl_size;
 	if (out_len & 8)
 		out_len += 7 - (out_len & 8);
         uint8_t *out     = new uint8_t[out_len]();
 
         // payload
+	size_t   o = MD5_DIGEST_LENGTH;
+	// meta
+        out[o++] = ether_type >> 8;
+        out[o++] = ether_type;
+        out[o++] = pl_size >> 8;
+        out[o++] = pl_size;
+	// addresses
+	out[o++] = dst_mac.get_family();
+	int temp = 0;
+	out[o++] = dst_mac.get_len();
+	dst_mac.get(&out[o], &temp);
+	o += temp;
+
+	out[o++] = src_mac.get_family();
+	out[o++] = src_mac.get_len();
+	src_mac.get(&out[o], &temp);
+	o += temp;
+	// data
         if (pl_size)
-                memcpy(&out[MD5_DIGEST_LENGTH + 4], payload, pl_size);
-        out[MD5_DIGEST_LENGTH + 0] = ether_type >> 8;
-        out[MD5_DIGEST_LENGTH + 1] = ether_type;
-        out[MD5_DIGEST_LENGTH + 2] = pl_size >> 8;
-        out[MD5_DIGEST_LENGTH + 3] = pl_size;
+                memcpy(&out[o], payload, pl_size);
+
         // add hash
 	// real crypto would not use md5
         md5bin(&out[MD5_DIGEST_LENGTH], out_len - MD5_DIGEST_LENGTH, out);
