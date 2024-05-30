@@ -226,6 +226,11 @@ std::optional<std::pair<phys *, any_addr> > router::resolve_mac_by_addr(ip_route
 	return { };
 }
 
+std::optional<phys *> router::find_interface_by_mac(ip_router_entry *const re, const any_addr & mac)
+{
+	return re->mac_lookup.iarp->get_phys_by_mac(mac);
+}
+
 void router::operator()()
 {
 	set_thread_name("myip-phys_router");
@@ -331,6 +336,9 @@ void router::operator()()
 				po.value()->dst_mac   = phys_mac.value().second;
 			}
 		}
+
+		if (po.value()->dst_mac.has_value() == true && po.value()->interface == nullptr)
+			po.value()->interface = find_interface_by_mac(re_dst, po.value()->dst_mac.value());
 
 		bool ok = true;
 

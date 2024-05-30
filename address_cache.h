@@ -22,6 +22,7 @@ protected:
 
 	static std::shared_mutex cache_lock;
 	static std::map<any_addr, address_entry_t> cache;
+	static std::map<any_addr, phys *> mac_cache;
 
 	interruptable_sleep cleaner_stop;
 	std::thread        *cleaner_th   { nullptr };
@@ -41,6 +42,7 @@ public:
 	void add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip);
 
 	virtual std::pair<phys *, any_addr *> query_cache(const any_addr & ip, const bool static_entry = false);
+	virtual phys * query_mac_cache(const any_addr & mac);
 
 	void dump_cache();
 };

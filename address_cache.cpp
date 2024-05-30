@@ -11,6 +11,7 @@
 
 std::shared_mutex address_cache::cache_lock;
 std::map<any_addr, address_cache::address_entry_t> address_cache::cache;
+std::map<any_addr, phys *> address_cache::mac_cache;
 
 address_cache::address_cache(stats *const s)
 {
@@ -50,6 +51,11 @@ void address_cache::update_cache(const any_addr & mac, const any_addr & ip, phys
 		it->second = { static_entry ? 0 : get_us(), mac, interface };
 		stats_inc_counter(address_cache_update);
 	}
+
+	auto it_mac = mac_cache.find(mac);
+
+	if (it_mac == mac_cache.end())  // TODO cleanup, like regular cache
+		mac_cache.insert({ mac, interface });
 }
 
 void address_cache::add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip)
@@ -77,6 +83,21 @@ std::pair<phys *, any_addr *> address_cache::query_cache(const any_addr & ip, co
 	stats_inc_counter(address_cache_hit);
 
 	return { it->second.interface, new any_addr(it->second.addr) };
+}
+
+phys * address_cache::query_mac_cache(const any_addr & mac)
+{
+	const std::shared_lock<std::shared_mutex> lock(cache_lock);
+
+	stats_inc_counter(address_cache_req);
+
+	auto it = mac_cache.find(mac);
+	if (it == mac_cache.end()) {
+		DOLOG(ll_warning, "address_cache: MAC %s is not in the cache\n", mac.to_str().c_str());
+		return nullptr;
+	}
+
+	return it->second;
 }
 
 void address_cache::cache_cleaner()

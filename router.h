@@ -103,6 +103,7 @@ private:
 	ip_router_entry *find_route(const std::optional<any_addr> & mac, const any_addr & ip);
 
 	std::optional<std::pair<phys *, any_addr> > resolve_mac_by_addr(ip_router_entry *const re, const any_addr & addr);
+	std::optional<phys *> find_interface_by_mac(ip_router_entry *const re, const any_addr & addr);
 
 public:
 	router(stats *const s, const int n_threads);
