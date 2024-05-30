@@ -53,7 +53,7 @@ bool phys_vpn_insertion_point::transmit_packet(const any_addr & dst_mac, const a
 	// loopback
 	if (dst_mac == my_mac) {
 		CDOLOG(ll_debug, "[VPN]", "transmit (loopback!) packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
-		return insert_packet(ether_type, payload, pl_size);
+		return insert_packet(dst_mac, src_mac, ether_type, payload, pl_size);
 	}
 
 	CDOLOG(ll_debug, "[VPN]", "transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
@@ -68,6 +68,11 @@ void phys_vpn_insertion_point::operator()()
 
 bool phys_vpn_insertion_point::insert_packet(const uint16_t ether_type, const uint8_t *const payload, const size_t pl_size)
 {
+	return insert_packet(gen_opponent_mac(my_mac), my_mac, ether_type, payload, pl_size);
+}
+
+bool phys_vpn_insertion_point::insert_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *const payload, const size_t pl_size)
+{
 	timespec ts { 0, 0 };
 	if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
 		CDOLOG(ll_warning, "[vpn]", "clock_gettime failed: %s\n", strerror(errno));
@@ -78,7 +83,7 @@ bool phys_vpn_insertion_point::insert_packet(const uint16_t ether_type, const ui
                 return false;
         }
 
-        packet *p = new packet(ts, gen_opponent_mac(my_mac), my_mac, payload, pl_size, nullptr, 0, "vpn");
+        packet *p = new packet(ts, dst_mac, src_mac, payload, pl_size, nullptr, 0, "vpn");
 
         it->second->queue_incoming_packet(this, p);
 

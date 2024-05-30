@@ -34,6 +34,7 @@ public:
 	void configure_endpoint(vpn *const v);
 	// from the vpn
 	bool insert_packet(const uint16_t ether_type, const uint8_t *const payload, const size_t pl_size);
+	bool insert_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *const payload, const size_t pl_size);
 
 	void operator()() override;
 };
