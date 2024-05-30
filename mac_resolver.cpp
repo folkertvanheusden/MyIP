@@ -79,7 +79,7 @@ void mac_resolver::dump_work() const
 
 std::optional<std::pair<phys*, any_addr> > mac_resolver::get_mac(phys *const interface, const any_addr & ip)
 {
-	DOLOG(ll_debug, "mac_resolver::get_mac: resolving %s via %s\n", ip.to_str().c_str(), interface->to_str().c_str());
+	DOLOG(ll_debug, "mac_resolver::get_mac: resolving %s\n", ip.to_str().c_str());
 
 	auto phys_family = interface->get_phys_type();
 
