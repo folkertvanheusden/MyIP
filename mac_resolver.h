@@ -39,7 +39,7 @@ public:
 	mac_resolver(stats *const s, router *const r);
 	virtual ~mac_resolver();
 
-	std::optional<any_addr> get_mac(phys *const interface, const any_addr & ip);
+	std::optional<std::pair<phys*, any_addr> > get_mac(phys *const interface, const any_addr & ip);
 
 	std::map<any_addr, std::optional<mac_resolver::mac_resolver_result> > dump_state() const;
 

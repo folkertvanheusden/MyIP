@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2024 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <assert.h>
 #include <chrono>
 #include <string.h>
@@ -8,6 +8,9 @@
 #include "phys.h"
 #include "time.h"
 
+
+std::shared_mutex address_cache::cache_lock;
+std::map<any_addr, address_cache::address_entry_t> address_cache::cache;
 
 address_cache::address_cache(stats *const s)
 {
@@ -115,5 +118,5 @@ void address_cache::dump_cache()
 	const std::shared_lock<std::shared_mutex> lock(cache_lock);
 
 	for(auto & e : cache)
-		DOLOG(ll_debug, "address_cache: %ld %s %s\n", e.second.ts, e.second.addr.to_str().c_str(), e.second.interface->to_str().c_str());
+		DOLOG(ll_debug, "address_cache: %s (%ld) %s %s\n", e.first.to_str().c_str(), e.second.ts, e.second.addr.to_str().c_str(), e.second.interface->to_str().c_str());
 }
