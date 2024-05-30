@@ -215,7 +215,7 @@ router::ip_router_entry *router::find_route(const std::optional<any_addr> & mac,
 	return re;
 }
 
-std::optional<any_addr> router::resolve_mac_by_addr(ip_router_entry *const re, const any_addr & addr)
+std::optional<std::pair<phys *, any_addr> > router::resolve_mac_by_addr(ip_router_entry *const re, const any_addr & addr)
 {
 	if (re->network_address.get_family() == any_addr::ipv4)
 		return re->mac_lookup.iarp->get_mac(re->interface, addr);
@@ -297,14 +297,17 @@ void router::operator()()
 
 			re_src = re_dst;
 
-			po.value()->src_mac = resolve_mac_by_addr(re_dst, re_dst->local_ip);
+			std::optional<std::pair<phys *, any_addr> > phys_mac;
+			phys_mac = resolve_mac_by_addr(re_dst, re_dst->local_ip);
+			if (phys_mac.has_value())
+				po.value()->src_mac = phys_mac.value().second;
 		}
 
 		if (po.value()->src_mac.has_value() == false) {
 			DOLOG(ll_debug, "router::operator: src-mac not known yet\n");
 
 			// must always succeed, see main where a static rarp is setup
-			po.value()->src_mac = resolve_mac_by_addr(re_src, po.value()->src_ip.value());
+			po.value()->src_mac = resolve_mac_by_addr(re_src, po.value()->src_ip.value()).value().second;
 
 			if (po.value()->src_mac.has_value() == false)
 				DOLOG(ll_info, "router::operator: cannot determine mac for source\n");
@@ -313,16 +316,19 @@ void router::operator()()
 		if (po.value()->dst_mac.has_value() == false) {
 			DOLOG(ll_debug, "router::operator: dst-mac not known yet\n");
 
-			po.value()->dst_mac = resolve_mac_by_addr(re_dst, po.value()->dst_ip.value());
+			std::optional<std::pair<phys *, any_addr> > phys_mac;
+			phys_mac = resolve_mac_by_addr(re_dst, po.value()->dst_ip.value());
 
 			// not found? try the default gateway
-			if (po.value()->dst_mac.has_value() == false && re_dst->default_gateway.has_value()) {
+			if (phys_mac.has_value() == false && re_dst->default_gateway.has_value()) {
 				DOLOG(ll_debug, "router::operator: MAC for %s not found, resolving default gateway (%s)\n", po.value()->dst_ip.value().to_str().c_str(), re_dst->default_gateway.value().to_str().c_str());
 
-				po.value()->dst_mac = resolve_mac_by_addr(re_dst, re_dst->default_gateway.value());
+				phys_mac = resolve_mac_by_addr(re_dst, re_dst->default_gateway.value());
+			}
 
-				if (po.value()->dst_mac.has_value())
-					DOLOG(ll_debug, "router::operator: default gateway (%s) can be reached via %s\n", po.value()->dst_ip.value().to_str().c_str(), re_dst->default_gateway.value().to_str().c_str(), po.value()->dst_mac.value().to_str().c_str());
+			if (phys_mac.has_value()) {
+				po.value()->interface = phys_mac.value().first;
+				po.value()->dst_mac   = phys_mac.value().second;
 			}
 		}
 
@@ -344,7 +350,7 @@ void router::operator()()
 					po.value()->dst_ip.value().to_str().c_str(), po.value()->dst_mac.value().to_str().c_str(),
 					re_dst->interface->to_str().c_str());
 
-			if (re_dst->interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
+			if (po.value()->interface.value()->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
 				DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s)\n", po.value()->to_str().c_str());
 			}
 		}
