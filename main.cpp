@@ -913,7 +913,10 @@ int main(int argc, char *argv[])
 	try {
 		const libconfig::Setting & s_vpn = root.lookup("vpn");
 
-		int port = cfg_int(s_vpn, "my-port", "udp port to listen on", false, 4000);
+		std::string my_ip_str = cfg_str(s_vpn, "my-ip", "my IP (external for tunnel)", false, "");
+		any_addr my_ip = parse_address(my_ip_str, 4, ".", 10);
+
+		int my_port = cfg_int(s_vpn, "my-port", "udp port to listen on", false, 4000);
 
 		std::string peer_ip_str = cfg_str(s_vpn, "peer-ip", "peer IP", false, "");
 		any_addr peer_ip = parse_address(peer_ip_str, 4, ".", 10);
@@ -931,7 +934,7 @@ int main(int argc, char *argv[])
 			if (!u)
 				continue;
 
-			vpn *v = new vpn(dev.second, &s, u, i4->get_addr(), port, peer_ip, peer_port, psk);
+			vpn *v = new vpn(dev.second, &s, u, my_ip, my_port, peer_ip, peer_port, psk);
 			dev.second->configure_endpoint(v);
 
 			u->add_handler(port, std::bind(&vpn::input, v, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
