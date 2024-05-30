@@ -43,14 +43,20 @@ void phys_vpn_insertion_point::configure_endpoint(vpn *const v)
 
 bool phys_vpn_insertion_point::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	CDOLOG(ll_debug, "[VPN]", "transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
-
 	if (!v)
 		return false;
 
 	stats_add_counter(phys_ifOutOctets,   pl_size);
 	stats_add_counter(phys_ifHCOutOctets, pl_size);
 	stats_inc_counter(phys_ifOutUcastPkts);
+
+	// loopback
+	if (dst_mac == my_mac) {
+		CDOLOG(ll_debug, "[VPN]", "transmit (loopback!) packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+		return insert_packet(ether_type, payload, pl_size);
+	}
+
+	CDOLOG(ll_debug, "[VPN]", "transmit packet %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
 
 	return v->transmit_packet(ether_type, payload, pl_size);
 }
