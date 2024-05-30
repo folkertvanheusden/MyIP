@@ -77,9 +77,9 @@ void mac_resolver::dump_work() const
 	DOLOG(ll_debug, "mac_resolver::dump: --- FIN ---\n");
 }
 
-std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_addr & ip)
+std::optional<std::pair<phys*, any_addr> > mac_resolver::get_mac(phys *const interface, const any_addr & ip)
 {
-	DOLOG(ll_debug, "mac_resolver::get_mac: resolving %s via %s\n", ip.to_str().c_str(), interface->to_str().c_str());
+	DOLOG(ll_debug, "mac_resolver::get_mac: resolving %s\n", ip.to_str().c_str());
 
 	auto phys_family = interface->get_phys_type();
 
@@ -87,19 +87,19 @@ std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_a
 	if (special_ip_addresses_mac.has_value()) {
 		DOLOG(ll_debug, "mac_resolver::get_mac: %s is special\n", ip.to_str().c_str());
 
-		return special_ip_addresses_mac;
+		return { { interface, special_ip_addresses_mac.value() } };
 	}
 
 	auto cache_result = query_cache(ip);
 
-	if (cache_result.first == interface) {
+	if (cache_result.first != nullptr) {
 		any_addr rc = *cache_result.second;
 
 		DOLOG(ll_debug, "mac_resolver::get_mac: %s is at %s\n", ip.to_str().c_str(), rc.to_str().c_str());
 
 		delete cache_result.second;
 
-		return rc;
+		return { { cache_result.first, rc } };
 	}
 
 	if (!send_request(ip, phys_family)) {
@@ -141,7 +141,7 @@ std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_a
 				DOLOG(ll_debug, "mac_resolver: no MAC found for %s\n", ip.to_str().c_str());
 			}
 
-			return result;
+			return { { interface, result.value() } };
 		}
 
 		if (repeated == false && get_ms() - start_ts >= 500) {
@@ -158,4 +158,9 @@ std::optional<any_addr> mac_resolver::get_mac(phys *const interface, const any_a
 	dump_work();
 
 	return { };
+}
+
+std::optional<phys *> mac_resolver::get_phys_by_mac(const any_addr & mac)
+{
+	return query_mac_cache(mac);
 }

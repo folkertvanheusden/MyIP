@@ -1,4 +1,4 @@
-// (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2024 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <errno.h>
 #include <getopt.h>
 #include <libconfig.h++>
@@ -19,6 +19,7 @@
 #include "phys_ppp.h"
 #include "phys_sctp_udp.h"
 #include "phys_slip.h"
+#include "phys_vpn_insertion_point.h"
 #include "arp.h"
 #include "dns.h"
 #include "graphviz.h"
@@ -387,6 +388,8 @@ int main(int argc, char *argv[])
 
 	std::vector<phys *> devs;
 
+	std::map<std::string, phys_vpn_insertion_point *> vpns;
+
 	for(size_t i=0; i<n_interfaces; i++) {
 		const libconfig::Setting &interface = interfaces[i];
 
@@ -431,6 +434,18 @@ int main(int argc, char *argv[])
 			dev = new phys_promiscuous(i + 1, &s, dev_name, r);
 
 			//dev->start_pcap("test-prom.pcap", true, true);
+		}
+		else if (type == "vpn") {
+			std::string dev_name = cfg_str(interface, "dev-name", "device name", false, "eth0");
+
+			sd.register_oid(myformat("1.3.6.1.2.1.31.1.1.1.1.%zu", i + 1), dev_name);  // name
+			sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.2.1.%zu",  i + 1), "MyIP Ethernet device");  // description
+			sd.register_oid(myformat("1.3.6.1.2.1.17.1.4.1.%zu",   i + 1), snmp_integer::si_integer, 1);  // device is up (1)
+
+			auto vpn_dev = new phys_vpn_insertion_point(i + 1, &s, dev_name, r, my_mac);
+			dev = vpn_dev;
+
+			vpns.insert({ dev_name, vpn_dev });
 		}
 		else if (type == "kiss") {
 			std::string descr    = cfg_str(interface, "descriptor", "pty-master:dev-file, pty-client:dev-file, tty:dev-file:baudrate, tcp-client:host:port, tcp-server:listen-addr:port", false, "");
@@ -888,6 +903,46 @@ int main(int argc, char *argv[])
 			g->add_connection(g->add_node("NTP " + ntp_u_ip_str, "NTP " + ntp_u_ip_str), i4->get_addr().to_str());
 
 			applications.push_back(ntp_);
+		}
+	}
+	catch(const libconfig::SettingNotFoundException &nfex) {
+		// just fine
+	}
+
+	// VPN
+	try {
+		const libconfig::Setting & s_vpn = root.lookup("vpn");
+
+		std::string my_ip_str = cfg_str(s_vpn, "my-ip", "my IP (external for tunnel)", false, "");
+		any_addr my_ip = parse_address(my_ip_str, 4, ".", 10);
+
+		int my_port = cfg_int(s_vpn, "my-port", "udp port to listen on", false, 4000);
+
+		std::string peer_ip_str = cfg_str(s_vpn, "peer-ip", "peer IP", false, "");
+		any_addr peer_ip = parse_address(peer_ip_str, 4, ".", 10);
+
+		int peer_port = cfg_int(s_vpn, "peer-port", "peer port", false, 4000);
+
+		std::string psk = cfg_str(s_vpn, "key", "PSK (ascii)", false, "");
+
+		for(auto & dev : vpns) {
+			ipv4 *i4 = dynamic_cast<ipv4 *>(dev.second->get_protocol(0x0800));
+			if (!i4)
+				continue;
+
+			udp *const u = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
+			if (!u)
+				continue;
+
+			vpn *v = new vpn(dev.second, &s, u, my_ip, my_port, peer_ip, peer_port, psk);
+			dev.second->configure_endpoint(v);
+
+			u->add_handler(my_port, std::bind(&vpn::input, v, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+			std::string my_ip = i4->get_addr().to_str();
+			g->add_connection(g->add_node("VPN " + my_ip, "VPN " + peer_ip_str), my_ip);
+
+			applications.push_back(v);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {

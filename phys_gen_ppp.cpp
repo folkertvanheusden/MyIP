@@ -19,16 +19,6 @@
 #include "utils.h"
 
 
-any_addr gen_opponent_mac(const any_addr & my_mac)
-{
-	uint8_t src_mac_bin[6] { 0 };
-
-	for(int i=0; i<6; i++)
-		src_mac_bin[i] = my_mac[i] ^ ((i & 1) ? 0x55 : 0xaa);
-
-	return any_addr(any_addr::mac, src_mac_bin);
-}
-
 phys_gen_ppp::phys_gen_ppp(const size_t dev_index, stats *const s, const std::string & name, const any_addr & my_mac, const any_addr & opponent_address, router *const r) :
 	phys(dev_index, s, "ppp-" + name, r),
 	my_mac(my_mac),

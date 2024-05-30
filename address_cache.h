@@ -1,4 +1,4 @@
-// (C) 2020-2022 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
+// (C) 2020-2024 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #pragma once
 
 #include <atomic>
@@ -11,17 +11,18 @@
 #include "time.h"
 
 
-typedef struct {
-	uint64_t ts;
-	any_addr addr;
-	phys    *interface;
-} address_entry_t;
-
 class address_cache
 {
 protected:
-	std::shared_mutex cache_lock;
-	std::map<any_addr, address_entry_t> cache;
+	typedef struct {
+		uint64_t ts;
+		any_addr addr;
+		phys    *interface;
+	} address_entry_t;
+
+	static std::shared_mutex cache_lock;
+	static std::map<any_addr, address_entry_t> cache;
+	static std::map<any_addr, phys *> mac_cache;
 
 	interruptable_sleep cleaner_stop;
 	std::thread        *cleaner_th   { nullptr };
@@ -41,6 +42,7 @@ public:
 	void add_static_entry(phys *const interface, const any_addr & mac, const any_addr & ip);
 
 	virtual std::pair<phys *, any_addr *> query_cache(const any_addr & ip, const bool static_entry = false);
+	virtual phys * query_mac_cache(const any_addr & mac);
 
 	void dump_cache();
 };

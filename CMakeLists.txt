@@ -59,6 +59,7 @@ add_executable(myip
 	phys_sctp_udp.cpp
 	phys_slip.cpp
 	phys_tap.cpp
+	phys_vpn_insertion_point.cpp
 	proc.cpp
 	router.cpp
 	sctp.cpp
@@ -83,6 +84,7 @@ add_executable(myip
 	udp.cpp
 	utils.cpp
 	vnc.cpp
+	vpn.cpp
 	)
 
 add_executable(myiptop

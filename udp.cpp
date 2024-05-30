@@ -106,7 +106,7 @@ void udp::remove_handler(const int port)
 
 bool udp::transmit_packet(const any_addr & dst_ip, const int dst_port, const any_addr & src_ip, const int src_port, const uint8_t *payload, const size_t pl_size)
 {
-	DOLOG(ll_debug, "UDP: transmit packet %d -> %d\n", src_port, dst_port);
+	DOLOG(ll_debug, "UDP: transmit packet %s:%d -> %s:%d\n", src_ip.to_str().c_str(), src_port, dst_ip.to_str().c_str(), dst_port);
 
 	if (dst_ip.get_len() != src_ip.get_len()) {
 		DOLOG(ll_debug, "UDP: source IP family different from destination\n");
