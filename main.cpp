@@ -937,7 +937,7 @@ int main(int argc, char *argv[])
 			vpn *v = new vpn(dev.second, &s, u, my_ip, my_port, peer_ip, peer_port, psk);
 			dev.second->configure_endpoint(v);
 
-			u->add_handler(port, std::bind(&vpn::input, v, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+			u->add_handler(my_port, std::bind(&vpn::input, v, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
 			std::string my_ip = i4->get_addr().to_str();
 			g->add_connection(g->add_node("VPN " + my_ip, "VPN " + peer_ip_str), my_ip);
