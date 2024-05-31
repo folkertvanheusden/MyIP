@@ -925,17 +925,23 @@ int main(int argc, char *argv[])
 
 		std::string psk = cfg_str(s_vpn, "key", "PSK (ascii)", false, "");
 
-		for(auto & dev : vpns) {
-			ipv4 *i4 = dynamic_cast<ipv4 *>(dev.second->get_protocol(0x0800));
-			if (!i4)
+		for(auto & vpn_dev : vpns) {
+			ipv4 *i4 = dynamic_cast<ipv4 *>(vpn_dev.second->get_protocol(0x0800));
+			if (!i4) {
+				DOLOG(ll_debug, "Device %s has no IPv4\n", vpn_dev.second->to_str().c_str());
 				continue;
+			}
 
 			udp *const u = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
-			if (!u)
+			if (!u) {
+				DOLOG(ll_debug, "Device %s has no UDP over IPv4\n", vpn_dev.second->to_str().c_str());
 				continue;
+			}
 
-			vpn *v = new vpn(dev.second, &s, u, my_ip, my_port, peer_ip, peer_port, psk);
-			dev.second->configure_endpoint(v);
+			vpn *v = new vpn(vpn_dev.second, &s, u, my_ip, my_port, peer_ip, peer_port, psk);
+			vpn_dev.second->configure_endpoint(v);
+
+			DOLOG(ll_debug, "Binding VPN to local port %d on %s\n", my_port, vpn_dev.second->to_str().c_str());
 
 			u->add_handler(my_port, std::bind(&vpn::input, v, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
 
