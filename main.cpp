@@ -389,6 +389,7 @@ int main(int argc, char *argv[])
 	std::vector<phys *> devs;
 
 	std::map<std::string, phys_vpn_insertion_point *> vpns;
+	std::vector<phys *> vpn_targets;
 
 	for(size_t i=0; i<n_interfaces; i++) {
 		const libconfig::Setting &interface = interfaces[i];
@@ -405,6 +406,8 @@ int main(int argc, char *argv[])
 //		sd.register_oid("1.3.6.1.2.1.2.2.1", snmp_integer::si_integer, int(i + 1));
 
 		sd.register_oid(myformat("1.3.6.1.2.1.2.2.1.1.%zu", i + 1), snmp_integer::si_integer, int(i + 1));
+
+		bool attach_vpn = cfg_bool(interface, "attach-vpn", "Attach VPN", true, false);
 
 		// MAC, IP
 		std::vector<std::pair<any_addr, any_addr> > static_mappings;
@@ -860,6 +863,9 @@ int main(int argc, char *argv[])
 		}
 
 		dev->start();
+
+		if (attach_vpn)
+			vpn_targets.push_back(dev);
 	}
 
 	if (run_at_started.empty() == false)
@@ -925,30 +931,34 @@ int main(int argc, char *argv[])
 
 		std::string psk = cfg_str(s_vpn, "key", "PSK (ascii)", false, "");
 
-		for(auto & vpn_dev : vpns) {
-			ipv4 *i4 = dynamic_cast<ipv4 *>(vpn_dev.second->get_protocol(0x0800));
-			if (!i4) {
-				DOLOG(ll_debug, "Device %s has no IPv4\n", vpn_dev.second->to_str().c_str());
-				continue;
+		for(auto & target_dev : vpn_targets) {
+			DOLOG(ll_debug, "Attaching VPN to %s\n", target_dev->to_str().c_str());
+
+			for(auto & vpn_dev : vpns) {
+				ipv4 *i4 = dynamic_cast<ipv4 *>(target_dev->get_protocol(0x0800));
+				if (!i4) {
+					DOLOG(ll_debug, "Device %s has no IPv4\n", target_dev->to_str().c_str());
+					continue;
+				}
+
+				udp *const u = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
+				if (!u) {
+					DOLOG(ll_debug, "Device %s has no UDP over IPv4\n", target_dev->to_str().c_str());
+					continue;
+				}
+
+				vpn *v = new vpn(vpn_dev.second, &s, u, my_ip, my_port, peer_ip, peer_port, psk);
+				vpn_dev.second->configure_endpoint(v);
+
+				DOLOG(ll_debug, "Binding VPN to local port %d on %s\n", my_port, vpn_dev.second->to_str().c_str());
+
+				u->add_handler(my_port, std::bind(&vpn::input, v, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
+
+				std::string my_ip = i4->get_addr().to_str();
+				g->add_connection(g->add_node("VPN " + my_ip, "VPN " + peer_ip_str), my_ip);
+
+				applications.push_back(v);
 			}
-
-			udp *const u = dynamic_cast<udp *>(i4->get_transport_layer(0x11));
-			if (!u) {
-				DOLOG(ll_debug, "Device %s has no UDP over IPv4\n", vpn_dev.second->to_str().c_str());
-				continue;
-			}
-
-			vpn *v = new vpn(vpn_dev.second, &s, u, my_ip, my_port, peer_ip, peer_port, psk);
-			vpn_dev.second->configure_endpoint(v);
-
-			DOLOG(ll_debug, "Binding VPN to local port %d on %s\n", my_port, vpn_dev.second->to_str().c_str());
-
-			u->add_handler(my_port, std::bind(&vpn::input, v, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6), nullptr);
-
-			std::string my_ip = i4->get_addr().to_str();
-			g->add_connection(g->add_node("VPN " + my_ip, "VPN " + peer_ip_str), my_ip);
-
-			applications.push_back(v);
 		}
 	}
 	catch(const libconfig::SettingNotFoundException &nfex) {
