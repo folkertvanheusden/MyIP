@@ -162,5 +162,9 @@ std::optional<std::pair<phys*, any_addr> > mac_resolver::get_mac(phys *const int
 
 std::optional<phys *> mac_resolver::get_phys_by_mac(const any_addr & mac)
 {
-	return query_mac_cache(mac);
+	auto rc = query_mac_cache(mac);
+	if (rc == nullptr)
+		return { };
+
+	return rc;
 }
