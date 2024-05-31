@@ -337,8 +337,12 @@ void router::operator()()
 			}
 		}
 
-		if (po.value()->dst_mac.has_value() == true && po.value()->interface == nullptr)
+		if (po.value()->dst_mac.has_value() == true && po.value()->interface == nullptr) {
 			po.value()->interface = find_interface_by_mac(re_dst, po.value()->dst_mac.value());
+
+			if (po.value()->interface.has_value() == false)
+				DOLOG(ll_warning, "router::operator: interface not found\n");
+		}
 
 		bool ok = true;
 
@@ -353,12 +357,15 @@ void router::operator()()
 		}
 
 		if (ok) {
+			// hier is re_dst->interface gezet maar po.value()->interface niet - hoe kan dat? wat gaat hier mis?
+			phys *use_interface = po.value()->interface.has_value() ? po.value()->interface.value() : re_dst->interface;
+
 			DOLOG(ll_debug, "router::operator: transmit packet from %s (%s) to %s (%s) via %s\n",
 					po.value()->src_ip.value().to_str().c_str(), po.value()->src_mac.value().to_str().c_str(),
 					po.value()->dst_ip.value().to_str().c_str(), po.value()->dst_mac.value().to_str().c_str(),
-					re_dst->interface->to_str().c_str());
+					use_interface->to_str().c_str());
 
-			if (po.value()->interface.value()->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
+			if (use_interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
 				DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s)\n", po.value()->to_str().c_str());
 			}
 		}
