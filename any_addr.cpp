@@ -91,7 +91,8 @@ bool any_addr::operator <(const any_addr & rhs) const
 {
 	assert(set_);
 
-	assert(get_family() == rhs.get_family());
+        if (get_family() != rhs.get_family())
+                return get_family() < rhs.get_family();
 
 	uint8_t rhs_bytes[ANY_ADDR_SIZE] { 0 };
 	int rhs_size { 0 };
