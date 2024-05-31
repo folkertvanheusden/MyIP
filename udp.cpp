@@ -55,7 +55,7 @@ void udp::operator()()
 
 		stats_inc_counter(udp_requests);
 
-		DOLOG(ll_debug, "UDP: packet for port %d from port %d\n", dst_port, src_port);
+		DOLOG(ll_debug, "UDP: packet for port %d from port %d (%d bytes)\n", dst_port, src_port, size);
 
 		cb_lock.lock_shared();
 		auto it = callbacks.find(dst_port);
