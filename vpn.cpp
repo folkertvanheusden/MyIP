@@ -140,10 +140,15 @@ bool vpn::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, co
 		DES_ncbc_encrypt(input, &out[o], 8, &sched_encrypt, &ivec_encrypt, DES_ENCRYPT);
 	}
 
+	CDOLOG(ll_debug, "[VPN]", "Packet %s->%s to peer (%zu to %zu bytes)", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), pl_size, out_len);
+
 	if (u->transmit_packet(peer_ip, peer_port, my_ip, my_port, out, out_len) == false) {
 		CDOLOG(ll_debug, "[vpn]", "VPN: packet transmit fail\n");
+		delete [] out;
 		return false;
 	}
+
+	delete [] out;
 
 	return true;
 }
