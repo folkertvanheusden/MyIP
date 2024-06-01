@@ -46,11 +46,13 @@ vpn::~vpn()
 
 void vpn::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd)
 {
-	DOLOG(ll_debug, "VPN: packet transmitted\n");
+	DOLOG(ll_debug, "VPN: packet from %s:%d to %s:%d\n", src_ip.to_str().c_str(), dst_ip.to_str().c_str());
 
 	auto pl = p->get_payload();
-	if (pl.second & 8)  // must be multiple of 8 due to 3DES
+	if (pl.second & 8) {  // must be multiple of 8 due to 3DES
+		DOLOG(ll_debug, "VPN: size (%d) is not multiple 8", pl.second);
 		return;
+	}
 
 	uint8_t *temp = new uint8_t[pl.second]();
 
