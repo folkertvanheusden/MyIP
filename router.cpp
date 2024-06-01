@@ -231,6 +231,14 @@ std::optional<phys *> router::find_interface_by_mac(ip_router_entry *const re, c
 	return re->mac_lookup.iarp->get_phys_by_mac(mac);
 }
 
+std::string addr_string_if_has_value(const std::optional<any_addr> & a)
+{
+	if (a.has_value())
+		return a.value().to_str();
+
+	return "-";
+}
+
 void router::operator()()
 {
 	set_thread_name("myip-phys_router");
@@ -274,6 +282,10 @@ void router::operator()()
 			continue;
 		}
 
+		DOLOG(ll_debug, "router::operator: routing %s (%s) to %s (%s)\n",
+				addr_string_if_has_value(po.value()->src_ip).c_str(), addr_string_if_has_value(po.value()->src_mac).c_str(),
+                                addr_string_if_has_value(po.value()->dst_ip).c_str(), addr_string_if_has_value(po.value()->dst_mac).c_str());
+
 		std::shared_lock<std::shared_mutex> lck(table_lock);
 
 		// also required: for MAC lookups
@@ -298,14 +310,14 @@ void router::operator()()
 		// when routing to an other physical address family, use for source-mac the local
 		// destination-interface mac as we're a router
 		if (re_src != re_dst) {
-			DOLOG(ll_debug, "router::operator: src-route different from dst-route\n");
-
 			re_src = re_dst;
 
 			std::optional<std::pair<phys *, any_addr> > phys_mac;
 			phys_mac = resolve_mac_by_addr(re_dst, re_dst->local_ip);
 			if (phys_mac.has_value())
 				po.value()->src_mac = phys_mac.value().second;
+
+			DOLOG(ll_debug, "router::operator: src-route different from dst-route, using %s as local mac address\n", addr_string_if_has_value(po.value()->src_mac).c_str());
 		}
 
 		if (po.value()->src_mac.has_value() == false) {
@@ -366,7 +378,7 @@ void router::operator()()
 					use_interface->to_str().c_str());
 
 			if (use_interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
-				DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s)\n", po.value()->to_str().c_str());
+				DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s) via %s\n", po.value()->to_str().c_str(), use_interface->to_str().c_str());
 			}
 		}
 		else {

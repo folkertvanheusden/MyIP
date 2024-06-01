@@ -43,8 +43,10 @@ void phys_vpn_insertion_point::configure_endpoint(vpn *const v)
 
 bool phys_vpn_insertion_point::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *payload, const size_t pl_size)
 {
-	if (!v)
+	if (!v) {
+		CDOLOG(ll_debug, "[VPN]", "not configured yet\n");
 		return false;
+	}
 
 	stats_add_counter(phys_ifOutOctets,   pl_size);
 	stats_add_counter(phys_ifHCOutOctets, pl_size);
