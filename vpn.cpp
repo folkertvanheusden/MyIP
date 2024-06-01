@@ -46,11 +46,11 @@ vpn::~vpn()
 
 void vpn::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd)
 {
-	DOLOG(ll_debug, "VPN: packet from %s:%d to %s:%d\n", src_ip.to_str().c_str(), dst_ip.to_str().c_str());
+	DOLOG(ll_debug, "VPN: packet from %s:%d to %s:%d\n", src_ip.to_str().c_str(), src_port, dst_ip.to_str().c_str(), dst_port);
 
 	auto pl = p->get_payload();
-	if (pl.second & 8) {  // must be multiple of 8 due to 3DES
-		DOLOG(ll_debug, "VPN: size (%d) is not multiple 8", pl.second);
+	if (pl.second & 7) {  // must be multiple of 8 due to DES
+		DOLOG(ll_debug, "VPN: size (%d) is not multiple of 8\n", pl.second);
 		return;
 	}
 
@@ -140,7 +140,7 @@ bool vpn::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, co
 		DES_ncbc_encrypt(input, &out[o], 8, &sched_encrypt, &ivec_encrypt, DES_ENCRYPT);
 	}
 
-	CDOLOG(ll_debug, "[VPN]", "Packet %s->%s to peer (%zu to %zu bytes)", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), pl_size, out_len);
+	CDOLOG(ll_debug, "[VPN]", "Packet %s->%s to peer (%zu to %zu bytes)\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), pl_size, out_len);
 
 	if (u->transmit_packet(peer_ip, peer_port, my_ip, my_port, out, out_len) == false) {
 		CDOLOG(ll_debug, "[vpn]", "VPN: packet transmit fail\n");
