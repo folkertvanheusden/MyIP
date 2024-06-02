@@ -82,6 +82,8 @@ void vpn::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		any_addr src_mac(src_family, &temp[o]);
 		o += src_len;
 
+		CDOLOG(ll_debug, "[vpn]", "VPN: %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+
 		if (phys->insert_packet(dst_mac, src_mac, ether_type, temp, pl_size))
 			CDOLOG(ll_debug, "[vpn]", "VPN: packet input fail\n");
 	}
