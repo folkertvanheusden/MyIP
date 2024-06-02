@@ -103,7 +103,7 @@ bool vpn::transmit_packet(const any_addr & dst_mac, const any_addr & src_mac, co
         // idea of the size which gives hints about its contents
         size_t   out_len = MD5_DIGEST_LENGTH + 2 + 2 + 1 + dst_mac.get_len() + 1 + src_mac.get_len() + pl_size;
 	if (out_len & 7)
-		out_len += 7 - (out_len & 7);
+		out_len += 8 - (out_len & 7);
         uint8_t *out     = new uint8_t[out_len]();
 
         // payload
