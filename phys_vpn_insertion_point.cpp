@@ -75,6 +75,8 @@ bool phys_vpn_insertion_point::insert_packet(const uint16_t ether_type, const ui
 
 bool phys_vpn_insertion_point::insert_packet(const any_addr & dst_mac, const any_addr & src_mac, const uint16_t ether_type, const uint8_t *const payload, const size_t pl_size)
 {
+	CDOLOG(ll_debug, "[VPN]", "phys_vpn_insertion_point::insert_packet: %s -> %s\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str());
+
 	timespec ts { 0, 0 };
 	if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
 		CDOLOG(ll_warning, "[vpn]", "clock_gettime failed: %s\n", strerror(errno));

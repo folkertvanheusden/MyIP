@@ -129,7 +129,7 @@ void ipv4::operator()()
 
 		const uint8_t *const payload_header = &p[0];
 
-		const uint16_t id = (payload_header[4] << 8) | payload_header[5];
+		// const uint16_t id = (payload_header[4] << 8) | payload_header[5];
 
 		stats_inc_counter(ipv4_n_pkt);
 
