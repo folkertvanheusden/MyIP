@@ -87,7 +87,7 @@ bool phys_vpn_insertion_point::insert_packet(const any_addr & dst_mac, const any
                 return false;
         }
 
-        packet *p = new packet(ts, dst_mac, src_mac, payload, pl_size, nullptr, 0, "vpn");
+        packet *p = new packet(ts, dst_mac, src_mac, payload, pl_size, nullptr, 0, "vpn", true);
 
         it->second->queue_incoming_packet(this, p);
 

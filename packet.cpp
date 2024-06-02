@@ -4,7 +4,11 @@
 #include "utils.h"
 
 
-packet::packet(const timespec & ts_in, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix) : ts(ts_in), src_mac_addr(src_mac_addr), src_addr(src_addr), dst_addr(dst_addr), log_prefix(log_prefix)
+packet::packet(const timespec & ts_in, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix, const bool is_forwarded) :
+	ts(ts_in),
+	src_mac_addr(src_mac_addr), src_addr(src_addr), dst_addr(dst_addr),
+	log_prefix(log_prefix),
+	is_forwarded(is_forwarded)
 {
 	this->size = size;
 	data = ::duplicate(in, size);
@@ -13,7 +17,11 @@ packet::packet(const timespec & ts_in, const any_addr & src_mac_addr, const any_
 	this->header = header_size ? ::duplicate(header, header_size) : nullptr;
 }
 
-packet::packet(const timespec & ts_in, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix) : ts(ts_in), src_mac_addr(src_addr), src_addr(src_addr), dst_addr(dst_addr), log_prefix(log_prefix)
+packet::packet(const timespec & ts_in, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix, const bool is_forwarded) :
+	ts(ts_in),
+	src_mac_addr(src_addr), src_addr(src_addr), dst_addr(dst_addr),
+	log_prefix(log_prefix),
+	is_forwarded(is_forwarded)
 {
 	this->size = size;
 	data = ::duplicate(in, size);
@@ -30,5 +38,5 @@ packet::~packet()
 
 packet *packet::duplicate() const
 {
-	return new packet(ts, src_mac_addr, src_addr, dst_addr, data, size, header, header_size, log_prefix);
+	return new packet(ts, src_mac_addr, src_addr, dst_addr, data, size, header, header_size, log_prefix, is_forwarded);
 }

@@ -17,22 +17,26 @@ private:
 	const any_addr src_addr;
 	const any_addr dst_addr;
 
-	uint8_t *data;
-	int      size;
+	uint8_t       *data;
+	int            size;
 
-	std::string log_prefix;
+	std::string    log_prefix;
 
 	// this is required for ICMP: it needs certain fields from the source (IP-)header
-	uint8_t *header;
-	int      header_size;
+	uint8_t       *header;
+	int            header_size;
+
+	const bool     is_forwarded;
 
 public:
-	packet(const timespec & ts, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix);
-	packet(const timespec & ts, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix);
+	packet(const timespec & ts, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix, const bool is_forwarded = false);
+	packet(const timespec & ts, const any_addr & src_mac_addr, const any_addr & src_addr, const any_addr & dst_addr, const uint8_t *const in, const int size, const uint8_t *const header, const int header_size, const std::string & log_prefix, const bool is_forwarded = false);
 	virtual ~packet();
 
 	uint8_t *get_data() const { return data; }
 	std::pair<const uint8_t *, int> get_payload() const { return { data, size }; }
+
+	bool get_is_forwarded() const { return is_forwarded; }
 
 	int get_size() const { return size; }
 

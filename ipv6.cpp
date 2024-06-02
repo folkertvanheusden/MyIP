@@ -107,7 +107,7 @@ void ipv6::operator()()
 
 		const uint8_t *const payload_header = &p[0];
 
-		const uint32_t flow_label = ((payload_header[1] & 15) << 16) | (payload_header[2] << 8) | payload_header[3];
+		//const uint32_t flow_label = ((payload_header[1] & 15) << 16) | (payload_header[2] << 8) | payload_header[3];
 
 		uint8_t version = payload_header[0] >> 4;
 		if (version != 0x06) {
@@ -136,7 +136,8 @@ void ipv6::operator()()
 			continue;
 		}
 
-		indp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
+		if (pkt->get_is_forwarded() == false)
+			indp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 
 		int ip_size = (payload_header[4] << 8) | payload_header[5];
 

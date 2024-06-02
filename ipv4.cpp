@@ -147,7 +147,8 @@ void ipv4::operator()()
 
 		pkt->add_to_log_prefix(myformat("[IPv4:%s]", pkt_src.to_str().c_str()));
 
-		iarp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
+		if (pkt->get_is_forwarded() == false)
+			iarp->update_cache(pkt->get_src_addr(), pkt_src, po.value().interface);
 
 		CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "packet %s => %s\n", pkt_src.to_str().c_str(), pkt_dst.to_str().c_str());
 
