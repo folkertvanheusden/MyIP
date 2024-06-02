@@ -48,8 +48,10 @@ void address_cache::update_cache(const any_addr & mac, const any_addr & ip, phys
 		stats_inc_counter(address_cache_store);
 	}
 	else {
-		it->second = { static_entry ? 0 : get_us(), mac, interface };
-		stats_inc_counter(address_cache_update);
+		if (it->second.ts != 0) {  // do not overwrite static entries
+			it->second = { static_entry ? 0 : get_us(), mac, interface };
+			stats_inc_counter(address_cache_update);
+		}
 	}
 
 	auto it_mac = mac_cache.find(mac);
@@ -103,8 +105,6 @@ phys * address_cache::query_mac_cache(const any_addr & mac)
 void address_cache::cache_cleaner()
 {
 	set_thread_name("myip-acc");
-
-	uint64_t prev = get_us();
 
 	for(;;) {
 		if (cleaner_stop.sleep(30000))
