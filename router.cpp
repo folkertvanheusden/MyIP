@@ -315,7 +315,7 @@ void router::operator()()
 			if (phys_mac.has_value()) {
 				po.value()->src_mac = phys_mac.value().second;
 
-				DOLOG(ll_debug, "router::operator: src-route different from dst-route, using %s as local mac address\n", addr_string_if_has_value(po.value()->src_mac).c_str());
+				DOLOG(ll_debug, "router::operator: src-route (%s) different from dst-route (%s), using %s as local mac address\n", re_src->to_str().c_str(), re_dst->to_str().c_str(), addr_string_if_has_value(po.value()->src_mac).c_str());
 			}
 			else {
 				DOLOG(ll_warning, "router::operator: src-route different from dst-route, cannot find local mac address\n");
