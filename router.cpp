@@ -313,9 +313,9 @@ void router::operator()()
 			std::optional<std::pair<phys *, any_addr> > phys_mac;
 			phys_mac = resolve_mac_by_addr(re_dst, re_dst->local_ip);
 			if (phys_mac.has_value()) {
-				po.value()->src_mac = phys_mac.value().second;
+				DOLOG(ll_debug, "router::operator: src-route (%s) different from dst-route (%s), using %s as local mac address (instead of %s)\n", re_src->to_str().c_str(), re_dst->to_str().c_str(), addr_string_if_has_value(phys_mac.value().second).c_str(), addr_string_if_has_value(po.value()->src_mac).c_str());
 
-				DOLOG(ll_debug, "router::operator: src-route (%s) different from dst-route (%s), using %s as local mac address\n", re_src->to_str().c_str(), re_dst->to_str().c_str(), addr_string_if_has_value(po.value()->src_mac).c_str());
+				po.value()->src_mac = phys_mac.value().second;
 			}
 			else {
 				DOLOG(ll_warning, "router::operator: src-route different from dst-route, cannot find local mac address\n");
