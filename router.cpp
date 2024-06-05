@@ -307,7 +307,7 @@ void router::operator()()
 
 		DOLOG(ll_debug, "router::operator: selected destination routing entry: %s\n", re_dst->to_str().c_str());
 
-		// when routing to an other physical address family, use for source-mac the local
+		// when routing to an other physical address family or interface, use for source-mac the local
 		// destination-interface mac as we're a router
 		if (re_src != re_dst) {
 			re_src = re_dst;
@@ -323,7 +323,6 @@ void router::operator()()
 		if (po.value()->src_mac.has_value() == false) {
 			DOLOG(ll_debug, "router::operator: src-mac not known yet\n");
 
-			// must always succeed, see main where a static rarp is setup
 			po.value()->src_mac = resolve_mac_by_addr(re_src, po.value()->src_ip.value()).value().second;
 
 			if (po.value()->src_mac.has_value() == false)
