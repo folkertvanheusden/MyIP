@@ -290,7 +290,6 @@ void router::operator()()
 
 		// also required: for MAC lookups
 		ip_router_entry *re_src = find_route(po.value()->src_mac, po.value()->src_ip.value());
-
 		if (!re_src) {
 			DOLOG(ll_debug, "router::operator: no route for source (%s)\n", po.value()->to_str().c_str());
 			continue;
@@ -299,7 +298,6 @@ void router::operator()()
 		DOLOG(ll_debug, "router::operator: selected source routing entry: %s\n", re_src->to_str().c_str());
 
 		ip_router_entry *re_dst = find_route(po.value()->dst_mac, po.value()->dst_ip.value());
-
 		if (!re_dst) {
 			DOLOG(ll_debug, "router::operator: no route for destination (%s)\n", po.value()->to_str().c_str());
 			continue;
@@ -314,10 +312,14 @@ void router::operator()()
 
 			std::optional<std::pair<phys *, any_addr> > phys_mac;
 			phys_mac = resolve_mac_by_addr(re_dst, re_dst->local_ip);
-			if (phys_mac.has_value())
+			if (phys_mac.has_value()) {
 				po.value()->src_mac = phys_mac.value().second;
 
-			DOLOG(ll_debug, "router::operator: src-route different from dst-route, using %s as local mac address\n", addr_string_if_has_value(po.value()->src_mac).c_str());
+				DOLOG(ll_debug, "router::operator: src-route different from dst-route, using %s as local mac address\n", addr_string_if_has_value(po.value()->src_mac).c_str());
+			}
+			else {
+				DOLOG(ll_warning, "router::operator: src-route different from dst-route, cannot find local mac address\n");
+			}
 		}
 
 		if (po.value()->src_mac.has_value() == false) {
