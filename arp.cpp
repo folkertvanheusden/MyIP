@@ -151,7 +151,6 @@ void arp::operator()()
 				std::unique_lock lck(work_lock);
 
 				auto it = work.find(work_ip);  // IP to resolve
-
 				if (it != work.end())
 					it->second = mac_resolver_result({ work_mac });
 
@@ -219,7 +218,7 @@ bool arp::send_request(const any_addr & ip, const any_addr::addr_family af)
 	else if (af == any_addr::ax25)
 		dest_mac = ax25_address("QST", 0, true, false).get_any_addr();
 	else
-		DOLOG(ll_warning, "ARP::send_request: address family %d unexpected", af);
+		DOLOG(ll_warning, "ARP::send_request: address family %d unexpected\n", af);
 
 	DOLOG(ll_info, "ARP::send_request: %s -> %s to resolve %s (%d bytes)\n", my_mac.to_str().c_str(), dest_mac.to_str().c_str(), ip.to_str().c_str(), end);
 
