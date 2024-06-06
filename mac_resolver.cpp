@@ -153,6 +153,10 @@ std::optional<std::pair<phys*, any_addr> > mac_resolver::get_mac(phys *const int
 		work_cv.wait_for(lck, 100ms);
 	}
 
+	auto e_it = work.find(ip);
+	if (e_it != work.end())
+		work.erase(e_it);
+
 	DOLOG(ll_debug, "mac_resolver: resolve %s timeout\n", ip.to_str().c_str());
 
 	dump_work();
