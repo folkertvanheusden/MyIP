@@ -248,138 +248,100 @@ void router::operator()()
 		if (!po.has_value())
 			break;
 
-		// TODO: generic; if not ip, then this (layer 2 routing)
-		if (po.value()->ether_type == 0x08FF) {  // AX.25; route by MAC-address/Callsign
-			phys *interface { nullptr };
-
-			auto route = ax25_table.find(po.value()->dst_mac.value());
-			if (route == ax25_table.end()) {
-				interface = ax25_default_interface;
-
-				DOLOG(ll_debug, "router::operator: routing packet (%s) via default interface\n", po.value()->to_str().c_str());
-			}
-			else {
-				if (route->second.interface.has_value()) {
-					interface = route->second.interface.value();
-					DOLOG(ll_debug, "router::operator: routing packet (%s) via %s\n", po.value()->to_str().c_str(), interface->to_str().c_str());
-				}
-				else {  // TODO find via
-					// TODO build new packet with via-path
-				}
-			}
-
-			if (interface) {
-				if (interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
-					DOLOG(ll_debug, "router::operator: cannot transmit_packet via AX.25 (%s)\n", po.value()->to_str().c_str());
-				}
-			}
-			else {
-				DOLOG(ll_debug, "router::operator: no (AX.25) path found (%s)\n", po.value()->to_str().c_str());
-			}
-
-			delete po.value();
-
-			continue;
-		}
-
 		DOLOG(ll_debug, "router::operator: routing %s (%s) to %s (%s)\n",
 				addr_string_if_has_value(po.value()->src_ip).c_str(), addr_string_if_has_value(po.value()->src_mac).c_str(),
                                 addr_string_if_has_value(po.value()->dst_ip).c_str(), addr_string_if_has_value(po.value()->dst_mac).c_str());
 
-		std::shared_lock<std::shared_mutex> lck(table_lock);
+		bool     ok        = false;
 
-		// also required: for MAC lookups
-		ip_router_entry *re_src = find_route(po.value()->src_mac, po.value()->src_ip.value());
-		if (!re_src) {
-			DOLOG(ll_debug, "router::operator: no route for source (%s)\n", po.value()->to_str().c_str());
-			continue;
-		}
+		phys    *interface = nullptr;
+		any_addr dst_mac;
+		any_addr src_mac;
 
-		DOLOG(ll_debug, "router::operator: selected source routing entry: %s\n", re_src->to_str().c_str());
+		do {
+			std::shared_lock<std::shared_mutex> lck(table_lock);
 
-		ip_router_entry *re_dst = find_route(po.value()->dst_mac, po.value()->dst_ip.value());
-		if (!re_dst) {
-			DOLOG(ll_debug, "router::operator: no route for destination (%s)\n", po.value()->to_str().c_str());
-			continue;
-		}
+			auto dst_route = find_route(po.value()->dst_mac, po.value()->dst_ip.value());
+			if (dst_route)
+				DOLOG(ll_debug, "dst_route known: %s\n", dst_route->to_str().c_str());
 
-		DOLOG(ll_debug, "router::operator: selected destination routing entry: %s\n", re_dst->to_str().c_str());
+			auto src_route = find_route(po.value()->src_mac, po.value()->src_ip.value());
+			if (src_route)
+				DOLOG(ll_debug, "src_route known: %s\n", src_route->to_str().c_str());
 
-		// when routing to an other physical address family or interface, use for source-mac the local
-		// destination-interface mac as we're a router
-		if (re_src != re_dst) {
-			re_src = re_dst;
+			if (dst_route && src_route) {
+				DOLOG(ll_debug, "src_route and dst_route known\n");
 
-			std::optional<std::pair<phys *, any_addr> > phys_mac;
-			phys_mac = resolve_mac_by_addr(re_dst, re_dst->local_ip);
-			if (phys_mac.has_value()) {
-				DOLOG(ll_debug, "router::operator: src-route (%s) different from dst-route (%s), using %s as local mac address (instead of %s)\n", re_src->to_str().c_str(), re_dst->to_str().c_str(), addr_string_if_has_value(phys_mac.value().second).c_str(), addr_string_if_has_value(po.value()->src_mac).c_str());
+				// destination ip known
+				if (po.value()->dst_mac.has_value())
+					// destination mac known
+					dst_mac = po.value()->dst_mac.value();
+				else {
+					// target mac not known
+					// find mac of target
+					auto local_adapter_target_mac_dst = resolve_mac_by_addr(dst_route, po.value()->dst_ip.value());
+					if (local_adapter_target_mac_dst.has_value()) {  // route via interface that can reach this ip-address
+						dst_mac   = local_adapter_target_mac_dst.value().second;
+						interface = local_adapter_target_mac_dst.value().first;
+					}
+					else if (src_route->default_gateway.has_value()) {  // route via default gateway
+						auto local_adapter_target_mac_gw = resolve_mac_by_addr(dst_route, src_route->default_gateway.value());
 
-				po.value()->src_mac = phys_mac.value().second;
+						// route via gateway
+						if (local_adapter_target_mac_gw.has_value()) {
+							dst_mac   = local_adapter_target_mac_dst.value().second;
+							interface = local_adapter_target_mac_dst.value().first;
+						}
+						else {
+							DOLOG(ll_warning, "cannot find router mac/interface\n");
+							break;
+						}
+					}
+					else {
+						DOLOG(ll_warning, "cannot find dst_mac/interface for dst_ip\n");
+						break;
+					}
+
+					if (interface == nullptr) {
+						DOLOG(ll_warning, "cannot find dst interface\n");
+						break;
+					}
+				}
+
+				if (dst_route->interface != src_route->interface) {
+					DOLOG(ll_debug, "dst interface different from src interface\n");
+
+					src_mac   = dst_route->interface->get_local_mac();
+					interface = dst_route->interface;
+
+					ok = true;
+					break;
+				}
+				else {
+					DOLOG(ll_debug, "dst interface equal to src interface\n");
+
+					src_mac   = src_route->interface->get_local_mac();
+					interface = dst_route->interface;
+
+					ok = true;
+					break;
+				}
+
+				DOLOG(ll_warning, "this should not be reached\n");
 			}
-			else {
-				DOLOG(ll_warning, "router::operator: src-route different from dst-route, cannot find local mac address\n");
-			}
+
+			DOLOG(ll_warning, "source or destination route not known\n");
 		}
-
-		if (po.value()->src_mac.has_value() == false) {
-			DOLOG(ll_debug, "router::operator: src-mac not known yet\n");
-
-			po.value()->src_mac = resolve_mac_by_addr(re_src, po.value()->src_ip.value()).value().second;
-
-			if (po.value()->src_mac.has_value() == false)
-				DOLOG(ll_info, "router::operator: cannot determine mac for source\n");
-		}
-
-		if (po.value()->dst_mac.has_value() == false) {
-			DOLOG(ll_debug, "router::operator: dst-mac not known yet\n");
-
-			std::optional<std::pair<phys *, any_addr> > phys_mac;
-			phys_mac = resolve_mac_by_addr(re_dst, po.value()->dst_ip.value());
-
-			// not found? try the default gateway
-			if (phys_mac.has_value() == false && re_dst->default_gateway.has_value()) {
-				DOLOG(ll_debug, "router::operator: MAC for %s not found, resolving default gateway (%s)\n", po.value()->dst_ip.value().to_str().c_str(), re_dst->default_gateway.value().to_str().c_str());
-
-				phys_mac = resolve_mac_by_addr(re_dst, re_dst->default_gateway.value());
-			}
-
-			if (phys_mac.has_value()) {
-				po.value()->interface = phys_mac.value().first;
-				po.value()->dst_mac   = phys_mac.value().second;
-			}
-		}
-
-		if (po.value()->dst_mac.has_value() == true && po.value()->interface == nullptr) {
-			po.value()->interface = find_interface_by_mac(re_dst, po.value()->dst_mac.value());
-
-			if (po.value()->interface.has_value() == false)
-				DOLOG(ll_warning, "router::operator: interface not found\n");
-		}
-
-		bool ok = true;
-
-		if (po.value()->src_mac.has_value() == false) {
-			ok = false;
-			DOLOG(ll_warning, "router::operator: no src MAC address (%s)\n", po.value()->to_str().c_str());
-		}
-
-		if (po.value()->dst_mac.has_value() == false) {
-			ok = false;
-			DOLOG(ll_warning, "router::operator: no dst MAC address (%s)\n", po.value()->to_str().c_str());
-		}
+		while(0);
 
 		if (ok) {
-			// hier is re_dst->interface gezet maar po.value()->interface niet - hoe kan dat? wat gaat hier mis?
-			phys *use_interface = po.value()->interface.has_value() ? po.value()->interface.value() : re_dst->interface;
+			DOLOG(ll_debug, "router::operator: transmit packet from %s to %s via %s\n",
+					src_mac.to_str().c_str(),
+					dst_mac.to_str().c_str(),
+					interface->to_str().c_str());
 
-			DOLOG(ll_debug, "router::operator: transmit packet from %s (%s) to %s (%s) via %s\n",
-					po.value()->src_ip.value().to_str().c_str(), po.value()->src_mac.value().to_str().c_str(),
-					po.value()->dst_ip.value().to_str().c_str(), po.value()->dst_mac.value().to_str().c_str(),
-					use_interface->to_str().c_str());
-
-			if (use_interface->transmit_packet(po.value()->dst_mac.value(), po.value()->src_mac.value(), po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
-				DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s) via %s\n", po.value()->to_str().c_str(), use_interface->to_str().c_str());
+			if (interface->transmit_packet(dst_mac, src_mac, po.value()->ether_type, po.value()->data, po.value()->data_len) == false) {
+				DOLOG(ll_debug, "router::operator: cannot transmit_packet (%s) via %s\n", po.value()->to_str().c_str(), interface->to_str().c_str());
 			}
 		}
 		else {
