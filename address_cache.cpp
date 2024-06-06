@@ -136,8 +136,14 @@ void address_cache::cache_cleaner()
 
 void address_cache::dump_cache()
 {
+	uint64_t now = get_us();
+
 	const std::shared_lock<std::shared_mutex> lock(cache_lock);
 
-	for(auto & e : cache)
-		DOLOG(ll_debug, "address_cache: %s (%ld) %s %s\n", e.first.to_str().c_str(), e.second.ts, e.second.addr.to_str().c_str(), e.second.interface->to_str().c_str());
+	for(auto & e : cache) {
+		if (e.second.ts)
+			DOLOG(ll_debug, "address_cache: %s (%.3f) %s %s\n", e.first.to_str().c_str(), (now - e.second.ts) / 1000000., e.second.addr.to_str().c_str(), e.second.interface->to_str().c_str());
+		else
+			DOLOG(ll_debug, "address_cache: %s %s %s\n", e.first.to_str().c_str(), e.second.addr.to_str().c_str(), e.second.interface->to_str().c_str());
+	}
 }

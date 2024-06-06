@@ -3,6 +3,7 @@
 #include <set>
 #include <thread>
 
+#include "address_cache.h"
 #include "any_addr.h"
 #include "arp.h"
 #include "ndp.h"
@@ -165,21 +166,23 @@ void router::dump()
 
 		interfaces.insert(entry.interface);
 	}
+	if (ip_table.empty())
+		DOLOG(ll_debug, " --- \n");
 
-	DOLOG(ll_debug, "routing tables (AX.25):\n");
+	if (ax25_table.empty() == false) {
+		DOLOG(ll_debug, "routing tables (AX.25):\n");
 
-	for(auto & entry : ax25_table) {
-		if (entry.second.interface.has_value())
-			DOLOG(ll_debug, ("| " + entry.first.to_str() + " -> " + entry.second.interface.value()->to_str() + "\n").c_str());
+		for(auto & entry : ax25_table) {
+			if (entry.second.interface.has_value())
+				DOLOG(ll_debug, ("| " + entry.first.to_str() + " -> " + entry.second.interface.value()->to_str() + "\n").c_str());
 
-		if (entry.second.via.has_value())
-			DOLOG(ll_debug, ("| " + entry.first.to_str() + " -> " + entry.second.via.value().to_str() + "\n").c_str());
+			if (entry.second.via.has_value())
+				DOLOG(ll_debug, ("| " + entry.first.to_str() + " -> " + entry.second.via.value().to_str() + "\n").c_str());
+		}
 	}
 
 	DOLOG(ll_debug, "arp tables:\n");
-
-	for(auto & i : interfaces)
-		DOLOG(ll_debug, ("| " + i->to_str() + "\n").c_str());
+	address_cache::dump_cache();
 
 	DOLOG(ll_debug, "-----\n");
 }

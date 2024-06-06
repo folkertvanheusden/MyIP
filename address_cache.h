@@ -44,5 +44,5 @@ public:
 	virtual std::pair<phys *, any_addr *> query_cache(const any_addr & ip, const bool static_entry = false);
 	virtual phys * query_mac_cache(const any_addr & mac);
 
-	void dump_cache();
+	static void dump_cache();
 };
