@@ -71,6 +71,9 @@ ntp::~ntp()
 
 void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, int dst_port, packet *p, session_data *const pd)
 {
+	if (dst_ip != my_ip)
+		return;
+
 	stats_inc_counter(ntp_requests);
 
 	if (p->get_size() < sizeof(sntp_datagram *)) {
