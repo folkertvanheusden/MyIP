@@ -16,7 +16,6 @@
 class phys_sctp_udp : public phys
 {
 private:
-	const any_addr my_mac;
 	const any_addr my_addr;  // IPv4 address matching the port
 	int            fd      { -1 };
 

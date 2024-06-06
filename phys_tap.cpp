@@ -87,6 +87,13 @@ phys_tap::phys_tap(const size_t dev_index, stats *const s, const std::string & d
 		exit(1);
 	}
 
+	if (ioctl(fd_sock, SIOCGIFHWADDR, &ifr_tap2) == -1) {
+		CDOLOG(ll_error, "[tap]", "ioctl SIOCGIFHWADDR(): %s\n", strerror(errno));
+		exit(1);
+	}
+
+	my_mac = any_addr(any_addr::mac, reinterpret_cast<const uint8_t *>(ifr_tap2.ifr_hwaddr.sa_data));
+
 	close(fd_sock);
 
 	th = new std::thread(std::ref(*this));

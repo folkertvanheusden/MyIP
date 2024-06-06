@@ -28,8 +28,9 @@
 // port is usually 9899
 phys_sctp_udp::phys_sctp_udp(const size_t dev_index, stats *const s, const any_addr & my_mac, const any_addr & my_addr, const int port, router *const r) :
 	phys(dev_index, s, myformat("sctp(udp)-%d", port), r),
-	my_mac(my_mac), my_addr(my_addr)
+	my_addr(my_addr)
 {
+	this->my_mac = my_mac;
 	fd = create_datagram_socket(port);
 
 	th = new std::thread(std::ref(*this));

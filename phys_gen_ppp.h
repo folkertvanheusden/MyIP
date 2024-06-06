@@ -19,8 +19,6 @@ std::vector<uint8_t> unwrap_ppp_frame(const std::vector<uint8_t> & payload, cons
 class phys_gen_ppp : public phys
 {
 protected:
-	const any_addr my_mac;
-
 	bool protocol_compression { false };
 	bool ac_field_compression { false };
 	bool lcp_options_acked    { false };

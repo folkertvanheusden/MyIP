@@ -20,8 +20,6 @@ private:
 	int fd        { -1 };
 	int ifr_index { -1 };
 
-	any_addr my_mac;
-
 	duration_events transmit_packet_de { "transmit packet", 8 };
 
 public:

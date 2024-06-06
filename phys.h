@@ -44,6 +44,8 @@ protected:
 
 	const std::string name;
 
+	any_addr  my_mac;
+
 	bool      SIOCGSTAMPNS_OLD_error_emitted = false;
 
 	std::mutex pcap_lock;
@@ -71,6 +73,8 @@ public:
 	timespec gen_packet_timestamp(const int fd);
 
 	void register_protocol(const uint16_t ether_type, network_layer *const p);
+
+	any_addr get_local_mac() const { return my_mac; }
 
 	network_layer *get_protocol(const uint16_t p);
 

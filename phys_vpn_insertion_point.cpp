@@ -22,9 +22,9 @@
 
 
 phys_vpn_insertion_point::phys_vpn_insertion_point(const size_t dev_index, stats *const s, const std::string & dev_name, router *const r, const any_addr & my_mac):
-	phys(dev_index, s, "vpn-" + dev_name, r),
-	my_mac(my_mac)
+	phys(dev_index, s, "vpn-" + dev_name, r)
 {
+	this->my_mac = my_mac;
 }
 
 phys_vpn_insertion_point::~phys_vpn_insertion_point()

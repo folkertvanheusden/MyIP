@@ -17,7 +17,6 @@ class phys_vpn_insertion_point : public phys
 {
 private:
 	vpn     *v { nullptr };
-	any_addr my_mac;
 
 public:
 	phys_vpn_insertion_point(const size_t dev_index, stats *const s, const std::string & dev_name, router *const r, const any_addr & my_mac);

@@ -15,7 +15,6 @@
 class phys_slip : public phys
 {
 protected:
-	const any_addr my_mac;
 	int fd { -1 };
 
 public:

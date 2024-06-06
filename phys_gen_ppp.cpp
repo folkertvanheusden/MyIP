@@ -21,9 +21,10 @@
 
 phys_gen_ppp::phys_gen_ppp(const size_t dev_index, stats *const s, const std::string & name, const any_addr & my_mac, const any_addr & opponent_address, router *const r) :
 	phys(dev_index, s, "ppp-" + name, r),
-	my_mac(my_mac),
 	opponent_address(opponent_address)
 {
+	this->my_mac = my_mac;
+
 	ACCM_rx.resize(32);
 	ACCM_rx.at(0) = 0xff;
 	ACCM_rx.at(1) = 0xff;
