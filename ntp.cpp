@@ -84,7 +84,7 @@ void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 	sntp_datagram *sntp = reinterpret_cast<sntp_datagram *>(p->get_data());
 
-	if (sntp->mode == 1 || sntp->mode == 3) { // time request
+	if (sntp->mode == 3) { // time request
 		stats_inc_counter(ntp_time_req);
 
 		stats_inc_counter(ntp_t_req_v[sntp->vn]);
@@ -92,7 +92,7 @@ void ntp::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 		sntp_datagram msgout { 0 };
 
 		msgout.li = 0;
-		msgout.mode = sntp->mode == 1 ? 1 : 4; // 4: server
+		msgout.mode = 4; // 4: server
 		msgout.vn = 3;
 		msgout.precision = -18; // 3.8us
 		msgout.stratum = 2;
