@@ -205,7 +205,8 @@ void ipv4::operator()()
 		int payload_size = size - header_size;
 
 		if (pkt_dst != myip) {
-			if (forward) {
+			// do not forward multicast
+			if (forward && (pkt_dst[0] & 0xf0) != 224) {
 				CDOLOG(ll_debug, pkt->get_log_prefix().c_str(), "forwarding packet to router\n");
 
 				r->route_packet({ }, 0x0800, pkt_dst, pkt->get_src_mac_addr(), pkt_src, p, size);
