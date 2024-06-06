@@ -135,27 +135,24 @@ void arp::operator()()
 
 			any_addr work_ip = SPA;
 
-			// for me?
-			if (dst_mac == my_mac) {
-				any_addr work_mac;
+			any_addr work_mac;
 
-				if (ether_type == 0x0800)
-					work_mac = any_addr(any_addr::mac,  &p[sha_offset]);
-				else if (ether_type == 0x08ff || ether_type == 0x00cc)  // AX.25
-					work_mac = any_addr(any_addr::ax25, &p[sha_offset]);
-				else
-					DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
+			if (ether_type == 0x0800)
+				work_mac = any_addr(any_addr::mac,  &p[sha_offset]);
+			else if (ether_type == 0x08ff || ether_type == 0x00cc)  // AX.25
+				work_mac = any_addr(any_addr::ax25, &p[sha_offset]);
+			else
+				DOLOG(ll_error, "ARP: unexpected ether-type %04x\n", ether_type);
 
-				DOLOG(ll_debug, "arp::operator: received arp-reply for %s (is at %s)\n", work_ip.to_str().c_str(), work_mac.to_str().c_str());
+			DOLOG(ll_debug, "arp::operator: received arp-reply for %s (is at %s)\n", work_ip.to_str().c_str(), work_mac.to_str().c_str());
 
-				std::unique_lock lck(work_lock);
+			std::unique_lock lck(work_lock);
 
-				auto it = work.find(work_ip);  // IP to resolve
-				if (it != work.end())
-					it->second = mac_resolver_result({ work_mac });
+			auto it = work.find(work_ip);  // IP to resolve
+			if (it != work.end())
+				it->second = mac_resolver_result({ work_mac });
 
-				work_cv.notify_all();
-			}
+			work_cv.notify_all();
 		}
 
 		delete pkt;
