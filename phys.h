@@ -88,3 +88,5 @@ public:
 
 	virtual void operator()() = 0;
 };
+
+bool process_ethernet_frame(const timespec & ts, const std::vector<uint8_t> & buffer, std::map<uint16_t, network_layer *> *const prot_map, router *const r, phys *const source_phys);
