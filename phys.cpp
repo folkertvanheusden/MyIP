@@ -181,12 +181,11 @@ bool process_ethernet_frame(const timespec & ts, const std::vector<uint8_t> & bu
 
 	auto it = prot_map->find(ether_type);
 	if (it == prot_map->end()) {
-		CDOLOG(ll_info, "[tap]", "dropping ethernet packet with ether type %04x (= unknown) and size %zu\n", ether_type, buffer.size());
+		CDOLOG(ll_info, "[EthernetFrame]", "dropping ethernet packet with ether type %04x (= unknown) and size %zu\n", ether_type, buffer.size());
 		return false;
 	}
 
 	any_addr dst_mac(any_addr::mac, buffer.data() + 0);
-
 	any_addr src_mac(any_addr::mac, buffer.data() + 6);
 
 	CDOLOG(ll_debug, "[EthernetFrame]", "queing packet from %s to %s with ether type %04x and size %zu\n", src_mac.to_str().c_str(), dst_mac.to_str().c_str(), ether_type, buffer.size());
