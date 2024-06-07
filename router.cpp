@@ -275,6 +275,21 @@ void router::operator()()
 			if (dst_route && src_route) {
 				DOLOG(ll_debug, "src_route and dst_route known\n");
 
+				// check for broadcasts packets and set dst mac accordingly
+				if (po.value()->dst_mac.has_value() == false && po.value()->ether_type == 0x0800 && dst_route != nullptr) {
+					uint8_t temp[4] { };
+					for(int i=0; i<4; i++)
+						temp[i] = dst_route->local_ip[i] | ~dst_route->mask.ipv4_netmask[i];
+					any_addr bc_address(any_addr::ipv4, temp);
+
+					if (po.value()->dst_ip.value() == bc_address) {
+						DOLOG(ll_debug, "Target IPv4 address (%s) is broadcast address, overriding destination mac address\n", po.value()->dst_ip.value().to_str().c_str());
+
+						constexpr const uint8_t mac_bc[] {  0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+						po.value()->dst_mac = any_addr(any_addr::mac, mac_bc);
+					}
+				}
+
 				// destination ip known
 				if (po.value()->dst_mac.has_value())
 					// destination mac known

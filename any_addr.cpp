@@ -188,6 +188,13 @@ const uint8_t & any_addr::operator[](const int index) const
 	return addr[index];
 }
 
+void any_addr::set(const int index, const uint8_t value)
+{
+	assert(index < addr_size);
+
+	addr[index] = value;
+}
+
 uint64_t any_addr::get_hash() const
 {
 	assert(set_);
