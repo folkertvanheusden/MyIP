@@ -18,7 +18,6 @@ private:
 	std::mutex        send_lock;
 
 	const std::string descriptor;
-	const any_addr    my_callsign;
 	std::optional<std::pair<std::string, int> > beacon;
 	const bool        add_callsign_repeaters { false };
 
@@ -33,7 +32,7 @@ private:
 	void handle_kiss(const int fd);
 
 public:
-	phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r, const bool add_callsign_repeaters);
+	phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_mac, std::optional<std::pair<std::string, int> > beacon, router *const r, const bool add_callsign_repeaters);
 	phys_kiss(const phys_kiss &) = delete;
 	virtual ~phys_kiss();
 
