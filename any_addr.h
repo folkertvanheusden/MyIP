@@ -47,6 +47,7 @@ public:
 	uint64_t get_hash() const;
 
 	void set(const addr_family af, const uint8_t src[]);
+	void set(const int index, const uint8_t value);
 
 	std::string to_str() const;
 };
