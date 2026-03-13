@@ -1,11 +1,11 @@
 // (C) 2020-2023 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 
 #include <algorithm>
-#include <errno.h>
+#include <cerrno>
+#include <cstring>
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
-#include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <linux/if.h>

@@ -311,7 +311,7 @@ void router::operator()()
 							interface = local_adapter_target_mac_dst.value().first;
 						}
 						else {
-							DOLOG(ll_warning, "cannot find router mac/interface\n");
+							DOLOG(ll_warning, "cannot find default gateway mac/interface\n");
 							break;
 						}
 					}
