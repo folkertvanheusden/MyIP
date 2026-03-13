@@ -128,13 +128,14 @@ int setup_accept_socket(const std::string & listen_addr, const int listen_port)
 	return fd;
 }
 
-phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_callsign, std::optional<std::pair<std::string, int> > beacon, router *const r, const bool add_callsign_repeaters) :
+phys_kiss::phys_kiss(const size_t dev_index, stats *const s, const std::string & descr, const any_addr & my_mac_in, std::optional<std::pair<std::string, int> > beacon, router *const r, const bool add_callsign_repeaters) :
 	phys(dev_index, s, "kiss-" + descr, r),
 	descriptor(descr),
-	my_callsign(my_callsign),
 	beacon(beacon),
 	add_callsign_repeaters(add_callsign_repeaters)
 {
+	my_mac = my_mac_in;
+
 	auto parts = split(descriptor, ":");
 
 	if (parts.at(0) == "tcp-server") {
@@ -328,7 +329,7 @@ void phys_kiss::send_beacon()
 
 	while(!stop_flag) {
 		ax25_packet a;
-		a.set_from   (my_callsign);
+		a.set_from   (my_mac);
 		a.set_to     ("IDENT", 0, true, false);
 		a.set_control(0x03);  // unnumbered information/frame
 		a.set_data   (reinterpret_cast<const uint8_t *>(beacon.value().first.c_str()), beacon.value().first.size());
@@ -637,7 +638,7 @@ void phys_kiss::handle_kiss(const int cfd)
 
 			std::optional<any_addr> add_callsign;
 			if (add_callsign_repeaters)
-				add_callsign = my_callsign;
+				add_callsign = my_mac;
 			ok = process_kiss_packet(ts, payload_v, &prot_map, r, this, add_callsign);
 		}
 

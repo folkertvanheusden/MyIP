@@ -1,6 +1,5 @@
 // (C) 2020-2024 by folkert van heusden <mail@vanheusden.com>, released under Apache License v2.0
 #include <chrono>
-#include <bsd/sys/time.h>
 
 #include "icmp4.h"
 #include "ipv4.h"
