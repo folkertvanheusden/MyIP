@@ -441,7 +441,6 @@ void tcp::packet_handler(packet *const pkt)
 		std::shared_lock<std::shared_mutex> lck(sessions_lock);
 
 		auto cur_it = sessions.find(id);
-
 		if (cur_it == sessions.end()) {
 			delete_entry = true;
 
@@ -450,6 +449,11 @@ void tcp::packet_handler(packet *const pkt)
 			delete pkt;
 			stats_inc_counter(tcp_errors);
 			main_packet_handling.insert(get_us() - start);
+			return;
+		}
+
+		if (header_size > size) {
+			DOLOG(ll_info, "%s: header with options > packet size [F]\n", pkt->get_log_prefix().c_str());
 			return;
 		}
 
@@ -468,8 +472,11 @@ void tcp::packet_handler(packet *const pkt)
 
 			if (cur_extra_headers_p[0] == 0 || cur_extra_headers_p[0] == 1) // 1-byte?
 				cur_extra_headers_p++;
-			else
+			else {
 				cur_extra_headers_p += cur_extra_headers_p[1];
+				if (cur_extra_headers_p[1] == 0)
+					return;
+			}
 		}
 
 		tcp_session *const cur_session = dynamic_cast<tcp_session *>(cur_it->second);
@@ -483,11 +490,6 @@ void tcp::packet_handler(packet *const pkt)
 		cur_session->window_size = std::max(1, win_size);
 
 		bool fail = false;
-
-		if (header_size > size) {
-			DOLOG(ll_info, "%s: header with options > packet size [F]\n", pkt->get_log_prefix().c_str());
-			fail = true;
-		}
 
 		if (!fail) {
 			if (flag_rst) {
@@ -770,8 +772,10 @@ void tcp::session_cleaner()
 			std::unique_lock<std::mutex> cur_session_lock(s->session_lock);
 
 			// client sessions take care of cleaning-up themselves during session setup
-			if (s->in_init)
+			if (s->in_init) {
+				it++;
 				continue;
+			}
 
 			std::string log_prefix = myformat("TCP[%012" PRIx64 "]", it->first);
 
