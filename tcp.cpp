@@ -969,7 +969,7 @@ bool tcp::send_data(session *const ts_in, const uint8_t *const data, const size_
 			break;
 		}
 
-		if (ts->get_is_terminating() == false) {
+		if (ts->get_is_terminating() == true) {
 			lck.unlock();
 			break;
 		}
