@@ -886,15 +886,6 @@ void tcp::session_ender()
 		DOLOG(ll_debug, "tcp::session_ender: ending \"%s\"\n", session->to_str().c_str());
 
 		// call session_closed_2
-		int close_port       = session->get_my_port();
-
-		auto cb_org          = get_lock_listener(close_port, "tcp::session_ender", false);
-
-		if (cb_org.has_value())  // is session initiated here?
-			cb_org.value().session_closed_2(this, session);
-		else
-			DOLOG(ll_info, "tcp::session_ender: port %d not known\n", close_port);
-
 		release_listener_lock(false);
 
 		// clean-up
