@@ -833,7 +833,7 @@ void tcp::unacked_sender()
 
 			// last packet >= 1s ago?
 			if (now - s->r_last_pkt_ts >= 1000000) {
-				int to_send = std::min(s->window_size - s->data_since_last_ack, s->unacked_size);
+				int to_send = std::min(s->window_size - ssize_t(s->data_since_last_ack), ssize_t(s->unacked_size));
 				int packet_size = idev->get_max_packet_size() - (20 + 12 /* timestamp option + padding */);
 
 				uint32_t resend_nr = s->my_seq_nr;
