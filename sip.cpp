@@ -162,6 +162,11 @@ void sip::input(const any_addr & src_ip, int src_port, const any_addr & dst_ip, 
 
 	std::vector<std::string> header_lines = split(header_body.at(0), "\r\n");
 
+	if (header_lines.empty()) {
+		DOLOG(ll_info, "SIP: no header line in request\n");
+		return;
+	}
+
 	std::vector<std::string> parts = split(header_lines.at(0), " ");
 
 	stats_inc_counter(sip_requests);

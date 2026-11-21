@@ -171,7 +171,7 @@ bool process_ethernet_frame(const timespec & ts, const std::vector<uint8_t> & bu
 	uint16_t ether_type = (buffer[12] << 8) | buffer[13];
 
 	if (ether_type == 0x08ff) {  // special case for BPQ
-		if (buffer.size() > 16) {
+		if (buffer.size() > 32) {
 			process_kiss_packet(ts, std::vector<uint8_t>(buffer.data() + 16, buffer.data() + buffer.size() - 16), prot_map, r, source_phys, { });
 			return true;
 		}
